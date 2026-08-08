@@ -23,7 +23,12 @@ public enum ErrorCode {
     ONBOARDING_NOT_FOUND(HttpStatus.NOT_FOUND, "온보딩 정보를 찾을 수 없습니다"),
 
     // Home
-    RECENT_TRAINING_NOT_FOUND(HttpStatus.NOT_FOUND, "이어할 학습 기록이 없습니다.");
+    RECENT_TRAINING_NOT_FOUND(HttpStatus.NOT_FOUND, "이어할 학습 기록이 없습니다."),
+
+    // Practice Content
+    CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "학습 콘텐츠를 찾을 수 없습니다"),
+    REFERENCE_AUDIO_NOT_FOUND(HttpStatus.NOT_FOUND, "기준 음성을 찾을 수 없습니다"),
+    NEXT_CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "조건에 맞는 다음 콘텐츠가 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;
