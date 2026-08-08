@@ -70,7 +70,9 @@ storage/
 tmp/
 temp/
 *.tmp
+/*.js
 
 ### Local Codex notes ###
 AGENTS.md
 .codex/
+.codex_backup_*/
