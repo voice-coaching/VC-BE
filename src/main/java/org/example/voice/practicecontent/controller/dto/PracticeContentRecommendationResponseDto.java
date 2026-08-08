@@ -1,4 +1,4 @@
 package org.example.voice.practicecontent.controller.dto;
 
-public record ReferenceAudioResponse() {
+public record PracticeContentRecommendationResponseDto() {
 }

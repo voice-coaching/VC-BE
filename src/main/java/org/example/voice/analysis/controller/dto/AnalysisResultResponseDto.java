@@ -1,4 +1,4 @@
 package org.example.voice.analysis.controller.dto;
 
-public record AnalysisStatusResponse() {
+public record AnalysisResultResponseDto() {
 }

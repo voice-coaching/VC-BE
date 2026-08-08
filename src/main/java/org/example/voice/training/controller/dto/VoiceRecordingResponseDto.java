@@ -1,4 +1,4 @@
 package org.example.voice.training.controller.dto;
 
-public record TrainingSessionCreateRequest() {
+public record VoiceRecordingResponseDto() {
 }

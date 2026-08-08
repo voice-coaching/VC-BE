@@ -1,4 +1,4 @@
 package org.example.voice.course.controller.dto;
 
-public record CourseProgressUpdateRequest() {
+public record CourseStepResponseDto() {
 }
