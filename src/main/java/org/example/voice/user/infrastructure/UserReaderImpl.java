@@ -1,6 +1,6 @@
 package org.example.voice.user.infrastructure;
 
-import org.example.voice.user.domain.UserReader;
+import org.example.voice.user.domain.port.UserReader;
 import org.springframework.stereotype.Repository;
 
 @Repository

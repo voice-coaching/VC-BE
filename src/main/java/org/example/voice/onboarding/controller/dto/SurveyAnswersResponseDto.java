@@ -1,6 +1,6 @@
 package org.example.voice.onboarding.controller.dto;
 
-import org.example.voice.onboarding.domain.SurveyAnswers;
+import org.example.voice.onboarding.domain.entity.SurveyAnswers;
 
 import java.util.List;
 

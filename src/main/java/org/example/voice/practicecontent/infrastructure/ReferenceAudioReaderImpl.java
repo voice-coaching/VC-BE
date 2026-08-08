@@ -1,6 +1,6 @@
 package org.example.voice.practicecontent.infrastructure;
 
-import org.example.voice.practicecontent.domain.ReferenceAudioReader;
+import org.example.voice.practicecontent.domain.port.ReferenceAudioReader;
 import org.springframework.stereotype.Repository;
 
 @Repository

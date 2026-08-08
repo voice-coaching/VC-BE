@@ -1,6 +1,6 @@
 package org.example.voice.training.infrastructure;
 
-import org.example.voice.training.domain.TrainingSessionWriter;
+import org.example.voice.training.domain.port.TrainingSessionWriter;
 import org.springframework.stereotype.Repository;
 
 @Repository

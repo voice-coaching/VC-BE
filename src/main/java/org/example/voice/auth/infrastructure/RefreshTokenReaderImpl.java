@@ -1,6 +1,6 @@
 package org.example.voice.auth.infrastructure;
 
-import org.example.voice.auth.domain.RefreshTokenReader;
+import org.example.voice.auth.domain.port.RefreshTokenReader;
 import org.springframework.stereotype.Repository;
 
 @Repository
