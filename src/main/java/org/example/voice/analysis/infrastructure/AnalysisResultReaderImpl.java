@@ -1,6 +1,6 @@
 package org.example.voice.analysis.infrastructure;
 
-import org.example.voice.analysis.domain.AnalysisResultReader;
+import org.example.voice.analysis.domain.port.AnalysisResultReader;
 import org.springframework.stereotype.Repository;
 
 @Repository

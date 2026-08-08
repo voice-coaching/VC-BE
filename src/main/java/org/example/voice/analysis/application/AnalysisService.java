@@ -1,7 +1,7 @@
 package org.example.voice.analysis.application;
 
 import lombok.RequiredArgsConstructor;
-import org.example.voice.analysis.domain.AnalysisResultReader;
+import org.example.voice.analysis.domain.port.AnalysisResultReader;
 import org.springframework.stereotype.Service;
 
 @Service
