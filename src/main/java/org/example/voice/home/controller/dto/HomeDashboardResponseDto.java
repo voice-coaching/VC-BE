@@ -1,4 +1,4 @@
 package org.example.voice.home.controller.dto;
 
-public record RecommendationResponse() {
+public record HomeDashboardResponseDto() {
 }

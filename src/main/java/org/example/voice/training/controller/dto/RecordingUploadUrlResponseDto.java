@@ -1,4 +1,4 @@
 package org.example.voice.training.controller.dto;
 
-public record RecordingUploadUrlResponse() {
+public record RecordingUploadUrlResponseDto() {
 }
