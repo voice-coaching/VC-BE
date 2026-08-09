@@ -2,10 +2,12 @@ package org.example.voice.course.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.example.voice.course.application.CourseService;
+import org.example.voice.course.application.CourseStepService;
 import org.example.voice.common.response.ApiResponse;
 import org.example.voice.course.controller.dto.CourseDetailResponseDto;
 import org.example.voice.course.controller.dto.CourseListResponseDto;
 import org.example.voice.course.controller.dto.CourseSearchConditionDto;
+import org.example.voice.course.controller.dto.CourseStepResponseDto;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CourseController {
 
     private final CourseService courseService;
+    private final CourseStepService courseStepService;
 
     @GetMapping
     public ApiResponse<CourseListResponseDto> getCourses(
@@ -33,5 +36,12 @@ public class CourseController {
         Long userId = 1L;
         CourseDetailResponseDto response = courseService.getCourse(courseId, userId);
         return ApiResponse.success("클래스 상세 정보를 조회했습니다.", response);
+    }
+
+    @GetMapping("/{courseId}/steps")
+    public ApiResponse<CourseStepResponseDto> getCourseSteps(@PathVariable Long courseId) {
+        Long userId = 1L;
+        CourseStepResponseDto response = courseStepService.getCourseSteps(courseId, userId);
+        return ApiResponse.success("클래스 단계 목록을 조회했습니다.", response);
     }
 }
