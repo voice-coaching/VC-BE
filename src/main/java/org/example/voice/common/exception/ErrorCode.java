@@ -55,7 +55,10 @@ public enum ErrorCode {
     // Course
     COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "클래스를 찾을 수 없습니다."),
     COURSE_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 완료한 클래스입니다."),
-    INVALID_COURSE_STEP(HttpStatus.CONFLICT, "해당 클래스에 포함되지 않은 단계입니다.");
+    COURSE_PROGRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "클래스 시작 기록이 없습니다."),
+    INVALID_PROGRESS_PERCENT(HttpStatus.BAD_REQUEST, "진행률은 0에서 100 사이여야 합니다."),
+    INVALID_COURSE_STEP(HttpStatus.CONFLICT, "해당 클래스에 포함되지 않은 단계입니다."),
+    REQUIRED_STEP_NOT_COMPLETED(HttpStatus.CONFLICT, "완료하지 않은 필수 단계가 있습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;

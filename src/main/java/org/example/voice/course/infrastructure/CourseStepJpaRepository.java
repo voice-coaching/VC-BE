@@ -14,5 +14,9 @@ public interface CourseStepJpaRepository extends JpaRepository<CourseStep, Long>
 
     Optional<CourseStep> findFirstByCourseIdOrderByStepOrderAscIdAsc(Long courseId);
 
+    Optional<CourseStep> findFirstByCourseIdAndRequiredTrueOrderByStepOrderDescIdDesc(Long courseId);
+
+    Optional<CourseStep> findByIdAndCourseId(Long id, Long courseId);
+
     boolean existsByIdAndCourseId(Long id, Long courseId);
 }
