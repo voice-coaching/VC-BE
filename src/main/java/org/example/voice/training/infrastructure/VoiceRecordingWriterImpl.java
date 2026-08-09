@@ -1,8 +1,81 @@
 package org.example.voice.training.infrastructure;
 
+import lombok.RequiredArgsConstructor;
+import org.example.voice.common.exception.BaseException;
+import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.training.domain.entity.TrainingSession;
+import org.example.voice.training.domain.entity.VoiceRecording;
+import org.example.voice.training.domain.model.RecordingSelectionData;
+import org.example.voice.training.domain.model.VoiceRecordingRegisteredData;
 import org.example.voice.training.domain.port.VoiceRecordingWriter;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 
 @Repository
+@RequiredArgsConstructor
 public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
+
+    private final TrainingSessionJpaRepository trainingSessionJpaRepository;
+    private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;
+
+    @Override
+    @Transactional
+    public VoiceRecordingRegisteredData register(
+            Long sessionId,
+            String objectKey,
+            String mimeType,
+            Long fileSizeBytes,
+            Integer durationMs,
+            Integer attemptNo
+    ) {
+        TrainingSession session = trainingSessionJpaRepository.findById(sessionId)
+                .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
+        VoiceRecording recording = voiceRecordingJpaRepository.save(
+                VoiceRecording.create(session, attemptNo, objectKey, mimeType, fileSizeBytes, durationMs)
+        );
+        return new VoiceRecordingRegisteredData(
+                recording.getId(),
+                recording.getAttemptNo(),
+                recording.getQualityStatus(),
+                recording.getSelected(),
+                recording.getCreatedAt()
+        );
+    }
+
+    @Override
+    @Transactional
+    public RecordingSelectionData select(Long sessionId, Long recordingId) {
+        // 한 세션에서는 최종 녹음이 하나만 선택되어야 한다.
+        // 먼저 같은 세션의 선택을 모두 해제하고, 요청받은 녹음 하나만 다시 선택한다.
+        TrainingSession session = trainingSessionJpaRepository.findById(sessionId)
+                .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
+        voiceRecordingJpaRepository
+                .findByTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNullOrderByAttemptNoAsc(
+                        sessionId,
+                        session.getUserId()
+                )
+                .forEach(VoiceRecording::unselect);
+
+        VoiceRecording recording = voiceRecordingJpaRepository.findById(recordingId)
+                .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
+        recording.select();
+        return new RecordingSelectionData(
+                sessionId,
+                recordingId,
+                OffsetDateTime.now(ZoneId.of("Asia/Seoul"))
+        );
+    }
+
+    @Override
+    @Transactional
+    public void delete(Long recordingId) {
+        // 실제 파일/row를 즉시 제거하지 않고 deleted_at만 찍는 soft delete 방식이다.
+        // 추후 스토리지 삭제 worker가 deleted_at 기준으로 물리 파일을 정리할 수 있다.
+        VoiceRecording recording = voiceRecordingJpaRepository.findById(recordingId)
+                .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
+        recording.delete();
+    }
 }
