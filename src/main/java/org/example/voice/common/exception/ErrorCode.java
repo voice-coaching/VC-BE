@@ -53,7 +53,9 @@ public enum ErrorCode {
     RECORDING_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 녹음에 접근할 권한이 없습니다."),
 
     // Course
-    COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "클래스를 찾을 수 없습니다.");
+    COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "클래스를 찾을 수 없습니다."),
+    COURSE_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 완료한 클래스입니다."),
+    INVALID_COURSE_STEP(HttpStatus.CONFLICT, "해당 클래스에 포함되지 않은 단계입니다.");
 
     private final HttpStatus httpStatus;
     private final String message;

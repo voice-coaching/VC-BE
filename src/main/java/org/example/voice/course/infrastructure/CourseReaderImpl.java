@@ -109,8 +109,15 @@ public class CourseReaderImpl implements CourseReader {
                 .map(progress -> new CourseProgressSummaryData(
                         progress.getStatus(),
                         progress.getProgressPercent().doubleValue(),
-                        progress.getLastStepId()
+                        validLastStepId(progress.getLastStepId(), courseId)
                 ))
                 .orElseGet(() -> new CourseProgressSummaryData(CourseProgressStatus.NOT_STARTED, 0.0, null));
+    }
+
+    private Long validLastStepId(Long lastStepId, Long courseId) {
+        if (lastStepId == null) {
+            return null;
+        }
+        return courseStepJpaRepository.existsByIdAndCourseId(lastStepId, courseId) ? lastStepId : null;
     }
 }

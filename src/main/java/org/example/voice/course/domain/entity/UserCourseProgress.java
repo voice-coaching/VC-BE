@@ -54,4 +54,17 @@ public class UserCourseProgress {
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    public static UserCourseProgress start(Course course, Long userId, Long firstStepId, OffsetDateTime now) {
+        UserCourseProgress progress = new UserCourseProgress();
+        progress.course = course;
+        progress.userId = userId;
+        progress.status = CourseProgressStatus.IN_PROGRESS;
+        progress.lastStepId = firstStepId;
+        progress.progressPercent = BigDecimal.ZERO;
+        progress.startedAt = now;
+        progress.completedAt = null;
+        progress.updatedAt = now;
+        return progress;
+    }
 }
