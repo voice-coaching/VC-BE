@@ -1,222 +1,120 @@
 package org.example.voice.practicecontent.infrastructure;
 
-import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.practicecontent.controller.dto.PracticeContentNextConditionDto;
 import org.example.voice.practicecontent.controller.dto.PracticeContentQueryConditionDto;
+import org.example.voice.practicecontent.domain.entity.PracticeContent;
 import org.example.voice.practicecontent.domain.model.PracticeContentDetailData;
 import org.example.voice.practicecontent.domain.model.PracticeContentPageData;
 import org.example.voice.practicecontent.domain.model.PracticeContentSummaryData;
 import org.example.voice.practicecontent.domain.port.PracticeContentReader;
-import org.example.voice.practicecontent.domain.type.ContentType;
-import org.example.voice.practicecontent.domain.type.Difficulty;
-import org.example.voice.practicecontent.domain.type.LearningFocus;
+import org.example.voice.practicecontent.domain.type.PublishStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PracticeContentReaderImpl implements PracticeContentReader {
 
-    private final EntityManager entityManager;
-    private final ObjectMapper objectMapper;
+    private final PracticeContentJpaRepository practiceContentJpaRepository;
+    private final ReferenceAudioJpaRepository referenceAudioJpaRepository;
 
     @Override
     public PracticeContentPageData<PracticeContentSummaryData> findPracticeContents(PracticeContentQueryConditionDto condition) {
-        QueryParts queryParts = buildPracticeContentQuery(condition);
-
-        @SuppressWarnings("unchecked")
-        List<Object[]> rows = entityManager.createNativeQuery("""
-                        select
-                            pc.id,
-                            pc.content_type,
-                            pc.title,
-                            pc.category,
-                            pc.difficulty,
-                            pc.estimated_seconds,
-                            pc.script_text
-                        from practice_contents pc
-                        %s
-                        order by pc.published_at desc nulls last, pc.created_at desc
-                        limit :limit offset :offset
-                        """.formatted(queryParts.whereClause()))
-                .setParameter("limit", condition.size())
-                .setParameter("offset", condition.page() * condition.size())
-                .unwrap(org.hibernate.query.NativeQuery.class)
-                .setProperties(queryParts.parameters())
-                .getResultList();
-
-        Number totalElements = (Number) entityManager.createNativeQuery("""
-                        select count(*)
-                        from practice_contents pc
-                        %s
-                        """.formatted(queryParts.whereClause()))
-                .unwrap(org.hibernate.query.NativeQuery.class)
-                .setProperties(queryParts.parameters())
-                .getSingleResult();
-
-        List<PracticeContentSummaryData> items = rows.stream()
+        PageRequest pageRequest = PageRequest.of(
+                condition.page(),
+                condition.size(),
+                Sort.by(Sort.Order.desc("publishedAt").nullsLast(), Sort.Order.desc("createdAt"))
+        );
+        Page<PracticeContent> page = practiceContentJpaRepository.findAll(searchSpec(condition), pageRequest);
+        List<PracticeContentSummaryData> items = page.getContent().stream()
                 .map(this::toSummaryData)
                 .toList();
-        return PracticeContentPageData.of(items, condition.page(), condition.size(), totalElements.longValue());
+        return PracticeContentPageData.of(items, page.getNumber(), page.getSize(), page.getTotalElements());
     }
 
     @Override
     public Optional<PracticeContentDetailData> findPracticeContent(Long contentId) {
-        @SuppressWarnings("unchecked")
-        List<Object[]> rows = entityManager.createNativeQuery("""
-                        select
-                            pc.id,
-                            pc.content_type,
-                            pc.learning_focus,
-                            pc.category,
-                            pc.title,
-                            pc.description,
-                            pc.script_text,
-                            pc.difficulty,
-                            pc.target_pronunciations,
-                            pc.estimated_seconds,
-                            exists (
-                                select 1
-                                from reference_audios ra
-                                where ra.content_id = pc.id
-                            ) as reference_audio_available
-                        from practice_contents pc
-                        where pc.id = :contentId
-                          and pc.status = 'PUBLISHED'
-                        """)
-                .setParameter("contentId", contentId)
-                .getResultList();
-
-        return rows.stream()
-                .findFirst()
-                .map(row -> new PracticeContentDetailData(
-                        toLong(row[0]),
-                        ContentType.valueOf((String) row[1]),
-                        LearningFocus.valueOf((String) row[2]),
-                        (String) row[3],
-                        (String) row[4],
-                        (String) row[5],
-                        (String) row[6],
-                        Difficulty.valueOf((String) row[7]),
-                        parseStringList(row[8]),
-                        toInteger(row[9]),
-                        (Boolean) row[10]
+        return practiceContentJpaRepository.findById(contentId)
+                .filter(PracticeContent::isPublished)
+                .map(content -> new PracticeContentDetailData(
+                        content.getId(),
+                        content.getContentType(),
+                        content.getLearningFocus(),
+                        content.getCategory(),
+                        content.getTitle(),
+                        content.getDescription(),
+                        content.getScriptText(),
+                        content.getDifficulty(),
+                        content.getTargetPronunciations() == null ? List.of() : content.getTargetPronunciations(),
+                        content.getEstimatedSeconds(),
+                        referenceAudioJpaRepository.existsByContentId(content.getId())
                 ));
     }
 
     @Override
     public Optional<PracticeContentSummaryData> findNextPracticeContent(PracticeContentNextConditionDto condition) {
-        QueryParts queryParts = buildNextContentQuery(condition);
-
-        @SuppressWarnings("unchecked")
-        List<Object[]> rows = entityManager.createNativeQuery("""
-                        select
-                            pc.id,
-                            pc.content_type,
-                            pc.title,
-                            pc.category,
-                            pc.difficulty,
-                            pc.estimated_seconds,
-                            pc.script_text
-                        from practice_contents pc
-                        %s
-                        order by pc.id asc
-                        limit 1
-                        """.formatted(queryParts.whereClause()))
-                .unwrap(org.hibernate.query.NativeQuery.class)
-                .setProperties(queryParts.parameters())
-                .getResultList();
-
-        return rows.stream()
+        Page<PracticeContent> page = practiceContentJpaRepository.findAll(nextSpec(condition), PageRequest.of(0, 1, Sort.by("id").ascending()));
+        return page.getContent().stream()
                 .findFirst()
                 .map(this::toSummaryData);
     }
 
-    private QueryParts buildPracticeContentQuery(PracticeContentQueryConditionDto condition) {
-        List<String> conditions = new ArrayList<>();
-        java.util.Map<String, Object> parameters = new java.util.HashMap<>();
-        conditions.add("pc.status = 'PUBLISHED'");
-        if (condition.type() != null) {
-            conditions.add("pc.content_type = :type");
-            parameters.put("type", condition.type().name());
-        }
-        if (condition.category() != null && !condition.category().isBlank()) {
-            conditions.add("pc.category = :category");
-            parameters.put("category", condition.category());
-        }
-        if (condition.difficulty() != null) {
-            conditions.add("pc.difficulty = :difficulty");
-            parameters.put("difficulty", condition.difficulty().name());
-        }
-        if (condition.focus() != null) {
-            conditions.add("pc.learning_focus = :focus");
-            parameters.put("focus", condition.focus().name());
-        }
-        return new QueryParts("where " + String.join(" and ", conditions), parameters);
+    private Specification<PracticeContent> searchSpec(PracticeContentQueryConditionDto condition) {
+        return (root, query, criteriaBuilder) -> {
+            var predicate = criteriaBuilder.equal(root.get("status"), PublishStatus.PUBLISHED);
+            if (condition.type() != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("contentType"), condition.type()));
+            }
+            if (condition.category() != null && !condition.category().isBlank()) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("category"), condition.category()));
+            }
+            if (condition.difficulty() != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("difficulty"), condition.difficulty()));
+            }
+            if (condition.focus() != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("learningFocus"), condition.focus()));
+            }
+            return predicate;
+        };
     }
 
-    private QueryParts buildNextContentQuery(PracticeContentNextConditionDto condition) {
-        List<String> conditions = new ArrayList<>();
-        java.util.Map<String, Object> parameters = new java.util.HashMap<>();
-        conditions.add("pc.status = 'PUBLISHED'");
-        conditions.add("pc.content_type = :type");
-        parameters.put("type", condition.type().name());
-        if (condition.category() != null && !condition.category().isBlank()) {
-            conditions.add("pc.category = :category");
-            parameters.put("category", condition.category());
-        }
-        if (condition.difficulty() != null) {
-            conditions.add("pc.difficulty = :difficulty");
-            parameters.put("difficulty", condition.difficulty().name());
-        }
-        if (condition.excludeId() != null) {
-            conditions.add("pc.id <> :excludeId");
-            parameters.put("excludeId", condition.excludeId());
-        }
-        return new QueryParts("where " + String.join(" and ", conditions), parameters);
+    private Specification<PracticeContent> nextSpec(PracticeContentNextConditionDto condition) {
+        return (root, query, criteriaBuilder) -> {
+            var predicate = criteriaBuilder.and(
+                    criteriaBuilder.equal(root.get("status"), PublishStatus.PUBLISHED),
+                    criteriaBuilder.equal(root.get("contentType"), condition.type())
+            );
+            if (condition.category() != null && !condition.category().isBlank()) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("category"), condition.category()));
+            }
+            if (condition.difficulty() != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("difficulty"), condition.difficulty()));
+            }
+            if (condition.excludeId() != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.notEqual(root.get("id"), condition.excludeId()));
+            }
+            return predicate;
+        };
     }
 
-    private PracticeContentSummaryData toSummaryData(Object[] row) {
+    private PracticeContentSummaryData toSummaryData(PracticeContent content) {
         return new PracticeContentSummaryData(
-                toLong(row[0]),
-                ContentType.valueOf((String) row[1]),
-                (String) row[2],
-                (String) row[3],
-                Difficulty.valueOf((String) row[4]),
-                toInteger(row[5]),
-                (String) row[6]
+                content.getId(),
+                content.getContentType(),
+                content.getTitle(),
+                content.getCategory(),
+                content.getDifficulty(),
+                content.getEstimatedSeconds(),
+                content.getScriptText()
         );
-    }
-
-    private List<String> parseStringList(Object value) {
-        if (value == null) {
-            return List.of();
-        }
-        try {
-            return objectMapper.readValue(value.toString(), new TypeReference<>() {
-            });
-        } catch (Exception exception) {
-            return List.of();
-        }
-    }
-
-    private Long toLong(Object value) {
-        return value == null ? null : ((Number) value).longValue();
-    }
-
-    private Integer toInteger(Object value) {
-        return value == null ? null : ((Number) value).intValue();
-    }
-
-    private record QueryParts(
-            String whereClause,
-            java.util.Map<String, Object> parameters
-    ) {
     }
 }

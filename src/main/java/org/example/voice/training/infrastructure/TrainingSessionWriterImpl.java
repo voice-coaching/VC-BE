@@ -1,8 +1,78 @@
 package org.example.voice.training.infrastructure;
 
+import lombok.RequiredArgsConstructor;
+import org.example.voice.common.exception.BaseException;
+import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.practicecontent.domain.entity.PracticeContent;
+import org.example.voice.practicecontent.domain.type.LearningFocus;
+import org.example.voice.practicecontent.infrastructure.PracticeContentJpaRepository;
+import org.example.voice.training.domain.entity.TrainingSession;
+import org.example.voice.training.domain.entity.VoiceRecording;
+import org.example.voice.training.domain.model.TrainingSessionCancellationData;
+import org.example.voice.training.domain.model.TrainingSessionCompletionData;
+import org.example.voice.training.domain.model.TrainingSessionCreatedData;
 import org.example.voice.training.domain.port.TrainingSessionWriter;
+import org.example.voice.training.domain.type.TrainingSessionStatus;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
+@RequiredArgsConstructor
 public class TrainingSessionWriterImpl implements TrainingSessionWriter {
+
+    private final PracticeContentJpaRepository practiceContentJpaRepository;
+    private final TrainingSessionJpaRepository trainingSessionJpaRepository;
+    private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;
+
+    @Override
+    @Transactional
+    public TrainingSessionCreatedData create(Long userId, Long contentId, Long courseStepId, LearningFocus learningFocus) {
+        PracticeContent content = practiceContentJpaRepository.findById(contentId)
+                .orElseThrow(() -> new BaseException(ErrorCode.CONTENT_NOT_FOUND));
+        TrainingSession session = trainingSessionJpaRepository.save(
+                TrainingSession.create(userId, content, courseStepId, learningFocus)
+        );
+        return new TrainingSessionCreatedData(
+                session.getId(),
+                session.getContent().getId(),
+                session.getCourseStepId(),
+                session.getLearningFocus(),
+                session.getStatus(),
+                session.getStartedAt()
+        );
+    }
+
+    @Override
+    @Transactional
+    public void updateStatus(Long sessionId, TrainingSessionStatus status) {
+        TrainingSession session = trainingSessionJpaRepository.findById(sessionId)
+                .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
+        session.updateStatus(status);
+    }
+
+    @Override
+    @Transactional
+    public TrainingSessionCompletionData complete(Long sessionId, Integer totalLearningSeconds) {
+        TrainingSession session = trainingSessionJpaRepository.findById(sessionId)
+                .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
+        session.complete(totalLearningSeconds);
+        return new TrainingSessionCompletionData(session.getId(), session.getStatus(), session.getCompletedAt());
+    }
+
+    @Override
+    @Transactional
+    public TrainingSessionCancellationData cancel(Long sessionId) {
+        TrainingSession session = trainingSessionJpaRepository.findById(sessionId)
+                .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
+        session.cancel();
+        voiceRecordingJpaRepository
+                .findByTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNullOrderByAttemptNoAsc(
+                        sessionId,
+                        session.getUserId()
+                )
+                .stream()
+                .filter(recording -> !recording.getSelected())
+                .forEach(VoiceRecording::delete);
+        return new TrainingSessionCancellationData(session.getId(), session.getStatus(), session.getCompletedAt());
+    }
 }

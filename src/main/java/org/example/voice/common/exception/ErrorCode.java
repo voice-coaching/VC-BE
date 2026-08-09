@@ -9,26 +9,48 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     // Common
-    INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "잘못된 입력값입니다"),
-    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다"),
-    ACCESS_DENIED(HttpStatus.FORBIDDEN, "접근 권한이 없습니다"),
-    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다"),
+    INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "잘못된 입력값입니다."),
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요하거나 Access Token이 만료되었습니다."),
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
 
     // User
-    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다"),
-    NICKNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다"),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    NICKNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
 
     // Onboarding
-    REQUIRED_ANSWER_MISSING(HttpStatus.BAD_REQUEST, "필수 설문 항목이 누락되었습니다"),
-    ONBOARDING_NOT_FOUND(HttpStatus.NOT_FOUND, "온보딩 정보를 찾을 수 없습니다"),
+    REQUIRED_ANSWER_MISSING(HttpStatus.BAD_REQUEST, "필수 설문 항목이 누락되었습니다."),
+    ONBOARDING_NOT_FOUND(HttpStatus.NOT_FOUND, "온보딩 정보를 찾을 수 없습니다."),
 
     // Home
     RECENT_TRAINING_NOT_FOUND(HttpStatus.NOT_FOUND, "이어할 학습 기록이 없습니다."),
 
     // Practice Content
-    CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "학습 콘텐츠를 찾을 수 없습니다"),
-    REFERENCE_AUDIO_NOT_FOUND(HttpStatus.NOT_FOUND, "기준 음성을 찾을 수 없습니다"),
-    NEXT_CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "조건에 맞는 다음 콘텐츠가 없습니다.");
+    CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "학습 콘텐츠를 찾을 수 없습니다."),
+    REFERENCE_AUDIO_NOT_FOUND(HttpStatus.NOT_FOUND, "기준 음성을 찾을 수 없습니다."),
+    NEXT_CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "조건에 맞는 다음 콘텐츠가 없습니다."),
+
+    // Training
+    CONTENT_NOT_AVAILABLE(HttpStatus.CONFLICT, "현재 학습할 수 없는 콘텐츠입니다."),
+    TRAINING_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "학습 세션을 찾을 수 없습니다."),
+    RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
+    UNSUPPORTED_AUDIO_FORMAT(HttpStatus.BAD_REQUEST, "지원하지 않는 음성 파일 형식입니다."),
+    AUDIO_FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "업로드 가능한 파일 크기를 초과했습니다."),
+    UPLOADED_OBJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "업로드된 음성 파일을 찾을 수 없습니다."),
+    RECORDING_ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 등록된 음성 파일입니다."),
+    RECORDING_NOT_FOUND(HttpStatus.NOT_FOUND, "녹음 파일을 찾을 수 없습니다."),
+    RECORDING_QUALITY_FAILED(HttpStatus.CONFLICT, "음질 검사를 통과하지 못한 녹음입니다."),
+    SELECTED_RECORDING_CANNOT_DELETE(HttpStatus.CONFLICT, "최종 선택된 녹음은 먼저 선택을 해제해야 합니다."),
+    ANALYZED_RECORDING_CANNOT_DELETE(HttpStatus.CONFLICT, "분석 완료된 녹음은 학습 기록 삭제 API를 이용해 주세요."),
+    SELECTED_RECORDING_NOT_FOUND(HttpStatus.CONFLICT, "분석할 최종 녹음을 선택해 주세요."),
+    AUDIO_QUALITY_NOT_ACCEPTABLE(HttpStatus.UNPROCESSABLE_ENTITY, "음질이 낮아 분석할 수 없습니다. 다시 녹음해 주세요."),
+    ANALYSIS_ALREADY_RUNNING(HttpStatus.CONFLICT, "이미 분석이 진행 중입니다."),
+    ANALYSIS_NOT_FOUND(HttpStatus.NOT_FOUND, "분석 요청 기록이 없습니다."),
+    ANALYSIS_NOT_FAILED(HttpStatus.CONFLICT, "실패한 분석만 재시도할 수 있습니다."),
+    MAX_RETRY_EXCEEDED(HttpStatus.CONFLICT, "분석 재시도 가능 횟수를 초과했습니다."),
+    ANALYSIS_NOT_COMPLETED(HttpStatus.CONFLICT, "분석이 완료된 후 학습을 종료할 수 있습니다."),
+    SESSION_ALREADY_FINISHED(HttpStatus.CONFLICT, "이미 종료된 학습 세션입니다."),
+    RECORDING_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 녹음에 접근할 권한이 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;
