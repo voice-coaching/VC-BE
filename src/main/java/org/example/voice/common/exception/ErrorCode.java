@@ -50,7 +50,15 @@ public enum ErrorCode {
     MAX_RETRY_EXCEEDED(HttpStatus.CONFLICT, "분석 재시도 가능 횟수를 초과했습니다."),
     ANALYSIS_NOT_COMPLETED(HttpStatus.CONFLICT, "분석이 완료된 후 학습을 종료할 수 있습니다."),
     SESSION_ALREADY_FINISHED(HttpStatus.CONFLICT, "이미 종료된 학습 세션입니다."),
-    RECORDING_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 녹음에 접근할 권한이 없습니다.");
+    RECORDING_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 녹음에 접근할 권한이 없습니다."),
+
+    // Course
+    COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "클래스를 찾을 수 없습니다."),
+    COURSE_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 완료한 클래스입니다."),
+    COURSE_PROGRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "클래스 시작 기록이 없습니다."),
+    INVALID_PROGRESS_PERCENT(HttpStatus.BAD_REQUEST, "진행률은 0에서 100 사이여야 합니다."),
+    INVALID_COURSE_STEP(HttpStatus.CONFLICT, "해당 클래스에 포함되지 않은 단계입니다."),
+    REQUIRED_STEP_NOT_COMPLETED(HttpStatus.CONFLICT, "완료하지 않은 필수 단계가 있습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;

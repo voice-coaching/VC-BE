@@ -54,4 +54,33 @@ public class UserCourseProgress {
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    public static UserCourseProgress start(Course course, Long userId, Long firstStepId, OffsetDateTime now) {
+        UserCourseProgress progress = new UserCourseProgress();
+        progress.course = course;
+        progress.userId = userId;
+        progress.status = CourseProgressStatus.IN_PROGRESS;
+        progress.lastStepId = firstStepId;
+        progress.progressPercent = BigDecimal.ZERO;
+        progress.startedAt = now;
+        progress.completedAt = null;
+        progress.updatedAt = now;
+        return progress;
+    }
+
+    public void updateProgress(Long lastStepId, BigDecimal progressPercent, OffsetDateTime now) {
+        this.lastStepId = lastStepId;
+        this.progressPercent = progressPercent;
+        if (this.status == CourseProgressStatus.NOT_STARTED) {
+            this.status = CourseProgressStatus.IN_PROGRESS;
+        }
+        this.updatedAt = now;
+    }
+
+    public void complete(OffsetDateTime now) {
+        this.status = CourseProgressStatus.COMPLETED;
+        this.progressPercent = BigDecimal.valueOf(100.0);
+        this.completedAt = now;
+        this.updatedAt = now;
+    }
 }
