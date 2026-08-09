@@ -12,4 +12,6 @@ public interface UserCourseProgressJpaRepository extends JpaRepository<UserCours
     Optional<UserCourseProgress> findFirstByUserIdOrderByUpdatedAtDesc(Long userId);
 
     List<UserCourseProgress> findByUserIdAndCourseIdIn(Long userId, Collection<Long> courseIds);
+
+    Optional<UserCourseProgress> findByUserIdAndCourseId(Long userId, Long courseId);
 }

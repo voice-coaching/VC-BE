@@ -4,9 +4,12 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.course.controller.dto.CourseSearchConditionDto;
 import org.example.voice.course.domain.entity.Course;
 import org.example.voice.course.domain.entity.UserCourseProgress;
+import org.example.voice.course.domain.model.CourseDetailData;
 import org.example.voice.course.domain.model.CoursePageData;
+import org.example.voice.course.domain.model.CourseProgressSummaryData;
 import org.example.voice.course.domain.model.CourseSummaryData;
 import org.example.voice.course.domain.port.CourseReader;
+import org.example.voice.course.domain.type.CourseProgressStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -17,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Repository
@@ -25,6 +29,7 @@ import java.util.stream.Collectors;
 public class CourseReaderImpl implements CourseReader {
 
     private final CourseJpaRepository courseJpaRepository;
+    private final CourseStepJpaRepository courseStepJpaRepository;
     private final UserCourseProgressJpaRepository userCourseProgressJpaRepository;
 
     @Override
@@ -42,6 +47,12 @@ public class CourseReaderImpl implements CourseReader {
                 .toList();
 
         return CoursePageData.of(items, page.getNumber(), page.getSize(), page.getTotalElements());
+    }
+
+    @Override
+    public Optional<CourseDetailData> findCourse(Long courseId, Long userId) {
+        return courseJpaRepository.findById(courseId)
+                .map(course -> toDetailData(course, findProgress(userId, courseId)));
     }
 
     private Specification<Course> searchSpec(CourseSearchConditionDto condition) {
@@ -78,5 +89,28 @@ public class CourseReaderImpl implements CourseReader {
                 course.getEstimatedMinutes(),
                 progressPercent == null ? 0.0 : progressPercent.doubleValue()
         );
+    }
+
+    private CourseDetailData toDetailData(Course course, CourseProgressSummaryData progress) {
+        return new CourseDetailData(
+                course.getId(),
+                course.getCourseType(),
+                course.getTitle(),
+                course.getDescription(),
+                course.getDifficulty(),
+                course.getEstimatedMinutes(),
+                courseStepJpaRepository.countByCourseId(course.getId()),
+                progress
+        );
+    }
+
+    private CourseProgressSummaryData findProgress(Long userId, Long courseId) {
+        return userCourseProgressJpaRepository.findByUserIdAndCourseId(userId, courseId)
+                .map(progress -> new CourseProgressSummaryData(
+                        progress.getStatus(),
+                        progress.getProgressPercent().doubleValue(),
+                        progress.getLastStepId()
+                ))
+                .orElseGet(() -> new CourseProgressSummaryData(CourseProgressStatus.NOT_STARTED, 0.0, null));
     }
 }
