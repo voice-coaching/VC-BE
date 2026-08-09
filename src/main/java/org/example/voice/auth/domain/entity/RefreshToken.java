@@ -1,4 +1,10 @@
 package org.example.voice.auth.domain.entity;
 
-public class RefreshToken {
+import java.time.OffsetDateTime;
+
+public record RefreshToken(
+        Long userId,
+        String token,
+        OffsetDateTime expiresAt
+) {
 }

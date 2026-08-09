@@ -6,12 +6,14 @@ import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.training.domain.model.AnalysisProgressData;
 import org.example.voice.training.domain.port.TrainingAnalysisReader;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class TrainingAnalysisReaderImpl implements TrainingAnalysisReader {
 
     private final AnalysisResultJpaRepository analysisResultJpaRepository;

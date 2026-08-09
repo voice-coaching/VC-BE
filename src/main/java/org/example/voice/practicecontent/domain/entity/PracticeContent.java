@@ -15,8 +15,11 @@ import org.example.voice.practicecontent.domain.type.ContentType;
 import org.example.voice.practicecontent.domain.type.Difficulty;
 import org.example.voice.practicecontent.domain.type.LearningFocus;
 import org.example.voice.practicecontent.domain.type.PublishStatus;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @Entity
 @Getter
@@ -51,6 +54,13 @@ public class PracticeContent {
     @Enumerated(EnumType.STRING)
     @Column(name = "difficulty", nullable = false)
     private Difficulty difficulty;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "target_pronunciations", columnDefinition = "jsonb")
+    private List<String> targetPronunciations;
+
+    @Column(name = "estimated_seconds")
+    private Integer estimatedSeconds;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)

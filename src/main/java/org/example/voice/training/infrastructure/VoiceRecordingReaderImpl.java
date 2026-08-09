@@ -8,6 +8,7 @@ import org.example.voice.training.domain.model.VoiceRecordingData;
 import org.example.voice.training.domain.port.VoiceRecordingReader;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -16,6 +17,7 @@ import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class VoiceRecordingReaderImpl implements VoiceRecordingReader {
 
     private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;

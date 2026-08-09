@@ -9,11 +9,13 @@ import org.example.voice.training.domain.model.TrainingSessionDetailData;
 import org.example.voice.training.domain.port.TrainingSessionReader;
 import org.example.voice.training.domain.type.TrainingSessionStatus;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class TrainingSessionReaderImpl implements TrainingSessionReader {
 
     private final PracticeContentJpaRepository practiceContentJpaRepository;
