@@ -1,0 +1,74 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: "21"
+          cache: gradle
+
+      - name: Grant execute permission for scripts
+        run: chmod +x gradlew
+
+      - name: Test and build
+        run: ./gradlew clean test bootJar --no-daemon
+
+      - name: Select executable JAR
+        id: artifact
+        shell: bash
+        run: |
+          jar_path="$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | head -n 1)"
+          test -n "$jar_path"
+          echo "path=$jar_path" >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/alpha-deploy
+          chmod 600 ~/.ssh/alpha-deploy
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload release
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          JAR_PATH: ${{ steps.artifact.outputs.path }}
+        run: |
+          scp -i ~/.ssh/alpha-deploy "$JAR_PATH" "$EC2_USER@$EC2_HOST:/tmp/alpha-${GITHUB_SHA}.jar"
+
+      - name: Activate release
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
+            "sudo /usr/local/sbin/alpha-deploy '$GITHUB_SHA'"
+
+      - name: Verify public HTTPS endpoint
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 3 https://api.voice-coaching.site/v3/api-docs > /dev/null
