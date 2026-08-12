@@ -30,7 +30,7 @@ class AuthControllerTest {
         AuthController controller = new AuthController(authService, mock(SocialLoginService.class), tokenService);
         ReflectionTestUtils.setField(controller, "refreshTokenSeconds", 1200L);
         ReflectionTestUtils.setField(controller, "secureCookie", true);
-        ReflectionTestUtils.setField(controller, "sameSite", "Lax");
+        ReflectionTestUtils.setField(controller, "sameSite", "None");
         mockMvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
@@ -56,7 +56,9 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.allOf(
                         org.hamcrest.Matchers.containsString("refreshToken=refresh"),
-                        org.hamcrest.Matchers.containsString("HttpOnly"))))
+                        org.hamcrest.Matchers.containsString("HttpOnly"),
+                        org.hamcrest.Matchers.containsString("Secure"),
+                        org.hamcrest.Matchers.containsString("SameSite=None"))))
                 .andExpect(jsonPath("$.data.accessToken").value("access"))
                 .andExpect(jsonPath("$.data.onboardingRequired").value(true));
     }
