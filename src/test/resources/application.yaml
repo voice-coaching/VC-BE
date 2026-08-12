@@ -27,3 +27,7 @@ auth:
     kakao:
       client-id: test
       client-secret: test
+
+app:
+  cors:
+    allowed-origins: http://localhost:3000
