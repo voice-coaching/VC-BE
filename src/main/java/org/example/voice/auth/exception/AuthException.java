@@ -1,8 +1,9 @@
 package org.example.voice.auth.exception;
 
-public class AuthException extends RuntimeException {
+import org.example.voice.common.exception.BusinessException;
+import org.example.voice.common.exception.ErrorCode;
 
-    public AuthException(String message) {
-        super(message);
-    }
+public class AuthException extends BusinessException {
+    public AuthException(ErrorCode errorCode) { super(errorCode); }
+    public AuthException(ErrorCode errorCode, Throwable cause) { super(errorCode, errorCode.getMessage(), cause); }
 }

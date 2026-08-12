@@ -26,7 +26,7 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "email")
+    @Column(name = "email", unique = true)
     private String email;
 
     @Column(name = "password")
@@ -60,4 +60,33 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private UserRole role;
+
+    private User(String email, String password, String nickname, OffsetDateTime now) {
+        this.email = email;
+        this.password = password;
+        this.nickname = nickname;
+        this.status = UserStatus.ACTIVE;
+        this.termsAgreedAt = now;
+        this.privacyAgreedAt = now;
+        this.createdAt = now;
+        this.updatedAt = now;
+        this.role = UserRole.USER;
+    }
+
+    public static User createLocal(String email, String encodedPassword, String nickname, OffsetDateTime now) {
+        return new User(email, encodedPassword, nickname, now);
+    }
+
+    public static User createSocial(String email, String nickname, OffsetDateTime now) {
+        return new User(email, null, nickname, now);
+    }
+
+    public void recordLogin(OffsetDateTime now) {
+        this.lastLoginAt = now;
+        this.updatedAt = now;
+    }
+
+    public boolean isSuspended() {
+        return status == UserStatus.SUSPENDED;
+    }
 }
