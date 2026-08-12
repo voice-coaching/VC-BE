@@ -1,6 +1,7 @@
 package org.example.voice.common.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.ConstraintViolationException;
 import org.example.voice.common.response.ApiResponse;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
@@ -30,19 +31,26 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining(", "));
         log.warn("Validation failed: {}", message);
         return ResponseEntity.badRequest()
-                .body(ApiResponse.error(message));
+                .body(ApiResponse.error(ErrorCode.VALIDATION_ERROR.getMessage()));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(ConstraintViolationException exception) {
+        log.warn("Constraint violation: {}", exception.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(ErrorCode.INVALID_EMAIL_FORMAT.getMessage()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleMessageNotReadable(HttpMessageNotReadableException exception) {
-        log.warn("Message not readable: {}", exception.getMessage());
+        log.warn("Request message was not readable");
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error(ErrorCode.INVALID_INPUT_VALUE.getMessage()));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException exception) {
-        log.warn("DB constraint violation: {}", exception.getMessage());
+        log.warn("DB constraint violation");
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error(ErrorCode.INVALID_INPUT_VALUE.getMessage()));
     }

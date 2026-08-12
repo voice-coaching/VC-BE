@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,7 +19,8 @@ import java.time.OffsetDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "social_accounts")
+@Table(name = "social_accounts", uniqueConstraints = @UniqueConstraint(
+        name = "uk_social_accounts_provider_user", columnNames = {"provider", "provider_user_id"}))
 public class SocialAccount {
 
     @Id
@@ -40,4 +42,16 @@ public class SocialAccount {
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
+
+    private SocialAccount(Long userId, OAuthProvider provider, String providerUserId, String providerEmail, OffsetDateTime now) {
+        this.userId = userId;
+        this.provider = provider;
+        this.providerUserId = providerUserId;
+        this.providerEmail = providerEmail;
+        this.createdAt = now;
+    }
+
+    public static SocialAccount create(Long userId, OAuthProvider provider, String providerUserId, String providerEmail, OffsetDateTime now) {
+        return new SocialAccount(userId, provider, providerUserId, providerEmail, now);
+    }
 }
