@@ -76,3 +76,6 @@ temp/
 AGENTS.md
 .codex/
 .codex_backup_*/
+
+### Local reference documents ###
+API명세서/
