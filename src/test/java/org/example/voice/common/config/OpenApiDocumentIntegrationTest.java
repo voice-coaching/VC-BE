@@ -40,6 +40,6 @@ class OpenApiDocumentIntegrationTest {
                 assertThat(field.getValue().path("tags").get(0).asText()).containsPattern("[가-힣]");
             }
         }
-        assertThat(operationCount).isEqualTo(45);
+        assertThat(operationCount).isEqualTo(52);
     }
 }

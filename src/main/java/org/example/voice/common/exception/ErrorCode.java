@@ -64,6 +64,7 @@ public enum ErrorCode {
     ANALYSIS_NOT_COMPLETED(HttpStatus.CONFLICT, "분석이 완료된 후 학습을 종료할 수 있습니다."),
     SESSION_ALREADY_FINISHED(HttpStatus.CONFLICT, "이미 종료된 학습 세션입니다."),
     RECORDING_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 녹음에 접근할 권한이 없습니다."),
+    TRAINING_SESSION_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 학습 기록에 접근할 권한이 없습니다."),
 
     // Analysis Result
     SESSION_ANALYSIS_NOT_FOUND(HttpStatus.NOT_FOUND, "학습 세션의 분석 결과가 없습니다."),
