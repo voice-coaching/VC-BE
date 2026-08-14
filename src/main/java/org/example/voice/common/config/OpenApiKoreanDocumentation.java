@@ -27,7 +27,8 @@ public class OpenApiKoreanDocumentation {
                     tag("학습 콘텐츠", "연습 콘텐츠와 예시 음성 정보를 조회합니다."),
                     tag("학습 세션", "학습 세션, 녹음 파일과 분석 요청 과정을 관리합니다."),
                     tag("분석 결과", "완료된 음성 분석 점수, 구간별 피드백과 종합 피드백을 제공합니다."),
-                    tag("클래스", "클래스 목록, 단계와 사용자별 학습 진도를 관리합니다.")
+                    tag("클래스", "클래스 목록, 단계와 사용자별 학습 진도를 관리합니다."),
+                    tag("마이페이지", "내 학습 기록, 통계, 강점·약점과 맞춤 추천을 제공합니다.")
             ));
             DOCS.forEach((key, doc) -> {
                 PathItem pathItem = openApi.getPaths().get(key.path());
@@ -65,6 +66,11 @@ public class OpenApiKoreanDocumentation {
                 case "page" -> "조회할 페이지 번호이며 0부터 시작합니다.";
                 case "size" -> "한 페이지에 조회할 항목 수";
                 case "refreshToken" -> "HttpOnly 쿠키로 전달되는 Refresh Token";
+                case "period" -> "조회 기간(WEEK, MONTH, THREE_MONTHS, YEAR)";
+                case "from" -> "조회 시작일(yyyy-MM-dd)";
+                case "to" -> "조회 종료일(yyyy-MM-dd)";
+                case "metric" -> "점수 지표(OVERALL, PRONUNCIATION, INTONATION)";
+                case "contentType" -> "추천 콘텐츠 유형";
                 default -> parameter.getDescription();
             });
         });
@@ -169,6 +175,13 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.PATCH, "/api/courses/{courseId}/progress", "클래스", "클래스 진도 수정", "완료한 단계와 학습 시간을 반영해 클래스 진도를 갱신합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/courses/{courseId}/complete", "클래스", "클래스 완료", "모든 필수 단계를 마친 클래스를 완료 상태로 변경합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/users/me/course-progress", "클래스", "내 클래스 진도 목록 조회", "인증된 사용자가 시작한 클래스별 진행률과 최근 학습 시각을 조회합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/training-sessions", "마이페이지", "학습 기록 목록 조회", "완료된 내 학습 기록을 콘텐츠 유형, 상태와 기간으로 필터링해 최신순 페이지로 조회합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/training-sessions/{sessionId}", "마이페이지", "학습 기록 상세 조회", "내 과거 학습의 콘텐츠, 최종 녹음, STT, 종합 분석과 음절별 피드백을 한 번에 조회합니다.", false);
+        add(map, PathItem.HttpMethod.DELETE, "/api/users/me/training-sessions/{sessionId}", "마이페이지", "학습 기록 삭제", "내 학습 세션과 연결된 음절 결과, 분석 결과와 녹음을 트랜잭션으로 삭제합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/statistics", "마이페이지", "학습 통계 조회", "선택 기간의 학습 횟수·시간, 오늘 현황, 연속 학습일과 평균 점수를 계산합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/strengths-weaknesses", "마이페이지", "강점 및 약점 조회", "음절 분석을 발음 항목별로 집계해 반복 시도한 강점과 약점을 점수순으로 제공합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/score-trends", "마이페이지", "점수 변화 추이 조회", "선택한 종합·발음·억양 점수의 날짜별 평균과 학습 횟수를 그래프 데이터로 제공합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/weakness-recommendations", "마이페이지", "약점 기반 추천 조회", "최근 반복된 발음 약점과 연결되는 공개 학습 콘텐츠와 클래스를 추천합니다.", false);
         return Map.copyOf(map);
     }
 
