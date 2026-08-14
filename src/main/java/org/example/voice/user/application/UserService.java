@@ -1,9 +1,25 @@
 package org.example.voice.user.application;
 
 import lombok.RequiredArgsConstructor;
+import org.example.voice.onboarding.domain.port.OnboardingProfileReader;
+import org.example.voice.user.domain.entity.User;
+import org.example.voice.user.domain.model.UpdatedUserProfile;
+import org.example.voice.user.domain.model.UserProfile;
+import org.example.voice.user.domain.model.WithdrawalResult;
+import org.example.voice.user.domain.port.LoginProviderReader;
 import org.example.voice.user.domain.port.UserReader;
+import org.example.voice.user.domain.port.UserSessionRevoker;
 import org.example.voice.user.domain.port.UserWriter;
+import org.example.voice.user.exception.NicknameAlreadyExistsException;
+import org.example.voice.user.exception.UserNotFoundException;
+import org.example.voice.user.exception.WithdrawalAlreadyProcessedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.LinkedHashSet;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -11,4 +27,59 @@ public class UserService {
 
     private final UserReader userReader;
     private final UserWriter userWriter;
+    private final LoginProviderReader loginProviderReader;
+    private final UserSessionRevoker userSessionRevoker;
+    private final OnboardingProfileReader onboardingProfileReader;
+
+    @Transactional(readOnly = true)
+    public UserProfile getMyProfile(Long userId) {
+        User user = findUser(userId);
+        LinkedHashSet<String> loginProviders = new LinkedHashSet<>();
+        if (user.hasLocalCredential()) {
+            loginProviders.add("LOCAL");
+        }
+        loginProviders.addAll(loginProviderReader.findByUserId(userId));
+
+        return new UserProfile(
+                user.getId(),
+                user.getEmail(),
+                user.getNickname(),
+                user.getStatus(),
+                List.copyOf(loginProviders),
+                onboardingProfileReader.findByUserId(userId).isPresent(),
+                user.getCreatedAt()
+        );
+    }
+
+    @Transactional
+    public UpdatedUserProfile updateMyProfile(Long userId, String nickname) {
+        User user = userReader.findByIdForUpdate(userId).orElseThrow(UserNotFoundException::new);
+        String normalizedNickname = nickname.trim();
+        if (userReader.existsByNicknameExcludingUserId(normalizedNickname, userId)) {
+            throw new NicknameAlreadyExistsException();
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        user.updateNickname(normalizedNickname, now);
+        userWriter.save(user);
+        return new UpdatedUserProfile(user.getId(), user.getNickname(), user.getUpdatedAt());
+    }
+
+    @Transactional
+    public WithdrawalResult withdraw(Long userId) {
+        User user = userReader.findByIdForUpdate(userId).orElseThrow(UserNotFoundException::new);
+        if (user.isWithdrawn()) {
+            throw new WithdrawalAlreadyProcessedException();
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        user.withdraw(now);
+        userWriter.save(user);
+        userSessionRevoker.revokeAll(userId);
+        return new WithdrawalResult(now);
+    }
+
+    private User findUser(Long userId) {
+        return userReader.findById(userId).orElseThrow(UserNotFoundException::new);
+    }
 }

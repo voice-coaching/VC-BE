@@ -89,4 +89,23 @@ public class User {
     public boolean isSuspended() {
         return status == UserStatus.SUSPENDED;
     }
+
+    public boolean hasLocalCredential() {
+        return password != null && !password.isBlank();
+    }
+
+    public boolean isWithdrawn() {
+        return status == UserStatus.WITHDRAWN;
+    }
+
+    public void updateNickname(String nickname, OffsetDateTime now) {
+        this.nickname = nickname;
+        this.updatedAt = now;
+    }
+
+    public void withdraw(OffsetDateTime now) {
+        this.status = UserStatus.WITHDRAWN;
+        this.deletedAt = now;
+        this.updatedAt = now;
+    }
 }

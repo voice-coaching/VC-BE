@@ -17,6 +17,11 @@ public class UserReaderImpl implements UserReader {
     }
 
     @Override
+    public boolean existsByNicknameExcludingUserId(String nickname, Long userId) {
+        return userJpaRepository.existsByNicknameIgnoreCaseAndIdNot(nickname, userId);
+    }
+
+    @Override
     public Optional<User> findByEmail(String email) {
         return userJpaRepository.findByEmailIgnoreCase(email);
     }

@@ -5,6 +5,7 @@ import java.util.Optional;
 
 public interface UserReader {
     boolean existsByEmail(String email);
+    boolean existsByNicknameExcludingUserId(String nickname, Long userId);
     Optional<User> findByEmail(String email);
     Optional<User> findById(Long id);
     Optional<User> findByIdForUpdate(Long id);
