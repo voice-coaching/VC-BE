@@ -75,9 +75,9 @@ This document summarizes the API list exported from the local API spec directory
 
 | Method | URL | Auth | Implementation Status | Description |
 | --- | --- | --- | --- | --- |
-| GET | `/api/users/me` | Bearer accessToken | 시작 전 | 내 정보 조회 |
-| PATCH | `/api/users/me` | Bearer accessToken | 시작 전 | 프로필 수정 |
-| DELETE | `/api/users/me` | Bearer accessToken | 시작 전 | 회원 탈퇴 |
+| GET | `/api/users/me` | Bearer accessToken | 완료 | 내 정보 조회 |
+| PATCH | `/api/users/me` | Bearer accessToken | 완료 | 프로필 수정 |
+| DELETE | `/api/users/me` | Bearer accessToken | 완료 | 회원 탈퇴 |
 
 ### 학습
 

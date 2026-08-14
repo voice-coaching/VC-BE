@@ -29,6 +29,8 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     NICKNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
 
+    WITHDRAWAL_ALREADY_PROCESSED(HttpStatus.CONFLICT, "이미 탈퇴 처리된 사용자입니다."),
+
     // Onboarding
     REQUIRED_ANSWER_MISSING(HttpStatus.BAD_REQUEST, "필수 설문 항목이 누락되었습니다."),
     ONBOARDING_NOT_FOUND(HttpStatus.NOT_FOUND, "온보딩 정보를 찾을 수 없습니다."),
