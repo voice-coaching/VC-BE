@@ -225,6 +225,9 @@
 | failure_reason | varchar(500) | N | - | - | - | 실패 사유 |
 | created_at | timestamptz | Y | now() | - | - | 생성 시각 |
 
+| feedback_regeneration_count | integer | Y | 0 | - | - | 종합 피드백 재생성 횟수 |
+| feedback_regenerated_at | timestamptz | N | - | - | - | 마지막 종합 피드백 재생성 시각 |
+
 ### analysis_segments
 - 목적: 분석 결과의 문장/구간별 매칭 및 세부 피드백을 저장한다.
 - 해당 모듈: analysis/ai

@@ -65,6 +65,10 @@ public enum ErrorCode {
     SESSION_ALREADY_FINISHED(HttpStatus.CONFLICT, "이미 종료된 학습 세션입니다."),
     RECORDING_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 녹음에 접근할 권한이 없습니다."),
 
+    // Analysis Result
+    SESSION_ANALYSIS_NOT_FOUND(HttpStatus.NOT_FOUND, "학습 세션의 분석 결과가 없습니다."),
+    FEEDBACK_REGENERATION_LIMIT(HttpStatus.TOO_MANY_REQUESTS, "피드백 재생성 가능 횟수를 초과했습니다."),
+
     // Course
     COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "클래스를 찾을 수 없습니다."),
     COURSE_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 완료한 클래스입니다."),

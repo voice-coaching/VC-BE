@@ -86,12 +86,19 @@ public class AnalysisResult {
     @Column(name = "failure_reason")
     private String failureReason;
 
+    @Column(name = "feedback_regeneration_count", nullable = false)
+    private Integer feedbackRegenerationCount;
+
+    @Column(name = "feedback_regenerated_at")
+    private OffsetDateTime feedbackRegeneratedAt;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
     private AnalysisResult(VoiceRecording recording) {
         this.recording = recording;
         this.status = AnalysisStatus.PENDING;
+        this.feedbackRegenerationCount = 0;
         this.createdAt = OffsetDateTime.now(SEOUL_ZONE_ID);
         this.analyzedAt = this.createdAt;
     }
@@ -108,5 +115,22 @@ public class AnalysisResult {
 
     public OffsetDateTime updatedAt() {
         return analyzedAt == null ? createdAt : analyzedAt;
+    }
+
+    public boolean isCompleted() {
+        return status == AnalysisStatus.COMPLETED;
+    }
+
+    public void regenerateFeedback(
+            String strengthsText,
+            String weaknessesText,
+            String summaryFeedback,
+            OffsetDateTime regeneratedAt
+    ) {
+        this.strengthsText = strengthsText;
+        this.weaknessesText = weaknessesText;
+        this.summaryFeedback = summaryFeedback;
+        this.feedbackRegenerationCount += 1;
+        this.feedbackRegeneratedAt = regeneratedAt;
     }
 }
