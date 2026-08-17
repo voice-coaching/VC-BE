@@ -77,11 +77,8 @@ AGENTS.md
 .codex/
 .codex_backup_*/
 
-<<<<<<< HEAD
-=======
 ### Local generated archives ###
 loggingStrategy/
 
->>>>>>> 17a31c9 ([DOCS]: API 설계 규칙 문서 정리)
 ### Local reference documents ###
 API명세서/

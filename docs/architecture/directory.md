@@ -21,7 +21,7 @@
 | `src/test/java/org/example/voice` | directory | 테스트 코드 루트 | 운영 코드 패키지 구조를 따른다. |
 | `src/test/resources` | directory | 테스트 전용 설정 | 테스트용 `application.yaml` 등을 둔다. |
 | `docs/api` | directory | API 명세 문서 | endpoint 목록과 request/response 명세를 둔다. |
-| `docs/architecture` | directory | 아키텍처 문서 | 구조, 컴포넌트, 디렉토리, 상태, 흐름 문서를 둔다. |
+| `docs/architecture` | directory | 아키텍처 문서 | 구조, 컴포넌트, 디렉토리, 상태, 흐름, 배포 문서를 둔다. |
 | `docs/database` | directory | DB 문서 | schema 문서를 둔다. |
 | `.codex/ai_rule_developer` | directory | AI 개발 규칙 문서 | API, 아키텍처, 코드 스타일 등 AI 작업 기준을 둔다. |
 
@@ -170,6 +170,7 @@ docs
 | `docs/api/specification.md` | API request/response 상세 명세 |
 | `docs/architecture/architecture.md` | 전체 아키텍처 개요 |
 | `docs/architecture/component.md` | 컴포넌트와 모듈 책임 |
+| `docs/architecture/deployment.md` | 배포 환경과 운영 보조 서비스 접근 방식 |
 | `docs/architecture/directory.md` | 디렉토리 구조와 배치 규칙 |
 | `docs/architecture/flow.md` | 주요 기능 흐름 |
 | `docs/architecture/state.md` | 상태 모델과 상태 전이 |

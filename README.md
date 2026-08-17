@@ -115,6 +115,7 @@ src/main/resources/application-secret.yaml
 
 - API 명세서: https://app.notion.com/p/697fd927f58c820f99850163cde5d6a2
 - ERD: https://app.notion.com/p/ERD-3b5fd927f58c80a48f6bd83fc7e1629c
+- EC2 Redis/Redis Insight 접근: [docs/architecture/deployment.md](docs/architecture/deployment.md)
 
 ## 커밋 컨벤션
 
