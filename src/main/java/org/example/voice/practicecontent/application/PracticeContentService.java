@@ -8,6 +8,7 @@ import org.example.voice.practicecontent.controller.dto.PracticeContentListRespo
 import org.example.voice.practicecontent.controller.dto.PracticeContentNextConditionDto;
 import org.example.voice.practicecontent.controller.dto.PracticeContentQueryConditionDto;
 import org.example.voice.practicecontent.controller.dto.PracticeContentRecommendationResponseDto;
+import org.example.voice.practicecontent.controller.dto.PracticeContentRecommendationsResponseDto;
 import org.example.voice.practicecontent.domain.port.PracticeContentReader;
 import org.example.voice.practicecontent.exception.ContentNotFoundException;
 import org.example.voice.practicecontent.exception.NextContentNotFoundException;
@@ -40,5 +41,12 @@ public class PracticeContentService {
         return practiceContentReader.findNextPracticeContent(condition)
                 .map(PracticeContentRecommendationResponseDto::from)
                 .orElseThrow(NextContentNotFoundException::new);
+    }
+
+    @Transactional(readOnly = true)
+    public PracticeContentRecommendationsResponseDto getPracticeContentRecommendations(Long contentId) {
+        return practiceContentReader.findRecommendationsByContentId(contentId)
+                .map(PracticeContentRecommendationsResponseDto::from)
+                .orElseThrow(ContentNotFoundException::new);
     }
 }

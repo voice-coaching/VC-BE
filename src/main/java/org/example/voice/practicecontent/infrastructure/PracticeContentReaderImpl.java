@@ -6,6 +6,7 @@ import org.example.voice.practicecontent.controller.dto.PracticeContentQueryCond
 import org.example.voice.practicecontent.domain.entity.PracticeContent;
 import org.example.voice.practicecontent.domain.model.PracticeContentDetailData;
 import org.example.voice.practicecontent.domain.model.PracticeContentPageData;
+import org.example.voice.practicecontent.domain.model.PracticeContentRecommendationData;
 import org.example.voice.practicecontent.domain.model.PracticeContentSummaryData;
 import org.example.voice.practicecontent.domain.port.PracticeContentReader;
 import org.example.voice.practicecontent.domain.type.PublishStatus;
@@ -23,6 +24,9 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PracticeContentReaderImpl implements PracticeContentReader {
+
+    private static final int RECOMMENDATION_LIMIT = 5;
+    private static final String CONTENT_RECOMMENDATION_REASON = "같은 난이도와 학습 초점의 콘텐츠입니다.";
 
     private final PracticeContentJpaRepository practiceContentJpaRepository;
     private final ReferenceAudioJpaRepository referenceAudioJpaRepository;
@@ -62,10 +66,32 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
 
     @Override
     public Optional<PracticeContentSummaryData> findNextPracticeContent(PracticeContentNextConditionDto condition) {
-        Page<PracticeContent> page = practiceContentJpaRepository.findAll(nextSpec(condition), PageRequest.of(0, 1, Sort.by("id").ascending()));
+        Page<PracticeContent> page = practiceContentJpaRepository.findAll(
+                nextSpec(condition),
+                PageRequest.of(0, 1, Sort.by("id").ascending())
+        );
         return page.getContent().stream()
                 .findFirst()
                 .map(this::toSummaryData);
+    }
+
+    @Override
+    public Optional<List<PracticeContentRecommendationData>> findRecommendationsByContentId(Long contentId) {
+        return practiceContentJpaRepository.findById(contentId)
+                .filter(PracticeContent::isPublished)
+                .map(content -> practiceContentJpaRepository.findAll(
+                                recommendationSpec(content),
+                                PageRequest.of(
+                                        0,
+                                        RECOMMENDATION_LIMIT,
+                                        Sort.by(Sort.Order.desc("publishedAt").nullsLast(), Sort.Order.desc("createdAt"))
+                                )
+                        )
+                        .getContent()
+                        .stream()
+                        .map(this::toRecommendationData)
+                        .toList()
+                );
     }
 
     private Specification<PracticeContent> searchSpec(PracticeContentQueryConditionDto condition) {
@@ -106,6 +132,15 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
         };
     }
 
+    private Specification<PracticeContent> recommendationSpec(PracticeContent content) {
+        return (root, query, criteriaBuilder) -> criteriaBuilder.and(
+                criteriaBuilder.equal(root.get("status"), PublishStatus.PUBLISHED),
+                criteriaBuilder.notEqual(root.get("id"), content.getId()),
+                criteriaBuilder.equal(root.get("difficulty"), content.getDifficulty()),
+                criteriaBuilder.equal(root.get("learningFocus"), content.getLearningFocus())
+        );
+    }
+
     private PracticeContentSummaryData toSummaryData(PracticeContent content) {
         return new PracticeContentSummaryData(
                 content.getId(),
@@ -115,6 +150,15 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
                 content.getDifficulty(),
                 content.getEstimatedSeconds(),
                 content.getScriptText()
+        );
+    }
+
+    private PracticeContentRecommendationData toRecommendationData(PracticeContent content) {
+        return new PracticeContentRecommendationData(
+                content.getId(),
+                content.getTitle(),
+                content.getContentType(),
+                CONTENT_RECOMMENDATION_REASON
         );
     }
 }
