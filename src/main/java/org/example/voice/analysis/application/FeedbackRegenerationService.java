@@ -8,9 +8,12 @@ import org.example.voice.analysis.domain.type.FeedbackStyle;
 import org.example.voice.analysis.exception.AnalysisNotCompletedException;
 import org.example.voice.analysis.exception.AnalysisNotFoundException;
 import org.example.voice.analysis.exception.FeedbackRegenerationLimitException;
+import org.example.voice.analysis.infrastructure.cache.AnalysisCacheNames;
 import org.example.voice.analysis.provider.AiFeedbackProvider;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
@@ -26,6 +29,10 @@ public class FeedbackRegenerationService {
     private final AiFeedbackProvider provider;
 
     @Transactional
+    @CacheEvict(
+            cacheNames = AnalysisCacheNames.DETAIL,
+            key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).owned(#userId, #analysisId)"
+    )
     public AnalysisResult regenerate(Long analysisId, Long userId, FeedbackStyle style) {
         AnalysisResult result = reader.findOwnedForUpdate(analysisId, userId).orElseThrow(AnalysisNotFoundException::new);
         if (!result.isCompleted()) throw new AnalysisNotCompletedException();

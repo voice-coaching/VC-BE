@@ -154,12 +154,16 @@
 
 - `AnalysisResultReader` / `AnalysisResultWriter`: 분석 결과 조회와 저장 계약
 - `AnalysisSegmentReader` / `AnalysisSegmentWriter`: 세그먼트 분석 조회와 저장 계약
+- `analysis/infrastructure/cache`: 분석 결과 cache name, key 생성 규칙, TTL 제공 계약
 
 ### 소유 경계
 
 - 분석 결과 상태, 점수, STT transcript, 세그먼트 결과는 `analysis` 모듈이 소유한다.
 - 분석 요청 트리거와 학습 세션 상태 변경은 `training` 모듈과 협력한다.
 - 외부 STT/AI provider 응답은 내부 model로 변환한 뒤 사용한다.
+- 완료된 분석 결과 상세, 세션 기준 분석 결과, 세그먼트 목록 캐시는 `analysis` infrastructure가 소유한다.
+- 진행 중이거나 실패한 분석 결과는 캐시하지 않는다.
+- 피드백 재생성은 분석 상세 캐시를 무효화한다.
 
 ## Course 컴포넌트
 
