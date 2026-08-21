@@ -9,12 +9,15 @@ import org.example.voice.course.infrastructure.CourseJpaRepository;
 import org.example.voice.mypage.domain.model.MyPageData;
 import org.example.voice.mypage.domain.port.MyPageReader;
 import org.example.voice.mypage.domain.port.MyPageWriter;
+import org.example.voice.mypage.infrastructure.cache.MyPageCacheNames;
 import org.example.voice.onboarding.domain.port.OnboardingProfileReader;
 import org.example.voice.practicecontent.domain.entity.PracticeContent;
 import org.example.voice.practicecontent.domain.type.ContentType;
 import org.example.voice.practicecontent.domain.type.PublishStatus;
 import org.example.voice.practicecontent.infrastructure.PracticeContentJpaRepository;
 import org.example.voice.training.domain.type.TrainingSessionStatus;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.PageRequest;
 
@@ -49,6 +52,11 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = MyPageCacheNames.HISTORY,
+            key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys)"
+                    + ".history(#userId, #type, #status, #from, #to, #page, #size)"
+    )
     public MyPageData.HistoryPage findHistory(Long userId, ContentType type, TrainingSessionStatus status,
                                               OffsetDateTime from, OffsetDateTime to, int page, int size) {
         TrainingSessionStatus selectedStatus = status == null ? TrainingSessionStatus.COMPLETED : status;
@@ -92,6 +100,11 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = MyPageCacheNames.HISTORY_DETAIL,
+            key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys).historyDetail(#userId, #sessionId)",
+            unless = "#result.isEmpty()"
+    )
     public Optional<MyPageData.HistoryDetail> findHistoryDetail(Long userId, Long sessionId) {
         List<Object[]> sessions = entityManager.createQuery("""
                 select s.id, s.status, s.startedAt, s.completedAt, s.totalLearningSeconds,
@@ -124,6 +137,11 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = MyPageCacheNames.STATISTICS,
+            key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys)"
+                    + ".statistics(#userId, #from, #to, #todayFrom, #todayTo)"
+    )
     public MyPageData.Statistics calculateStatistics(Long userId, OffsetDateTime from, OffsetDateTime to,
                                                      OffsetDateTime todayFrom, OffsetDateTime todayTo) {
         Object[] totals = entityManager.createQuery("""
@@ -158,6 +176,10 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = MyPageCacheNames.UNIT_SCORES,
+            key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys).unitScores(#userId, #from, #to)"
+    )
     public List<MyPageData.UnitScore> findUnitScores(Long userId, OffsetDateTime from, OffsetDateTime to) {
         List<Object[]> rows = entityManager.createQuery("""
                 select s.targetUnit, avg(s.pronunciationScore), count(s.id)
@@ -188,6 +210,11 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = MyPageCacheNames.SCORE_TREND,
+            key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys)"
+                    + ".scoreTrend(#userId, #metric, #from, #to)"
+    )
     public List<MyPageData.TrendPoint> findScoreTrend(Long userId, String metric, OffsetDateTime from, OffsetDateTime to) {
         String field = switch (metric) { case "OVERALL" -> "a.overallScore"; case "PRONUNCIATION" -> "a.pronunciationScore";
             case "INTONATION" -> "a.intonationScore"; default -> throw new IllegalArgumentException(metric); };
@@ -205,6 +232,11 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = MyPageCacheNames.RECOMMENDATIONS,
+            key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys)"
+                    + ".recommendations(#targetUnits, #contentType, #limit)"
+    )
     public List<MyPageData.Recommendation> findRecommendations(List<String> targetUnits, ContentType contentType, int limit) {
         if (targetUnits.isEmpty()) return List.of();
         List<MyPageData.Recommendation> result = new ArrayList<>();
@@ -230,6 +262,14 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     }
 
     @Override
+    @CacheEvict(cacheNames = {
+            MyPageCacheNames.HISTORY,
+            MyPageCacheNames.HISTORY_DETAIL,
+            MyPageCacheNames.STATISTICS,
+            MyPageCacheNames.UNIT_SCORES,
+            MyPageCacheNames.SCORE_TREND,
+            MyPageCacheNames.RECOMMENDATIONS
+    }, allEntries = true)
     public void deleteHistory(Long sessionId) {
         entityManager.createQuery("delete from AnalysisSegment s where s.analysisResult.id in (select a.id from AnalysisResult a where a.recording.trainingSession.id=:id)")
                 .setParameter("id", sessionId).executeUpdate();

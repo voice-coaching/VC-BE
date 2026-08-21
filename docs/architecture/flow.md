@@ -546,12 +546,15 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - 기간 또는 필터 조건을 변경해 다시 조회할 수 있다.
 - Side effects:
   - 조회 흐름은 DB 변경을 만들지 않는다.
+  - 학습 기록 목록/상세, 학습 통계, 강점 및 약점, 점수 변화 추이, 약점 기반 추천 조회는 Redis cache entry를 생성할 수 있다.
+  - 학습 세션 완료/취소와 마이페이지 학습 기록 삭제는 마이페이지 조회 캐시를 무효화한다.
 - Related API:
   - `GET /api/users/me/training-sessions`
   - `GET /api/users/me/training-sessions/{sessionId}`
   - `GET /api/users/me/statistics`
   - `GET /api/users/me/strengths-weaknesses`
   - `GET /api/users/me/score-trends`
+  - `GET /api/users/me/weakness-recommendations`
 - Related modules:
   - `home`, `training`, `analysis`, `user`
 - Related DB tables:

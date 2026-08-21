@@ -3,6 +3,7 @@ package org.example.voice.training.infrastructure;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.mypage.infrastructure.cache.MyPageCacheNames;
 import org.example.voice.practicecontent.domain.entity.PracticeContent;
 import org.example.voice.practicecontent.domain.type.LearningFocus;
 import org.example.voice.practicecontent.infrastructure.PracticeContentJpaRepository;
@@ -13,6 +14,7 @@ import org.example.voice.training.domain.model.TrainingSessionCompletionData;
 import org.example.voice.training.domain.model.TrainingSessionCreatedData;
 import org.example.voice.training.domain.port.TrainingSessionWriter;
 import org.example.voice.training.domain.type.TrainingSessionStatus;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,6 +54,14 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {
+            MyPageCacheNames.HISTORY,
+            MyPageCacheNames.HISTORY_DETAIL,
+            MyPageCacheNames.STATISTICS,
+            MyPageCacheNames.UNIT_SCORES,
+            MyPageCacheNames.SCORE_TREND,
+            MyPageCacheNames.RECOMMENDATIONS
+    }, allEntries = true)
     public TrainingSessionCompletionData complete(Long sessionId, Integer totalLearningSeconds) {
         TrainingSession session = trainingSessionJpaRepository.findById(sessionId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
@@ -61,6 +71,14 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {
+            MyPageCacheNames.HISTORY,
+            MyPageCacheNames.HISTORY_DETAIL,
+            MyPageCacheNames.STATISTICS,
+            MyPageCacheNames.UNIT_SCORES,
+            MyPageCacheNames.SCORE_TREND,
+            MyPageCacheNames.RECOMMENDATIONS
+    }, allEntries = true)
     public TrainingSessionCancellationData cancel(Long sessionId) {
         TrainingSession session = trainingSessionJpaRepository.findById(sessionId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));

@@ -187,6 +187,27 @@
 - 클래스 목록, 상세, 단계 목록 캐시는 `course` infrastructure가 소유한다.
 - 사용자별 진도 변경은 클래스 조회 캐시를 무효화한다.
 
+## MyPage 컴포넌트
+
+### 책임
+
+- 완료된 학습 기록 목록과 상세 조회
+- 학습 통계, 강점 및 약점, 점수 변화 추이, 약점 기반 추천 계산
+- 사용자 학습 기록 삭제
+
+### 주요 계약
+
+- `MyPageReader`: 사용자 소유 학습 기록과 통계 read model 조회 계약
+- `MyPageWriter`: 사용자 학습 기록 삭제 계약
+- `mypage/infrastructure/cache`: 마이페이지 cache name, key 생성 규칙, TTL 제공 계약
+
+### 소유 경계
+
+- 마이페이지는 사용자 화면용 학습 기록/통계 read model을 소유하고 원천 entity는 소유하지 않는다.
+- 원천 entity는 `training`, `analysis`, `practicecontent`, `course` 모듈이 각각 소유한다.
+- 마이페이지 조회 캐시는 `mypage` infrastructure가 소유한다.
+- 학습 세션 완료/취소와 마이페이지 학습 기록 삭제는 마이페이지 조회 캐시를 무효화한다.
+
 ## Home 컴포넌트
 
 ### 책임
