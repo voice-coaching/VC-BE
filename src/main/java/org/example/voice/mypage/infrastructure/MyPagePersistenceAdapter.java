@@ -6,6 +6,7 @@ import jakarta.persistence.TypedQuery;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.course.domain.entity.Course;
 import org.example.voice.course.infrastructure.CourseJpaRepository;
+import org.example.voice.home.infrastructure.cache.HomeCacheNames;
 import org.example.voice.mypage.domain.model.MyPageData;
 import org.example.voice.mypage.domain.port.MyPageReader;
 import org.example.voice.mypage.domain.port.MyPageWriter;
@@ -18,6 +19,7 @@ import org.example.voice.practicecontent.infrastructure.PracticeContentJpaReposi
 import org.example.voice.training.domain.type.TrainingSessionStatus;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.PageRequest;
 
@@ -262,14 +264,18 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     }
 
     @Override
-    @CacheEvict(cacheNames = {
-            MyPageCacheNames.HISTORY,
-            MyPageCacheNames.HISTORY_DETAIL,
-            MyPageCacheNames.STATISTICS,
-            MyPageCacheNames.UNIT_SCORES,
-            MyPageCacheNames.SCORE_TREND,
-            MyPageCacheNames.RECOMMENDATIONS
-    }, allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(cacheNames = HomeCacheNames.TODAY_STATUS, allEntries = true),
+            @CacheEvict(cacheNames = HomeCacheNames.RECENT_TRAINING, allEntries = true),
+            @CacheEvict(cacheNames = {
+                    MyPageCacheNames.HISTORY,
+                    MyPageCacheNames.HISTORY_DETAIL,
+                    MyPageCacheNames.STATISTICS,
+                    MyPageCacheNames.UNIT_SCORES,
+                    MyPageCacheNames.SCORE_TREND,
+                    MyPageCacheNames.RECOMMENDATIONS
+            }, allEntries = true)
+    })
     public void deleteHistory(Long sessionId) {
         entityManager.createQuery("delete from AnalysisSegment s where s.analysisResult.id in (select a.id from AnalysisResult a where a.recording.trainingSession.id=:id)")
                 .setParameter("id", sessionId).executeUpdate();

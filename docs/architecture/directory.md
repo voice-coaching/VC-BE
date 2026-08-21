@@ -134,6 +134,7 @@ common
 | `course/infrastructure/cache` | 클래스 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `CourseCacheNames`, `CourseCacheKeys`, `CourseCacheTtlProvider` |
 | `analysis/infrastructure/cache` | 분석 결과 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `AnalysisCacheNames`, `AnalysisCacheKeys`, `AnalysisCacheTtlProvider` |
 | `mypage/infrastructure/cache` | 마이페이지 학습 기록/통계 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `MyPageCacheNames`, `MyPageCacheKeys`, `MyPageCacheTtlProvider` |
+| `home/infrastructure/cache` | 홈 화면 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `HomeCacheNames`, `HomeCacheKeys`, `HomeCacheTtlProvider` |
 
 ## Resources 구조
 

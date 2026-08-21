@@ -12,6 +12,7 @@ import org.example.voice.course.domain.port.CourseProgressWriter;
 import org.example.voice.course.domain.type.CourseProgressStatus;
 import org.example.voice.course.exception.CourseAlreadyCompletedException;
 import org.example.voice.course.infrastructure.cache.CourseCacheNames;
+import org.example.voice.home.infrastructure.cache.HomeCacheNames;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Repository;
@@ -29,6 +30,7 @@ public class CourseProgressWriterImpl implements CourseProgressWriter {
 
     @Override
     @Caching(evict = {
+            @CacheEvict(cacheNames = HomeCacheNames.COURSE_PROGRESS, allEntries = true),
             @CacheEvict(cacheNames = CourseCacheNames.LIST, allEntries = true),
             @CacheEvict(
                     cacheNames = CourseCacheNames.DETAIL,
@@ -50,6 +52,7 @@ public class CourseProgressWriterImpl implements CourseProgressWriter {
 
     @Override
     @Caching(evict = {
+            @CacheEvict(cacheNames = HomeCacheNames.COURSE_PROGRESS, allEntries = true),
             @CacheEvict(cacheNames = CourseCacheNames.LIST, allEntries = true),
             @CacheEvict(
                     cacheNames = CourseCacheNames.DETAIL,
@@ -72,6 +75,7 @@ public class CourseProgressWriterImpl implements CourseProgressWriter {
 
     @Override
     @Caching(evict = {
+            @CacheEvict(cacheNames = HomeCacheNames.COURSE_PROGRESS, allEntries = true),
             @CacheEvict(cacheNames = CourseCacheNames.LIST, allEntries = true),
             @CacheEvict(
                     cacheNames = CourseCacheNames.DETAIL,

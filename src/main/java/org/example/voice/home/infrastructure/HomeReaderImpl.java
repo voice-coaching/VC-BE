@@ -7,6 +7,7 @@ import org.example.voice.home.domain.model.RecentTrainingData;
 import org.example.voice.home.domain.model.RecommendationItemData;
 import org.example.voice.home.domain.model.TodayLearningStatusData;
 import org.example.voice.home.domain.port.HomeReader;
+import org.example.voice.home.infrastructure.cache.HomeCacheNames;
 import org.example.voice.onboarding.domain.port.OnboardingProfileReader;
 import org.example.voice.practicecontent.domain.entity.PracticeContent;
 import org.example.voice.practicecontent.domain.type.ContentType;
@@ -16,6 +17,7 @@ import org.example.voice.practicecontent.infrastructure.PracticeContentJpaReposi
 import org.example.voice.training.domain.entity.TrainingSession;
 import org.example.voice.training.domain.type.TrainingSessionStatus;
 import org.example.voice.training.infrastructure.TrainingSessionJpaRepository;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -42,6 +44,10 @@ public class HomeReaderImpl implements HomeReader {
     private final OnboardingProfileReader onboardingProfileReader;
 
     @Override
+    @Cacheable(
+            cacheNames = HomeCacheNames.TODAY_STATUS,
+            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).user(#userId)"
+    )
     public TodayLearningStatusData getTodayStatus(Long userId) {
         OffsetDateTime startOfDay = LocalDate.now(SEOUL_ZONE_ID).atStartOfDay(SEOUL_ZONE_ID).toOffsetDateTime();
         OffsetDateTime startOfNextDay = startOfDay.plusDays(1);
@@ -62,6 +68,10 @@ public class HomeReaderImpl implements HomeReader {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = HomeCacheNames.RECOMMENDATIONS,
+            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).recommendations(#userId, #type, #limit)"
+    )
     public List<RecommendationItemData> findRecommendations(Long userId, ContentType type, int limit) {
         PageRequest pageRequest = PageRequest.of(
                 0,
@@ -76,6 +86,11 @@ public class HomeReaderImpl implements HomeReader {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = HomeCacheNames.RECENT_TRAINING,
+            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).user(#userId)",
+            unless = "#result.isEmpty()"
+    )
     public Optional<RecentTrainingData> findRecentTraining(Long userId) {
         return trainingSessionJpaRepository.findLatestByUserId(userId, PageRequest.of(0, 1))
                 .stream()
@@ -84,6 +99,11 @@ public class HomeReaderImpl implements HomeReader {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = HomeCacheNames.COURSE_PROGRESS,
+            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).user(#userId)",
+            unless = "#result.isEmpty()"
+    )
     public Optional<CourseProgressData> findCourseProgress(Long userId) {
         return userCourseProgressJpaRepository.findFirstByUserIdOrderByUpdatedAtDesc(userId)
                 .map(progress -> new CourseProgressData(

@@ -220,12 +220,15 @@
 ### 주요 계약
 
 - `HomeReader`: 홈 화면에 필요한 집계/조회 데이터 계약
+- `home/infrastructure/cache`: 홈 화면 cache name, key 생성 규칙, TTL 제공 계약
 
 ### 소유 경계
 
 - 홈은 여러 모듈의 데이터를 조합해 화면용 read model을 제공한다.
 - 홈 전용 entity를 만들기보다 `domain/model` 기반 조회 모델을 우선 사용한다.
 - 원본 데이터 소유권은 `training`, `course`, `practicecontent`, `analysis`, `onboarding` 모듈에 둔다.
+- 오늘 학습 상태, 추천, 최근 학습, 최근 클래스 진행률 캐시는 `home` infrastructure가 소유한다.
+- 학습 세션, 클래스 진도, 온보딩 목표 변경은 관련 홈 조회 캐시를 무효화한다.
 
 ## Common 컴포넌트
 
