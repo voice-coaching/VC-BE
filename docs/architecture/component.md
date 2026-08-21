@@ -18,6 +18,7 @@
 - Application service는 유스케이스를 수행하고 domain port를 통해 저장소와 외부 기능을 사용한다.
 - Domain port는 application이 필요로 하는 기능 계약을 정의한다.
 - Infrastructure 구현체는 domain port를 구현하며 JPA repository 또는 외부 client를 사용한다.
+- Redis Cache 같은 조회 최적화 구현은 infrastructure reader 또는 기능별 cache 구현에 둔다.
 - Response DTO는 domain model 또는 application 결과를 받아 API 응답 형태로 변환한다.
 - Entity는 외부 API 응답으로 직접 노출하지 않는다.
 
@@ -109,11 +110,13 @@
 
 - `PracticeContentReader`: 학습 콘텐츠 조회와 추천 후보 조회 계약
 - `ReferenceAudioReader`: 기준 음성 조회 계약
+- `practicecontent/infrastructure/cache`: 학습 콘텐츠 cache name, key 생성 규칙, TTL 제공 계약
 
 ### 소유 경계
 
 - 콘텐츠, 기준 음성 entity와 콘텐츠 타입/난이도/학습 초점 enum은 `practicecontent`가 소유한다.
 - 사용자별 학습 기록 기반 추천은 `home` 또는 `training` 데이터와 협력할 수 있지만, 콘텐츠 원본 데이터는 이 모듈이 소유한다.
+- 학습 콘텐츠 목록, 상세, 다음 콘텐츠, 콘텐츠 기반 추천, 기준 음성 목록 캐시는 `practicecontent` infrastructure가 소유한다.
 
 ## Training 컴포넌트
 
@@ -171,11 +174,14 @@
 - `CourseReader`: 클래스 목록/상세 조회 계약
 - `CourseStepReader`: 클래스 단계 조회 계약
 - `CourseProgressReader` / `CourseProgressWriter`: 사용자 클래스 진도 조회와 저장 계약
+- `course/infrastructure/cache`: 클래스 조회 cache name, key 생성 규칙, TTL 제공 계약
 
 ### 소유 경계
 
 - 클래스, 클래스 단계, 사용자 클래스 진도 entity는 `course` 모듈이 소유한다.
 - 클래스 단계가 학습 콘텐츠와 연결될 수 있지만, 콘텐츠 원본은 `practicecontent` 모듈이 소유한다.
+- 클래스 목록, 상세, 단계 목록 캐시는 `course` infrastructure가 소유한다.
+- 사용자별 진도 변경은 클래스 조회 캐시를 무효화한다.
 
 ## Home 컴포넌트
 
@@ -200,6 +206,7 @@
 
 | Package | Responsibility |
 | --- | --- |
+| `common/cache` | 여러 모듈에서 재사용하는 캐시 key 조립 유틸리티와 TTL provider 계약 |
 | `common/config` | Web, Security, JPA, Jackson 설정 |
 | `common/response` | `ApiResponse`, `PageResponse` |
 | `common/exception` | 공통 예외, `ErrorCode`, 전역 예외 처리 |

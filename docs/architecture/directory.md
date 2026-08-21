@@ -101,6 +101,7 @@ src/main/java/org/example/voice
 
 ```text
 common
++-- cache
 +-- config
 +-- enums
 +-- exception
@@ -112,7 +113,8 @@ common
 
 | Path | Responsibility | Examples |
 | --- | --- | --- |
-| `common/config` | 전역 Spring 설정 | `SecurityConfig`, `WebConfig`, `JpaConfig`, `JacksonConfig`, `OpenApiConfig` |
+| `common/cache` | 여러 모듈에서 재사용하는 캐시 기반 유틸리티와 TTL provider 계약 | `CacheKey`, `CacheTtlProvider` |
+| `common/config` | 전역 Spring 설정 | `SecurityConfig`, `WebConfig`, `JpaConfig`, `JacksonConfig`, `OpenApiConfig`, `CacheConfig` |
 | `common/enums` | 여러 모듈에서 공유되는 enum | 현재 placeholder만 존재한다. |
 | `common/exception` | 공통 예외와 전역 예외 처리 | `ErrorCode`, `BaseException`, `BusinessException`, `GlobalExceptionHandler` |
 | `common/response` | 공통 API 응답 모델 | `ApiResponse`, `PageResponse` |
@@ -121,6 +123,15 @@ common
 | `common/util` | 범용 유틸리티 | `DateTimeUtils`, `StringUtils` |
 
 `common`에는 특정 기능만 사용하는 비즈니스 규칙을 두지 않는다.
+
+## 기능별 Infrastructure Cache 구조
+
+기능별 Redis cache name과 key 생성 규칙은 해당 기능의 `infrastructure/cache`에 둔다.
+
+| Path | Responsibility | Examples |
+| --- | --- | --- |
+| `practicecontent/infrastructure/cache` | 학습 콘텐츠 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `PracticeContentCacheNames`, `PracticeContentCacheKeys`, `PracticeContentCacheTtlProvider` |
+| `course/infrastructure/cache` | 클래스 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `CourseCacheNames`, `CourseCacheKeys`, `CourseCacheTtlProvider` |
 
 ## Resources 구조
 

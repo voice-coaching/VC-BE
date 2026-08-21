@@ -206,9 +206,11 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 - Steps:
   1. Controller가 type, category, difficulty, focus, page, size 등 조회 조건을 받는다.
   2. condition DTO가 기본 page/size 값을 보정한다.
-  3. `PracticeContentService` 또는 `ReferenceAudioService`가 콘텐츠를 조회한다.
-  4. 기준 음성 재생 URL이 필요한 경우 권한과 대상 존재 여부를 확인한다.
-  5. 목록, 상세, 기준 음성, 다음 콘텐츠 결과를 response DTO로 변환한다.
+  3. `PracticeContentService` 또는 `ReferenceAudioService`가 domain reader port를 호출한다.
+  4. Infrastructure reader는 Redis Cache에 조회 결과가 있으면 캐시 값을 반환한다.
+  5. 캐시가 없으면 JPA repository로 PostgreSQL을 조회하고 결과를 Redis에 저장한다.
+  6. 기준 음성 재생 URL이 필요한 경우 권한과 대상 존재 여부를 확인한다.
+  7. 목록, 상세, 기준 음성, 다음 콘텐츠 결과를 response DTO로 변환한다.
 - Validation:
   - 콘텐츠 존재 여부
   - 게시 상태 여부
@@ -224,8 +226,10 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - 로그인 사용자는 게시된 콘텐츠만 조회한다.
 - Retry or recovery:
   - 다른 필터 조건으로 다시 조회할 수 있다.
+  - 캐시 값은 TTL 만료 후 다음 조회에서 DB 값으로 다시 채워진다.
 - Side effects:
   - 일반 조회는 DB 변경을 만들지 않는다.
+  - 학습 콘텐츠 목록, 상세, 다음 콘텐츠, 콘텐츠 기반 추천, 기준 음성 목록 조회는 Redis cache entry를 생성할 수 있다.
   - 재생 URL 발급은 외부 storage/CDN 접근을 만들 수 있다.
 - Related API:
   - `GET /api/practice-contents`
@@ -421,11 +425,12 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - 클래스는 게시 상태여야 한다.
 - Steps:
   1. 사용자가 클래스 목록을 조회한다.
-  2. 클래스 상세와 단계 목록을 조회한다.
-  3. 시작 API가 사용자 클래스 진도 record를 생성하거나 기존 record를 반환한다.
-  4. 사용자가 단계 학습을 진행하며 lastStepId와 progressPercent를 갱신한다.
-  5. 모든 필수 단계 완료 조건을 만족하면 클래스 완료 API를 호출한다.
-  6. 완료 시 사용자 클래스 진도 상태를 COMPLETED로 변경한다.
+  2. `CourseReader` 또는 `CourseStepReader` infrastructure 구현체가 Redis Cache에 조회 결과가 있으면 캐시 값을 반환한다.
+  3. 캐시가 없으면 JPA repository로 클래스 상세와 단계 목록을 조회하고 결과를 Redis에 저장한다.
+  4. 시작 API가 사용자 클래스 진도 record를 생성하거나 기존 진도를 반환한다.
+  5. 사용자가 단계 학습을 진행하며 lastStepId와 progressPercent를 갱신한다.
+  6. 모든 필수 단계 완료 조건을 만족하면 클래스 완료 API를 호출한다.
+  7. 완료 시 사용자 클래스 진도 상태를 COMPLETED로 변경한다.
 - Validation:
   - course 존재 여부
   - course publish 상태
@@ -444,8 +449,11 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - 본인 클래스 진도만 조회/수정할 수 있다.
 - Retry or recovery:
   - 잘못된 step/progress 값을 수정해 다시 요청한다.
+  - 캐시 값은 TTL 만료 후 다음 조회에서 DB 값으로 다시 채워진다.
 - Side effects:
   - `user_course_progress`가 생성 또는 갱신된다.
+  - 클래스 목록, 상세, 단계 목록 조회는 Redis cache entry를 생성할 수 있다.
+  - 클래스 시작, 진도 수정, 완료 처리는 사용자별 클래스 조회 캐시를 무효화한다.
 - Related API:
   - `GET /api/courses`
   - `GET /api/courses/{courseId}`

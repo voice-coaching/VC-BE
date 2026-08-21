@@ -9,8 +9,22 @@ Redis와 Redis Insight는 Docker Compose로 실행한다.
 - Redis: `127.0.0.1:6379`
 - Redis Insight: `127.0.0.1:5540`
 - Redis password: `.env`의 `REDIS_PASSWORD`
+- Application usage: Spring Cache 기반 조회 캐시
 
 `docker-compose.yml`은 두 포트를 EC2 localhost에만 바인딩한다. 따라서 EC2 보안 그룹에서 `6379`, `5540`을 외부에 열지 않는다.
+
+## Redis Cache Usage
+
+Spring Boot 애플리케이션은 Redis를 조회 캐시 저장소로 사용한다.
+
+- 공통 설정: `common/config/CacheConfig`
+- 공통 key 유틸리티와 TTL provider 계약: `common/cache`
+- 기능별 cache name/key/TTL provider: 각 기능의 `infrastructure/cache`
+- 현재 적용 범위: 학습 콘텐츠 목록, 상세, 다음 콘텐츠, 콘텐츠 기반 추천, 기준 음성 목록, 클래스 목록, 클래스 상세, 클래스 단계 목록
+
+TTL은 cache name별로 애플리케이션 설정에서 관리한다. 현재 학습 콘텐츠 목록, 다음 콘텐츠, 콘텐츠 기반 추천은 10분, 상세와 기준 음성 목록은 30분을 사용한다. 클래스 목록은 10분, 클래스 상세와 단계 목록은 20분을 사용한다.
+
+클래스 조회 캐시는 사용자별 진도 정보를 포함하므로 cache key에 `userId`를 포함한다. 클래스 시작, 진도 수정, 완료 처리 시 관련 클래스 상세와 단계 목록 캐시는 해당 사용자/클래스 기준으로 무효화하고, 클래스 목록 캐시는 전체 무효화한다.
 
 ## Environment
 

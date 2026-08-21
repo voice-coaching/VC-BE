@@ -18,6 +18,7 @@ voice는 발음 및 억양 학습을 위한 Spring Boot 기반 백엔드 프로�
 - Authentication: JWT Access Token / Refresh Token
 - API Documentation: Springdoc OpenAPI
 - External Integration: OAuth, storage presigned URL, STT/AI feedback provider
+- Cache: Redis Cache
 
 ## 주요 기능
 
@@ -124,6 +125,7 @@ src/main/java/org/example/voice
 
 ```text
 common
++-- cache
 +-- config
 +-- response
 +-- exception
@@ -133,7 +135,8 @@ common
 +-- util
 ```
 
-- `config`: Web, Security, JPA, Jackson 등 전역 설정
+- `cache`: 캐시 key 조립 등 여러 모듈에서 재사용하는 캐시 기반 유틸리티
+- `config`: Web, Security, JPA, Jackson, Redis Cache 등 전역 설정
 - `response`: `ApiResponse`, `PageResponse`
 - `exception`: `ErrorCode`, `BaseException`, `BusinessException`, `GlobalExceptionHandler`
 - `security`: JWT 인증 필터, 로그인 사용자 컨텍스트
@@ -163,10 +166,12 @@ Client
 -> Controller
 -> Application Service
 -> Domain Port
--> Infrastructure Reader
+-> Infrastructure Reader / Redis Cache
 -> JPA Repository
 -> Database
 ```
+
+조회 결과 캐시는 infrastructure reader 구현체의 `@Cacheable` 경계에서 적용한다. Application service와 Controller는 Redis 세부사항에 의존하지 않는다.
 
 일반적인 명령 흐름:
 
@@ -210,6 +215,18 @@ Domain Entity / Domain Model
 - 읽기와 쓰기 책임이 커지면 `Reader`와 `Writer` port로 분리한다.
 - Entity 변경 시 DB schema 문서와 migration 필요 여부를 함께 검토한다.
 
+## 캐시 경계
+
+- Redis Cache는 반복 조회가 많고 변경 빈도가 낮은 read model에 우선 적용한다.
+- 캐시 설정과 공통 key 유틸리티는 `common/config`, `common/cache`에 둔다.
+- 기능별 TTL은 `common/cache/CacheTtlProvider` 구현체로 제공한다.
+- 기능별 cache name과 key 생성 규칙은 각 기능의 `infrastructure/cache`에 둔다.
+- 캐시 적용은 domain port 구현체인 infrastructure reader에서 수행한다.
+- 존재하지 않는 단일 리소스나 다음 콘텐츠 없음 같은 negative lookup은 캐시하지 않는다.
+- 학습 콘텐츠 목록, 상세, 다음 콘텐츠, 콘텐츠 기반 추천, 기준 음성 목록은 TTL 기반으로 만료한다.
+- 클래스 목록, 상세, 단계 목록은 사용자별 진도 정보가 포함되므로 cache key에 `userId`를 포함한다.
+- 클래스 시작, 진도 수정, 완료 처리 시 클래스 목록 캐시는 전체 무효화하고 상세/단계 캐시는 해당 `userId`와 `courseId` 기준으로 무효화한다.
+
 ## 아키텍처 결정
 
 | Date | Decision | Reason | Impact |
@@ -217,3 +234,4 @@ Domain Entity / Domain Model
 | 2026-08-12 | 기능 단위 패키지와 4계층 구조를 기본 구조로 사용한다. | 도메인별 책임을 분리하고 API, 유스케이스, 도메인, 인프라 변경 범위를 줄이기 위해서이다. | 신규 기능은 `<feature>/controller`, `application`, `domain`, `infrastructure` 구조를 따른다. |
 | 2026-08-12 | API DTO는 `controller/dto`, 조회/집계 모델은 `domain/model`에 둔다. | 외부 API 계약과 내부 도메인 데이터를 분리하기 위해서이다. | Entity를 API 응답으로 직접 노출하지 않고 DTO 변환을 명시한다. |
 | 2026-08-12 | 저장소와 외부 연동은 domain port와 infrastructure 구현으로 분리한다. | application layer가 DB/JPA/외부 provider 세부사항에 강하게 결합되는 것을 줄이기 위해서이다. | Reader/Writer/Provider port와 `*Impl`, `*JpaRepository` 구현을 사용한다. |
+| 2026-08-20 | Redis Cache는 infrastructure reader 경계에서 적용한다. | 조회 성능을 개선하면서 Controller와 application service가 Redis 세부사항에 의존하지 않도록 하기 위해서이다. | 공통 캐시 설정은 `common`, 기능별 캐시 이름과 key/TTL 규칙은 각 기능의 `infrastructure/cache`에 둔다. |

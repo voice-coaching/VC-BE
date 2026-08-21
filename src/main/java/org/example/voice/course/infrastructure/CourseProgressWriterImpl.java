@@ -11,6 +11,9 @@ import org.example.voice.course.domain.model.CourseProgressData;
 import org.example.voice.course.domain.port.CourseProgressWriter;
 import org.example.voice.course.domain.type.CourseProgressStatus;
 import org.example.voice.course.exception.CourseAlreadyCompletedException;
+import org.example.voice.course.infrastructure.cache.CourseCacheNames;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
@@ -25,6 +28,17 @@ public class CourseProgressWriterImpl implements CourseProgressWriter {
     private final UserCourseProgressJpaRepository userCourseProgressJpaRepository;
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CourseCacheNames.LIST, allEntries = true),
+            @CacheEvict(
+                    cacheNames = CourseCacheNames.DETAIL,
+                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)"
+            ),
+            @CacheEvict(
+                    cacheNames = CourseCacheNames.STEPS,
+                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)"
+            )
+    })
     public CourseProgressData startCourse(Long courseId, Long userId) {
         Course course = courseJpaRepository.findById(courseId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
@@ -35,6 +49,17 @@ public class CourseProgressWriterImpl implements CourseProgressWriter {
     }
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CourseCacheNames.LIST, allEntries = true),
+            @CacheEvict(
+                    cacheNames = CourseCacheNames.DETAIL,
+                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)"
+            ),
+            @CacheEvict(
+                    cacheNames = CourseCacheNames.STEPS,
+                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)"
+            )
+    })
     public CourseProgressData updateCourseProgress(Long courseId, Long userId, CourseProgressUpdateRequestDto request) {
         validateProgressPercent(request);
         validateLastStep(request.lastStepId(), courseId);
@@ -46,6 +71,17 @@ public class CourseProgressWriterImpl implements CourseProgressWriter {
     }
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CourseCacheNames.LIST, allEntries = true),
+            @CacheEvict(
+                    cacheNames = CourseCacheNames.DETAIL,
+                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)"
+            ),
+            @CacheEvict(
+                    cacheNames = CourseCacheNames.STEPS,
+                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)"
+            )
+    })
     public CourseProgressData completeCourse(Long courseId, Long userId) {
         UserCourseProgress progress = userCourseProgressJpaRepository.findByUserIdAndCourseId(userId, courseId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));

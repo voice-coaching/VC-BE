@@ -10,6 +10,8 @@ import org.example.voice.practicecontent.domain.model.PracticeContentRecommendat
 import org.example.voice.practicecontent.domain.model.PracticeContentSummaryData;
 import org.example.voice.practicecontent.domain.port.PracticeContentReader;
 import org.example.voice.practicecontent.domain.type.PublishStatus;
+import org.example.voice.practicecontent.infrastructure.cache.PracticeContentCacheNames;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -32,6 +34,10 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     private final ReferenceAudioJpaRepository referenceAudioJpaRepository;
 
     @Override
+    @Cacheable(
+            cacheNames = PracticeContentCacheNames.LIST,
+            key = "T(org.example.voice.practicecontent.infrastructure.cache.PracticeContentCacheKeys).list(#condition)"
+    )
     public PracticeContentPageData<PracticeContentSummaryData> findPracticeContents(PracticeContentQueryConditionDto condition) {
         PageRequest pageRequest = PageRequest.of(
                 condition.page(),
@@ -46,6 +52,11 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = PracticeContentCacheNames.DETAIL,
+            key = "#contentId",
+            unless = "#result.isEmpty()"
+    )
     public Optional<PracticeContentDetailData> findPracticeContent(Long contentId) {
         return practiceContentJpaRepository.findById(contentId)
                 .filter(PracticeContent::isPublished)
@@ -65,6 +76,11 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = PracticeContentCacheNames.NEXT,
+            key = "T(org.example.voice.practicecontent.infrastructure.cache.PracticeContentCacheKeys).next(#condition)",
+            unless = "#result.isEmpty()"
+    )
     public Optional<PracticeContentSummaryData> findNextPracticeContent(PracticeContentNextConditionDto condition) {
         Page<PracticeContent> page = practiceContentJpaRepository.findAll(
                 nextSpec(condition),
@@ -76,6 +92,11 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = PracticeContentCacheNames.RECOMMENDATIONS,
+            key = "#contentId",
+            unless = "#result.isEmpty()"
+    )
     public Optional<List<PracticeContentRecommendationData>> findRecommendationsByContentId(Long contentId) {
         return practiceContentJpaRepository.findById(contentId)
                 .filter(PracticeContent::isPublished)
