@@ -27,7 +27,7 @@ public class CourseStepReaderImpl implements CourseStepReader {
     @Cacheable(
             cacheNames = CourseCacheNames.STEPS,
             key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#p1, #p0)",
-            unless = "!#result.isPresent()"
+            unless = "#result == null"
     )
     public Optional<CourseStepListData> findCourseSteps(Long courseId, Long userId) {
         if (!courseJpaRepository.existsById(courseId)) {

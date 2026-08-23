@@ -105,7 +105,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     @Cacheable(
             cacheNames = MyPageCacheNames.HISTORY_DETAIL,
             key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys).historyDetail(#p0, #p1)",
-            unless = "!#result.isPresent()"
+            unless = "#result == null"
     )
     public Optional<MyPageData.HistoryDetail> findHistoryDetail(Long userId, Long sessionId) {
         List<Object[]> sessions = entityManager.createQuery("""

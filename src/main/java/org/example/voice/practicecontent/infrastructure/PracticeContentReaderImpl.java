@@ -55,7 +55,7 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     @Cacheable(
             cacheNames = PracticeContentCacheNames.DETAIL,
             key = "#p0",
-            unless = "!#result.isPresent()"
+            unless = "#result == null"
     )
     public Optional<PracticeContentDetailData> findPracticeContent(Long contentId) {
         return practiceContentJpaRepository.findById(contentId)
@@ -79,7 +79,7 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     @Cacheable(
             cacheNames = PracticeContentCacheNames.NEXT,
             key = "T(org.example.voice.practicecontent.infrastructure.cache.PracticeContentCacheKeys).next(#p0)",
-            unless = "!#result.isPresent()"
+            unless = "#result == null"
     )
     public Optional<PracticeContentSummaryData> findNextPracticeContent(PracticeContentNextConditionDto condition) {
         Page<PracticeContent> page = practiceContentJpaRepository.findAll(
@@ -95,7 +95,7 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     @Cacheable(
             cacheNames = PracticeContentCacheNames.RECOMMENDATIONS,
             key = "#p0",
-            unless = "!#result.isPresent()"
+            unless = "#result == null"
     )
     public Optional<List<PracticeContentRecommendationData>> findRecommendationsByContentId(Long contentId) {
         return practiceContentJpaRepository.findById(contentId)

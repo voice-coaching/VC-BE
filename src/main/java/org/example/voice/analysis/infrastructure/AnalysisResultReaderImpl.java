@@ -37,7 +37,7 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
     @Cacheable(
             cacheNames = AnalysisCacheNames.DETAIL,
             key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).owned(#p1, #p0)",
-            unless = "!#result.isPresent() || !#result.get().isCompleted()"
+            unless = "#result == null || !#result.isCompleted()"
     )
     public Optional<AnalysisResultData> findOwnedData(Long analysisId, Long userId) {
         return repository.findByIdAndRecordingTrainingSessionUserId(analysisId, userId)
@@ -48,7 +48,7 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
     @Cacheable(
             cacheNames = AnalysisCacheNames.SESSION_RESULT,
             key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).session(#p1, #p0)",
-            unless = "!#result.isPresent() || !#result.get().isCompleted()"
+            unless = "#result == null || !#result.isCompleted()"
     )
     public Optional<AnalysisResultData> findLatestBySessionData(Long sessionId, Long userId) {
         return repository
