@@ -19,6 +19,7 @@ import org.example.voice.training.domain.type.TrainingSessionStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ import java.time.OffsetDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@Import(NoOpCacheConfig.class)
 @Transactional
 class MyPagePersistenceAdapterTest {
     @Autowired MyPagePersistenceAdapter adapter;
