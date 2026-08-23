@@ -59,7 +59,7 @@ public class CourseReaderImpl implements CourseReader {
     @Cacheable(
             cacheNames = CourseCacheNames.DETAIL,
             key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#p1, #p0)",
-            unless = "#result.isEmpty()"
+            unless = "!#result.isPresent()"
     )
     public Optional<CourseDetailData> findCourse(Long courseId, Long userId) {
         return courseJpaRepository.findById(courseId)

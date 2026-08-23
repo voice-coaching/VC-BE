@@ -89,7 +89,7 @@ public class HomeReaderImpl implements HomeReader {
     @Cacheable(
             cacheNames = HomeCacheNames.RECENT_TRAINING,
             key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).user(#p0)",
-            unless = "#result.isEmpty()"
+            unless = "!#result.isPresent()"
     )
     public Optional<RecentTrainingData> findRecentTraining(Long userId) {
         return trainingSessionJpaRepository.findLatestByUserId(userId, PageRequest.of(0, 1))
@@ -102,7 +102,7 @@ public class HomeReaderImpl implements HomeReader {
     @Cacheable(
             cacheNames = HomeCacheNames.COURSE_PROGRESS,
             key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).user(#p0)",
-            unless = "#result.isEmpty()"
+            unless = "!#result.isPresent()"
     )
     public Optional<CourseProgressData> findCourseProgress(Long userId) {
         return userCourseProgressJpaRepository.findFirstByUserIdOrderByUpdatedAtDesc(userId)
