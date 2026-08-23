@@ -36,7 +36,7 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     @Override
     @Cacheable(
             cacheNames = PracticeContentCacheNames.LIST,
-            key = "T(org.example.voice.practicecontent.infrastructure.cache.PracticeContentCacheKeys).list(#condition)"
+            key = "T(org.example.voice.practicecontent.infrastructure.cache.PracticeContentCacheKeys).list(#p0)"
     )
     public PracticeContentPageData<PracticeContentSummaryData> findPracticeContents(PracticeContentQueryConditionDto condition) {
         PageRequest pageRequest = PageRequest.of(
@@ -54,7 +54,7 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     @Override
     @Cacheable(
             cacheNames = PracticeContentCacheNames.DETAIL,
-            key = "#contentId",
+            key = "#p0",
             unless = "#result.isEmpty()"
     )
     public Optional<PracticeContentDetailData> findPracticeContent(Long contentId) {
@@ -78,7 +78,7 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     @Override
     @Cacheable(
             cacheNames = PracticeContentCacheNames.NEXT,
-            key = "T(org.example.voice.practicecontent.infrastructure.cache.PracticeContentCacheKeys).next(#condition)",
+            key = "T(org.example.voice.practicecontent.infrastructure.cache.PracticeContentCacheKeys).next(#p0)",
             unless = "#result.isEmpty()"
     )
     public Optional<PracticeContentSummaryData> findNextPracticeContent(PracticeContentNextConditionDto condition) {
@@ -94,7 +94,7 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     @Override
     @Cacheable(
             cacheNames = PracticeContentCacheNames.RECOMMENDATIONS,
-            key = "#contentId",
+            key = "#p0",
             unless = "#result.isEmpty()"
     )
     public Optional<List<PracticeContentRecommendationData>> findRecommendationsByContentId(Long contentId) {

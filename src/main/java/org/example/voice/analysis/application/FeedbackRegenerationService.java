@@ -31,7 +31,7 @@ public class FeedbackRegenerationService {
     @Transactional
     @CacheEvict(
             cacheNames = AnalysisCacheNames.DETAIL,
-            key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).owned(#userId, #analysisId)"
+            key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).owned(#p1, #p0)"
     )
     public AnalysisResult regenerate(Long analysisId, Long userId, FeedbackStyle style) {
         AnalysisResult result = reader.findOwnedForUpdate(analysisId, userId).orElseThrow(AnalysisNotFoundException::new);

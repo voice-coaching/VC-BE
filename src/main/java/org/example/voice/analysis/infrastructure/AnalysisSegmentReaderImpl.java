@@ -29,7 +29,7 @@ public class AnalysisSegmentReaderImpl implements AnalysisSegmentReader {
     @Override
     @Cacheable(
             cacheNames = AnalysisCacheNames.SEGMENTS,
-            key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).segments(#userId, #analysisId, #page, #size)"
+            key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).segments(#p1, #p0, #p2, #p3)"
     )
     public AnalysisSegmentPageData findPageData(Long analysisId, Long userId, int page, int size) {
         List<AnalysisSegmentData> items = repository

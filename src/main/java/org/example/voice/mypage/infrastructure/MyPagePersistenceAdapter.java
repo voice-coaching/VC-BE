@@ -57,7 +57,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     @Cacheable(
             cacheNames = MyPageCacheNames.HISTORY,
             key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys)"
-                    + ".history(#userId, #type, #status, #from, #to, #page, #size)"
+                    + ".history(#p0, #p1, #p2, #p3, #p4, #p5, #p6)"
     )
     public MyPageData.HistoryPage findHistory(Long userId, ContentType type, TrainingSessionStatus status,
                                               OffsetDateTime from, OffsetDateTime to, int page, int size) {
@@ -104,7 +104,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     @Override
     @Cacheable(
             cacheNames = MyPageCacheNames.HISTORY_DETAIL,
-            key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys).historyDetail(#userId, #sessionId)",
+            key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys).historyDetail(#p0, #p1)",
             unless = "#result.isEmpty()"
     )
     public Optional<MyPageData.HistoryDetail> findHistoryDetail(Long userId, Long sessionId) {
@@ -142,7 +142,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     @Cacheable(
             cacheNames = MyPageCacheNames.STATISTICS,
             key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys)"
-                    + ".statistics(#userId, #from, #to, #todayFrom, #todayTo)"
+                    + ".statistics(#p0, #p1, #p2, #p3, #p4)"
     )
     public MyPageData.Statistics calculateStatistics(Long userId, OffsetDateTime from, OffsetDateTime to,
                                                      OffsetDateTime todayFrom, OffsetDateTime todayTo) {
@@ -180,7 +180,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     @Override
     @Cacheable(
             cacheNames = MyPageCacheNames.UNIT_SCORES,
-            key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys).unitScores(#userId, #from, #to)"
+            key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys).unitScores(#p0, #p1, #p2)"
     )
     public List<MyPageData.UnitScore> findUnitScores(Long userId, OffsetDateTime from, OffsetDateTime to) {
         List<Object[]> rows = entityManager.createQuery("""
@@ -215,7 +215,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     @Cacheable(
             cacheNames = MyPageCacheNames.SCORE_TREND,
             key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys)"
-                    + ".scoreTrend(#userId, #metric, #from, #to)"
+                    + ".scoreTrend(#p0, #p1, #p2, #p3)"
     )
     public List<MyPageData.TrendPoint> findScoreTrend(Long userId, String metric, OffsetDateTime from, OffsetDateTime to) {
         String field = switch (metric) { case "OVERALL" -> "a.overallScore"; case "PRONUNCIATION" -> "a.pronunciationScore";
@@ -237,7 +237,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     @Cacheable(
             cacheNames = MyPageCacheNames.RECOMMENDATIONS,
             key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys)"
-                    + ".recommendations(#targetUnits, #contentType, #limit)"
+                    + ".recommendations(#p0, #p1, #p2)"
     )
     public List<MyPageData.Recommendation> findRecommendations(List<String> targetUnits, ContentType contentType, int limit) {
         if (targetUnits.isEmpty()) return List.of();

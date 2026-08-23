@@ -46,7 +46,7 @@ public class HomeReaderImpl implements HomeReader {
     @Override
     @Cacheable(
             cacheNames = HomeCacheNames.TODAY_STATUS,
-            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).user(#userId)"
+            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).user(#p0)"
     )
     public TodayLearningStatusData getTodayStatus(Long userId) {
         OffsetDateTime startOfDay = LocalDate.now(SEOUL_ZONE_ID).atStartOfDay(SEOUL_ZONE_ID).toOffsetDateTime();
@@ -70,7 +70,7 @@ public class HomeReaderImpl implements HomeReader {
     @Override
     @Cacheable(
             cacheNames = HomeCacheNames.RECOMMENDATIONS,
-            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).recommendations(#userId, #type, #limit)"
+            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).recommendations(#p0, #p1, #p2)"
     )
     public List<RecommendationItemData> findRecommendations(Long userId, ContentType type, int limit) {
         PageRequest pageRequest = PageRequest.of(
@@ -88,7 +88,7 @@ public class HomeReaderImpl implements HomeReader {
     @Override
     @Cacheable(
             cacheNames = HomeCacheNames.RECENT_TRAINING,
-            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).user(#userId)",
+            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).user(#p0)",
             unless = "#result.isEmpty()"
     )
     public Optional<RecentTrainingData> findRecentTraining(Long userId) {
@@ -101,7 +101,7 @@ public class HomeReaderImpl implements HomeReader {
     @Override
     @Cacheable(
             cacheNames = HomeCacheNames.COURSE_PROGRESS,
-            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).user(#userId)",
+            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).user(#p0)",
             unless = "#result.isEmpty()"
     )
     public Optional<CourseProgressData> findCourseProgress(Long userId) {

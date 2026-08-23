@@ -34,11 +34,11 @@ public class CourseProgressWriterImpl implements CourseProgressWriter {
             @CacheEvict(cacheNames = CourseCacheNames.LIST, allEntries = true),
             @CacheEvict(
                     cacheNames = CourseCacheNames.DETAIL,
-                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)"
+                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#p1, #p0)"
             ),
             @CacheEvict(
                     cacheNames = CourseCacheNames.STEPS,
-                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)"
+                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#p1, #p0)"
             )
     })
     public CourseProgressData startCourse(Long courseId, Long userId) {
@@ -56,11 +56,11 @@ public class CourseProgressWriterImpl implements CourseProgressWriter {
             @CacheEvict(cacheNames = CourseCacheNames.LIST, allEntries = true),
             @CacheEvict(
                     cacheNames = CourseCacheNames.DETAIL,
-                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)"
+                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#p1, #p0)"
             ),
             @CacheEvict(
                     cacheNames = CourseCacheNames.STEPS,
-                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)"
+                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#p1, #p0)"
             )
     })
     public CourseProgressData updateCourseProgress(Long courseId, Long userId, CourseProgressUpdateRequestDto request) {
@@ -79,11 +79,11 @@ public class CourseProgressWriterImpl implements CourseProgressWriter {
             @CacheEvict(cacheNames = CourseCacheNames.LIST, allEntries = true),
             @CacheEvict(
                     cacheNames = CourseCacheNames.DETAIL,
-                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)"
+                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#p1, #p0)"
             ),
             @CacheEvict(
                     cacheNames = CourseCacheNames.STEPS,
-                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)"
+                    key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#p1, #p0)"
             )
     })
     public CourseProgressData completeCourse(Long courseId, Long userId) {

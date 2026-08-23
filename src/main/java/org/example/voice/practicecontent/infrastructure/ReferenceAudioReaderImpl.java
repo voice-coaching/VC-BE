@@ -29,7 +29,7 @@ public class ReferenceAudioReaderImpl implements ReferenceAudioReader {
     @Override
     @Cacheable(
             cacheNames = PracticeContentCacheNames.EXISTS,
-            key = "#contentId",
+            key = "#p0",
             unless = "#result == false"
     )
     public boolean existsPracticeContent(Long contentId) {
@@ -39,7 +39,7 @@ public class ReferenceAudioReaderImpl implements ReferenceAudioReader {
     @Override
     @Cacheable(
             cacheNames = PracticeContentCacheNames.REFERENCE_AUDIO_LIST,
-            key = "#contentId"
+            key = "#p0"
     )
     public List<ReferenceAudioData> findReferenceAudiosByContentId(Long contentId) {
         return referenceAudioJpaRepository.findByContentIdOrderByPrimaryDescIdAsc(contentId)

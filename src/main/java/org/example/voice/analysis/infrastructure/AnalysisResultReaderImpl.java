@@ -36,7 +36,7 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
     @Override
     @Cacheable(
             cacheNames = AnalysisCacheNames.DETAIL,
-            key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).owned(#userId, #analysisId)",
+            key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).owned(#p1, #p0)",
             unless = "#result.isEmpty() || !#result.get().isCompleted()"
     )
     public Optional<AnalysisResultData> findOwnedData(Long analysisId, Long userId) {
@@ -47,7 +47,7 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
     @Override
     @Cacheable(
             cacheNames = AnalysisCacheNames.SESSION_RESULT,
-            key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).session(#userId, #sessionId)",
+            key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).session(#p1, #p0)",
             unless = "#result.isEmpty() || !#result.get().isCompleted()"
     )
     public Optional<AnalysisResultData> findLatestBySessionData(Long sessionId, Long userId) {

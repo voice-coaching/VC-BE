@@ -37,7 +37,7 @@ public class CourseReaderImpl implements CourseReader {
     @Override
     @Cacheable(
             cacheNames = CourseCacheNames.LIST,
-            key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).list(#condition, #userId)"
+            key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).list(#p0, #p1)"
     )
     public CoursePageData<CourseSummaryData> findCourses(CourseSearchConditionDto condition, Long userId) {
         PageRequest pageRequest = PageRequest.of(
@@ -58,7 +58,7 @@ public class CourseReaderImpl implements CourseReader {
     @Override
     @Cacheable(
             cacheNames = CourseCacheNames.DETAIL,
-            key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#userId, #courseId)",
+            key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#p1, #p0)",
             unless = "#result.isEmpty()"
     )
     public Optional<CourseDetailData> findCourse(Long courseId, Long userId) {
