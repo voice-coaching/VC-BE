@@ -198,7 +198,7 @@ Domain Entity / Domain Model
 - 공개 API는 회원가입, 로그인, 소셜 로그인, 토큰 갱신처럼 명확한 경우에만 허용한다.
 - 그 외 API는 기본적으로 `Authorization: Bearer <accessToken>`을 요구한다.
 - 인증은 security 계층에서 처리하고, 권한 및 소유권 검증은 application layer에서 명시적으로 수행한다.
-- 현재 임시 구현에 하드코딩된 `userId`가 있더라도 최종 구조는 로그인 사용자 컨텍스트를 기준으로 한다.
+- Controller는 인증된 `LoginUser`의 `userId`를 application layer에 명시적으로 전달한다.
 
 ## 외부 연동 경계
 

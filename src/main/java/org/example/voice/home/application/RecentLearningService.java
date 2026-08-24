@@ -11,13 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RecentLearningService {
 
-    private static final Long TEMP_LOGIN_USER_ID = 1L;
-
     private final HomeReader homeReader;
 
     @Transactional(readOnly = true)
-    public RecentTrainingSessionResponseDto getRecentTrainingSession() {
-        return homeReader.findRecentTraining(TEMP_LOGIN_USER_ID)
+    public RecentTrainingSessionResponseDto getRecentTrainingSession(Long userId) {
+        return homeReader.findRecentTraining(userId)
                 .map(RecentTrainingSessionResponseDto::from)
                 .orElseThrow(RecentTrainingNotFoundException::new);
     }

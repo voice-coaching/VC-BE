@@ -10,13 +10,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class HomeService {
 
-    private static final Long TEMP_LOGIN_USER_ID = 1L;
-
     private final HomeReader homeReader;
 
     @Transactional(readOnly = true)
-    public HomeDashboardResponseDto getHomeDashboard() {
-        Long userId = TEMP_LOGIN_USER_ID;
+    public HomeDashboardResponseDto getHomeDashboard(Long userId) {
         return HomeDashboardResponseDto.from(
                 homeReader.getTodayStatus(userId),
                 homeReader.findRecommendations(userId, null, 1),

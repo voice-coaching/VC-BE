@@ -50,8 +50,10 @@ public class UserController {
     }
 
     @GetMapping("/me/training-sessions/recent")
-    public ApiResponse<RecentTrainingSessionResponseDto> getRecentTrainingSession() {
-        RecentTrainingSessionResponseDto response = recentLearningService.getRecentTrainingSession();
+    public ApiResponse<RecentTrainingSessionResponseDto> getRecentTrainingSession(
+            @AuthenticationPrincipal LoginUser loginUser
+    ) {
+        RecentTrainingSessionResponseDto response = recentLearningService.getRecentTrainingSession(loginUser.id());
         return ApiResponse.success("최근 학습 정보를 조회했습니다.", response);
     }
 }
