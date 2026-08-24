@@ -10,6 +10,8 @@ import org.example.voice.course.domain.model.CourseProgressSummaryData;
 import org.example.voice.course.domain.model.CourseSummaryData;
 import org.example.voice.course.domain.port.CourseReader;
 import org.example.voice.course.domain.type.CourseProgressStatus;
+import org.example.voice.course.infrastructure.cache.CourseCacheNames;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -33,6 +35,10 @@ public class CourseReaderImpl implements CourseReader {
     private final UserCourseProgressJpaRepository userCourseProgressJpaRepository;
 
     @Override
+    @Cacheable(
+            cacheNames = CourseCacheNames.LIST,
+            key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).list(#p0, #p1)"
+    )
     public CoursePageData<CourseSummaryData> findCourses(CourseSearchConditionDto condition, Long userId) {
         PageRequest pageRequest = PageRequest.of(
                 condition.page(),
@@ -50,6 +56,11 @@ public class CourseReaderImpl implements CourseReader {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = CourseCacheNames.DETAIL,
+            key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#p1, #p0)",
+            unless = "#result == null"
+    )
     public Optional<CourseDetailData> findCourse(Long courseId, Long userId) {
         return courseJpaRepository.findById(courseId)
                 .map(course -> toDetailData(course, findProgress(userId, courseId)));

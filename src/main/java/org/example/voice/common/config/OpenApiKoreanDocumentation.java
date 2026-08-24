@@ -146,6 +146,7 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/practice-contents/next", "학습 콘텐츠", "다음 학습 콘텐츠 추천", "현재 콘텐츠와 조회 조건을 기준으로 이어서 학습할 다음 콘텐츠를 찾습니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/practice-contents/{contentId}", "학습 콘텐츠", "학습 콘텐츠 상세 조회", "선택한 콘텐츠의 원문, 난이도, 학습 포인트와 부가 정보를 조회합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/practice-contents/{contentId}/reference-audios", "학습 콘텐츠", "예시 음성 목록 조회", "학습 콘텐츠에 등록된 아나운서 또는 예시 발화 음성 목록을 조회합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/practice-contents/{contentId}/recommendations", "학습 콘텐츠", "콘텐츠 기반 추천 조회", "선택한 콘텐츠와 난이도 및 학습 초점이 유사한 콘텐츠 목록을 조회합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/reference-audios/{audioId}/playback-url", "학습 콘텐츠", "예시 음성 재생 URL 발급", "예시 음성을 제한된 시간 동안 재생할 수 있는 URL을 발급합니다.", false);
 
         add(map, PathItem.HttpMethod.POST, "/api/training-sessions", "학습 세션", "학습 세션 생성", "학습할 콘텐츠와 학습 초점을 선택해 새로운 녹음·분석 세션을 시작합니다.", false);

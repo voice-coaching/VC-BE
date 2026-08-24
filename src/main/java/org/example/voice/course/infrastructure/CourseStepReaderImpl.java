@@ -6,6 +6,8 @@ import org.example.voice.course.domain.entity.UserCourseProgress;
 import org.example.voice.course.domain.model.CourseStepData;
 import org.example.voice.course.domain.model.CourseStepListData;
 import org.example.voice.course.domain.port.CourseStepReader;
+import org.example.voice.course.infrastructure.cache.CourseCacheNames;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Repository;
 
@@ -22,6 +24,11 @@ public class CourseStepReaderImpl implements CourseStepReader {
     private final UserCourseProgressJpaRepository userCourseProgressJpaRepository;
 
     @Override
+    @Cacheable(
+            cacheNames = CourseCacheNames.STEPS,
+            key = "T(org.example.voice.course.infrastructure.cache.CourseCacheKeys).userCourse(#p1, #p0)",
+            unless = "#result == null"
+    )
     public Optional<CourseStepListData> findCourseSteps(Long courseId, Long userId) {
         if (!courseJpaRepository.existsById(courseId)) {
             return Optional.empty();

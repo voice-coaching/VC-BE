@@ -2,9 +2,11 @@ package org.example.voice.course.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.example.voice.common.response.ApiResponse;
+import org.example.voice.common.security.LoginUser;
 import org.example.voice.course.application.CourseProgressService;
 import org.example.voice.course.controller.dto.CourseProgressListResponseDto;
 import org.example.voice.course.controller.dto.CourseProgressSearchConditionDto;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,10 +21,10 @@ public class UserCourseProgressController {
 
     @GetMapping
     public ApiResponse<CourseProgressListResponseDto> getMyCourseProgress(
+            @AuthenticationPrincipal LoginUser user,
             @ModelAttribute CourseProgressSearchConditionDto condition
     ) {
-        Long userId = 1L;
-        CourseProgressListResponseDto response = courseProgressService.getMyCourseProgress(userId, condition);
+        CourseProgressListResponseDto response = courseProgressService.getMyCourseProgress(user.id(), condition);
         return ApiResponse.success("클래스 진행 목록을 조회했습니다.", response);
     }
 }

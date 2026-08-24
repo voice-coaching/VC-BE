@@ -11,17 +11,16 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RecommendationService {
 
-    private static final Long TEMP_LOGIN_USER_ID = 1L;
     private static final int DEFAULT_LIMIT = 5;
     private static final int MAX_LIMIT = 20;
 
     private final HomeReader homeReader;
 
     @Transactional(readOnly = true)
-    public RecommendationResponseDto getRecommendations(RecommendationSearchConditionDto condition) {
+    public RecommendationResponseDto getRecommendations(Long userId, RecommendationSearchConditionDto condition) {
         int limit = resolveLimit(condition);
         return RecommendationResponseDto.from(
-                homeReader.findRecommendations(TEMP_LOGIN_USER_ID, condition.type(), limit)
+                homeReader.findRecommendations(userId, condition == null ? null : condition.type(), limit)
         );
     }
 

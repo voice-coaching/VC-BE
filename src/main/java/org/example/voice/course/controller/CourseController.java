@@ -4,10 +4,12 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.course.application.CourseService;
 import org.example.voice.course.application.CourseStepService;
 import org.example.voice.common.response.ApiResponse;
+import org.example.voice.common.security.LoginUser;
 import org.example.voice.course.controller.dto.CourseDetailResponseDto;
 import org.example.voice.course.controller.dto.CourseListResponseDto;
 import org.example.voice.course.controller.dto.CourseSearchConditionDto;
 import org.example.voice.course.controller.dto.CourseStepResponseDto;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,24 +26,28 @@ public class CourseController {
 
     @GetMapping
     public ApiResponse<CourseListResponseDto> getCourses(
+            @AuthenticationPrincipal LoginUser user,
             @ModelAttribute CourseSearchConditionDto condition
     ) {
-        Long userId = 1L;
-        CourseListResponseDto response = courseService.getCourses(condition, userId);
+        CourseListResponseDto response = courseService.getCourses(condition, user.id());
         return ApiResponse.success("클래스 목록을 조회했습니다.", response);
     }
 
     @GetMapping("/{courseId}")
-    public ApiResponse<CourseDetailResponseDto> getCourse(@PathVariable Long courseId) {
-        Long userId = 1L;
-        CourseDetailResponseDto response = courseService.getCourse(courseId, userId);
+    public ApiResponse<CourseDetailResponseDto> getCourse(
+            @AuthenticationPrincipal LoginUser user,
+            @PathVariable Long courseId
+    ) {
+        CourseDetailResponseDto response = courseService.getCourse(courseId, user.id());
         return ApiResponse.success("클래스 상세 정보를 조회했습니다.", response);
     }
 
     @GetMapping("/{courseId}/steps")
-    public ApiResponse<CourseStepResponseDto> getCourseSteps(@PathVariable Long courseId) {
-        Long userId = 1L;
-        CourseStepResponseDto response = courseStepService.getCourseSteps(courseId, userId);
+    public ApiResponse<CourseStepResponseDto> getCourseSteps(
+            @AuthenticationPrincipal LoginUser user,
+            @PathVariable Long courseId
+    ) {
+        CourseStepResponseDto response = courseStepService.getCourseSteps(courseId, user.id());
         return ApiResponse.success("클래스 단계 목록을 조회했습니다.", response);
     }
 }

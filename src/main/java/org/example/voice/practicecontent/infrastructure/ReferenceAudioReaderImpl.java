@@ -6,6 +6,8 @@ import org.example.voice.practicecontent.domain.model.ReferenceAudioData;
 import org.example.voice.practicecontent.domain.model.ReferenceAudioPlaybackUrlData;
 import org.example.voice.practicecontent.domain.port.ReferenceAudioReader;
 import org.example.voice.practicecontent.domain.type.PublishStatus;
+import org.example.voice.practicecontent.infrastructure.cache.PracticeContentCacheNames;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,11 +27,20 @@ public class ReferenceAudioReaderImpl implements ReferenceAudioReader {
     private final ReferenceAudioJpaRepository referenceAudioJpaRepository;
 
     @Override
+    @Cacheable(
+            cacheNames = PracticeContentCacheNames.EXISTS,
+            key = "#p0",
+            unless = "#result == false"
+    )
     public boolean existsPracticeContent(Long contentId) {
         return practiceContentJpaRepository.existsByIdAndStatus(contentId, PublishStatus.PUBLISHED);
     }
 
     @Override
+    @Cacheable(
+            cacheNames = PracticeContentCacheNames.REFERENCE_AUDIO_LIST,
+            key = "#p0"
+    )
     public List<ReferenceAudioData> findReferenceAudiosByContentId(Long contentId) {
         return referenceAudioJpaRepository.findByContentIdOrderByPrimaryDescIdAsc(contentId)
                 .stream()

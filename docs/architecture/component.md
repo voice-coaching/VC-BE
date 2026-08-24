@@ -18,6 +18,7 @@
 - Application service는 유스케이스를 수행하고 domain port를 통해 저장소와 외부 기능을 사용한다.
 - Domain port는 application이 필요로 하는 기능 계약을 정의한다.
 - Infrastructure 구현체는 domain port를 구현하며 JPA repository 또는 외부 client를 사용한다.
+- Redis Cache 같은 조회 최적화 구현은 infrastructure reader 또는 기능별 cache 구현에 둔다.
 - Response DTO는 domain model 또는 application 결과를 받아 API 응답 형태로 변환한다.
 - Entity는 외부 API 응답으로 직접 노출하지 않는다.
 
@@ -109,11 +110,13 @@
 
 - `PracticeContentReader`: 학습 콘텐츠 조회와 추천 후보 조회 계약
 - `ReferenceAudioReader`: 기준 음성 조회 계약
+- `practicecontent/infrastructure/cache`: 학습 콘텐츠 cache name, key 생성 규칙, TTL 제공 계약
 
 ### 소유 경계
 
 - 콘텐츠, 기준 음성 entity와 콘텐츠 타입/난이도/학습 초점 enum은 `practicecontent`가 소유한다.
 - 사용자별 학습 기록 기반 추천은 `home` 또는 `training` 데이터와 협력할 수 있지만, 콘텐츠 원본 데이터는 이 모듈이 소유한다.
+- 학습 콘텐츠 목록, 상세, 다음 콘텐츠, 콘텐츠 기반 추천, 기준 음성 목록 캐시는 `practicecontent` infrastructure가 소유한다.
 
 ## Training 컴포넌트
 
@@ -151,12 +154,16 @@
 
 - `AnalysisResultReader` / `AnalysisResultWriter`: 분석 결과 조회와 저장 계약
 - `AnalysisSegmentReader` / `AnalysisSegmentWriter`: 세그먼트 분석 조회와 저장 계약
+- `analysis/infrastructure/cache`: 분석 결과 cache name, key 생성 규칙, TTL 제공 계약
 
 ### 소유 경계
 
 - 분석 결과 상태, 점수, STT transcript, 세그먼트 결과는 `analysis` 모듈이 소유한다.
 - 분석 요청 트리거와 학습 세션 상태 변경은 `training` 모듈과 협력한다.
 - 외부 STT/AI provider 응답은 내부 model로 변환한 뒤 사용한다.
+- 완료된 분석 결과 상세, 세션 기준 분석 결과, 세그먼트 목록 캐시는 `analysis` infrastructure가 소유한다.
+- 진행 중이거나 실패한 분석 결과는 캐시하지 않는다.
+- 피드백 재생성은 분석 상세 캐시를 무효화한다.
 
 ## Course 컴포넌트
 
@@ -171,11 +178,35 @@
 - `CourseReader`: 클래스 목록/상세 조회 계약
 - `CourseStepReader`: 클래스 단계 조회 계약
 - `CourseProgressReader` / `CourseProgressWriter`: 사용자 클래스 진도 조회와 저장 계약
+- `course/infrastructure/cache`: 클래스 조회 cache name, key 생성 규칙, TTL 제공 계약
 
 ### 소유 경계
 
 - 클래스, 클래스 단계, 사용자 클래스 진도 entity는 `course` 모듈이 소유한다.
 - 클래스 단계가 학습 콘텐츠와 연결될 수 있지만, 콘텐츠 원본은 `practicecontent` 모듈이 소유한다.
+- 클래스 목록, 상세, 단계 목록 캐시는 `course` infrastructure가 소유한다.
+- 사용자별 진도 변경은 클래스 조회 캐시를 무효화한다.
+
+## MyPage 컴포넌트
+
+### 책임
+
+- 완료된 학습 기록 목록과 상세 조회
+- 학습 통계, 강점 및 약점, 점수 변화 추이, 약점 기반 추천 계산
+- 사용자 학습 기록 삭제
+
+### 주요 계약
+
+- `MyPageReader`: 사용자 소유 학습 기록과 통계 read model 조회 계약
+- `MyPageWriter`: 사용자 학습 기록 삭제 계약
+- `mypage/infrastructure/cache`: 마이페이지 cache name, key 생성 규칙, TTL 제공 계약
+
+### 소유 경계
+
+- 마이페이지는 사용자 화면용 학습 기록/통계 read model을 소유하고 원천 entity는 소유하지 않는다.
+- 원천 entity는 `training`, `analysis`, `practicecontent`, `course` 모듈이 각각 소유한다.
+- 마이페이지 조회 캐시는 `mypage` infrastructure가 소유한다.
+- 학습 세션 완료/취소와 마이페이지 학습 기록 삭제는 마이페이지 조회 캐시를 무효화한다.
 
 ## Home 컴포넌트
 
@@ -189,17 +220,21 @@
 ### 주요 계약
 
 - `HomeReader`: 홈 화면에 필요한 집계/조회 데이터 계약
+- `home/infrastructure/cache`: 홈 화면 cache name, key 생성 규칙, TTL 제공 계약
 
 ### 소유 경계
 
 - 홈은 여러 모듈의 데이터를 조합해 화면용 read model을 제공한다.
 - 홈 전용 entity를 만들기보다 `domain/model` 기반 조회 모델을 우선 사용한다.
 - 원본 데이터 소유권은 `training`, `course`, `practicecontent`, `analysis`, `onboarding` 모듈에 둔다.
+- 오늘 학습 상태, 추천, 최근 학습, 최근 클래스 진행률 캐시는 `home` infrastructure가 소유한다.
+- 학습 세션, 클래스 진도, 온보딩 목표 변경은 관련 홈 조회 캐시를 무효화한다.
 
 ## Common 컴포넌트
 
 | Package | Responsibility |
 | --- | --- |
+| `common/cache` | 여러 모듈에서 재사용하는 캐시 key 조립 유틸리티와 TTL provider 계약 |
 | `common/config` | Web, Security, JPA, Jackson 설정 |
 | `common/response` | `ApiResponse`, `PageResponse` |
 | `common/exception` | 공통 예외, `ErrorCode`, 전역 예외 처리 |
