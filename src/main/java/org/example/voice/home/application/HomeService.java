@@ -16,7 +16,7 @@ public class HomeService {
     public HomeDashboardResponseDto getHomeDashboard(Long userId) {
         return HomeDashboardResponseDto.from(
                 homeReader.getTodayStatus(userId),
-                homeReader.findRecommendations(userId, null, 1),
+                homeReader.findRecommendations(userId, null, 1).items(),
                 homeReader.findRecentTraining(userId).orElse(null),
                 homeReader.findCourseProgress(userId).orElse(null)
         );

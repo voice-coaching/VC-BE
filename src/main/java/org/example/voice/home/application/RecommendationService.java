@@ -20,7 +20,7 @@ public class RecommendationService {
     public RecommendationResponseDto getRecommendations(Long userId, RecommendationSearchConditionDto condition) {
         int limit = resolveLimit(condition);
         return RecommendationResponseDto.from(
-                homeReader.findRecommendations(userId, condition == null ? null : condition.type(), limit)
+                homeReader.findRecommendations(userId, condition == null ? null : condition.type(), limit).items()
         );
     }
 

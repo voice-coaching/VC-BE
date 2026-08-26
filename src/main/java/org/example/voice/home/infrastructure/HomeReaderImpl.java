@@ -5,6 +5,7 @@ import org.example.voice.course.infrastructure.UserCourseProgressJpaRepository;
 import org.example.voice.home.domain.model.CourseProgressData;
 import org.example.voice.home.domain.model.RecentTrainingData;
 import org.example.voice.home.domain.model.RecommendationItemData;
+import org.example.voice.home.domain.model.RecommendationListData;
 import org.example.voice.home.domain.model.TodayLearningStatusData;
 import org.example.voice.home.domain.port.HomeReader;
 import org.example.voice.home.infrastructure.cache.HomeCacheNames;
@@ -72,17 +73,18 @@ public class HomeReaderImpl implements HomeReader {
             cacheNames = HomeCacheNames.RECOMMENDATIONS,
             key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).recommendations(#p0, #p1, #p2)"
     )
-    public List<RecommendationItemData> findRecommendations(Long userId, ContentType type, int limit) {
+    public RecommendationListData findRecommendations(Long userId, ContentType type, int limit) {
         PageRequest pageRequest = PageRequest.of(
                 0,
                 limit,
                 Sort.by(Sort.Order.desc("publishedAt").nullsLast(), Sort.Order.desc("createdAt"))
         );
-        return practiceContentJpaRepository.findAll(recommendationSpec(type), pageRequest)
+        List<RecommendationItemData> items = practiceContentJpaRepository.findAll(recommendationSpec(type), pageRequest)
                 .getContent()
                 .stream()
                 .map(this::toRecommendationData)
                 .toList();
+        return new RecommendationListData(items);
     }
 
     @Override
