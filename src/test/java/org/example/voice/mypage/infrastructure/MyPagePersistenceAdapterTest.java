@@ -73,10 +73,10 @@ class MyPagePersistenceAdapterTest {
         assertThat(adapter.findHistoryDetail(1L, session.getId())).isPresent();
         assertThat(adapter.calculateStatistics(1L, now.minusDays(1), now.plusDays(1), now.minusDays(1),
                 now.plusDays(1)).totalSessionCount()).isEqualTo(1);
-        assertThat(adapter.findUnitScores(1L, now.minusDays(1), now.plusDays(1))).singleElement()
+        assertThat(adapter.findUnitScores(1L, now.minusDays(1), now.plusDays(1)).items()).singleElement()
                 .extracting(MyPageData.UnitScore::attemptCount).isEqualTo(3);
-        assertThat(adapter.findScoreTrend(1L, "PRONUNCIATION", now.minusDays(1), now.plusDays(1))).hasSize(1);
-        assertThat(adapter.findRecommendations(java.util.List.of("TENSE_SS"), ContentType.SENTENCE, 10)).hasSize(1);
+        assertThat(adapter.findScoreTrend(1L, "PRONUNCIATION", now.minusDays(1), now.plusDays(1)).items()).hasSize(1);
+        assertThat(adapter.findRecommendations(java.util.List.of("TENSE_SS"), ContentType.SENTENCE, 10).items()).hasSize(1);
 
         adapter.deleteHistory(session.getId()); entityManager.flush(); entityManager.clear();
         assertThat(adapter.sessionExists(session.getId())).isFalse();

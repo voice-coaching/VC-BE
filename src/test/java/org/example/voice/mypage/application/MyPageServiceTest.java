@@ -54,8 +54,8 @@ class MyPageServiceTest {
     }
 
     @Test void strengthsAndWeaknessesExcludeInsufficientSamplesAndSortScores() {
-        when(reader.findUnitScores(eq(1L), any(), any())).thenReturn(List.of(
-                unit("A", "90", 4), unit("B", "55", 5), unit("C", "99", 2)));
+        when(reader.findUnitScores(eq(1L), any(), any())).thenReturn(new MyPageData.UnitScoreList(List.of(
+                unit("A", "90", 4), unit("B", "55", 5), unit("C", "99", 2))));
         MyPageData.StrengthsWeaknesses result = service.getStrengthsWeaknesses(1L, "MONTH", 5);
         assertThat(result.minimumDataSatisfied()).isTrue();
         assertThat(result.strengths()).extracting(MyPageData.UnitScore::targetUnit).containsExactly("A");
