@@ -28,12 +28,15 @@ public final class MyPageData {
                              BigDecimal averageIntonationScore) {}
     public record UnitScore(String targetUnit, String label, BigDecimal averageScore, int attemptCount,
                             String commonErrorType) {}
+    public record UnitScoreList(List<UnitScore> items) {}
     public record StrengthsWeaknesses(List<UnitScore> strengths, List<UnitScore> weaknesses,
                                       boolean minimumDataSatisfied) {}
     public record TrendPoint(LocalDate date, BigDecimal score, int sessionCount) {}
+    public record TrendPointList(List<TrendPoint> items) {}
     public record ScoreTrend(String metric, List<TrendPoint> points) {}
     public record Weakness(String targetUnit, String label, BigDecimal averageScore) {}
     public record Recommendation(String targetType, Long contentId, Long courseId, String contentType,
                                  String title, String reason) {}
+    public record RecommendationList(List<Recommendation> items) {}
     public record WeaknessRecommendations(List<Weakness> weaknesses, List<Recommendation> recommendations) {}
 }

@@ -16,7 +16,7 @@ public interface MyPageReader {
     Optional<MyPageData.HistoryDetail> findHistoryDetail(Long userId, Long sessionId);
     MyPageData.Statistics calculateStatistics(Long userId, OffsetDateTime from, OffsetDateTime to,
                                               OffsetDateTime todayFrom, OffsetDateTime todayTo);
-    List<MyPageData.UnitScore> findUnitScores(Long userId, OffsetDateTime from, OffsetDateTime to);
-    List<MyPageData.TrendPoint> findScoreTrend(Long userId, String metric, OffsetDateTime from, OffsetDateTime to);
-    List<MyPageData.Recommendation> findRecommendations(List<String> targetUnits, ContentType contentType, int limit);
+    MyPageData.UnitScoreList findUnitScores(Long userId, OffsetDateTime from, OffsetDateTime to);
+    MyPageData.TrendPointList findScoreTrend(Long userId, String metric, OffsetDateTime from, OffsetDateTime to);
+    MyPageData.RecommendationList findRecommendations(List<String> targetUnits, ContentType contentType, int limit);
 }
