@@ -4,10 +4,9 @@ import org.example.voice.practicecontent.controller.dto.PracticeContentNextCondi
 import org.example.voice.practicecontent.controller.dto.PracticeContentQueryConditionDto;
 import org.example.voice.practicecontent.domain.model.PracticeContentDetailData;
 import org.example.voice.practicecontent.domain.model.PracticeContentPageData;
-import org.example.voice.practicecontent.domain.model.PracticeContentRecommendationData;
+import org.example.voice.practicecontent.domain.model.PracticeContentRecommendationListData;
 import org.example.voice.practicecontent.domain.model.PracticeContentSummaryData;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface PracticeContentReader {
@@ -18,5 +17,5 @@ public interface PracticeContentReader {
 
     Optional<PracticeContentSummaryData> findNextPracticeContent(PracticeContentNextConditionDto condition);
 
-    Optional<List<PracticeContentRecommendationData>> findRecommendationsByContentId(Long contentId);
+    Optional<PracticeContentRecommendationListData> findRecommendationsByContentId(Long contentId);
 }

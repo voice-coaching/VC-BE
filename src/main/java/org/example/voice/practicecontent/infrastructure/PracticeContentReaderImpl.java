@@ -7,6 +7,7 @@ import org.example.voice.practicecontent.domain.entity.PracticeContent;
 import org.example.voice.practicecontent.domain.model.PracticeContentDetailData;
 import org.example.voice.practicecontent.domain.model.PracticeContentPageData;
 import org.example.voice.practicecontent.domain.model.PracticeContentRecommendationData;
+import org.example.voice.practicecontent.domain.model.PracticeContentRecommendationListData;
 import org.example.voice.practicecontent.domain.model.PracticeContentSummaryData;
 import org.example.voice.practicecontent.domain.port.PracticeContentReader;
 import org.example.voice.practicecontent.domain.type.PublishStatus;
@@ -97,7 +98,7 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
             key = "#p0",
             unless = "#result == null"
     )
-    public Optional<List<PracticeContentRecommendationData>> findRecommendationsByContentId(Long contentId) {
+    public Optional<PracticeContentRecommendationListData> findRecommendationsByContentId(Long contentId) {
         return practiceContentJpaRepository.findById(contentId)
                 .filter(PracticeContent::isPublished)
                 .map(content -> practiceContentJpaRepository.findAll(
@@ -112,7 +113,8 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
                         .stream()
                         .map(this::toRecommendationData)
                         .toList()
-                );
+                )
+                .map(PracticeContentRecommendationListData::new);
     }
 
     private Specification<PracticeContent> searchSpec(PracticeContentQueryConditionDto condition) {

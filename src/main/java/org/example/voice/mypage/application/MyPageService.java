@@ -57,7 +57,7 @@ public class MyPageService {
     public MyPageData.StrengthsWeaknesses getStrengthsWeaknesses(Long userId, String period, int limit) {
         if (limit < 1 || limit > 20) throw invalid();
         Range range = range(null, null, period);
-        List<MyPageData.UnitScore> eligible = reader.findUnitScores(userId, range.from(), range.toExclusive()).stream()
+        List<MyPageData.UnitScore> eligible = reader.findUnitScores(userId, range.from(), range.toExclusive()).items().stream()
                 .filter(it -> it.attemptCount() >= MINIMUM_ATTEMPTS).toList();
         List<MyPageData.UnitScore> strengths = eligible.stream()
                 .filter(it -> it.averageScore().compareTo(java.math.BigDecimal.valueOf(80)) >= 0)
@@ -74,21 +74,21 @@ public class MyPageService {
         if (!List.of("OVERALL", "PRONUNCIATION", "INTONATION").contains(normalized)) throw invalid();
         Range range = range(null, null, period);
         return new MyPageData.ScoreTrend(normalized,
-                reader.findScoreTrend(userId, normalized, range.from(), range.toExclusive()));
+                reader.findScoreTrend(userId, normalized, range.from(), range.toExclusive()).items());
     }
 
     @Transactional(readOnly = true)
     public MyPageData.WeaknessRecommendations getWeaknessRecommendations(Long userId, int limit, String type) {
         if (limit < 1 || limit > 50) throw invalid();
         Range range = range(null, null, "MONTH");
-        List<MyPageData.UnitScore> units = reader.findUnitScores(userId, range.from(), range.toExclusive()).stream()
+        List<MyPageData.UnitScore> units = reader.findUnitScores(userId, range.from(), range.toExclusive()).items().stream()
                 .filter(it -> it.attemptCount() >= MINIMUM_ATTEMPTS)
                 .sorted(Comparator.comparing(MyPageData.UnitScore::averageScore)).limit(5).toList();
         List<MyPageData.Weakness> weaknesses = units.stream().map(it -> new MyPageData.Weakness(
                 it.targetUnit(), it.label(), it.averageScore().setScale(1, RoundingMode.HALF_UP))).toList();
         return new MyPageData.WeaknessRecommendations(weaknesses,
                 reader.findRecommendations(units.stream().map(MyPageData.UnitScore::targetUnit).toList(),
-                        enumValue(ContentType.class, type), limit));
+                        enumValue(ContentType.class, type), limit).items());
     }
 
     private BaseException sessionError(Long sessionId) {

@@ -46,7 +46,7 @@ public class PracticeContentService {
     @Transactional(readOnly = true)
     public PracticeContentRecommendationsResponseDto getPracticeContentRecommendations(Long contentId) {
         return practiceContentReader.findRecommendationsByContentId(contentId)
-                .map(PracticeContentRecommendationsResponseDto::from)
+                .map(recommendations -> PracticeContentRecommendationsResponseDto.from(recommendations.items()))
                 .orElseThrow(ContentNotFoundException::new);
     }
 }

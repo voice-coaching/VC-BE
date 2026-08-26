@@ -182,7 +182,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
             cacheNames = MyPageCacheNames.UNIT_SCORES,
             key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys).unitScores(#p0, #p1, #p2)"
     )
-    public List<MyPageData.UnitScore> findUnitScores(Long userId, OffsetDateTime from, OffsetDateTime to) {
+    public MyPageData.UnitScoreList findUnitScores(Long userId, OffsetDateTime from, OffsetDateTime to) {
         List<Object[]> rows = entityManager.createQuery("""
                 select s.targetUnit, avg(s.pronunciationScore), count(s.id)
                 from AnalysisSegment s where s.targetUnit is not null and s.pronunciationScore is not null
@@ -191,11 +191,12 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
                 group by s.targetUnit
                 """, Object[].class).setParameter("status", AnalysisStatus.COMPLETED).setParameter("userId", userId)
                 .setParameter("from", from).setParameter("to", to).getResultList();
-        return rows.stream().map(row -> {
+        List<MyPageData.UnitScore> items = rows.stream().map(row -> {
             String target = (String) row[0];
             String error = mostCommonError(userId, target, from, to);
             return new MyPageData.UnitScore(target, label(target), round(number(row[1])), ((Long) row[2]).intValue(), error);
         }).toList();
+        return new MyPageData.UnitScoreList(items);
     }
 
     private String mostCommonError(Long userId, String target, OffsetDateTime from, OffsetDateTime to) {
@@ -217,7 +218,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
             key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys)"
                     + ".scoreTrend(#p0, #p1, #p2, #p3)"
     )
-    public List<MyPageData.TrendPoint> findScoreTrend(Long userId, String metric, OffsetDateTime from, OffsetDateTime to) {
+    public MyPageData.TrendPointList findScoreTrend(Long userId, String metric, OffsetDateTime from, OffsetDateTime to) {
         String field = switch (metric) { case "OVERALL" -> "a.overallScore"; case "PRONUNCIATION" -> "a.pronunciationScore";
             case "INTONATION" -> "a.intonationScore"; default -> throw new IllegalArgumentException(metric); };
         List<Object[]> rows = entityManager.createQuery("select a.analyzedAt, " + field + " from AnalysisResult a "
@@ -228,9 +229,10 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
         Map<LocalDate, List<BigDecimal>> grouped = rows.stream().collect(Collectors.groupingBy(
                 row -> ((OffsetDateTime) row[0]).atZoneSameInstant(SEOUL).toLocalDate(), LinkedHashMap::new,
                 Collectors.mapping(row -> number(row[1]), Collectors.toList())));
-        return grouped.entrySet().stream().map(entry -> new MyPageData.TrendPoint(entry.getKey(), round(entry.getValue()
+        List<MyPageData.TrendPoint> items = grouped.entrySet().stream().map(entry -> new MyPageData.TrendPoint(entry.getKey(), round(entry.getValue()
                 .stream().reduce(BigDecimal.ZERO, BigDecimal::add).divide(BigDecimal.valueOf(entry.getValue().size()),
                         2, RoundingMode.HALF_UP)), entry.getValue().size())).toList();
+        return new MyPageData.TrendPointList(items);
     }
 
     @Override
@@ -239,8 +241,8 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
             key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys)"
                     + ".recommendations(#p0, #p1, #p2)"
     )
-    public List<MyPageData.Recommendation> findRecommendations(List<String> targetUnits, ContentType contentType, int limit) {
-        if (targetUnits.isEmpty()) return List.of();
+    public MyPageData.RecommendationList findRecommendations(List<String> targetUnits, ContentType contentType, int limit) {
+        if (targetUnits.isEmpty()) return new MyPageData.RecommendationList(List.of());
         List<MyPageData.Recommendation> result = new ArrayList<>();
         int candidateLimit = Math.max(50, limit * 10);
         List<PracticeContent> contents = contentRepository
@@ -260,7 +262,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
             result.add(new MyPageData.Recommendation("COURSE", null, course.getId(), null, course.getTitle(),
                     "발음 원리부터 단계적으로 약점을 복습할 수 있습니다."));
         }
-        return result;
+        return new MyPageData.RecommendationList(result);
     }
 
     @Override
