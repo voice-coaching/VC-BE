@@ -23,6 +23,7 @@
 | `docs/api` | directory | API 명세 문서 | endpoint 목록과 request/response 명세를 둔다. |
 | `docs/architecture` | directory | 아키텍처 문서 | 구조, 컴포넌트, 디렉토리, 상태, 흐름, 배포 문서를 둔다. |
 | `docs/database` | directory | DB 문서 | schema 문서를 둔다. |
+| `docs/troubleshooting` | directory | 장애 분석과 해결 기록 | 운영 중 발생한 오류의 로그, 원인 코드, 해결 방식, 배포 조치를 기록한다. |
 | `.codex/ai_rule_developer` | directory | AI 개발 규칙 문서 | API, 아키텍처, 코드 스타일 등 AI 작업 기준을 둔다. |
 
 ## 운영 코드 루트
@@ -189,6 +190,7 @@ docs
 | `docs/architecture/flow.md` | 주요 기능 흐름 |
 | `docs/architecture/state.md` | 상태 모델과 상태 전이 |
 | `docs/database/schema.md` | DB schema 문서 |
+| `docs/troubleshooting` | 장애 분석, 원인 코드, 해결 방식, 배포 조치 기록 |
 
 ## 파일 추가 체크리스트
 
