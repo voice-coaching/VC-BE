@@ -24,7 +24,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CacheConfig {
 
-    private static final String CACHE_KEY_PREFIX = "voice:cache:v2:";
     private static final String CACHE_TYPE_PROPERTY_NAME = "@class";
     private static final String APPLICATION_PACKAGE_PREFIX = "org.example.voice.";
 
@@ -51,7 +50,6 @@ public class CacheConfig {
 
     private RedisCacheConfiguration baseConfiguration(Duration ttl) {
         return RedisCacheConfiguration.defaultCacheConfig()
-                .prefixCacheNameWith(CACHE_KEY_PREFIX)
                 .disableCachingNullValues()
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(
                         redisValueSerializer()
