@@ -11,6 +11,8 @@ EC2에 JAR로 배포한 서버에서 홈 화면 진입 시 Redis 캐시 역직�
 - `GET /api/home`
 - `GET /api/recommendations?limit=3`
 - `GET /api/practice-contents`
+- `GET /api/practice-contents/{contentId}/reference-audios`
+- `GET /api/practice-contents/{contentId}/recommendations`
 - `GET /api/users/me/strengths-weaknesses?period=MONTH&limit=5`
 - `GET /api/users/me/score-trends?metric=PRONUNCIATION&period=MONTH`
 - `GET /api/users/me/weakness-recommendations?limit=3`
@@ -57,10 +59,12 @@ expected JsonToken.VALUE_STRING: need String, Number of Boolean value that conta
 
 같은 패턴이 마이페이지 조회 캐시에도 남아 있었다. `MyPagePersistenceAdapter.findUnitScores(...)`, `findScoreTrend(...)`, `findRecommendations(...)`가 모두 `@Cacheable` 메서드에서 최상위 `List<T>`를 직접 반환했다.
 
+전체 캐시 정합성 점검 과정에서 `ReferenceAudioReaderImpl.findReferenceAudiosByContentId(...)`와 `PracticeContentReaderImpl.findRecommendationsByContentId(...)`도 목록 캐시를 최상위 `List<T>` 또는 `Optional<List<T>>` 형태로 반환하고 있어 같은 오류가 발생할 수 있는 후보로 확인되었다.
+
 정리하면 문제는 두 가지였다.
 
 - Redis value serializer가 타입 정보를 보존하지 않았다.
-- 홈 추천 캐시와 마이페이지 목록 캐시가 최상위 `List<T>`를 직접 캐싱했다.
+- 홈 추천 캐시, 마이페이지 목록 캐시, 연습 콘텐츠 하위 목록 캐시가 최상위 `List<T>` 계열 값을 직접 캐싱했다.
 
 ## 원인이 된 코드
 
@@ -137,6 +141,17 @@ public List<MyPageData.UnitScore> findUnitScores(Long userId, OffsetDateTime fro
 ```
 
 `strengths-weaknesses`와 `weakness-recommendations`는 내부적으로 `findUnitScores(...)`를 호출하므로, 해당 캐시 key가 이전 배열 형태로 저장되어 있거나 최상위 리스트 역직렬화가 흔들리면 두 API 모두 500 오류가 발생할 수 있었다.
+
+### 연습 콘텐츠 하위 목록 캐시 반환 타입
+
+전체 코드 점검 중 `ReferenceAudioReader`와 `PracticeContentReader`에도 같은 위험 패턴이 남아 있었다.
+
+```java
+List<ReferenceAudioData> findReferenceAudiosByContentId(Long contentId);
+Optional<List<PracticeContentRecommendationData>> findRecommendationsByContentId(Long contentId);
+```
+
+두 메서드는 각각 `@Cacheable` 경계에서 참조 음성 목록과 연습 콘텐츠 추천 목록을 캐싱한다. 따라서 cache hit 시 이전 직렬화 포맷 또는 최상위 generic list 역직렬화 문제로 같은 500 오류가 발생할 수 있었다.
 
 ## 해결
 
@@ -260,6 +275,33 @@ reader.findUnitScores(userId, range.from(), range.toExclusive()).items()
 reader.findScoreTrend(userId, normalized, range.from(), range.toExclusive()).items()
 ```
 
+### 연습 콘텐츠 하위 목록 캐시 최상위 반환 타입 보정
+
+연습 콘텐츠 하위 목록 캐시도 명확한 domain model wrapper를 사용하도록 변경했다.
+
+```java
+public record ReferenceAudioListData(List<ReferenceAudioData> items) {}
+public record PracticeContentRecommendationListData(List<PracticeContentRecommendationData> items) {}
+```
+
+`ReferenceAudioReader`와 `PracticeContentReader` port 반환 타입을 wrapper로 변경했다.
+
+```java
+ReferenceAudioListData findReferenceAudiosByContentId(Long contentId);
+Optional<PracticeContentRecommendationListData> findRecommendationsByContentId(Long contentId);
+```
+
+서비스 계층에서는 기존 DTO 변환 흐름을 유지하기 위해 `items()`를 꺼내 전달한다.
+
+```java
+referenceAudioReader.findReferenceAudiosByContentId(contentId).items()
+```
+
+```java
+practiceContentReader.findRecommendationsByContentId(contentId)
+        .map(recommendations -> PracticeContentRecommendationsResponseDto.from(recommendations.items()))
+```
+
 ## 배포 시 조치
 
 이번 변경은 Redis cache prefix를 변경하지 않는다. 따라서 기존 Redis에 이전 직렬화 방식으로 저장된 캐시 값이 남아 있으면 배포 직후 cache hit 시 오류가 재발할 수 있다.
@@ -295,3 +337,11 @@ sudo bash -c 'cd /etc/voice && set -a && . /etc/alpha-backend.env && set +a && d
 - `src/main/java/org/example/voice/mypage/domain/port/MyPageReader.java`
 - `src/main/java/org/example/voice/mypage/infrastructure/MyPagePersistenceAdapter.java`
 - `src/main/java/org/example/voice/mypage/application/MyPageService.java`
+- `src/main/java/org/example/voice/practicecontent/domain/model/ReferenceAudioListData.java`
+- `src/main/java/org/example/voice/practicecontent/domain/model/PracticeContentRecommendationListData.java`
+- `src/main/java/org/example/voice/practicecontent/domain/port/ReferenceAudioReader.java`
+- `src/main/java/org/example/voice/practicecontent/domain/port/PracticeContentReader.java`
+- `src/main/java/org/example/voice/practicecontent/infrastructure/ReferenceAudioReaderImpl.java`
+- `src/main/java/org/example/voice/practicecontent/infrastructure/PracticeContentReaderImpl.java`
+- `src/main/java/org/example/voice/practicecontent/application/ReferenceAudioService.java`
+- `src/main/java/org/example/voice/practicecontent/application/PracticeContentService.java`

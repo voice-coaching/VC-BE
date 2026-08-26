@@ -3,6 +3,7 @@ package org.example.voice.practicecontent.infrastructure;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.practicecontent.domain.entity.ReferenceAudio;
 import org.example.voice.practicecontent.domain.model.ReferenceAudioData;
+import org.example.voice.practicecontent.domain.model.ReferenceAudioListData;
 import org.example.voice.practicecontent.domain.model.ReferenceAudioPlaybackUrlData;
 import org.example.voice.practicecontent.domain.port.ReferenceAudioReader;
 import org.example.voice.practicecontent.domain.type.PublishStatus;
@@ -41,11 +42,12 @@ public class ReferenceAudioReaderImpl implements ReferenceAudioReader {
             cacheNames = PracticeContentCacheNames.REFERENCE_AUDIO_LIST,
             key = "#p0"
     )
-    public List<ReferenceAudioData> findReferenceAudiosByContentId(Long contentId) {
-        return referenceAudioJpaRepository.findByContentIdOrderByPrimaryDescIdAsc(contentId)
+    public ReferenceAudioListData findReferenceAudiosByContentId(Long contentId) {
+        List<ReferenceAudioData> items = referenceAudioJpaRepository.findByContentIdOrderByPrimaryDescIdAsc(contentId)
                 .stream()
                 .map(this::toData)
                 .toList();
+        return new ReferenceAudioListData(items);
     }
 
     @Override
