@@ -21,7 +21,7 @@ public record AnalysisResultResponseDto(Long id, String status, String transcrip
                 data.pronunciationScore(),
                 data.intonationScore(),
                 data.speedWpm(),
-                data.speedStatus(),
+                data.speedStatus() == null ? null : data.speedStatus().name(),
                 data.stressScore(),
                 data.pauseScore(),
                 FeedbackRegenerationService.split(data.strengthsText()),

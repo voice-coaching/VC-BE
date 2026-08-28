@@ -1,6 +1,7 @@
 package org.example.voice.analysis.domain.model;
 
 import org.example.voice.analysis.domain.type.AnalysisStatus;
+import org.example.voice.analysis.domain.type.SpeedStatus;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -14,7 +15,7 @@ public record AnalysisResultData(
         BigDecimal pronunciationScore,
         BigDecimal intonationScore,
         BigDecimal speedWpm,
-        String speedStatus,
+        SpeedStatus speedStatus,
         BigDecimal stressScore,
         BigDecimal pauseScore,
         String strengthsText,
