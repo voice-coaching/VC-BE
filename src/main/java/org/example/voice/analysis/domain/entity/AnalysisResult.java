@@ -15,6 +15,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
+import org.example.voice.analysis.domain.type.SpeedStatus;
 import org.example.voice.training.domain.entity.VoiceRecording;
 
 import java.math.BigDecimal;
@@ -62,8 +63,9 @@ public class AnalysisResult {
     @Column(name = "speed_wpm")
     private BigDecimal speedWpm;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "speed_status")
-    private String speedStatus;
+    private SpeedStatus speedStatus;
 
     @Column(name = "stress_score")
     private BigDecimal stressScore;
