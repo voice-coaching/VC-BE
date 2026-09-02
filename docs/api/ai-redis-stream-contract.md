@@ -49,7 +49,7 @@ job messages.
 | `ANALYSIS_CANCELLATION_OUTBOX_POLL_INTERVAL` | Y | Durable cancellation dispatch interval, default `PT1S`. |
 | `ANALYSIS_RETENTION_AGE` | Y | Minimum terminal DB evidence age before outbox/marker cleanup, default `PT1H`. |
 | `ANALYSIS_RETENTION_POLL_INTERVAL` / `ANALYSIS_RETENTION_BATCH_SIZE` | Y | Cleanup schedule and bounded batch, defaults `PT5M` / `100`. |
-| `ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES` | Y | UTF-8 request/result payload cap, default `65536`. |
+| `ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES` | Y | UTF-8 request/result payload cap, default `65536`, range `1024..1048576`; configure the AI worker's result cap to the same value. |
 | `ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH` | Y | Approximate result DLQ cap, default `10000`. |
 | `ANALYSIS_PENDING_CLAIM_IDLE` | Y | Minimum pending idle time before reclaim; default `PT5M`. |
 | `ANALYSIS_STREAM_MAX_RETRIES` | Y | Dispatch/result retry cap; default `3`. |
@@ -350,7 +350,9 @@ the request; the request remains pending until the worker publishes a terminal
 5. Operators inspect the DLQ using restricted tooling. Replaying a message requires a
    new deliberate Stream entry; do not edit a message in place.
 6. The AI request consumer reclaims idle pending requests before reading new entries.
-   It writes a terminal result before ACKing a valid request. A malformed or missing
+   It measures the encoded UTF-8 result before publication and writes a terminal result
+   before ACKing a valid request. A non-serializable or oversized normal result is
+   replaced with a bounded `FAILED` result for the same request generation. A malformed or missing
    request payload cannot produce a normal result; the worker copies it to
    `analysis:request:dlq:v1` with only the source Stream ID, original payload, and a
    stable failure code, then ACKs it. Request-DLQ access and replay are restricted

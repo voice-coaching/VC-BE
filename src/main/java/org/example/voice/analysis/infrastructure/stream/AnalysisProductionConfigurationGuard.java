@@ -43,7 +43,7 @@ public class AnalysisProductionConfigurationGuard {
                 || invalidDuration(stream.getRedisCommandTimeout())
                 || invalidDuration(stream.getRedisShutdownTimeout())
                 || stream.getRedisCommandTimeout().compareTo(stream.getResultBlock()) <= 0
-                || stream.getMaximumPayloadBytes() <= 0
+                || stream.getMaximumPayloadBytes() < 1_024
                 || stream.getMaximumPayloadBytes() > 1_048_576
                 || stream.getDeadLetterMaximumLength() <= 0
                 || stream.getDeadLetterMaximumLength() > 1_000_000

@@ -61,6 +61,20 @@ class AnalysisProductionConfigurationGuardTest {
                 .hasMessage("analysis_stream_configuration_invalid");
     }
 
+    @Test
+    void refusesPayloadLimitTooSmallForTerminalFailureEnvelope() {
+        AnalysisStreamProperties stream = validStream();
+        stream.setMaximumPayloadBytes(1_023);
+        ObjectStorageProperties storage = new ObjectStorageProperties();
+        storage.setEnabled(true);
+        MediaNormalizationProperties media = new MediaNormalizationProperties();
+        media.setEnabled(true);
+
+        assertThatThrownBy(() -> new AnalysisProductionConfigurationGuard(storage, media, stream))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("analysis_stream_resource_limits_invalid");
+    }
+
     private static AnalysisStreamProperties validStream() {
         AnalysisStreamProperties stream = new AnalysisStreamProperties();
         stream.setRedisSslEnabled(true);
