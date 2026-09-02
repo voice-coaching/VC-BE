@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.domain.model.AnalysisWorkerRequest;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationIssue;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
+import org.example.voice.analysis.domain.model.AnalysisWorkerVisualInput;
 import org.example.voice.analysis.domain.port.AnalysisAuthorizationIssuer;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
@@ -132,6 +133,16 @@ public class TrainingAnalysisRequestService {
     ) {
         try {
             String scriptSha256 = sha256(source.scriptText());
+            AnalysisWorkerVisualInput visualInput = source.visualObjectKey() == null
+                    ? null
+                    : new AnalysisWorkerVisualInput(
+                            source.visualObjectKey(),
+                            source.visualSha256(),
+                            source.visualMimeType(),
+                            source.visualFileSizeBytes(),
+                            source.visualConsentReceiptSha256(),
+                            source.visualConsentPolicyRevision()
+                    );
             AnalysisAuthorizationGrant grant = analysisAuthorizationIssuer.issue(
                     new AnalysisAuthorizationIssue(
                             requestEventId,
@@ -146,7 +157,8 @@ public class TrainingAnalysisRequestService {
                             source.durationMs(),
                             source.learningFocus(),
                             consentReceiptSha256,
-                            consentPolicyRevision
+                            consentPolicyRevision,
+                            visualInput
                     )
             );
             return new AnalysisWorkerRequest(
@@ -163,6 +175,7 @@ public class TrainingAnalysisRequestService {
                     source.fileSizeBytes(),
                     source.durationMs(),
                     source.learningFocus(),
+                    visualInput,
                     grant
             );
         } catch (IllegalArgumentException error) {

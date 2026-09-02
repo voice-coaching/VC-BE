@@ -3,6 +3,7 @@ package org.example.voice.analysis.application;
 import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.model.AnalysisWorkerResult;
 import org.example.voice.analysis.domain.model.AnalysisWorkerPronunciationEvidence;
+import org.example.voice.analysis.domain.model.AnalysisWorkerVisualSupplement;
 import org.example.voice.analysis.domain.port.AnalysisResultReader;
 import org.example.voice.analysis.domain.port.AnalysisResultWriter;
 import org.example.voice.analysis.domain.port.AnalysisSegmentWriter;
@@ -31,6 +32,7 @@ class AnalysisResultIngestionServiceTest {
     @Mock private AnalysisResultWriter writer;
     @Mock private AnalysisSegmentWriter segmentWriter;
     @Mock private AnalysisResult analysisResult;
+    @Mock private org.example.voice.training.domain.port.RecordingDeletionScheduler deletionScheduler;
 
     @Test
     void ignoresLateResultFromPreviousRetryGeneration() {
@@ -60,6 +62,54 @@ class AnalysisResultIngestionServiceTest {
     }
 
     @Test
+    void schedulesCanonicalVisualDeletionAfterAcceptedTerminalResult() {
+        AnalysisWorkerResult base = completed();
+        AnalysisWorkerResult result = new AnalysisWorkerResult(
+                base.schemaVersion(), base.eventId(), base.requestEventId(), base.analysisId(),
+                base.status(), base.outcome(), base.failureCode(), base.failureReason(),
+                base.transcript(), base.sttConfidence(), base.sttModelName(), base.overallScore(),
+                base.pronunciationScore(), base.intonationScore(), base.speedWpm(), base.speedStatus(),
+                base.stressScore(), base.pauseScore(), base.strengthsText(), base.weaknessesText(),
+                base.summaryFeedback(), base.pronunciationEvidence(), base.workerRevision(),
+                base.pipelineRevision(), base.audioSha256(), base.segments(),
+                new AnalysisWorkerVisualSupplement(
+                        AnalysisWorkerVisualSupplement.SCHEMA_VERSION,
+                        0,
+                        "supports_upstream",
+                        "lip.aperture.low",
+                        "lip_aperture_hint",
+                        "f".repeat(64),
+                        "1".repeat(64)
+                )
+        );
+        var recording = org.mockito.Mockito.mock(
+                org.example.voice.training.domain.entity.VoiceRecording.class
+        );
+        var session = org.mockito.Mockito.mock(
+                org.example.voice.training.domain.entity.TrainingSession.class
+        );
+        when(reader.findForIngestion(1L)).thenReturn(Optional.of(analysisResult));
+        when(analysisResult.isForActiveRequest(result.requestEventId())).thenReturn(true);
+        when(analysisResult.complete(result)).thenReturn(true);
+        when(analysisResult.getRecording()).thenReturn(recording);
+        when(recording.getVisualObjectKey()).thenReturn(
+                "recordings/analysis-video/00000000-0000-0000-0000-000000000001.mp4"
+        );
+        when(recording.getTrainingSession()).thenReturn(session);
+        when(session.getUserId()).thenReturn(9L);
+        when(session.getId()).thenReturn(7L);
+
+        assertThat(service().ingest(result)).isEqualTo(AnalysisResultIngestionDisposition.APPLIED);
+
+        verify(deletionScheduler).schedule(
+                9L,
+                7L,
+                "recordings/analysis-video/00000000-0000-0000-0000-000000000001.mp4",
+                org.example.voice.training.domain.type.RecordingDeletionReason.ANALYSIS_COMPLETED
+        );
+    }
+
+    @Test
     void failsOnlyTheActiveGenerationWhenResultDeliveryIsExhausted() {
         AnalysisWorkerResult result = completed();
         when(reader.findForIngestion(1L)).thenReturn(Optional.of(analysisResult));
@@ -79,7 +129,12 @@ class AnalysisResultIngestionServiceTest {
     }
 
     private AnalysisResultIngestionService service() {
-        return new AnalysisResultIngestionService(reader, writer, segmentWriter);
+        return new AnalysisResultIngestionService(
+                reader,
+                writer,
+                segmentWriter,
+                deletionScheduler
+        );
     }
 
     private AnalysisWorkerResult completed() {

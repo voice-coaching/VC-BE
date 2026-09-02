@@ -137,6 +137,24 @@ public class AnalysisResult {
     @Column(name = "evidence_state", length = 100)
     private String evidenceState;
 
+    @Column(name = "visual_supplement_schema_version", length = 100)
+    private String visualSupplementSchemaVersion;
+
+    @Column(name = "visual_evidence_relation", length = 40)
+    private String visualEvidenceRelation;
+
+    @Column(name = "visual_approved_claim_id", length = 192)
+    private String visualApprovedClaimId;
+
+    @Column(name = "visual_renderer_key", length = 192)
+    private String visualRendererKey;
+
+    @Column(name = "visual_phone_anchor_ref", length = 64)
+    private String visualPhoneAnchorRef;
+
+    @Column(name = "visual_supplement_sha256", length = 64)
+    private String visualSupplementSha256;
+
     @Column(name = "feedback_regeneration_count", nullable = false)
     private Integer feedbackRegenerationCount;
 
@@ -216,6 +234,14 @@ public class AnalysisResult {
             this.operatingThreshold = result.pronunciationEvidence().operatingThreshold();
             this.scoreSemantics = result.pronunciationEvidence().scoreSemantics();
             this.evidenceState = result.pronunciationEvidence().evidenceState();
+        }
+        if (result.visualSupplement() != null) {
+            this.visualSupplementSchemaVersion = result.visualSupplement().schemaVersion();
+            this.visualEvidenceRelation = result.visualSupplement().evidenceRelation();
+            this.visualApprovedClaimId = result.visualSupplement().approvedClaimId();
+            this.visualRendererKey = result.visualSupplement().rendererKey();
+            this.visualPhoneAnchorRef = result.visualSupplement().upstreamPhoneAnchorRef();
+            this.visualSupplementSha256 = result.visualSupplement().supplementSha256();
         }
         this.failureCode = null;
         this.failureReason = null;
@@ -304,5 +330,11 @@ public class AnalysisResult {
         this.operatingThreshold = null;
         this.scoreSemantics = null;
         this.evidenceState = null;
+        this.visualSupplementSchemaVersion = null;
+        this.visualEvidenceRelation = null;
+        this.visualApprovedClaimId = null;
+        this.visualRendererKey = null;
+        this.visualPhoneAnchorRef = null;
+        this.visualSupplementSha256 = null;
     }
 }

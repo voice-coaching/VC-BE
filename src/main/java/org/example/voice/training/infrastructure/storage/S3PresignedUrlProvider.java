@@ -165,6 +165,13 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
             throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
         }
         requireOwnedKey(objectKey);
+        String opaqueAudio = java.util.regex.Pattern.quote(properties.getRecordingsPrefix())
+                + "analysis-audio/[0-9a-fA-F-]{36}\\.wav";
+        String opaqueVideo = java.util.regex.Pattern.quote(properties.getRecordingsPrefix())
+                + "analysis-video/[0-9a-fA-F-]{36}\\.mp4";
+        if (objectKey.matches(opaqueAudio) || objectKey.matches(opaqueVideo)) {
+            return;
+        }
         String ownerPrefix = "%susers/%d/sessions/%d/".formatted(
                 properties.getRecordingsPrefix(), userId, sessionId
         );

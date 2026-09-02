@@ -6,7 +6,6 @@ import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.consent.domain.type.ProcessingConsentScope;
 import org.springframework.stereotype.Repository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -41,7 +40,7 @@ public class JpaProcessingConsentLedger implements ProcessingConsentLedger {
     }
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public ProcessingConsentReceipt grantVoiceAnalysis(
             Long userId,
             Long sessionId,
@@ -62,7 +61,7 @@ public class JpaProcessingConsentLedger implements ProcessingConsentLedger {
     }
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public ProcessingConsentReceipt grantFaceVideoProcessing(
             Long userId,
             Long sessionId,

@@ -8,6 +8,8 @@ import org.example.voice.analysis.domain.port.AnalysisResultWriter;
 import org.example.voice.analysis.domain.port.AnalysisSegmentWriter;
 import org.example.voice.analysis.domain.type.AnalysisResultIngestionDisposition;
 import org.example.voice.analysis.infrastructure.cache.AnalysisCacheNames;
+import org.example.voice.training.domain.port.RecordingDeletionScheduler;
+import org.example.voice.training.domain.type.RecordingDeletionReason;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,7 @@ public class AnalysisResultIngestionService {
     private final AnalysisResultReader analysisResultReader;
     private final AnalysisResultWriter analysisResultWriter;
     private final AnalysisSegmentWriter analysisSegmentWriter;
+    private final RecordingDeletionScheduler recordingDeletionScheduler;
 
     @Transactional
     @Caching(evict = {
@@ -52,6 +55,7 @@ public class AnalysisResultIngestionService {
                 }
                 analysisResultWriter.save(analysisResult);
                 analysisSegmentWriter.replaceForAnalysis(analysisResult, message.segments());
+                scheduleVisualDeletion(analysisResult);
                 yield AnalysisResultIngestionDisposition.APPLIED;
             }
             case FAILED -> {
@@ -68,6 +72,19 @@ public class AnalysisResultIngestionService {
             }
             case PENDING -> throw new IllegalArgumentException("PENDING is not a worker result status");
         };
+    }
+
+    private void scheduleVisualDeletion(AnalysisResult analysisResult) {
+        var recording = analysisResult.getRecording();
+        if (recording == null || recording.getVisualObjectKey() == null) {
+            return;
+        }
+        recordingDeletionScheduler.schedule(
+                recording.getTrainingSession().getUserId(),
+                recording.getTrainingSession().getId(),
+                recording.getVisualObjectKey(),
+                RecordingDeletionReason.ANALYSIS_COMPLETED
+        );
     }
 
     /**

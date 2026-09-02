@@ -3,6 +3,7 @@ package org.example.voice.training.application;
 import org.example.voice.analysis.domain.model.AnalysisWorkerRequest;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationIssue;
+import org.example.voice.analysis.domain.model.AnalysisWorkerVisualInput;
 import org.example.voice.analysis.domain.port.AnalysisAuthorizationIssuer;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.common.exception.BaseException;
@@ -89,11 +90,52 @@ class TrainingAnalysisRequestServiceTest {
         assertThat(request.getValue().contentId()).isEqualTo(12L);
         assertThat(request.getValue().audioObjectKey()).isEqualTo("recordings/50.wav");
         assertThat(request.getValue().scriptSha256()).hasSize(64);
-        assertThat(request.getValue().schemaVersion()).isEqualTo("voice-coaching.analysis-request.v3");
+        assertThat(request.getValue().schemaVersion()).isEqualTo("voice-coaching.analysis-request.v4");
         assertThat(request.getValue().audioSha256()).isEqualTo("d".repeat(64));
         assertThat(request.getValue().authorizationGrant().requestEventId())
                 .isEqualTo(request.getValue().eventId());
         assertThat(request.getValue().authorizationGrant().consentReceiptSha256()).isEqualTo("e".repeat(64));
+    }
+
+    @Test
+    void bindsCanonicalVisualAndFaceConsentWithoutPublishingOwnerIdentifiers() {
+        SelectedRecordingAnalysisData source = new SelectedRecordingAnalysisData(
+                50L,
+                12L,
+                "revision-v1",
+                "가",
+                "recordings/analysis-audio/00000000-0000-0000-0000-000000000001.wav",
+                "audio/wav",
+                1234L,
+                1200,
+                "d".repeat(64),
+                "recordings/analysis-video/00000000-0000-0000-0000-000000000002.mp4",
+                "video/mp4",
+                4000L,
+                "f".repeat(64),
+                "9".repeat(64),
+                "voice-video-processing-consent-v1",
+                LearningFocus.PRONUNCIATION,
+                RecordingQualityStatus.PASS
+        );
+        when(voiceRecordingReader.findSelectedForAnalysis(7L, 9L)).thenReturn(Optional.of(source));
+        when(trainingAnalysisWriter.createPending(eq(50L), any())).thenReturn(
+                new AnalysisRequestData(35L, AnalysisStatus.PENDING, OffsetDateTime.now())
+        );
+        allowAuthorization();
+
+        service().requestAnalysis(7L, 9L, consent());
+
+        ArgumentCaptor<AnalysisWorkerRequest> request = ArgumentCaptor.forClass(AnalysisWorkerRequest.class);
+        verify(analysisJobPublisher).publish(request.capture());
+        assertThat(request.getValue().visualInput()).isEqualTo(new AnalysisWorkerVisualInput(
+                source.visualObjectKey(), source.visualSha256(), source.visualMimeType(),
+                source.visualFileSizeBytes(), source.visualConsentReceiptSha256(),
+                source.visualConsentPolicyRevision()
+        ));
+        assertThat(request.getValue().audioObjectKey()).doesNotContain("users/", "sessions/");
+        assertThat(request.getValue().visualInput().objectKey()).doesNotContain("users/", "sessions/");
+        assertThat(request.getValue().authorizationGrant().binds(request.getValue().visualInput())).isTrue();
     }
 
     @Test
@@ -245,6 +287,12 @@ class TrainingAnalysisRequestServiceTest {
                     issue.learningFocus(),
                     issue.consentReceiptSha256(),
                     issue.consentPolicyRevision(),
+                    issue.visualInput() == null ? null : sha256(issue.visualInput().objectKey()),
+                    issue.visualInput() == null ? null : issue.visualInput().sha256(),
+                    issue.visualInput() == null ? null : issue.visualInput().mimeType(),
+                    issue.visualInput() == null ? null : issue.visualInput().fileSizeBytes(),
+                    issue.visualInput() == null ? null : issue.visualInput().consentReceiptSha256(),
+                    issue.visualInput() == null ? null : issue.visualInput().consentPolicyRevision(),
                     issuedAt,
                     issuedAt.plusSeconds(300),
                     AnalysisAuthorizationGrant.PURPOSE,

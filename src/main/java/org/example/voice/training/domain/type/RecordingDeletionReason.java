@@ -5,5 +5,6 @@ public enum RecordingDeletionReason {
     SESSION_CANCELED,
     HISTORY_DELETED,
     USER_WITHDRAWN,
-    UPLOAD_EXPIRED
+    UPLOAD_EXPIRED,
+    ANALYSIS_COMPLETED
 }

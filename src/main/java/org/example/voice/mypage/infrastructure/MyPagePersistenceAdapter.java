@@ -285,7 +285,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     })
     public void deleteHistory(Long sessionId) {
         List<Object[]> recordings = entityManager.createQuery("""
-                select r.trainingSession.userId, r.audioUrl
+                select r.trainingSession.userId, r.audioUrl, r.visualObjectKey
                   from VoiceRecording r
                  where r.trainingSession.id = :id
                 """, Object[].class).setParameter("id", sessionId).getResultList();
@@ -295,6 +295,14 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
                 (String) recording[1],
                 RecordingDeletionReason.HISTORY_DELETED
         ));
+        recordings.stream()
+                .filter(recording -> recording[2] != null)
+                .forEach(recording -> recordingDeletionScheduler.schedule(
+                        (Long) recording[0],
+                        sessionId,
+                        (String) recording[2],
+                        RecordingDeletionReason.HISTORY_DELETED
+                ));
         entityManager.createQuery("delete from AnalysisRequestOutbox o where o.analysisResult.id in (select a.id from AnalysisResult a where a.recording.trainingSession.id=:id)")
                 .setParameter("id", sessionId).executeUpdate();
         entityManager.createQuery("delete from AnalysisSegment s where s.analysisResult.id in (select a.id from AnalysisResult a where a.recording.trainingSession.id=:id)")

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.model.AnalysisResultData;
 import org.example.voice.analysis.domain.model.PronunciationEvidenceData;
+import org.example.voice.analysis.domain.model.VisualSupplementData;
 import org.example.voice.analysis.domain.port.AnalysisResultReader;
 import org.example.voice.analysis.infrastructure.cache.AnalysisCacheNames;
 import org.example.voice.training.infrastructure.AnalysisResultJpaRepository;
@@ -83,7 +84,23 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
                 result.getWeaknessesText(),
                 result.getSummaryFeedback(),
                 pronunciationEvidence(result),
+                visualSupplement(result),
                 result.getAnalyzedAt()
+        );
+    }
+
+    private VisualSupplementData visualSupplement(AnalysisResult result) {
+        if (result.getVisualSupplementSchemaVersion() == null) {
+            return null;
+        }
+        return new VisualSupplementData(
+                result.getVisualSupplementSchemaVersion(),
+                result.getSelectedExpectedIndex(),
+                result.getVisualEvidenceRelation(),
+                result.getVisualApprovedClaimId(),
+                result.getVisualRendererKey(),
+                result.getVisualPhoneAnchorRef(),
+                result.getVisualSupplementSha256()
         );
     }
 

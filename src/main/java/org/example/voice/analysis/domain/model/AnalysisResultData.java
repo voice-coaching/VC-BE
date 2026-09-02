@@ -24,8 +24,34 @@ public record AnalysisResultData(
         String weaknessesText,
         String summaryFeedback,
         PronunciationEvidenceData pronunciationEvidence,
+        VisualSupplementData visualSupplement,
         OffsetDateTime analyzedAt
 ) {
+
+    public AnalysisResultData(
+            Long id,
+            AnalysisStatus status,
+            AnalysisOutcome outcome,
+            String transcript,
+            BigDecimal sttConfidence,
+            BigDecimal overallScore,
+            BigDecimal pronunciationScore,
+            BigDecimal intonationScore,
+            BigDecimal speedWpm,
+            SpeedStatus speedStatus,
+            BigDecimal stressScore,
+            BigDecimal pauseScore,
+            String strengthsText,
+            String weaknessesText,
+            String summaryFeedback,
+            PronunciationEvidenceData pronunciationEvidence,
+            OffsetDateTime analyzedAt
+    ) {
+        this(id, status, outcome, transcript, sttConfidence, overallScore,
+                pronunciationScore, intonationScore, speedWpm, speedStatus,
+                stressScore, pauseScore, strengthsText, weaknessesText,
+                summaryFeedback, pronunciationEvidence, null, analyzedAt);
+    }
 
     public boolean isCompleted() {
         return status == AnalysisStatus.COMPLETED;

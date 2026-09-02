@@ -6,6 +6,7 @@ import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.training.controller.dto.RecordingRegisterRequestDto;
 import org.example.voice.training.domain.model.NormalizedRecordingData;
 import org.example.voice.training.domain.model.VoiceRecordingRegisteredData;
+import org.example.voice.consent.domain.model.ProcessingConsentReceipt;
 import org.example.voice.training.domain.port.RecordingMediaNormalizationPort;
 import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.example.voice.training.domain.port.RecordingObjectStoragePort;
@@ -42,7 +43,9 @@ class VoiceRecordingServiceTest {
     void storesOnlyBackendNormalizedMediaAndMeasuredQuality() {
         RecordingRegisterRequestDto request = audioRequest();
         NormalizedRecordingData normalized = normalized();
-        when(normalization.normalize(9L, 7L, request.objectKey(), request.mimeType(), request.fileSizeBytes()))
+        when(normalization.normalize(
+                9L, 7L, request.objectKey(), request.mimeType(), request.fileSizeBytes(), null
+        ))
                 .thenReturn(normalized);
         when(writer.register(7L, normalized)).thenReturn(
                 new VoiceRecordingRegisteredData(
@@ -81,7 +84,7 @@ class VoiceRecordingServiceTest {
                                 .isEqualTo(ErrorCode.VIDEO_PROCESSING_CONSENT_REQUIRED));
 
         verify(objectStorage, never()).assertUploadedObject(any(), any(), any(), any(), anyLong());
-        verify(normalization, never()).normalize(any(), any(), any(), any(), anyLong());
+        verify(normalization, never()).normalize(any(), any(), any(), any(), anyLong(), any());
         verify(consentLedger, never()).grantFaceVideoProcessing(any(), any(), any(), any());
     }
 
@@ -96,7 +99,19 @@ class VoiceRecordingServiceTest {
                 "voice-video-processing-consent-v1"
         );
         NormalizedRecordingData normalized = normalized();
-        when(normalization.normalize(9L, 7L, request.objectKey(), request.mimeType(), request.fileSizeBytes()))
+        ProcessingConsentReceipt faceReceipt = new ProcessingConsentReceipt(
+                "f".repeat(64), OffsetDateTime.now()
+        );
+        when(consentLedger.grantFaceVideoProcessing(any(), any(), any(), any()))
+                .thenReturn(faceReceipt);
+        when(normalization.normalize(
+                org.mockito.ArgumentMatchers.eq(9L),
+                org.mockito.ArgumentMatchers.eq(7L),
+                org.mockito.ArgumentMatchers.eq(request.objectKey()),
+                org.mockito.ArgumentMatchers.eq(request.mimeType()),
+                org.mockito.ArgumentMatchers.eq(request.fileSizeBytes()),
+                any()
+        ))
                 .thenReturn(normalized);
         when(writer.register(7L, normalized)).thenReturn(
                 new VoiceRecordingRegisteredData(
@@ -118,14 +133,16 @@ class VoiceRecordingServiceTest {
         );
         var inOrder = org.mockito.Mockito.inOrder(consentLedger, normalization);
         inOrder.verify(consentLedger).grantFaceVideoProcessing(any(), any(), any(), any());
-        inOrder.verify(normalization).normalize(any(), any(), any(), any(), anyLong());
+        inOrder.verify(normalization).normalize(any(), any(), any(), any(), anyLong(), any());
     }
 
     @Test
     void deletesNormalizedObjectWhenDatabaseRegistrationFails() {
         RecordingRegisterRequestDto request = audioRequest();
         NormalizedRecordingData normalized = normalized();
-        when(normalization.normalize(9L, 7L, request.objectKey(), request.mimeType(), request.fileSizeBytes()))
+        when(normalization.normalize(
+                9L, 7L, request.objectKey(), request.mimeType(), request.fileSizeBytes(), null
+        ))
                 .thenReturn(normalized);
         when(writer.register(7L, normalized)).thenThrow(new IllegalStateException("database unavailable"));
 

@@ -30,9 +30,31 @@ public record AnalysisWorkerRequest(
         Long fileSizeBytes,
         Integer durationMs,
         LearningFocus learningFocus,
+        AnalysisWorkerVisualInput visualInput,
         AnalysisAuthorizationGrant authorizationGrant
 ) {
-    public static final String SCHEMA_VERSION = "voice-coaching.analysis-request.v3";
+    public static final String SCHEMA_VERSION = "voice-coaching.analysis-request.v4";
+
+    public AnalysisWorkerRequest(
+            String schemaVersion,
+            UUID eventId,
+            Long analysisId,
+            Long contentId,
+            String promptRevision,
+            String scriptText,
+            String scriptSha256,
+            String audioObjectKey,
+            String audioSha256,
+            String mimeType,
+            Long fileSizeBytes,
+            Integer durationMs,
+            LearningFocus learningFocus,
+            AnalysisAuthorizationGrant authorizationGrant
+    ) {
+        this(schemaVersion, eventId, analysisId, contentId, promptRevision,
+                scriptText, scriptSha256, audioObjectKey, audioSha256, mimeType,
+                fileSizeBytes, durationMs, learningFocus, null, authorizationGrant);
+    }
 
     public AnalysisWorkerRequest {
         requireEquals(SCHEMA_VERSION, schemaVersion, "schemaVersion");
@@ -46,7 +68,8 @@ public record AnalysisWorkerRequest(
         requireSha256(audioSha256, "audioSha256");
         if (audioObjectKey.startsWith("http://") || audioObjectKey.startsWith("https://")
                 || audioObjectKey.startsWith("/") || audioObjectKey.contains("\\")
-                || hasTraversalSegment(audioObjectKey)) {
+                || hasTraversalSegment(audioObjectKey)
+                || hasOwnerSegment(audioObjectKey)) {
             throw new IllegalArgumentException("audioObjectKey must be a relative, non-traversing object key");
         }
         if (!"audio/wav".equals(mimeType)) {
@@ -73,7 +96,8 @@ public record AnalysisWorkerRequest(
                 || !Objects.equals(mimeType, authorizationGrant.mimeType())
                 || !Objects.equals(fileSizeBytes, authorizationGrant.fileSizeBytes())
                 || !Objects.equals(durationMs, authorizationGrant.durationMs())
-                || learningFocus != authorizationGrant.learningFocus()) {
+                || learningFocus != authorizationGrant.learningFocus()
+                || !authorizationGrant.binds(visualInput)) {
             throw new IllegalArgumentException("authorizationGrant does not bind this request");
         }
     }
@@ -109,6 +133,12 @@ public record AnalysisWorkerRequest(
             }
         }
         return false;
+    }
+
+    private static boolean hasOwnerSegment(String value) {
+        return java.util.Arrays.stream(value.split("/"))
+                .anyMatch(segment -> segment.equalsIgnoreCase("users")
+                        || segment.equalsIgnoreCase("sessions"));
     }
 
     private static String sha256(String value) {

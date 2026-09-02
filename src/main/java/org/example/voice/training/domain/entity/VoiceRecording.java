@@ -54,6 +54,24 @@ public class VoiceRecording {
     @Column(name = "audio_sha256", length = 64)
     private String audioSha256;
 
+    @Column(name = "visual_object_key", length = 1000)
+    private String visualObjectKey;
+
+    @Column(name = "visual_mime_type", length = 100)
+    private String visualMimeType;
+
+    @Column(name = "visual_file_size_bytes")
+    private Long visualFileSizeBytes;
+
+    @Column(name = "visual_sha256", length = 64)
+    private String visualSha256;
+
+    @Column(name = "visual_consent_receipt_sha256", length = 64)
+    private String visualConsentReceiptSha256;
+
+    @Column(name = "visual_consent_policy_revision", length = 100)
+    private String visualConsentPolicyRevision;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "quality_status", nullable = false)
     private RecordingQualityStatus qualityStatus;
@@ -81,6 +99,12 @@ public class VoiceRecording {
             Long fileSizeBytes,
             Integer durationMs,
             String audioSha256,
+            String visualObjectKey,
+            String visualMimeType,
+            Long visualFileSizeBytes,
+            String visualSha256,
+            String visualConsentReceiptSha256,
+            String visualConsentPolicyRevision,
             RecordingQualityStatus qualityStatus,
             BigDecimal volumeScore,
             BigDecimal noiseScore
@@ -92,6 +116,12 @@ public class VoiceRecording {
         this.fileSizeBytes = fileSizeBytes;
         this.durationMs = durationMs;
         this.audioSha256 = audioSha256;
+        this.visualObjectKey = visualObjectKey;
+        this.visualMimeType = visualMimeType;
+        this.visualFileSizeBytes = visualFileSizeBytes;
+        this.visualSha256 = visualSha256;
+        this.visualConsentReceiptSha256 = visualConsentReceiptSha256;
+        this.visualConsentPolicyRevision = visualConsentPolicyRevision;
         this.qualityStatus = qualityStatus;
         this.volumeScore = volumeScore;
         this.noiseScore = noiseScore;
@@ -111,6 +141,29 @@ public class VoiceRecording {
             BigDecimal volumeScore,
             BigDecimal noiseScore
     ) {
+        return create(trainingSession, attemptNo, audioUrl, mimeType, fileSizeBytes,
+                durationMs, audioSha256, null, null, null, null, null, null,
+                qualityStatus, volumeScore, noiseScore);
+    }
+
+    public static VoiceRecording create(
+            TrainingSession trainingSession,
+            Integer attemptNo,
+            String audioUrl,
+            String mimeType,
+            Long fileSizeBytes,
+            Integer durationMs,
+            String audioSha256,
+            String visualObjectKey,
+            String visualMimeType,
+            Long visualFileSizeBytes,
+            String visualSha256,
+            String visualConsentReceiptSha256,
+            String visualConsentPolicyRevision,
+            RecordingQualityStatus qualityStatus,
+            BigDecimal volumeScore,
+            BigDecimal noiseScore
+    ) {
         return new VoiceRecording(
                 trainingSession,
                 attemptNo,
@@ -119,6 +172,12 @@ public class VoiceRecording {
                 fileSizeBytes,
                 durationMs,
                 audioSha256,
+                visualObjectKey,
+                visualMimeType,
+                visualFileSizeBytes,
+                visualSha256,
+                visualConsentReceiptSha256,
+                visualConsentPolicyRevision,
                 qualityStatus,
                 volumeScore,
                 noiseScore

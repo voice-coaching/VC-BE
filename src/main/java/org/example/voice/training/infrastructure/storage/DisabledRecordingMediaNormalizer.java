@@ -3,6 +3,7 @@ package org.example.voice.training.infrastructure.storage;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.training.domain.model.NormalizedRecordingData;
+import org.example.voice.training.domain.model.VisualProcessingAuthorizationData;
 import org.example.voice.training.domain.port.RecordingMediaNormalizationPort;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -22,7 +23,8 @@ public class DisabledRecordingMediaNormalizer implements RecordingMediaNormaliza
             Long sessionId,
             String sourceObjectKey,
             String declaredMimeType,
-            long declaredFileSizeBytes
+            long declaredFileSizeBytes,
+            VisualProcessingAuthorizationData visualAuthorization
     ) {
         throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
     }

@@ -4,12 +4,14 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.consent.domain.model.ProcessingConsentReceipt;
 import org.example.voice.training.controller.dto.RecordingRegisterRequestDto;
 import org.example.voice.training.domain.model.RecordingPlaybackUrlData;
 import org.example.voice.training.domain.model.NormalizedRecordingData;
 import org.example.voice.training.domain.model.RecordingSelectionData;
 import org.example.voice.training.domain.model.VoiceRecordingData;
 import org.example.voice.training.domain.model.VoiceRecordingRegisteredData;
+import org.example.voice.training.domain.model.VisualProcessingAuthorizationData;
 import org.example.voice.training.domain.port.VoiceRecordingReader;
 import org.example.voice.training.domain.port.VoiceRecordingWriter;
 import org.example.voice.training.domain.port.RecordingObjectStoragePort;
@@ -55,12 +57,17 @@ public class VoiceRecordingService {
                 request.mimeType(),
                 request.fileSizeBytes()
         );
+        VisualProcessingAuthorizationData visualAuthorization = null;
         if (request.mimeType().startsWith("video/")) {
-            processingConsentLedger.grantFaceVideoProcessing(
+            ProcessingConsentReceipt faceConsent = processingConsentLedger.grantFaceVideoProcessing(
                     userId,
                     sessionId,
                     request.videoProcessingConsentPolicyRevision(),
                     request.objectKey()
+            );
+            visualAuthorization = new VisualProcessingAuthorizationData(
+                    faceConsent.receiptSha256(),
+                    request.videoProcessingConsentPolicyRevision()
             );
         }
         NormalizedRecordingData normalized = mediaNormalization.normalize(
@@ -68,7 +75,8 @@ public class VoiceRecordingService {
                 sessionId,
                 request.objectKey(),
                 request.mimeType(),
-                request.fileSizeBytes()
+                request.fileSizeBytes(),
+                visualAuthorization
         );
 
         try {
@@ -77,6 +85,11 @@ public class VoiceRecordingService {
         } catch (RuntimeException error) {
             try {
                 mediaNormalization.deleteNormalizedObject(userId, sessionId, normalized.objectKey());
+                if (normalized.visual() != null) {
+                    mediaNormalization.deleteNormalizedObject(
+                            userId, sessionId, normalized.visual().objectKey()
+                    );
+                }
             } catch (RuntimeException cleanupFailure) {
                 cleanupFailure.addSuppressed(error);
                 throw cleanupFailure;

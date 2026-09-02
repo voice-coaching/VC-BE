@@ -42,6 +42,12 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
                         normalized.fileSizeBytes(),
                         normalized.durationMs(),
                         normalized.audioSha256(),
+                        normalized.visual() == null ? null : normalized.visual().objectKey(),
+                        normalized.visual() == null ? null : normalized.visual().mimeType(),
+                        normalized.visual() == null ? null : normalized.visual().fileSizeBytes(),
+                        normalized.visual() == null ? null : normalized.visual().visualSha256(),
+                        normalized.visual() == null ? null : normalized.visual().consentReceiptSha256(),
+                        normalized.visual() == null ? null : normalized.visual().consentPolicyRevision(),
                         normalized.qualityStatus(),
                         normalized.volumeScore(),
                         normalized.noiseScore()
@@ -100,6 +106,14 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
                 recording.getAudioUrl(),
                 RecordingDeletionReason.RECORDING_DELETED
         );
+        if (recording.getVisualObjectKey() != null) {
+            recordingDeletionScheduler.schedule(
+                    recording.getTrainingSession().getUserId(),
+                    sessionId,
+                    recording.getVisualObjectKey(),
+                    RecordingDeletionReason.RECORDING_DELETED
+            );
+        }
     }
 
     private TrainingSession findMutableSession(Long sessionId) {

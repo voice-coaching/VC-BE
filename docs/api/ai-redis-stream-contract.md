@@ -93,25 +93,33 @@ would violate at-least-once delivery.
 VC-BE also rejects an oversized request payload before writing its durable outbox row;
 the dispatcher repeats the check immediately before Redis I/O as defense in depth.
 
-## Request payload: `voice-coaching.analysis-request.v3`
+## Request payload: `voice-coaching.analysis-request.v4`
 
 ```json
 {
-  "schemaVersion": "voice-coaching.analysis-request.v3",
+  "schemaVersion": "voice-coaching.analysis-request.v4",
   "eventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
   "analysisId": 35,
   "contentId": 12,
   "promptRevision": "2026-09-02T00:00:00Z",
   "scriptText": "안녕하세요. 오늘 날씨가 좋습니다.",
   "scriptSha256": "lower-case sha256 hex",
-  "audioObjectKey": "recordings/50.wav",
+  "audioObjectKey": "recordings/analysis-audio/<opaque-uuid>.wav",
   "audioSha256": "lower-case sha256 of the normalized WAV bytes",
   "mimeType": "audio/wav",
   "fileSizeBytes": 1234,
   "durationMs": 1200,
   "learningFocus": "PRONUNCIATION",
+  "visualInput": {
+    "objectKey": "recordings/analysis-video/<opaque-uuid>.mp4",
+    "sha256": "lower-case sha256 of the canonical MP4 bytes",
+    "mimeType": "video/mp4",
+    "fileSizeBytes": 4567,
+    "consentReceiptSha256": "lower-case sha256 hex",
+    "consentPolicyRevision": "voice-video-processing-consent-v1"
+  },
   "authorizationGrant": {
-    "grantVersion": "voice-coaching.analysis-authorization.v2",
+    "grantVersion": "voice-coaching.analysis-authorization.v3",
     "keyId": "backend-2026-09",
     "requestEventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
     "analysisId": 35,
@@ -126,6 +134,12 @@ the dispatcher repeats the check immediately before Redis I/O as defense in dept
     "learningFocus": "PRONUNCIATION",
     "consentReceiptSha256": "lower-case sha256 hex",
     "consentPolicyRevision": "voice-analysis-consent-v1",
+    "visualObjectKeySha256": "lower-case sha256 hex",
+    "visualSha256": "lower-case sha256 hex",
+    "visualMimeType": "video/mp4",
+    "visualFileSizeBytes": 4567,
+    "visualConsentReceiptSha256": "lower-case sha256 hex",
+    "visualConsentPolicyRevision": "voice-video-processing-consent-v1",
     "issuedAtUtc": "2026-09-02T00:00:00Z",
     "expiresAtUtc": "2026-09-02T00:05:00Z",
     "purpose": "pronunciation_coaching",
@@ -151,14 +165,19 @@ the dispatcher repeats the check immediately before Redis I/O as defense in dept
 | `mimeType` | N | Registered media MIME type. |
 | `fileSizeBytes` / `durationMs` | N | Non-negative registered metadata. |
 | `learningFocus` | Y | `PRONUNCIATION`, `INTONATION`, or `BOTH`. Unsupported worker focus fails closed. |
+| `visualInput` | N | All-or-none canonical MP4 reference and face-processing consent. It is consumed only after Seungun selects a phone. |
 | `authorizationGrant` | Y | Signed, short-lived, same-request processing authority described below. |
 
 Before this payload exists, VC-BE verifies that the upload key belongs to the
 authenticated user and session, probes the real container and codecs, extracts exactly
 one audio stream, writes 16 kHz mono signed PCM WAV, performs technical audio QC,
-stores it under a backend-only normalized key, calculates `audioSha256`, and deletes
-the client-uploaded source. MP4/QuickTime accepts H.264 or HEVC with AAC; WebM video
-accepts VP8 or VP9 with Opus or Vorbis. Unsupported or ambiguous streams fail closed.
+stores it under an opaque backend-only key, calculates `audioSha256`, and deletes
+the client-uploaded source. For consented video, VC-BE also strips container metadata,
+canonicalizes the media to MP4 H.264/HEVC plus AAC, stores it under a second opaque
+key, and binds its digest, size, MIME and face-consent receipt into the request.
+MP4/QuickTime accepts H.264 or HEVC with AAC; WebM video accepts VP8 or VP9 with
+Opus or Vorbis and is transcoded to the canonical MP4 contract. Unsupported or
+ambiguous streams fail closed.
 
 The payload intentionally excludes `userId`, `sessionId`, `recordingId`, file paths,
 presigned URLs, and raw consent material. Both analyze and retry REST calls require
@@ -166,10 +185,12 @@ presigned URLs, and raw consent material. Both analyze and retry REST calls requ
 issuing a job, VC-BE durably records an opaque consent receipt bound to the owner,
 session, recording, request generation, policy revision, and normalized audio digest,
 then signs that receipt into a five-minute grant. Session cancellation and account
-withdrawal timestamp every still-active receipt as revoked. The v2 grant
+withdrawal timestamp every still-active receipt as revoked. The v3 grant
 binds request event, analysis/content/prompt, script digest, object-key digest,
-normalized audio digest, MIME, size, duration, learning focus, policy, purpose, data category, cleanup and egress
-policy. A retry receives and persists a new request event, receipt and signature.
+normalized audio digest, MIME, size, duration, learning focus, policy, purpose,
+data category, cleanup and egress policy. When visual input is present it additionally
+binds every visual field and its separate face-processing consent. A retry receives
+and persists a new request event, receipt and signature.
 
 The signature is HMAC-SHA256 over the fields above in listed order, excluding
 `signature`. Each line is `name:utf8ByteLength:value\n`; a null value is
@@ -177,7 +198,7 @@ The signature is HMAC-SHA256 over the fields above in listed order, excluding
 UTC JSON strings. The AI keyring selects the secret by `keyId` and compares the
 signature in constant time. Unknown keys, signature/binding differences, a future or
 expired window, a TTL over ten minutes, a policy mismatch, missing cleanup, or enabled
-remote egress fail before object storage access. Legacy request v1/v2 and grant v1 are unsupported.
+remote egress fail before object storage access. Legacy request v1-v3 and grant v1-v2 are unsupported.
 
 The AI worker uses a restricted object-storage adapter for the configured bucket and
 must verify the key, MIME type, registered size, locally calculated digest against
@@ -187,11 +208,11 @@ request transaction rolls back instead of leaving a stranded pending analysis. A
 worker deployment without an approved authorization, storage, and Seungun composition
 must refuse startup before it consumes any Stream entry.
 
-## Result payload: `voice-coaching.analysis-result.v2`
+## Result payload: `voice-coaching.analysis-result.v3`
 
 ```json
 {
-  "schemaVersion": "voice-coaching.analysis-result.v2",
+  "schemaVersion": "voice-coaching.analysis-result.v3",
   "eventId": "e917fda8-3c4f-4b7e-9094-7a1706081f1b",
   "requestEventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
   "analysisId": 35,
@@ -224,7 +245,16 @@ must refuse startup before it consumes any Stream entry.
   "workerRevision": "worker-revision",
   "pipelineRevision": "pipeline-revision",
   "audioSha256": "lower-case sha256 hex",
-  "segments": []
+  "segments": [],
+  "visualSupplement": {
+    "schemaVersion": "voice-coaching.visual-supplement.v1",
+    "selectedExpectedIndex": 0,
+    "evidenceRelation": "supports_upstream",
+    "approvedClaimId": "lip.aperture.low",
+    "rendererKey": "lip_aperture_hint",
+    "upstreamPhoneAnchorRef": "lower-case sha256 hex",
+    "supplementSha256": "lower-case sha256 hex"
+  }
 }
 ```
 
@@ -232,18 +262,19 @@ must refuse startup before it consumes any Stream entry.
 | --- | --- | --- |
 | `schemaVersion`, `eventId`, `requestEventId`, `analysisId`, `status` | Y | Version, UUID lineage, and positive analysis ID. `requestEventId` must equal the current active request generation. |
 | `status` | Y | `PROCESSING`, `COMPLETED`, or `FAILED`; `PENDING` is not a worker result. |
-| `outcome` | completed only | Result v2 accepts only `COACHING_READY` and `COMPLETED_NO_ISSUE`; other enum values remain reserved until their evidence mapping is reviewed. |
+| `outcome` | completed only | Result v3 accepts only `COACHING_READY` and `COMPLETED_NO_ISSUE`; other enum values remain reserved until their evidence mapping is reviewed. |
+| `visualSupplement` | N | Only an approved same-attempt action projection. Its selected index must equal Seungun's `pronunciationEvidence.selectedExpectedIndex`; it cannot create a diagnosis. |
 | `failureCode`, `failureReason` | failed only | Stable code plus learner-safe reason (max 500 chars). Never include infrastructure exception text. Failed/processing results contain no transcript, scores, feedback, digest, or segments; a failure may retain worker/pipeline revision receipts. |
 | `pronunciationEvidence` | coaching only | Required exactly when `outcome=COACHING_READY`. It preserves the same-attempt Seungun-selected phone, index, optional time range, threshold-passed ranking score and explicit non-confidence semantics. |
-| transcript, score, strength/weakness, segment fields | N | The v2 production mapping requires these to remain `null`/empty because no approved Seungun mapping currently supplies them. Placeholder or independently inferred values are rejected. |
+| transcript, score, strength/weakness, segment fields | N | The v3 production mapping requires these to remain `null`/empty because no approved Seungun mapping currently supplies them. Placeholder or independently inferred values are rejected. |
 | revision/digest fields | completed | Worker/pipeline revision and lower-case audio SHA-256 are required provenance; object keys and digests are not exposed as public client API fields. |
 | `segments` | all states | Must currently be an empty array. A future segment mapping requires a new reviewed schema. |
 
-Legacy `voice-coaching.analysis-result.v1` is rejected. Result-v2 deployment therefore
+Legacy `voice-coaching.analysis-result.v1` and `v2` are rejected. Result-v3 deployment therefore
 requires a quiesced rollout: stop new analysis admission and the AI worker, drain or
 deliberately resolve all pending request/result entries, deploy Backend and worker,
-then enable both together. Do not run a v1 producer against the v2 consumer or the
-reverse. The Redis stream name remains `analysis:result:v1`; it identifies the
+then enable both together. Do not run an older result producer against the v3 consumer
+or the reverse. The Redis stream name remains `analysis:result:v1`; it identifies the
 transport channel, not the JSON schema version.
 
 `PROCESSING` updates only the job state. It does not authorize the AI worker to ACK

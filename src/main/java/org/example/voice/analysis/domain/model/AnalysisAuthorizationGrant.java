@@ -26,6 +26,12 @@ public record AnalysisAuthorizationGrant(
         LearningFocus learningFocus,
         String consentReceiptSha256,
         String consentPolicyRevision,
+        String visualObjectKeySha256,
+        String visualSha256,
+        String visualMimeType,
+        Long visualFileSizeBytes,
+        String visualConsentReceiptSha256,
+        String visualConsentPolicyRevision,
         Instant issuedAtUtc,
         Instant expiresAtUtc,
         String purpose,
@@ -34,9 +40,42 @@ public record AnalysisAuthorizationGrant(
         boolean remoteEgressAllowed,
         String signature
 ) {
-    public static final String GRANT_VERSION = "voice-coaching.analysis-authorization.v2";
+    public static final String GRANT_VERSION = "voice-coaching.analysis-authorization.v3";
     public static final String PURPOSE = "pronunciation_coaching";
     public static final String DATA_CATEGORY = "learner_voice_recording";
+
+    public AnalysisAuthorizationGrant(
+            String grantVersion,
+            String keyId,
+            UUID requestEventId,
+            Long analysisId,
+            Long contentId,
+            String promptRevision,
+            String scriptSha256,
+            String audioObjectKeySha256,
+            String audioSha256,
+            String mimeType,
+            Long fileSizeBytes,
+            Integer durationMs,
+            LearningFocus learningFocus,
+            String consentReceiptSha256,
+            String consentPolicyRevision,
+            Instant issuedAtUtc,
+            Instant expiresAtUtc,
+            String purpose,
+            String dataCategory,
+            boolean deleteOnCompletion,
+            boolean remoteEgressAllowed,
+            String signature
+    ) {
+        this(grantVersion, keyId, requestEventId, analysisId, contentId,
+                promptRevision, scriptSha256, audioObjectKeySha256, audioSha256,
+                mimeType, fileSizeBytes, durationMs, learningFocus,
+                consentReceiptSha256, consentPolicyRevision,
+                null, null, null, null, null, null,
+                issuedAtUtc, expiresAtUtc, purpose, dataCategory,
+                deleteOnCompletion, remoteEgressAllowed, signature);
+    }
 
     public AnalysisAuthorizationGrant {
         requireEquals(GRANT_VERSION, grantVersion, "grantVersion");
@@ -60,6 +99,14 @@ public record AnalysisAuthorizationGrant(
         Objects.requireNonNull(learningFocus, "learningFocus");
         requireSha256(consentReceiptSha256, "consentReceiptSha256");
         requireText(consentPolicyRevision, 100, "consentPolicyRevision");
+        validateVisualClaims(
+                visualObjectKeySha256,
+                visualSha256,
+                visualMimeType,
+                visualFileSizeBytes,
+                visualConsentReceiptSha256,
+                visualConsentPolicyRevision
+        );
         Objects.requireNonNull(issuedAtUtc, "issuedAtUtc");
         Objects.requireNonNull(expiresAtUtc, "expiresAtUtc");
         if (!expiresAtUtc.isAfter(issuedAtUtc)) {
@@ -94,6 +141,12 @@ public record AnalysisAuthorizationGrant(
         append(value, "learningFocus", learningFocus);
         append(value, "consentReceiptSha256", consentReceiptSha256);
         append(value, "consentPolicyRevision", consentPolicyRevision);
+        append(value, "visualObjectKeySha256", visualObjectKeySha256);
+        append(value, "visualSha256", visualSha256);
+        append(value, "visualMimeType", visualMimeType);
+        append(value, "visualFileSizeBytes", visualFileSizeBytes);
+        append(value, "visualConsentReceiptSha256", visualConsentReceiptSha256);
+        append(value, "visualConsentPolicyRevision", visualConsentPolicyRevision);
         append(value, "issuedAtUtc", issuedAtUtc);
         append(value, "expiresAtUtc", expiresAtUtc);
         append(value, "purpose", purpose);
@@ -101,6 +154,51 @@ public record AnalysisAuthorizationGrant(
         append(value, "deleteOnCompletion", deleteOnCompletion);
         append(value, "remoteEgressAllowed", remoteEgressAllowed);
         return value.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    public boolean binds(AnalysisWorkerVisualInput visualInput) {
+        if (visualInput == null) {
+            return visualObjectKeySha256 == null;
+        }
+        return sha256(visualInput.objectKey()).equals(visualObjectKeySha256)
+                && visualInput.sha256().equals(visualSha256)
+                && visualInput.mimeType().equals(visualMimeType)
+                && visualInput.fileSizeBytes().equals(visualFileSizeBytes)
+                && visualInput.consentReceiptSha256().equals(visualConsentReceiptSha256)
+                && visualInput.consentPolicyRevision().equals(visualConsentPolicyRevision);
+    }
+
+    private static void validateVisualClaims(
+            String objectKeySha256,
+            String visualSha256,
+            String mimeType,
+            Long fileSizeBytes,
+            String consentReceiptSha256,
+            String consentPolicyRevision
+    ) {
+        boolean absent = objectKeySha256 == null && visualSha256 == null && mimeType == null
+                && fileSizeBytes == null && consentReceiptSha256 == null && consentPolicyRevision == null;
+        if (absent) {
+            return;
+        }
+        requireSha256(objectKeySha256, "visualObjectKeySha256");
+        requireSha256(visualSha256, "visualSha256");
+        if (!"video/mp4".equals(mimeType) || fileSizeBytes == null || fileSizeBytes <= 0) {
+            throw new IllegalArgumentException("visual media claims are invalid");
+        }
+        requireSha256(consentReceiptSha256, "visualConsentReceiptSha256");
+        requireText(consentPolicyRevision, 100, "visualConsentPolicyRevision");
+    }
+
+    private static String sha256(String value) {
+        try {
+            return java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256")
+                            .digest(value.getBytes(StandardCharsets.UTF_8))
+            );
+        } catch (java.security.NoSuchAlgorithmException error) {
+            throw new IllegalStateException("SHA-256 is unavailable", error);
+        }
     }
 
     private static void append(StringBuilder target, String name, Object rawValue) {

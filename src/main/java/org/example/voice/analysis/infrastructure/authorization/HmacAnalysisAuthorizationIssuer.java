@@ -78,6 +78,14 @@ public class HmacAnalysisAuthorizationIssuer implements AnalysisAuthorizationIss
                 issue.learningFocus(),
                 receiptSha256,
                 issue.consentPolicyRevision(),
+                issue.visualInput() == null ? null : sha256(
+                        issue.visualInput().objectKey().getBytes(StandardCharsets.UTF_8)
+                ),
+                issue.visualInput() == null ? null : issue.visualInput().sha256(),
+                issue.visualInput() == null ? null : issue.visualInput().mimeType(),
+                issue.visualInput() == null ? null : issue.visualInput().fileSizeBytes(),
+                issue.visualInput() == null ? null : issue.visualInput().consentReceiptSha256(),
+                issue.visualInput() == null ? null : issue.visualInput().consentPolicyRevision(),
                 issuedAt,
                 issuedAt.plus(properties.getGrantTtl()),
                 AnalysisAuthorizationGrant.PURPOSE,

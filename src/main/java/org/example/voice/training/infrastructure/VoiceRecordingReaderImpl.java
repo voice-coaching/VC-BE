@@ -100,6 +100,12 @@ public class VoiceRecordingReaderImpl implements VoiceRecordingReader {
                         recording.getFileSizeBytes(),
                         recording.getDurationMs(),
                         recording.getAudioSha256(),
+                        recording.getVisualObjectKey(),
+                        recording.getVisualMimeType(),
+                        recording.getVisualFileSizeBytes(),
+                        recording.getVisualSha256(),
+                        recording.getVisualConsentReceiptSha256(),
+                        recording.getVisualConsentPolicyRevision(),
                         recording.getTrainingSession().getLearningFocus(),
                         recording.getQualityStatus()
                 ));

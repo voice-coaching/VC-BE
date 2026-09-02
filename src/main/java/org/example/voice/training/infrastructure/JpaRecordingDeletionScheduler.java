@@ -33,7 +33,7 @@ public class JpaRecordingDeletionScheduler implements RecordingDeletionScheduler
     @Transactional
     public void scheduleAllForUser(Long userId, RecordingDeletionReason reason) {
         List<Object[]> recordings = entityManager.createQuery("""
-                select recording.trainingSession.id, recording.audioUrl
+                select recording.trainingSession.id, recording.audioUrl, recording.visualObjectKey
                   from VoiceRecording recording
                  where recording.trainingSession.userId = :userId
                 """, Object[].class)
@@ -45,5 +45,13 @@ public class JpaRecordingDeletionScheduler implements RecordingDeletionScheduler
                 (String) recording[1],
                 reason
         ));
+        recordings.stream()
+                .filter(recording -> recording[2] != null)
+                .forEach(recording -> schedule(
+                        userId,
+                        (Long) recording[0],
+                        (String) recording[2],
+                        reason
+                ));
     }
 }

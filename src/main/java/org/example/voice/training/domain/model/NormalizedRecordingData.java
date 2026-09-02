@@ -13,9 +13,24 @@ public record NormalizedRecordingData(
         String audioSha256,
         RecordingQualityStatus qualityStatus,
         BigDecimal volumeScore,
-        BigDecimal noiseScore
+        BigDecimal noiseScore,
+        NormalizedVisualData visual
 ) {
     public static final String CANONICAL_MIME_TYPE = "audio/wav";
+
+    public NormalizedRecordingData(
+            String objectKey,
+            String mimeType,
+            Long fileSizeBytes,
+            Integer durationMs,
+            String audioSha256,
+            RecordingQualityStatus qualityStatus,
+            BigDecimal volumeScore,
+            BigDecimal noiseScore
+    ) {
+        this(objectKey, mimeType, fileSizeBytes, durationMs, audioSha256,
+                qualityStatus, volumeScore, noiseScore, null);
+    }
 
     public NormalizedRecordingData {
         if (objectKey == null || objectKey.isBlank() || objectKey.length() > 1_000) {

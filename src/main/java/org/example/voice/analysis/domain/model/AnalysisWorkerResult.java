@@ -40,9 +40,46 @@ public record AnalysisWorkerResult(
         String workerRevision,
         String pipelineRevision,
         String audioSha256,
-        List<AnalysisWorkerSegment> segments
+        List<AnalysisWorkerSegment> segments,
+        AnalysisWorkerVisualSupplement visualSupplement
 ) {
-    public static final String SCHEMA_VERSION = "voice-coaching.analysis-result.v2";
+    public static final String SCHEMA_VERSION = "voice-coaching.analysis-result.v3";
+
+    public AnalysisWorkerResult(
+            String schemaVersion,
+            UUID eventId,
+            UUID requestEventId,
+            Long analysisId,
+            AnalysisStatus status,
+            AnalysisOutcome outcome,
+            String failureCode,
+            String failureReason,
+            String transcript,
+            BigDecimal sttConfidence,
+            String sttModelName,
+            BigDecimal overallScore,
+            BigDecimal pronunciationScore,
+            BigDecimal intonationScore,
+            BigDecimal speedWpm,
+            SpeedStatus speedStatus,
+            BigDecimal stressScore,
+            BigDecimal pauseScore,
+            String strengthsText,
+            String weaknessesText,
+            String summaryFeedback,
+            AnalysisWorkerPronunciationEvidence pronunciationEvidence,
+            String workerRevision,
+            String pipelineRevision,
+            String audioSha256,
+            List<AnalysisWorkerSegment> segments
+    ) {
+        this(schemaVersion, eventId, requestEventId, analysisId, status, outcome,
+                failureCode, failureReason, transcript, sttConfidence, sttModelName,
+                overallScore, pronunciationScore, intonationScore, speedWpm,
+                speedStatus, stressScore, pauseScore, strengthsText, weaknessesText,
+                summaryFeedback, pronunciationEvidence, workerRevision,
+                pipelineRevision, audioSha256, segments, null);
+    }
 
     public AnalysisWorkerResult {
         requireEquals(SCHEMA_VERSION, schemaVersion, "schemaVersion");
@@ -88,7 +125,7 @@ public record AnalysisWorkerResult(
         if (status == AnalysisStatus.COMPLETED) {
             if (outcome != AnalysisOutcome.COACHING_READY
                     && outcome != AnalysisOutcome.COMPLETED_NO_ISSUE) {
-                throw new IllegalArgumentException("result v2 outcome is unsupported");
+                throw new IllegalArgumentException("result v3 outcome is unsupported");
             }
             requireText(workerRevision, 100, "workerRevision");
             requireText(pipelineRevision, 100, "pipelineRevision");
@@ -99,6 +136,13 @@ public record AnalysisWorkerResult(
                 requireText(summaryFeedback, 20_000, "summaryFeedback");
                 Objects.requireNonNull(pronunciationEvidence,
                         "COACHING_READY result requires pronunciationEvidence");
+                if (visualSupplement != null
+                        && !visualSupplement.selectedExpectedIndex().equals(
+                                pronunciationEvidence.selectedExpectedIndex())) {
+                    throw new IllegalArgumentException(
+                            "visual supplement must bind Seungun selected phone"
+                    );
+                }
             } else if (summaryFeedback != null || pronunciationEvidence != null) {
                 throw new IllegalArgumentException(
                         "non-coaching outcome must not contain pronunciation coaching evidence"
@@ -119,11 +163,16 @@ public record AnalysisWorkerResult(
                     weaknessesText
             ) || !segments.isEmpty()) {
                 throw new IllegalArgumentException(
-                        "result v2 does not accept unapproved transcript, score, or segment mappings"
+                        "result v3 does not accept unapproved transcript, score, or segment mappings"
                 );
             }
-        } else if (pronunciationEvidence != null) {
-            throw new IllegalArgumentException(status + " result must not contain pronunciationEvidence");
+        } else if (pronunciationEvidence != null || visualSupplement != null) {
+            throw new IllegalArgumentException(status + " result must not contain coaching evidence");
+        }
+        if (status == AnalysisStatus.COMPLETED
+                && outcome != AnalysisOutcome.COACHING_READY
+                && visualSupplement != null) {
+            throw new IllegalArgumentException("visual supplement requires coaching-ready Seungun evidence");
         }
         if (sttConfidence != null && (sttConfidence.signum() < 0 || sttConfidence.compareTo(BigDecimal.ONE) > 0)) {
             throw new IllegalArgumentException("sttConfidence must be between 0 and 1");

@@ -2,6 +2,7 @@ package org.example.voice.analysis.infrastructure.authorization;
 
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationIssue;
+import org.example.voice.analysis.domain.model.AnalysisWorkerVisualInput;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.practicecontent.domain.type.LearningFocus;
@@ -34,8 +35,45 @@ class HmacAnalysisAuthorizationIssuerTest {
         assertThat(grant.signature()).hasSize(64);
         assertThat(grant.signature()).isNotEqualTo("0".repeat(64));
         assertThat(grant.signature())
-                .isEqualTo("79f14f0ef0f388ef3efc30e6870662636694caafeb6767d078c9d166777c84bf");
+                .isEqualTo("94416ceb8712c06e9b3798867eb7e8a0e13dfb547f965090aae66da50a1dc353");
         assertThat(new String(grant.canonicalSigningInput())).contains("scriptSha256:64:");
+    }
+
+    @Test
+    void matchesPythonCanonicalHmacVectorWhenVisualClaimsArePresent() {
+        HmacAnalysisAuthorizationIssuer issuer = issuer("voice-analysis-consent-v1");
+        AnalysisAuthorizationIssue base = issue("voice-analysis-consent-v1");
+        AnalysisWorkerVisualInput visualInput = new AnalysisWorkerVisualInput(
+                "recordings/analysis-video/00000000-0000-0000-0000-000000000001.mp4",
+                "f".repeat(64),
+                "video/mp4",
+                4567L,
+                "e".repeat(64),
+                "voice-video-processing-consent-v1"
+        );
+        AnalysisAuthorizationIssue issue = new AnalysisAuthorizationIssue(
+                base.requestEventId(),
+                base.analysisId(),
+                base.contentId(),
+                base.promptRevision(),
+                base.scriptSha256(),
+                base.audioObjectKey(),
+                base.audioSha256(),
+                base.mimeType(),
+                base.fileSizeBytes(),
+                base.durationMs(),
+                base.learningFocus(),
+                base.consentReceiptSha256(),
+                base.consentPolicyRevision(),
+                visualInput
+        );
+
+        AnalysisAuthorizationGrant grant = issuer.issue(issue);
+
+        assertThat(grant.visualObjectKeySha256())
+                .isEqualTo("350294a93744e37eb7c03f54a50710177c99a7231b485eb39061983c95cba7d6");
+        assertThat(grant.signature())
+                .isEqualTo("dc132de88e2cba1bb2e1a6916d7bfc30525eafb77d8b2b943b3a4232c8906208");
     }
 
     @Test

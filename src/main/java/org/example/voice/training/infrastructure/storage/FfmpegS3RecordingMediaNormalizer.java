@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.training.domain.model.NormalizedRecordingData;
+import org.example.voice.training.domain.model.NormalizedVisualData;
+import org.example.voice.training.domain.model.VisualProcessingAuthorizationData;
 import org.example.voice.training.domain.port.RecordingMediaNormalizationPort;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -83,18 +85,29 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             Long sessionId,
             String sourceObjectKey,
             String declaredMimeType,
-            long declaredFileSizeBytes
+            long declaredFileSizeBytes,
+            VisualProcessingAuthorizationData visualAuthorization
     ) {
-        String ownerPrefix = requireOwnerPrefix(userId, sessionId, sourceObjectKey);
+        requireOwnerPrefix(userId, sessionId, sourceObjectKey);
+        boolean video = declaredMimeType != null && declaredMimeType.startsWith("video/");
+        if (video != (visualAuthorization != null)) {
+            throw new BaseException(ErrorCode.VIDEO_PROCESSING_CONSENT_REQUIRED);
+        }
         if (declaredFileSizeBytes <= 0 || declaredFileSizeBytes > media.getMaximumInputBytes()) {
             throw new BaseException(ErrorCode.AUDIO_FILE_TOO_LARGE);
         }
         Path workspace = createWorkspace();
         Path source = workspace.resolve("source.media");
         Path canonical = workspace.resolve("canonical.wav");
-        String normalizedObjectKey = ownerPrefix + "normalized/" + UUID.randomUUID() + ".wav";
+        Path canonicalVisual = workspace.resolve("canonical.mp4");
+        String normalizedObjectKey = storage.getRecordingsPrefix()
+                + "analysis-audio/" + UUID.randomUUID() + ".wav";
+        String visualObjectKey = video
+                ? storage.getRecordingsPrefix() + "analysis-video/" + UUID.randomUUID() + ".mp4"
+                : null;
         boolean sourceDownloaded = false;
         boolean normalizedUploaded = false;
+        boolean visualUploaded = false;
         RuntimeException failure = null;
         try {
             s3Client.getObject(
@@ -109,7 +122,40 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             requireRestrictedRegularFile(source, declaredFileSizeBytes, media.getMaximumInputBytes());
             ProbeDocument probe = probe(source);
             long probedDurationMs = validateProbe(probe, declaredMimeType);
-            transcode(source, canonical);
+            Path audioSource = source;
+            NormalizedVisualData visual = null;
+            if (video) {
+                canonicalizeVideo(source, canonicalVisual, declaredMimeType);
+                Files.setPosixFilePermissions(canonicalVisual, READ_ONLY_FILE_PERMISSIONS);
+                requireRestrictedRegularFile(canonicalVisual, null, media.getMaximumInputBytes());
+                ProbeDocument canonicalProbe = probe(canonicalVisual);
+                long canonicalDurationMs = validateProbe(canonicalProbe, NormalizedVisualData.CANONICAL_MIME_TYPE);
+                if (Math.abs(canonicalDurationMs - probedDurationMs) > 1_500) {
+                    throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
+                }
+                String visualDigest = sha256(canonicalVisual);
+                s3Client.putObject(
+                        PutObjectRequest.builder()
+                                .bucket(storage.getBucket())
+                                .key(visualObjectKey)
+                                .contentType(NormalizedVisualData.CANONICAL_MIME_TYPE)
+                                .contentLength(Files.size(canonicalVisual))
+                                .metadata(java.util.Map.of("sha256", visualDigest))
+                                .build(),
+                        RequestBody.fromFile(canonicalVisual)
+                );
+                visualUploaded = true;
+                visual = new NormalizedVisualData(
+                        visualObjectKey,
+                        NormalizedVisualData.CANONICAL_MIME_TYPE,
+                        Files.size(canonicalVisual),
+                        visualDigest,
+                        visualAuthorization.receiptSha256(),
+                        visualAuthorization.policyRevision()
+                );
+                audioSource = canonicalVisual;
+            }
+            transcode(audioSource, canonical);
             Files.setPosixFilePermissions(canonical, READ_ONLY_FILE_PERMISSIONS);
             requireRestrictedRegularFile(canonical, null, media.getMaximumNormalizedBytes());
             PcmQuality quality = inspectCanonicalWav(canonical);
@@ -136,7 +182,8 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                     digest,
                     quality.status(),
                     quality.volumeScore(),
-                    null
+                    null,
+                    visual
             );
         } catch (BaseException error) {
             failure = error;
@@ -171,6 +218,17 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                     }
                 }
             }
+            if ((failure != null || mandatoryCleanupFailure != null) && visualUploaded) {
+                try {
+                    deleteNormalizedObject(userId, sessionId, visualObjectKey);
+                } catch (RuntimeException cleanupFailure) {
+                    if (mandatoryCleanupFailure == null) {
+                        mandatoryCleanupFailure = cleanupFailure;
+                    } else {
+                        mandatoryCleanupFailure.addSuppressed(cleanupFailure);
+                    }
+                }
+            }
             RuntimeException workspaceCleanupFailure = deleteWorkspace(workspace);
             if (workspaceCleanupFailure != null) {
                 if (mandatoryCleanupFailure == null) {
@@ -190,8 +248,8 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
 
     @Override
     public void deleteNormalizedObject(Long userId, Long sessionId, String objectKey) {
-        String ownerPrefix = requireOwnerPrefix(userId, sessionId, objectKey);
-        if (!objectKey.startsWith(ownerPrefix + "normalized/")) {
+        if (userId == null || userId <= 0 || sessionId == null || sessionId <= 0
+                || !isOpaqueAnalysisObjectKey(objectKey)) {
             throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
         }
         try {
@@ -238,6 +296,36 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                 "-f", "wav",
                 canonical.toString()
         );
+        run(command, false);
+    }
+
+    private void canonicalizeVideo(Path source, Path canonical, String declaredMimeType)
+            throws IOException, InterruptedException {
+        List<String> codecs = "video/webm".equals(declaredMimeType)
+                ? List.of(
+                        "-c:v", "libx264",
+                        "-preset", "veryfast",
+                        "-pix_fmt", "yuv420p",
+                        "-c:a", "aac",
+                        "-ac", "1",
+                        "-ar", "16000",
+                        "-b:a", "64k"
+                )
+                : List.of("-c", "copy");
+        java.util.ArrayList<String> command = new java.util.ArrayList<>(List.of(
+                media.getFfmpegBinary(),
+                "-nostdin",
+                "-hide_banner",
+                "-loglevel", "error",
+                "-protocol_whitelist", "file,pipe",
+                "-i", source.toString(),
+                "-map", "0:v:0",
+                "-map", "0:a:0",
+                "-map_metadata", "-1",
+                "-map_chapters", "-1"
+        ));
+        command.addAll(codecs);
+        command.addAll(List.of("-movflags", "+faststart", "-f", "mp4", canonical.toString()));
         run(command, false);
     }
 
@@ -526,6 +614,17 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
         }
         return ownerPrefix;
+    }
+
+    private boolean isOpaqueAnalysisObjectKey(String objectKey) {
+        if (objectKey == null || objectKey.contains("\\")) {
+            return false;
+        }
+        String audioPattern = java.util.regex.Pattern.quote(storage.getRecordingsPrefix())
+                + "analysis-audio/[0-9a-fA-F-]{36}\\.wav";
+        String videoPattern = java.util.regex.Pattern.quote(storage.getRecordingsPrefix())
+                + "analysis-video/[0-9a-fA-F-]{36}\\.mp4";
+        return objectKey.matches(audioPattern) || objectKey.matches(videoPattern);
     }
 
     private static long parseDurationMs(String value) {

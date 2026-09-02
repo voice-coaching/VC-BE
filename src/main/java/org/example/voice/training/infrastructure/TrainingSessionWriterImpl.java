@@ -143,6 +143,14 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
                             recording.getAudioUrl(),
                             RecordingDeletionReason.SESSION_CANCELED
                     );
+                    if (recording.getVisualObjectKey() != null) {
+                        recordingDeletionScheduler.schedule(
+                                session.getUserId(),
+                                sessionId,
+                                recording.getVisualObjectKey(),
+                                RecordingDeletionReason.SESSION_CANCELED
+                        );
+                    }
                 });
         return new TrainingSessionCancellationData(session.getId(), session.getStatus(), session.getCompletedAt());
     }

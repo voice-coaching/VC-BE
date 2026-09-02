@@ -13,7 +13,7 @@ class AnalysisStreamCodecTest {
     void decodesGroundedResultV2WithSameAttemptPronunciationEvidence() {
         var result = codec.decodeResult("""
                 {
-                  "schemaVersion": "voice-coaching.analysis-result.v2",
+                  "schemaVersion": "voice-coaching.analysis-result.v3",
                   "eventId": "e917fda8-3c4f-4b7e-9094-7a1706081f1b",
                   "requestEventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
                   "analysisId": 35,
@@ -65,7 +65,7 @@ class AnalysisStreamCodecTest {
     void rejectsUnknownPronunciationEvidenceFields() {
         assertThatThrownBy(() -> codec.decodeResult("""
                 {
-                  "schemaVersion": "voice-coaching.analysis-result.v2",
+                  "schemaVersion": "voice-coaching.analysis-result.v3",
                   "eventId": "e917fda8-3c4f-4b7e-9094-7a1706081f1b",
                   "requestEventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
                   "analysisId": 35,

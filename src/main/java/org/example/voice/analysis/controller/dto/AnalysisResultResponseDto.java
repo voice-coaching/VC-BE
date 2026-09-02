@@ -11,7 +11,9 @@ public record AnalysisResultResponseDto(Long id, String status, String outcome, 
         BigDecimal overallScore, BigDecimal pronunciationScore, BigDecimal intonationScore, BigDecimal speedWpm,
         String speedStatus, BigDecimal stressScore, BigDecimal pauseScore, List<String> strengths,
         List<String> weaknesses, String summaryFeedback,
-        PronunciationEvidenceResponseDto pronunciationEvidence, OffsetDateTime analyzedAt) {
+        PronunciationEvidenceResponseDto pronunciationEvidence,
+        VisualSupplementResponseDto visualSupplement,
+        OffsetDateTime analyzedAt) {
     public static AnalysisResultResponseDto from(AnalysisResultData data) {
         return new AnalysisResultResponseDto(
                 data.id(),
@@ -30,6 +32,7 @@ public record AnalysisResultResponseDto(Long id, String status, String outcome, 
                 FeedbackRegenerationService.split(data.weaknessesText()),
                 data.summaryFeedback(),
                 PronunciationEvidenceResponseDto.from(data.pronunciationEvidence()),
+                VisualSupplementResponseDto.from(data.visualSupplement()),
                 data.analyzedAt()
         );
     }
