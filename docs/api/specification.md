@@ -737,23 +737,34 @@ Content-Type: application/json
   "data": {
     "id": "Long",
     "status": "String", // AnalysisStatus; analysis_results.status; 값: PENDING, PROCESSING, COMPLETED, FAILED
-    "outcome": "String | null", // AnalysisOutcome; COMPLETED일 때만 COACHING_READY, COMPLETED_NO_ISSUE, RERECORD_REQUIRED, UNCERTAIN, FAILED_CLOSED
-    "transcript": "String",
-    "sttConfidence": "Number",
-    "overallScore": "Number",
-    "pronunciationScore": "Number",
-    "intonationScore": "Number",
-    "speedWpm": "Number",
-    "speedStatus": "String", // SpeedStatus; analysis_results.speed_status; 값: TOO_SLOW, NORMAL, TOO_FAST
-    "stressScore": "Number",
-    "pauseScore": "Number",
+    "outcome": "String | null", // result.v2 완료 값: COACHING_READY, COMPLETED_NO_ISSUE
+    "transcript": "String | null", // result.v2 현재 미측정
+    "sttConfidence": "Number | null", // result.v2 현재 미측정
+    "overallScore": "Number | null", // result.v2 현재 미측정
+    "pronunciationScore": "Number | null", // result.v2 현재 미측정
+    "intonationScore": "Number | null", // result.v2 현재 미측정
+    "speedWpm": "Number | null", // result.v2 현재 미측정
+    "speedStatus": "String | null", // result.v2 현재 미측정
+    "stressScore": "Number | null", // result.v2 현재 미측정
+    "pauseScore": "Number | null", // result.v2 현재 미측정
     "strengths": [
       "String"
     ],
     "weaknesses": [
       "String"
     ],
-    "summaryFeedback": "String",
+    "summaryFeedback": "String | null",
+    "pronunciationEvidence": { // COACHING_READY일 때만 존재, 그 외 null
+      "schemaVersion": "voice-coaching.pronunciation-evidence.v1",
+      "selectedPhone": "String",
+      "selectedExpectedIndex": "Integer",
+      "selectedStartMs": "Integer | null",
+      "selectedEndMs": "Integer | null",
+      "detectorScore": "Number",
+      "operatingThreshold": "Number",
+      "scoreSemantics": "detector_ranking_score_not_calibrated_correctness_confidence",
+      "evidenceState": "frozen_detector_threshold_passed"
+    },
     "analyzedAt": "String (ISO-8601)"
   }
 }

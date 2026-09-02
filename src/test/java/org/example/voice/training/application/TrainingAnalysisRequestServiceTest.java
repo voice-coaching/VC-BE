@@ -133,6 +133,33 @@ class TrainingAnalysisRequestServiceTest {
     }
 
     @Test
+    void rejectsUnsupportedCombinedFocusBeforeConsentOrAnalysisState() {
+        SelectedRecordingAnalysisData source = new SelectedRecordingAnalysisData(
+                50L,
+                12L,
+                "2026-09-02T00:00:00Z",
+                "안녕하세요.",
+                "recordings/50.wav",
+                "audio/wav",
+                1234L,
+                1200,
+                "d".repeat(64),
+                LearningFocus.BOTH,
+                RecordingQualityStatus.PASS
+        );
+        when(voiceRecordingReader.findSelectedForAnalysis(7L, 9L)).thenReturn(Optional.of(source));
+
+        assertThatThrownBy(() -> service().requestAnalysis(7L, 9L, consent()))
+                .isInstanceOfSatisfying(BaseException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.ANALYSIS_FOCUS_NOT_SUPPORTED));
+
+        verify(processingConsentLedger, never()).grantVoiceAnalysis(any(), any(), any(), any(), any(), any());
+        verify(trainingAnalysisWriter, never()).createPending(any(), any());
+        verify(analysisJobPublisher, never()).publish(any());
+    }
+
+    @Test
     void retriesTheLockedFailedGenerationUsingItsPersistedCount() {
         SelectedRecordingAnalysisData source = new SelectedRecordingAnalysisData(
                 50L,

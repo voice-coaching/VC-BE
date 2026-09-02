@@ -9,6 +9,7 @@ import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.consent.domain.model.ProcessingConsentReceipt;
 import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.practicecontent.domain.type.LearningFocus;
 import org.example.voice.training.domain.model.AnalysisProgressData;
 import org.example.voice.training.domain.model.AnalysisRequestData;
 import org.example.voice.training.domain.model.AnalysisRetryData;
@@ -50,6 +51,7 @@ public class TrainingAnalysisRequestService {
         validateConsent(consent);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.SELECTED_RECORDING_NOT_FOUND));
+        validateSupportedFocus(source);
         if (source.qualityStatus() != RecordingQualityStatus.PASS) {
             throw new BaseException(ErrorCode.AUDIO_QUALITY_NOT_ACCEPTABLE);
         }
@@ -93,6 +95,7 @@ public class TrainingAnalysisRequestService {
         validateConsent(consent);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
+        validateSupportedFocus(source);
         AnalysisProgressData failed = trainingAnalysisReader.findLatestFailedBySelectedRecording(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FAILED));
 
@@ -170,6 +173,12 @@ public class TrainingAnalysisRequestService {
                 || consent.policyRevision().isBlank()
                 || consent.policyRevision().length() > 100) {
             throw new BaseException(ErrorCode.ANALYSIS_CONSENT_REQUIRED);
+        }
+    }
+
+    private static void validateSupportedFocus(SelectedRecordingAnalysisData source) {
+        if (source.learningFocus() != LearningFocus.PRONUNCIATION) {
+            throw new BaseException(ErrorCode.ANALYSIS_FOCUS_NOT_SUPPORTED);
         }
     }
 

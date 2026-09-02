@@ -36,12 +36,13 @@ public record AnalysisWorkerResult(
         String strengthsText,
         String weaknessesText,
         String summaryFeedback,
+        AnalysisWorkerPronunciationEvidence pronunciationEvidence,
         String workerRevision,
         String pipelineRevision,
         String audioSha256,
         List<AnalysisWorkerSegment> segments
 ) {
-    public static final String SCHEMA_VERSION = "voice-coaching.analysis-result.v1";
+    public static final String SCHEMA_VERSION = "voice-coaching.analysis-result.v2";
 
     public AnalysisWorkerResult {
         requireEquals(SCHEMA_VERSION, schemaVersion, "schemaVersion");
@@ -83,6 +84,46 @@ public record AnalysisWorkerResult(
                 audioSha256
         )) {
             throw new IllegalArgumentException(status + " result must not contain analysis payload");
+        }
+        if (status == AnalysisStatus.COMPLETED) {
+            if (outcome != AnalysisOutcome.COACHING_READY
+                    && outcome != AnalysisOutcome.COMPLETED_NO_ISSUE) {
+                throw new IllegalArgumentException("result v2 outcome is unsupported");
+            }
+            requireText(workerRevision, 100, "workerRevision");
+            requireText(pipelineRevision, 100, "pipelineRevision");
+            if (audioSha256 == null) {
+                throw new IllegalArgumentException("COMPLETED result requires audioSha256");
+            }
+            if (outcome == AnalysisOutcome.COACHING_READY) {
+                requireText(summaryFeedback, 20_000, "summaryFeedback");
+                Objects.requireNonNull(pronunciationEvidence,
+                        "COACHING_READY result requires pronunciationEvidence");
+            } else if (summaryFeedback != null || pronunciationEvidence != null) {
+                throw new IllegalArgumentException(
+                        "non-coaching outcome must not contain pronunciation coaching evidence"
+                );
+            }
+            if (hasAnalysisPayload(
+                    transcript,
+                    sttConfidence,
+                    sttModelName,
+                    overallScore,
+                    pronunciationScore,
+                    intonationScore,
+                    speedWpm,
+                    speedStatus,
+                    stressScore,
+                    pauseScore,
+                    strengthsText,
+                    weaknessesText
+            ) || !segments.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "result v2 does not accept unapproved transcript, score, or segment mappings"
+                );
+            }
+        } else if (pronunciationEvidence != null) {
+            throw new IllegalArgumentException(status + " result must not contain pronunciationEvidence");
         }
         if (sttConfidence != null && (sttConfidence.signum() < 0 || sttConfidence.compareTo(BigDecimal.ONE) > 0)) {
             throw new IllegalArgumentException("sttConfidence must be between 0 and 1");
@@ -140,6 +181,12 @@ public record AnalysisWorkerResult(
     private static void requireLength(String value, int maxLength, String field) {
         if (value != null && value.length() > maxLength) {
             throw new IllegalArgumentException(field + " is too long");
+        }
+    }
+
+    private static void requireText(String value, int maxLength, String field) {
+        if (value == null || value.isBlank() || value.length() > maxLength) {
+            throw new IllegalArgumentException(field + " is invalid");
         }
     }
 

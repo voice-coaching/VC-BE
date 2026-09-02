@@ -10,7 +10,8 @@ import java.util.List;
 public record AnalysisResultResponseDto(Long id, String status, String outcome, String transcript, BigDecimal sttConfidence,
         BigDecimal overallScore, BigDecimal pronunciationScore, BigDecimal intonationScore, BigDecimal speedWpm,
         String speedStatus, BigDecimal stressScore, BigDecimal pauseScore, List<String> strengths,
-        List<String> weaknesses, String summaryFeedback, OffsetDateTime analyzedAt) {
+        List<String> weaknesses, String summaryFeedback,
+        PronunciationEvidenceResponseDto pronunciationEvidence, OffsetDateTime analyzedAt) {
     public static AnalysisResultResponseDto from(AnalysisResultData data) {
         return new AnalysisResultResponseDto(
                 data.id(),
@@ -28,6 +29,7 @@ public record AnalysisResultResponseDto(Long id, String status, String outcome, 
                 FeedbackRegenerationService.split(data.strengthsText()),
                 FeedbackRegenerationService.split(data.weaknessesText()),
                 data.summaryFeedback(),
+                PronunciationEvidenceResponseDto.from(data.pronunciationEvidence()),
                 data.analyzedAt()
         );
     }

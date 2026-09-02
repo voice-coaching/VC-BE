@@ -114,6 +114,7 @@ class AnalysisWorkerPayloadTest {
                 null,
                 null,
                 null,
+                null,
                 null
         )).isInstanceOf(IllegalArgumentException.class);
     }
@@ -133,6 +134,7 @@ class AnalysisWorkerPayloadTest {
                 null,
                 null,
                 java.math.BigDecimal.TEN,
+                null,
                 null,
                 null,
                 null,

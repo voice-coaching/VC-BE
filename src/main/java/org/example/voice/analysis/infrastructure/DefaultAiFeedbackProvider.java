@@ -8,8 +8,21 @@ import java.util.List;
 @Component
 public class DefaultAiFeedbackProvider implements AiFeedbackProvider {
     public GeneratedFeedback regenerate(FeedbackSource source, FeedbackStyle style) {
-        List<String> strengths = source.strengths().isEmpty() ? List.of("문장을 끝까지 안정적으로 발화했습니다.") : source.strengths();
-        List<String> weaknesses = source.weaknesses().isEmpty() ? List.of("핵심 음절을 한 번 더 또박또박 연습해 보세요.") : source.weaknesses();
-        return new GeneratedFeedback(strengths, weaknesses, "강점은 유지하면서 개선 항목을 천천히 반복해 보세요.");
+        if (source == null
+                || source.approvedSummaryFeedback() == null
+                || source.approvedSummaryFeedback().isBlank()
+                || source.selectedPhone() == null
+                || source.selectedPhone().isBlank()
+                || source.selectedExpectedIndex() == null
+                || source.selectedExpectedIndex() < 0
+                || !"frozen_detector_threshold_passed".equals(source.evidenceState())
+                || source.pipelineRevision() == null
+                || source.pipelineRevision().isBlank()
+                || style != FeedbackStyle.COACHING) {
+            throw new IllegalArgumentException("approved pronunciation evidence is required");
+        }
+        // The default provider is deliberately deterministic: it may replay the
+        // approved same-attempt claim, but it cannot invent a new diagnosis.
+        return new GeneratedFeedback(List.of(), List.of(), source.approvedSummaryFeedback());
     }
 }

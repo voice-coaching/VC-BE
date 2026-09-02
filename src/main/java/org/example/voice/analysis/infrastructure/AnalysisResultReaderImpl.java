@@ -3,6 +3,7 @@ package org.example.voice.analysis.infrastructure;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.model.AnalysisResultData;
+import org.example.voice.analysis.domain.model.PronunciationEvidenceData;
 import org.example.voice.analysis.domain.port.AnalysisResultReader;
 import org.example.voice.analysis.infrastructure.cache.AnalysisCacheNames;
 import org.example.voice.training.infrastructure.AnalysisResultJpaRepository;
@@ -81,7 +82,25 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
                 result.getStrengthsText(),
                 result.getWeaknessesText(),
                 result.getSummaryFeedback(),
+                pronunciationEvidence(result),
                 result.getAnalyzedAt()
+        );
+    }
+
+    private PronunciationEvidenceData pronunciationEvidence(AnalysisResult result) {
+        if (result.getPronunciationEvidenceSchemaVersion() == null) {
+            return null;
+        }
+        return new PronunciationEvidenceData(
+                result.getPronunciationEvidenceSchemaVersion(),
+                result.getSelectedPhone(),
+                result.getSelectedExpectedIndex(),
+                result.getSelectedStartMs(),
+                result.getSelectedEndMs(),
+                result.getDetectorScore(),
+                result.getOperatingThreshold(),
+                result.getScoreSemantics(),
+                result.getEvidenceState()
         );
     }
 }

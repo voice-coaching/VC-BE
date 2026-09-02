@@ -110,6 +110,33 @@ public class AnalysisResult {
     @Column(name = "audio_sha256", length = 64)
     private String audioSha256;
 
+    @Column(name = "pronunciation_evidence_schema_version", length = 100)
+    private String pronunciationEvidenceSchemaVersion;
+
+    @Column(name = "selected_phone", length = 16)
+    private String selectedPhone;
+
+    @Column(name = "selected_expected_index")
+    private Integer selectedExpectedIndex;
+
+    @Column(name = "selected_start_ms")
+    private Integer selectedStartMs;
+
+    @Column(name = "selected_end_ms")
+    private Integer selectedEndMs;
+
+    @Column(name = "detector_score", precision = 8, scale = 6)
+    private BigDecimal detectorScore;
+
+    @Column(name = "operating_threshold", precision = 8, scale = 6)
+    private BigDecimal operatingThreshold;
+
+    @Column(name = "score_semantics", length = 100)
+    private String scoreSemantics;
+
+    @Column(name = "evidence_state", length = 100)
+    private String evidenceState;
+
     @Column(name = "feedback_regeneration_count", nullable = false)
     private Integer feedbackRegenerationCount;
 
@@ -179,6 +206,17 @@ public class AnalysisResult {
         this.workerRevision = result.workerRevision();
         this.pipelineRevision = result.pipelineRevision();
         this.audioSha256 = result.audioSha256();
+        if (result.pronunciationEvidence() != null) {
+            this.pronunciationEvidenceSchemaVersion = result.pronunciationEvidence().schemaVersion();
+            this.selectedPhone = result.pronunciationEvidence().selectedPhone();
+            this.selectedExpectedIndex = result.pronunciationEvidence().selectedExpectedIndex();
+            this.selectedStartMs = result.pronunciationEvidence().selectedStartMs();
+            this.selectedEndMs = result.pronunciationEvidence().selectedEndMs();
+            this.detectorScore = result.pronunciationEvidence().detectorScore();
+            this.operatingThreshold = result.pronunciationEvidence().operatingThreshold();
+            this.scoreSemantics = result.pronunciationEvidence().scoreSemantics();
+            this.evidenceState = result.pronunciationEvidence().evidenceState();
+        }
         this.failureCode = null;
         this.failureReason = null;
         this.analyzedAt = OffsetDateTime.now(SEOUL_ZONE_ID);
@@ -240,5 +278,14 @@ public class AnalysisResult {
         this.workerRevision = null;
         this.pipelineRevision = null;
         this.audioSha256 = null;
+        this.pronunciationEvidenceSchemaVersion = null;
+        this.selectedPhone = null;
+        this.selectedExpectedIndex = null;
+        this.selectedStartMs = null;
+        this.selectedEndMs = null;
+        this.detectorScore = null;
+        this.operatingThreshold = null;
+        this.scoreSemantics = null;
+        this.evidenceState = null;
     }
 }

@@ -2,6 +2,7 @@ package org.example.voice.analysis.application;
 
 import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.model.AnalysisWorkerResult;
+import org.example.voice.analysis.domain.model.AnalysisWorkerPronunciationEvidence;
 import org.example.voice.analysis.domain.port.AnalysisResultReader;
 import org.example.voice.analysis.domain.port.AnalysisResultWriter;
 import org.example.voice.analysis.domain.port.AnalysisSegmentWriter;
@@ -16,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
@@ -90,7 +92,6 @@ class AnalysisResultIngestionServiceTest {
                 AnalysisOutcome.COACHING_READY,
                 null,
                 null,
-                "테스트 문장",
                 null,
                 null,
                 null,
@@ -103,6 +104,18 @@ class AnalysisResultIngestionServiceTest {
                 null,
                 null,
                 null,
+                "‘가’의 첫 번째 음절 ‘가’에 해당하는 목표 음소 ‘ㄱ’ 소리를 다시 연습해 보세요.",
+                new AnalysisWorkerPronunciationEvidence(
+                        AnalysisWorkerPronunciationEvidence.SCHEMA_VERSION,
+                        "ㄱ",
+                        0,
+                        100,
+                        200,
+                        new BigDecimal("0.91"),
+                        new BigDecimal("0.80"),
+                        AnalysisWorkerPronunciationEvidence.SCORE_SEMANTICS,
+                        AnalysisWorkerPronunciationEvidence.EVIDENCE_STATE
+                ),
                 "worker-v1",
                 "pipeline-v1",
                 "a".repeat(64),

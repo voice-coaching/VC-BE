@@ -8,6 +8,8 @@ import org.example.voice.analysis.domain.type.FeedbackStyle;
 import org.example.voice.analysis.exception.AnalysisNotCompletedException;
 import org.example.voice.analysis.exception.AnalysisNotFoundException;
 import org.example.voice.analysis.exception.FeedbackRegenerationLimitException;
+import org.example.voice.analysis.exception.FeedbackEvidenceUnavailableException;
+import org.example.voice.analysis.domain.type.AnalysisOutcome;
 import org.example.voice.analysis.infrastructure.cache.AnalysisCacheNames;
 import org.example.voice.analysis.provider.AiFeedbackProvider;
 import org.springframework.cache.annotation.CacheEvict;
@@ -37,7 +39,25 @@ public class FeedbackRegenerationService {
         AnalysisResult result = reader.findOwnedForUpdate(analysisId, userId).orElseThrow(AnalysisNotFoundException::new);
         if (!result.isCompleted()) throw new AnalysisNotCompletedException();
         if (result.getFeedbackRegenerationCount() >= LIMIT) throw new FeedbackRegenerationLimitException();
-        AiFeedbackProvider.GeneratedFeedback generated = provider.regenerate(new AiFeedbackProvider.FeedbackSource(result.getTranscript(), split(result.getStrengthsText()), split(result.getWeaknessesText())), style);
+        if (result.getAnalysisOutcome() != AnalysisOutcome.COACHING_READY
+                || result.getSummaryFeedback() == null
+                || result.getSummaryFeedback().isBlank()
+                || result.getSelectedPhone() == null
+                || result.getSelectedExpectedIndex() == null
+                || result.getEvidenceState() == null
+                || result.getPipelineRevision() == null) {
+            throw new FeedbackEvidenceUnavailableException();
+        }
+        AiFeedbackProvider.GeneratedFeedback generated = provider.regenerate(
+                new AiFeedbackProvider.FeedbackSource(
+                        result.getSummaryFeedback(),
+                        result.getSelectedPhone(),
+                        result.getSelectedExpectedIndex(),
+                        result.getEvidenceState(),
+                        result.getPipelineRevision()
+                ),
+                style
+        );
         result.regenerateFeedback(String.join("\n", generated.strengths()), String.join("\n", generated.weaknesses()), generated.summaryFeedback(), OffsetDateTime.now(SEOUL));
         return writer.save(result);
     }

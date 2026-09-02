@@ -169,29 +169,40 @@ request transaction rolls back instead of leaving a stranded pending analysis. A
 worker deployment without an approved authorization, storage, and Seungun composition
 must refuse startup before it consumes any Stream entry.
 
-## Result payload: `voice-coaching.analysis-result.v1`
+## Result payload: `voice-coaching.analysis-result.v2`
 
 ```json
 {
-  "schemaVersion": "voice-coaching.analysis-result.v1",
+  "schemaVersion": "voice-coaching.analysis-result.v2",
   "eventId": "e917fda8-3c4f-4b7e-9094-7a1706081f1b",
   "requestEventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
   "analysisId": 35,
   "status": "COMPLETED",
   "outcome": "COACHING_READY",
-  "transcript": "안녕하세요. 오늘 날씨가 좋습니다.",
-  "sttConfidence": 0.9342,
-  "sttModelName": "worker-stt-model",
-  "overallScore": 82.5,
-  "pronunciationScore": 80.0,
+  "transcript": null,
+  "sttConfidence": null,
+  "sttModelName": null,
+  "overallScore": null,
+  "pronunciationScore": null,
   "intonationScore": null,
   "speedWpm": null,
   "speedStatus": null,
   "stressScore": null,
   "pauseScore": null,
-  "strengthsText": "발화가 안정적입니다.",
-  "weaknessesText": "받침을 한 번 더 연습해 보세요.",
-  "summaryFeedback": "승인된 피드백 요약",
+  "strengthsText": null,
+  "weaknessesText": null,
+  "summaryFeedback": "목표 음소 ‘ㄱ’ 소리를 천천히 분리해 발음해 보세요.",
+  "pronunciationEvidence": {
+    "schemaVersion": "voice-coaching.pronunciation-evidence.v1",
+    "selectedPhone": "ㄱ",
+    "selectedExpectedIndex": 0,
+    "selectedStartMs": 120,
+    "selectedEndMs": 240,
+    "detectorScore": 0.91,
+    "operatingThreshold": 0.8,
+    "scoreSemantics": "detector_ranking_score_not_calibrated_correctness_confidence",
+    "evidenceState": "frozen_detector_threshold_passed"
+  },
   "workerRevision": "worker-revision",
   "pipelineRevision": "pipeline-revision",
   "audioSha256": "lower-case sha256 hex",
@@ -203,18 +214,19 @@ must refuse startup before it consumes any Stream entry.
 | --- | --- | --- |
 | `schemaVersion`, `eventId`, `requestEventId`, `analysisId`, `status` | Y | Version, UUID lineage, and positive analysis ID. `requestEventId` must equal the current active request generation. |
 | `status` | Y | `PROCESSING`, `COMPLETED`, or `FAILED`; `PENDING` is not a worker result. |
-| `outcome` | completed only | `COACHING_READY`, `COMPLETED_NO_ISSUE`, `RERECORD_REQUIRED`, `UNCERTAIN`, `FAILED_CLOSED`. |
+| `outcome` | completed only | Result v2 accepts only `COACHING_READY` and `COMPLETED_NO_ISSUE`; other enum values remain reserved until their evidence mapping is reviewed. |
 | `failureCode`, `failureReason` | failed only | Stable code plus learner-safe reason (max 500 chars). Never include infrastructure exception text. Failed/processing results contain no transcript, scores, feedback, digest, or segments; a failure may retain worker/pipeline revision receipts. |
-| score fields | N | Decimal in `0..100`; absent measurement stays `null`, never `0`. |
-| `sttConfidence` | N | Decimal in `0..1`. |
-| `speedWpm` | N | Non-negative decimal. |
-| revision/digest fields | N | Worker/pipeline revision and lower-case audio SHA-256 for provenance; not exposed as public client API fields. |
-| `segments` | completed only | Array of unique positive `sequenceNo`; terminal failed/processing messages contain an empty array. |
+| `pronunciationEvidence` | coaching only | Required exactly when `outcome=COACHING_READY`. It preserves the same-attempt Seungun-selected phone, index, optional time range, threshold-passed ranking score and explicit non-confidence semantics. |
+| transcript, score, strength/weakness, segment fields | N | The v2 production mapping requires these to remain `null`/empty because no approved Seungun mapping currently supplies them. Placeholder or independently inferred values are rejected. |
+| revision/digest fields | completed | Worker/pipeline revision and lower-case audio SHA-256 are required provenance; object keys and digests are not exposed as public client API fields. |
+| `segments` | all states | Must currently be an empty array. A future segment mapping requires a new reviewed schema. |
 
-For a completed result, every segment requires `sequenceNo`, `matchType`
-(`MATCH`, `SUBSTITUTION`, `OMISSION`, `ADDITION`) and `resultStatus`
-(`NORMAL`, `CAUTION`, `NEEDS_IMPROVEMENT`). Times are non-negative and, when both
-exist, `startMs < endMs`. String and numeric limits are validated before persistence.
+Legacy `voice-coaching.analysis-result.v1` is rejected. Result-v2 deployment therefore
+requires a quiesced rollout: stop new analysis admission and the AI worker, drain or
+deliberately resolve all pending request/result entries, deploy Backend and worker,
+then enable both together. Do not run a v1 producer against the v2 consumer or the
+reverse. The Redis stream name remains `analysis:result:v1`; it identifies the
+transport channel, not the JSON schema version.
 
 `PROCESSING` updates only the job state. It does not authorize the AI worker to ACK
 the request; the request remains pending until the worker publishes a terminal
@@ -266,8 +278,10 @@ Client APIs remain VC-BE REST endpoints:
 - `GET /api/analyses/{analysisId}`
 - `GET /api/analyses/{analysisId}/segments`
 
-Completed result views add nullable `outcome`; worker revisions, object keys, hashes,
-Stream IDs, and internal failure codes are not public API response fields.
+Completed result views add nullable `outcome` and `pronunciationEvidence`; worker
+revisions, object keys, hashes, Stream IDs, and internal failure codes are not public
+API response fields. The current runtime accepts only `PRONUNCIATION`. `INTONATION`
+and `BOTH` requests return `422` before consent issuance or analysis state creation.
 
 Both POST endpoints above require this request body; the server rejects missing,
 false, blank, or stale consent before it creates/publishes analysis state:

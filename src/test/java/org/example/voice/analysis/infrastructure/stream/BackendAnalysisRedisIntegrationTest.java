@@ -112,6 +112,7 @@ class BackendAnalysisRedisIntegrationTest {
                 null,
                 null,
                 null,
+                null,
                 "synthetic-worker-v1",
                 "synthetic-seungun-v1",
                 "a".repeat(64),

@@ -61,6 +61,7 @@ public enum ErrorCode {
     SELECTED_RECORDING_NOT_FOUND(HttpStatus.CONFLICT, "분석할 최종 녹음을 선택해 주세요."),
     AUDIO_QUALITY_NOT_ACCEPTABLE(HttpStatus.UNPROCESSABLE_ENTITY, "음질이 낮아 분석할 수 없습니다. 다시 녹음해 주세요."),
     ANALYSIS_SOURCE_NOT_READY(HttpStatus.UNPROCESSABLE_ENTITY, "분석에 사용할 녹음 정보를 안전하게 확인할 수 없습니다. 다시 녹음해 주세요."),
+    ANALYSIS_FOCUS_NOT_SUPPORTED(HttpStatus.UNPROCESSABLE_ENTITY, "현재는 발음 분석만 지원합니다."),
     MEDIA_NORMALIZATION_FAILED(HttpStatus.UNPROCESSABLE_ENTITY, "지원되는 형식으로 녹음을 처리할 수 없습니다. 다시 녹음해 주세요."),
     ANALYSIS_CONSENT_REQUIRED(HttpStatus.BAD_REQUEST, "음성 분석을 위한 명시적 동의가 필요합니다."),
     ANALYSIS_CONSENT_POLICY_MISMATCH(HttpStatus.CONFLICT, "현재 동의 정책을 다시 확인해 주세요."),
@@ -78,6 +79,7 @@ public enum ErrorCode {
 
     // Analysis Result
     SESSION_ANALYSIS_NOT_FOUND(HttpStatus.NOT_FOUND, "학습 세션의 분석 결과가 없습니다."),
+    FEEDBACK_EVIDENCE_UNAVAILABLE(HttpStatus.CONFLICT, "승인된 발음 근거가 없어 피드백을 다시 구성할 수 없습니다."),
     FEEDBACK_REGENERATION_LIMIT(HttpStatus.TOO_MANY_REQUESTS, "피드백 재생성 가능 횟수를 초과했습니다."),
 
     // Course

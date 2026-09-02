@@ -1,9 +1,9 @@
 # DB Schema - voice
 
 - 데이터베이스: PostgreSQL
-- 현재 schema source of truth: `src/main/resources/db/migration/V0..V8`
+- 현재 schema source of truth: `src/main/resources/db/migration/V0..V9`
 - `voicebackup(08.08.15.15).sql`은 2026-08-07 당시의 historical 참고자료이며 신규 배포 입력이 아니다.
-- 빈 PostgreSQL은 `V0__create_core_application_schema.sql`로 core table을 만든 뒤 V1~V8을 순서대로 적용한다.
+- 빈 PostgreSQL은 `V0__create_core_application_schema.sql`로 core table을 만든 뒤 V1~V9를 순서대로 적용한다.
 
 ## 테이블 목록
 

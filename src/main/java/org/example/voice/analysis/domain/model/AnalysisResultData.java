@@ -23,6 +23,7 @@ public record AnalysisResultData(
         String strengthsText,
         String weaknessesText,
         String summaryFeedback,
+        PronunciationEvidenceData pronunciationEvidence,
         OffsetDateTime analyzedAt
 ) {
 
