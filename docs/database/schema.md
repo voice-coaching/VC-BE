@@ -255,6 +255,28 @@
 | created_at | timestamptz | Y | now() | - | - | enqueue time |
 | published_at | timestamptz | N | - | - | - | successful XADD time |
 
+### processing_consents
+- 목적: 음성 분석과 얼굴 영상 처리에 대한 명시적 동의 receipt 및 철회 시각을 감사 가능하게 보존한다.
+- 해당 모듈: consent/training/analysis
+- Migration: `V6__create_processing_consent_ledger.sql`
+
+| Column | Type | Required | Default | Index | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- |
+| id | bigint | Y | identity | PK | Y | 동의 기록 ID |
+| user_id | bigint | Y | - | Index | - | 동의를 제출한 사용자 ID의 감사용 snapshot |
+| training_session_id | bigint | Y | - | Index | - | 동의가 적용된 학습 세션 ID의 감사용 snapshot |
+| recording_id | bigint | N | - | - | - | 음성 분석 동의의 정규화 녹음 ID |
+| scope | varchar(40) | Y | - | CHECK | - | `VOICE_ANALYSIS` 또는 `FACE_VIDEO_PROCESSING` |
+| policy_revision | varchar(100) | Y | - | - | - | 사용자가 수락한 정확한 정책 revision |
+| subject_sha256 | varchar(64) | Y | - | CHECK | - | audio digest 또는 원본 object key digest |
+| request_event_id | varchar(36) | N | - | Index | - | 음성 분석 요청 generation UUID |
+| receipt_sha256 | varchar(64) | Y | - | - | Y | worker grant에도 포함되는 opaque receipt digest |
+| granted_at | timestamptz | Y | - | - | - | 동의 수락 시각(UTC) |
+| revoked_at | timestamptz | N | - | Index | - | 세션 취소 또는 회원 탈퇴에 따른 철회 시각 |
+
+감사 기록은 계정/세션 row가 정리된 뒤에도 철회 증거를 보존해야 하므로 물리 FK 대신
+식별자 snapshot을 저장한다. 사용자 입력 원문, object key, 영상·음성 바이트는 저장하지 않는다.
+
 ### analysis_segments
 - 목적: 분석 결과의 문장/구간별 매칭 및 세부 피드백을 저장한다.
 - 해당 모듈: analysis/ai

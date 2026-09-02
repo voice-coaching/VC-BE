@@ -3,6 +3,7 @@ package org.example.voice.training.application;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.training.controller.dto.RecordingRegisterRequestDto;
 import org.example.voice.training.domain.model.RecordingPlaybackUrlData;
 import org.example.voice.training.domain.model.NormalizedRecordingData;
@@ -33,6 +34,7 @@ public class VoiceRecordingService {
     private final TrainingSessionService trainingSessionService;
     private final RecordingObjectStoragePort objectStorage;
     private final RecordingMediaNormalizationPort mediaNormalization;
+    private final ProcessingConsentLedger processingConsentLedger;
 
     @Transactional
     public VoiceRecordingRegisteredData register(Long sessionId, RecordingRegisterRequestDto request, Long userId) {
@@ -51,6 +53,14 @@ public class VoiceRecordingService {
                 request.mimeType(),
                 request.fileSizeBytes()
         );
+        if (request.mimeType().startsWith("video/")) {
+            processingConsentLedger.grantFaceVideoProcessing(
+                    userId,
+                    sessionId,
+                    request.videoProcessingConsentPolicyRevision(),
+                    request.objectKey()
+            );
+        }
         NormalizedRecordingData normalized = mediaNormalization.normalize(
                 userId,
                 sessionId,

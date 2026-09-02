@@ -2,6 +2,7 @@ package org.example.voice.training.application;
 
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.training.controller.dto.RecordingRegisterRequestDto;
 import org.example.voice.training.domain.model.NormalizedRecordingData;
 import org.example.voice.training.domain.model.VoiceRecordingRegisteredData;
@@ -33,6 +34,7 @@ class VoiceRecordingServiceTest {
     @Mock private TrainingSessionService sessions;
     @Mock private RecordingObjectStoragePort objectStorage;
     @Mock private RecordingMediaNormalizationPort normalization;
+    @Mock private ProcessingConsentLedger consentLedger;
 
     @Test
     void storesOnlyBackendNormalizedMediaAndMeasuredQuality() {
@@ -77,6 +79,43 @@ class VoiceRecordingServiceTest {
 
         verify(objectStorage, never()).assertUploadedObject(any(), any(), any(), any(), anyLong());
         verify(normalization, never()).normalize(any(), any(), any(), any(), anyLong());
+        verify(consentLedger, never()).grantFaceVideoProcessing(any(), any(), any(), any());
+    }
+
+    @Test
+    void recordsVideoConsentBeforeNormalizingOwnedMedia() {
+        RecordingRegisterRequestDto request = new RecordingRegisterRequestDto(
+                "recordings/users/9/sessions/7/source.mp4",
+                "video/mp4",
+                2_000L,
+                1_000,
+                true,
+                "voice-video-processing-consent-v1"
+        );
+        NormalizedRecordingData normalized = normalized();
+        when(normalization.normalize(9L, 7L, request.objectKey(), request.mimeType(), request.fileSizeBytes()))
+                .thenReturn(normalized);
+        when(writer.register(7L, normalized)).thenReturn(
+                new VoiceRecordingRegisteredData(
+                        50L,
+                        1,
+                        RecordingQualityStatus.PASS,
+                        false,
+                        OffsetDateTime.now()
+                )
+        );
+
+        service().register(7L, request, 9L);
+
+        verify(consentLedger).grantFaceVideoProcessing(
+                9L,
+                7L,
+                "voice-video-processing-consent-v1",
+                request.objectKey()
+        );
+        var inOrder = org.mockito.Mockito.inOrder(consentLedger, normalization);
+        inOrder.verify(consentLedger).grantFaceVideoProcessing(any(), any(), any(), any());
+        inOrder.verify(normalization).normalize(any(), any(), any(), any(), anyLong());
     }
 
     @Test
@@ -94,7 +133,7 @@ class VoiceRecordingServiceTest {
     }
 
     private VoiceRecordingService service() {
-        return new VoiceRecordingService(reader, writer, sessions, objectStorage, normalization);
+        return new VoiceRecordingService(reader, writer, sessions, objectStorage, normalization, consentLedger);
     }
 
     private static RecordingRegisterRequestDto audioRequest() {

@@ -2,6 +2,7 @@ package org.example.voice.user.application;
 
 import lombok.RequiredArgsConstructor;
 import org.example.voice.onboarding.domain.port.OnboardingProfileReader;
+import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.user.domain.entity.User;
 import org.example.voice.user.domain.model.UpdatedUserProfile;
 import org.example.voice.user.domain.model.UserProfile;
@@ -30,6 +31,7 @@ public class UserService {
     private final LoginProviderReader loginProviderReader;
     private final UserSessionRevoker userSessionRevoker;
     private final OnboardingProfileReader onboardingProfileReader;
+    private final ProcessingConsentLedger processingConsentLedger;
 
     @Transactional(readOnly = true)
     public UserProfile getMyProfile(Long userId) {
@@ -76,6 +78,7 @@ public class UserService {
         user.withdraw(now);
         userWriter.save(user);
         userSessionRevoker.revokeAll(userId);
+        processingConsentLedger.revokeForUser(userId);
         return new WithdrawalResult(now);
     }
 

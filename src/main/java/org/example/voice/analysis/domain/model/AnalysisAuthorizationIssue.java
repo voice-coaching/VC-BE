@@ -17,6 +17,7 @@ public record AnalysisAuthorizationIssue(
         Long fileSizeBytes,
         Integer durationMs,
         LearningFocus learningFocus,
+        String consentReceiptSha256,
         String consentPolicyRevision
 ) {
 }

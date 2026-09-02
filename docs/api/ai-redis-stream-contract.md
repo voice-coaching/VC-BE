@@ -144,11 +144,14 @@ accepts VP8 or VP9 with Opus or Vorbis. Unsupported or ambiguous streams fail cl
 
 The payload intentionally excludes `userId`, `sessionId`, `recordingId`, file paths,
 presigned URLs, and raw consent material. Both analyze and retry REST calls require
-`{"accepted":true,"policyRevision":"..."}` from the authenticated owner. VC-BE
-generates an opaque random receipt digest and signs a five-minute grant. The v2 grant
+`{"accepted":true,"policyRevision":"..."}` from the authenticated owner. Before
+issuing a job, VC-BE durably records an opaque consent receipt bound to the owner,
+session, recording, request generation, policy revision, and normalized audio digest,
+then signs that receipt into a five-minute grant. Session cancellation and account
+withdrawal timestamp every still-active receipt as revoked. The v2 grant
 binds request event, analysis/content/prompt, script digest, object-key digest,
 normalized audio digest, MIME, size, duration, learning focus, policy, purpose, data category, cleanup and egress
-policy. A retry receives a new request event, receipt and signature.
+policy. A retry receives and persists a new request event, receipt and signature.
 
 The signature is HMAC-SHA256 over the fields above in listed order, excluding
 `signature`. Each line is `name:utf8ByteLength:value\n`; a null value is

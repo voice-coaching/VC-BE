@@ -2,6 +2,7 @@ package org.example.voice.user.application;
 
 import org.example.voice.onboarding.domain.entity.OnboardingProfile;
 import org.example.voice.onboarding.domain.port.OnboardingProfileReader;
+import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.user.domain.entity.User;
 import org.example.voice.user.domain.port.LoginProviderReader;
 import org.example.voice.user.domain.port.UserReader;
@@ -28,6 +29,7 @@ class UserServiceTest {
     private LoginProviderReader loginProviderReader;
     private UserSessionRevoker userSessionRevoker;
     private OnboardingProfileReader onboardingProfileReader;
+    private ProcessingConsentLedger processingConsentLedger;
     private UserService userService;
 
     @BeforeEach
@@ -37,7 +39,15 @@ class UserServiceTest {
         loginProviderReader = mock(LoginProviderReader.class);
         userSessionRevoker = mock(UserSessionRevoker.class);
         onboardingProfileReader = mock(OnboardingProfileReader.class);
-        userService = new UserService(userReader, userWriter, loginProviderReader, userSessionRevoker, onboardingProfileReader);
+        processingConsentLedger = mock(ProcessingConsentLedger.class);
+        userService = new UserService(
+                userReader,
+                userWriter,
+                loginProviderReader,
+                userSessionRevoker,
+                onboardingProfileReader,
+                processingConsentLedger
+        );
     }
 
     @Test
@@ -98,6 +108,7 @@ class UserServiceTest {
         verify(user).withdraw(result.withdrawnAt());
         verify(userWriter).save(user);
         verify(userSessionRevoker).revokeAll(1L);
+        verify(processingConsentLedger).revokeForUser(1L);
     }
 
     @Test
@@ -108,6 +119,6 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> userService.withdraw(1L))
                 .isInstanceOf(WithdrawalAlreadyProcessedException.class);
-        verifyNoInteractions(userWriter, userSessionRevoker);
+        verifyNoInteractions(userWriter, userSessionRevoker, processingConsentLedger);
     }
 }

@@ -7,6 +7,8 @@ import org.example.voice.analysis.domain.port.AnalysisAuthorizationIssuer;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.consent.domain.model.ProcessingConsentReceipt;
+import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.practicecontent.domain.type.LearningFocus;
 import org.example.voice.training.domain.model.AnalysisRequestData;
 import org.example.voice.training.domain.model.AnalysisConsentData;
@@ -51,6 +53,7 @@ class TrainingAnalysisRequestServiceTest {
     @Mock private TrainingSessionWriter trainingSessionWriter;
     @Mock private AnalysisJobPublisher analysisJobPublisher;
     @Mock private AnalysisAuthorizationIssuer analysisAuthorizationIssuer;
+    @Mock private ProcessingConsentLedger processingConsentLedger;
 
     @Test
     void createsTrustedWorkerRequestAndPersistsItsEventGeneration() {
@@ -87,6 +90,7 @@ class TrainingAnalysisRequestServiceTest {
         assertThat(request.getValue().audioSha256()).isEqualTo("d".repeat(64));
         assertThat(request.getValue().authorizationGrant().requestEventId())
                 .isEqualTo(request.getValue().eventId());
+        assertThat(request.getValue().authorizationGrant().consentReceiptSha256()).isEqualTo("e".repeat(64));
     }
 
     @Test
@@ -169,11 +173,14 @@ class TrainingAnalysisRequestServiceTest {
                 trainingAnalysisWriter,
                 trainingSessionWriter,
                 analysisJobPublisher,
-                analysisAuthorizationIssuer
+                analysisAuthorizationIssuer,
+                processingConsentLedger
         );
     }
 
     private void allowAuthorization() {
+        when(processingConsentLedger.grantVoiceAnalysis(any(), any(), any(), any(), any(), any()))
+                .thenReturn(new ProcessingConsentReceipt("e".repeat(64), OffsetDateTime.now()));
         when(analysisAuthorizationIssuer.issue(any())).thenAnswer(invocation -> {
             AnalysisAuthorizationIssue issue = invocation.getArgument(0);
             Instant issuedAt = Instant.parse("2026-09-02T00:00:00Z");
@@ -191,7 +198,7 @@ class TrainingAnalysisRequestServiceTest {
                     issue.fileSizeBytes(),
                     issue.durationMs(),
                     issue.learningFocus(),
-                    "b".repeat(64),
+                    issue.consentReceiptSha256(),
                     issue.consentPolicyRevision(),
                     issuedAt,
                     issuedAt.plusSeconds(300),

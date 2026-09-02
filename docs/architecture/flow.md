@@ -328,14 +328,15 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 - Steps:
   1. `TrainingAnalysisRequestService`가 세션과 최종 녹음 존재 여부를 확인한다.
   2. 이미 진행 중인 분석이 있는지 확인한다.
-  3. 분석 결과 row를 `PENDING`과 새 request event id로 만들고, 같은 DB transaction에 outbox event를 저장한다.
-  4. outbox dispatcher가 versioned request payload를 전용 Redis Stream에 at-least-once로 발행한다.
-  5. worker는 자기 객체 저장소 권한으로 object key를 해석해 녹음을 분석하고 versioned result event를 반환한다.
-  6. result consumer는 active request event id가 일치할 때만 `analysis_results`와 세그먼트를 저장하고 그 뒤 ACK한다.
-  7. 사용자는 상태 API로 진행률을 조회한다.
-  8. 완료 후 종합 분석과 세그먼트 분석을 조회한다.
-  9. 완료된 분석 결과 조회는 Redis Cache에 저장될 수 있다.
-  10. 필요하면 피드백 재생성 API로 AI 요약 피드백만 다시 생성한다.
+  3. 명시적 동의를 owner/session/recording/request generation/policy/audio digest와 결합한 opaque receipt로 영속화한다.
+  4. 분석 결과 row를 `PENDING`과 새 request event id로 만들고, 같은 DB transaction에 outbox event를 저장한다.
+  5. outbox dispatcher가 versioned request payload를 전용 Redis Stream에 at-least-once로 발행한다.
+  6. worker는 자기 객체 저장소 권한으로 object key를 해석해 녹음을 분석하고 versioned result event를 반환한다.
+  7. result consumer는 active request event id가 일치할 때만 `analysis_results`와 세그먼트를 저장하고 그 뒤 ACK한다.
+  8. 사용자는 상태 API로 진행률을 조회한다.
+  9. 완료 후 종합 분석과 세그먼트 분석을 조회한다.
+  10. 완료된 분석 결과 조회는 Redis Cache에 저장될 수 있다.
+  11. 필요하면 피드백 재생성 API로 AI 요약 피드백만 다시 생성한다.
 - Validation:
   - session owner 일치 여부
   - 선택된 녹음 존재 여부
@@ -362,7 +363,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - 피드백 재생성은 분석 데이터는 유지하고 AI summary만 다시 생성한다.
   - 캐시 값은 TTL 만료 후 다음 조회에서 DB 값으로 다시 채워진다.
 - Side effects:
-  - `analysis_results`, `analysis_segments`, `analysis_request_outbox`가 생성 또는 갱신된다.
+  - `processing_consents`, `analysis_results`, `analysis_segments`, `analysis_request_outbox`가 생성 또는 갱신된다.
   - 분석 job은 전용 Redis Stream으로 발행되며, 유효한 결과가 DB transaction으로 저장된 뒤에만 ACK한다.
   - 완료된 분석 결과 상세, 학습 세션 기준 분석 결과, 세그먼트 목록 조회는 Redis cache entry를 생성할 수 있다.
   - 피드백 재생성은 분석 상세 캐시를 무효화한다.
@@ -377,7 +378,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 - Related modules:
   - `training`, `analysis`, `common/storage`
 - Related DB tables:
-  - `training_sessions`, `voice_recordings`, `analysis_results`, `analysis_segments`, `analysis_request_outbox`
+  - `training_sessions`, `voice_recordings`, `processing_consents`, `analysis_results`, `analysis_segments`, `analysis_request_outbox`
 
 ## 학습 세션 완료 및 취소
 

@@ -7,7 +7,6 @@ import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.practicecontent.domain.type.LearningFocus;
 import org.junit.jupiter.api.Test;
 
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -56,8 +55,7 @@ class HmacAnalysisAuthorizationIssuerTest {
 
         assertThatThrownBy(() -> new HmacAnalysisAuthorizationIssuer(
                 properties,
-                Clock.fixed(NOW, ZoneOffset.UTC),
-                new FixedSecureRandom()
+                Clock.fixed(NOW, ZoneOffset.UTC)
         )).isInstanceOf(IllegalStateException.class)
                 .hasMessage("analysis_authorization_configuration_invalid");
     }
@@ -65,8 +63,7 @@ class HmacAnalysisAuthorizationIssuerTest {
     private static HmacAnalysisAuthorizationIssuer issuer(String policyRevision) {
         return new HmacAnalysisAuthorizationIssuer(
                 properties(policyRevision),
-                Clock.fixed(NOW, ZoneOffset.UTC),
-                new FixedSecureRandom()
+                Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }
 
@@ -92,14 +89,8 @@ class HmacAnalysisAuthorizationIssuerTest {
                 1234L,
                 1200,
                 LearningFocus.PRONUNCIATION,
+                "4bb06f8e4e3a7715d201d573d0aa423762e55dabd61a2c02278fa56cc6d294e0",
                 policyRevision
         );
-    }
-
-    private static final class FixedSecureRandom extends SecureRandom {
-        @Override
-        public void nextBytes(byte[] bytes) {
-            java.util.Arrays.fill(bytes, (byte) 7);
-        }
     }
 }

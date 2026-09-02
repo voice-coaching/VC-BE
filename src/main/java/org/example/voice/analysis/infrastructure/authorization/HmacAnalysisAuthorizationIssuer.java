@@ -13,7 +13,6 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -28,20 +27,17 @@ public class HmacAnalysisAuthorizationIssuer implements AnalysisAuthorizationIss
     private final AnalysisAuthorizationProperties properties;
     private final byte[] signingSecret;
     private final Clock clock;
-    private final SecureRandom secureRandom;
 
     public HmacAnalysisAuthorizationIssuer(AnalysisAuthorizationProperties properties) {
-        this(properties, Clock.systemUTC(), new SecureRandom());
+        this(properties, Clock.systemUTC());
     }
 
     HmacAnalysisAuthorizationIssuer(
             AnalysisAuthorizationProperties properties,
-            Clock clock,
-            SecureRandom secureRandom
+            Clock clock
     ) {
         this.properties = properties;
         this.clock = clock;
-        this.secureRandom = secureRandom;
         this.signingSecret = validateAndDecode(properties);
     }
 
@@ -51,9 +47,12 @@ public class HmacAnalysisAuthorizationIssuer implements AnalysisAuthorizationIss
             throw new BaseException(ErrorCode.ANALYSIS_CONSENT_POLICY_MISMATCH);
         }
         Instant issuedAt = clock.instant();
-        byte[] receiptEntropy = new byte[32];
-        secureRandom.nextBytes(receiptEntropy);
-        AnalysisAuthorizationGrant unsigned = grant(issue, issuedAt, sha256(receiptEntropy), "0".repeat(64));
+        AnalysisAuthorizationGrant unsigned = grant(
+                issue,
+                issuedAt,
+                issue.consentReceiptSha256(),
+                "0".repeat(64)
+        );
         return grant(issue, issuedAt, unsigned.consentReceiptSha256(), hmac(unsigned.canonicalSigningInput()));
     }
 

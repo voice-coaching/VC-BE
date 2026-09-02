@@ -126,7 +126,7 @@
 | `RECORDING` | `UPLOADING` | 녹음 업로드 URL 발급 또는 업로드 시작 | 세션 소유권, 파일 조건 | presigned URL 발급 |
 | `RECORDING` or `UPLOADING` | `ANALYZING` | `POST /api/training-sessions/{sessionId}/analyze` | 최종 녹음 선택, 품질 `PASS`, 분석 중복 없음 | `analysis_results`와 request outbox를 한 transaction으로 생성 |
 | `ANALYZING` | `COMPLETED` | `POST /api/training-sessions/{sessionId}/complete` | 선택 녹음의 분석 완료 | 완료 시간 저장 |
-| `RECORDING` or `UPLOADING` or `ANALYZING` | `CANCELED` | `POST /api/training-sessions/{sessionId}/cancel` | terminal 상태 아님 | 취소 시간 저장, 임시 녹음 삭제 대상 |
+| `RECORDING` or `UPLOADING` or `ANALYZING` | `CANCELED` | `POST /api/training-sessions/{sessionId}/cancel` | terminal 상태 아님 | 취소 시간 저장, active processing consent 철회, 임시 녹음 삭제 대상 |
 | any non-terminal | `FAILED` | 내부 처리 실패 | 실패 사유 존재 | 실패 사유 기록 대상 |
 | none | `RecordingQualityStatus.PASS` | backend media normalization | owner/consent/container/codec/digest 및 기술 QC 통과 | canonical WAV 등록, 분석 요청 가능 |
 | none | `LOW_VOLUME` | backend media normalization | RMS 기준 미달 | canonical WAV 등록, 재녹음 안내 |

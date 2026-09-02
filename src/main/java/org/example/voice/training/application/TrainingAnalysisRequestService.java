@@ -7,6 +7,8 @@ import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
 import org.example.voice.analysis.domain.port.AnalysisAuthorizationIssuer;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.consent.domain.model.ProcessingConsentReceipt;
+import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.training.domain.model.AnalysisProgressData;
 import org.example.voice.training.domain.model.AnalysisRequestData;
 import org.example.voice.training.domain.model.AnalysisRetryData;
@@ -39,6 +41,7 @@ public class TrainingAnalysisRequestService {
     private final TrainingSessionWriter trainingSessionWriter;
     private final AnalysisJobPublisher analysisJobPublisher;
     private final AnalysisAuthorizationIssuer analysisAuthorizationIssuer;
+    private final ProcessingConsentLedger processingConsentLedger;
 
     @Transactional
     public AnalysisRequestData requestAnalysis(Long sessionId, Long userId, AnalysisConsentData consent) {
@@ -57,11 +60,19 @@ public class TrainingAnalysisRequestService {
             throw new BaseException(ErrorCode.ANALYSIS_ALREADY_REQUESTED);
         }
 
-        trainingSessionWriter.startAnalysis(sessionId);
         UUID requestEventId = UUID.randomUUID();
+        ProcessingConsentReceipt consentReceipt = processingConsentLedger.grantVoiceAnalysis(
+                userId,
+                sessionId,
+                source.recordingId(),
+                requestEventId,
+                consent.policyRevision(),
+                source.audioSha256()
+        );
+        trainingSessionWriter.startAnalysis(sessionId);
         AnalysisRequestData result = trainingAnalysisWriter.createPending(source.recordingId(), requestEventId);
         analysisJobPublisher.publish(toWorkerRequest(
-                result.analysisId(), requestEventId, source, consent.policyRevision()
+                result.analysisId(), requestEventId, source, consent.policyRevision(), consentReceipt.receiptSha256()
         ));
         return result;
     }
@@ -82,17 +93,25 @@ public class TrainingAnalysisRequestService {
         validateConsent(consent);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
-        trainingSessionWriter.assertAnalysisRetryAllowed(sessionId);
         AnalysisProgressData failed = trainingAnalysisReader.findLatestFailedBySelectedRecording(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FAILED));
 
         UUID requestEventId = UUID.randomUUID();
+        ProcessingConsentReceipt consentReceipt = processingConsentLedger.grantVoiceAnalysis(
+                userId,
+                sessionId,
+                source.recordingId(),
+                requestEventId,
+                consent.policyRevision(),
+                source.audioSha256()
+        );
+        trainingSessionWriter.assertAnalysisRetryAllowed(sessionId);
         AnalysisRetryData result = trainingAnalysisWriter.retry(
                 failed.analysisId(),
                 requestEventId
         );
         analysisJobPublisher.publish(toWorkerRequest(
-                result.analysisId(), requestEventId, source, consent.policyRevision()
+                result.analysisId(), requestEventId, source, consent.policyRevision(), consentReceipt.receiptSha256()
         ));
         return result;
     }
@@ -101,7 +120,8 @@ public class TrainingAnalysisRequestService {
             Long analysisId,
             UUID requestEventId,
             SelectedRecordingAnalysisData source,
-            String consentPolicyRevision
+            String consentPolicyRevision,
+            String consentReceiptSha256
     ) {
         try {
             String scriptSha256 = sha256(source.scriptText());
@@ -118,6 +138,7 @@ public class TrainingAnalysisRequestService {
                             source.fileSizeBytes(),
                             source.durationMs(),
                             source.learningFocus(),
+                            consentReceiptSha256,
                             consentPolicyRevision
                     )
             );
