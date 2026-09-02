@@ -15,6 +15,8 @@ import java.time.Duration;
 public class MediaNormalizationProperties {
     private boolean enabled;
     private Path workspaceRoot = Path.of("/tmp/voice-coach-media-normalization");
+    private String sandboxPythonBinary = "/usr/bin/python3.12";
+    private long sandboxAddressSpaceBytes = 2L * 1024L * 1024L * 1024L;
     private String ffmpegBinary = "/usr/bin/ffmpeg";
     private String ffprobeBinary = "/usr/bin/ffprobe";
     private Duration processTimeout = Duration.ofSeconds(30);

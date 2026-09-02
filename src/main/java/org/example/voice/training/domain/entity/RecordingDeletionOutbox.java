@@ -91,14 +91,15 @@ public class RecordingDeletionOutbox {
         lastErrorCode = null;
     }
 
-    public void recordFailure(String errorCode, int maxAttempts) {
+    public boolean recordFailure(String errorCode, int maxAttempts) {
         attemptCount += 1;
         lastErrorCode = errorCode;
         if (attemptCount >= maxAttempts) {
             status = RecordingDeletionStatus.FAILED;
-            return;
+            return true;
         }
         nextAttemptAt = OffsetDateTime.now(ZoneOffset.UTC)
                 .plusSeconds(Math.min(3600L, 30L * (1L << Math.min(attemptCount - 1, 6))));
+        return false;
     }
 }

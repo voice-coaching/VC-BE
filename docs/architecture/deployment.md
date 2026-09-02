@@ -11,6 +11,7 @@ VC-BE starts the Stream outbox dispatcher and result consumer only when
 fail-closed하며 PENDING 결과나 outbox event를 저장하지 않는다.
 
 - Request stream: `analysis:request:v1`
+- Request DLQ: `analysis:request:dlq:v1`
 - Result stream: `analysis:result:v1`
 - Result DLQ: `analysis:result:dlq:v1`
 - Cancellation tombstone: `analysis:canceled:v1:<opaque-request-event-id>`
@@ -43,6 +44,10 @@ Management health and Prometheus endpoints bind to `127.0.0.1:9091` by default u
 `/internal/actuator`. A reverse proxy or agent on the same host may scrape them. If
 `MANAGEMENT_SERVER_ADDRESS` is changed to a non-loopback address, security-group and
 network-policy rules must restrict `MANAGEMENT_SERVER_PORT`; it is not a public API.
+The Stream ACL must permit aggregate `XLEN` and `XPENDING` reads. Alert on a sustained
+increase in request/result outstanding entries, PEL depth, DLQ depth, DB outbox age,
+recording-deletion age, or any observation-failure counter. A gauge value of `-1`
+is unknown, not an empty queue.
 
 Do not apply an unconditional `MAXLEN` to the request or result Stream. Each service
 atomically deletes its own entry with `XACK` only after its durable handoff completes.
@@ -115,6 +120,8 @@ ANALYSIS_REDIS_USERNAME=<analysis-acl-user>
 ANALYSIS_REDIS_PASSWORD=<analysis-acl-password>
 ANALYSIS_REDIS_SSL_ENABLED=true
 ANALYSIS_REQUEST_STREAM=analysis:request:v1
+ANALYSIS_REQUEST_CONSUMER_GROUP=analysis-workers
+ANALYSIS_REQUEST_DLQ_STREAM=analysis:request:dlq:v1
 ANALYSIS_RESULT_STREAM=analysis:result:v1
 ANALYSIS_RESULT_CONSUMER_NAME=<unique-host-or-pod-name>
 ANALYSIS_CANCELLATION_KEY_PREFIX=analysis:canceled:v1:
@@ -123,6 +130,7 @@ ANALYSIS_CANCELLATION_OUTBOX_POLL_INTERVAL=PT1S
 ANALYSIS_RETENTION_AGE=PT1H
 ANALYSIS_RETENTION_POLL_INTERVAL=PT5M
 ANALYSIS_RETENTION_BATCH_SIZE=100
+ANALYSIS_OBSERVATION_POLL_INTERVAL=PT30S
 ANALYSIS_AUTHORIZATION_KEY_ID=<active-key-id>
 ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64=<secret-manager-value>
 ANALYSIS_CONSENT_POLICY_REVISION=<active-consent-revision>
@@ -137,6 +145,8 @@ STORAGE_DELETION_DISPATCH_INTERVAL_MS=30000
 STORAGE_UPLOAD_INTENT_SWEEP_INTERVAL_MS=60000
 MEDIA_NORMALIZATION_ENABLED=true
 MEDIA_NORMALIZATION_WORKSPACE_ROOT=/var/lib/voice-coach/media-normalization
+MEDIA_NORMALIZATION_SANDBOX_PYTHON_BINARY=/usr/bin/python3.12
+MEDIA_NORMALIZATION_SANDBOX_ADDRESS_SPACE_BYTES=2147483648
 MEDIA_NORMALIZATION_FFMPEG_BINARY=/usr/bin/ffmpeg
 MEDIA_NORMALIZATION_FFPROBE_BINARY=/usr/bin/ffprobe
 MEDIA_NORMALIZATION_PROCESS_TIMEOUT=PT30S
@@ -154,7 +164,14 @@ WAV/MP4 PUT, 조건부 처리 원본 DELETE 및 rollback canonical 객체 DELETE
 배포 전 사용하는 S3 호환 구현이 ETag 기반 `If-Match` GET/DELETE와 VersionId를 지원하는지
 검증한다. 클라이언트는 normalized
 prefix에 대한 PUT 권한을 받지 않는다. ffmpeg/ffprobe는 고정된 절대 경로의 검토된
-binary를 사용하고 workspace root는 서비스 계정만 접근할 수 있어야 한다.
+binary를 사용하고 workspace root는 서비스 계정만 접근할 수 있어야 한다. 배포 이미지에는
+Python 3.12와 `libseccomp.so.2`가 필요하다. JAR에 포함된 launcher는 실행마다 mode `0700`
+workspace에 mode `0400`으로 기록된 뒤, `no_new_privs`, 네트워크·process-escape syscall
+차단과 CPU/address-space/output/file-descriptor limit를 적용하고 media binary를 실행한다.
+이 launcher는 mount namespace를 만들지 않으므로 애플리케이션은 non-root로 실행하고,
+root filesystem은 read-only로 두며 media workspace만 쓰기 가능하게 mount해야 한다.
+Recording deletion dispatcher는 객체 하나마다 별도 DB transaction을 사용하므로 느린 S3
+삭제 하나가 전체 100개 batch의 lock과 rollback 범위를 확장하지 않는다.
 
 Spring Boot 애플리케이션을 EC2 호스트에서 JAR로 직접 실행하면 `REDIS_HOST=localhost`를 사용한다.
 

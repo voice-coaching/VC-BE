@@ -26,6 +26,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,6 +39,22 @@ import static org.mockito.Mockito.when;
 class FfmpegS3RecordingMediaNormalizerTest {
     @TempDir Path temporaryDirectory;
     @Mock private S3Client s3Client;
+
+    @Test
+    void sandboxLauncherDeniesNetworkSocketCreation() throws Exception {
+        Process process = new ProcessBuilder(
+                mediaProperties().getSandboxPythonBinary(),
+                Path.of("scripts/media_sandbox.py").toAbsolutePath().normalize().toString(),
+                "--self-test"
+        ).start();
+
+        assertThat(process.waitFor(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(process.exitValue()).isZero();
+        assertThat(new String(
+                process.getInputStream().readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8
+        ).trim()).isEqualTo("{\"networkIsolation\": \"seccomp_socket_denied\"}");
+    }
 
     @Test
     void parsesSupportedMp4AndStoresCanonicalAudioWithDigest() throws Exception {

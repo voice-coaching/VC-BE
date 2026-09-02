@@ -22,4 +22,10 @@ public interface AnalysisCancellationOutboxJpaRepository
             AnalysisCancellationOutboxStatus status,
             OffsetDateTime now
     );
+
+    long countByStatus(AnalysisCancellationOutboxStatus status);
+
+    Optional<AnalysisCancellationOutbox> findFirstByStatusOrderByCreatedAtAsc(
+            AnalysisCancellationOutboxStatus status
+    );
 }

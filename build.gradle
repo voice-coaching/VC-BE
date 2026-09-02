@@ -50,3 +50,9 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.named('processResources') {
+    from('scripts/media_sandbox.py') {
+        into 'media-sandbox'
+    }
+}

@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -51,6 +52,7 @@ import java.util.concurrent.TimeUnit;
 @ConditionalOnProperty(prefix = "storage.media-normalization", name = "enabled", havingValue = "true")
 public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormalizationPort {
     private static final int MAXIMUM_PROBE_OUTPUT_BYTES = 64 * 1024;
+    private static final int MAXIMUM_SANDBOX_LAUNCHER_BYTES = 64 * 1024;
     private static final String CANONICAL_CODEC = "pcm_s16le";
     private static final Set<String> MP4_VIDEO_CODECS = Set.of("h264", "hevc");
     private static final Set<String> WEBM_VIDEO_CODECS = Set.of("vp8", "vp9");
@@ -68,6 +70,7 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
     private final MediaNormalizationProperties media;
     private final S3Client s3Client;
     private final ObjectMapper objectMapper;
+    private final byte[] sandboxLauncher;
 
     public FfmpegS3RecordingMediaNormalizer(
             ObjectStorageProperties storage,
@@ -80,6 +83,7 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
         this.s3Client = recordingS3Client;
         this.objectMapper = objectMapper;
         validateConfiguration(media);
+        this.sandboxLauncher = loadSandboxLauncher();
     }
 
     @Override
@@ -114,6 +118,7 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
         SourceObjectInspection sourceInspection = null;
         RuntimeException failure = null;
         try {
+            writeSandboxLauncher(workspace);
             sourceInspection = inspectSourceObject(
                     sourceObjectKey, declaredMimeType, declaredFileSizeBytes
             );
@@ -342,9 +347,9 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                 "-show_entries",
                 "format=format_name,duration:stream=codec_type,codec_name,sample_rate,channels",
                 "-of", "json",
-                source.toString()
+                sandboxPath(source)
         );
-        byte[] output = run(command, true);
+        byte[] output = run(command, true, source.getParent());
         try {
             return objectMapper.readValue(output, ProbeDocument.class);
         } catch (IOException error) {
@@ -359,16 +364,16 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                 "-hide_banner",
                 "-loglevel", "error",
                 "-protocol_whitelist", "file,pipe",
-                "-i", source.toString(),
+                "-i", sandboxPath(source),
                 "-map", "0:a:0",
                 "-vn",
                 "-ac", "1",
                 "-ar", "16000",
                 "-c:a", CANONICAL_CODEC,
                 "-f", "wav",
-                canonical.toString()
+                sandboxPath(canonical)
         );
-        run(command, false);
+        run(command, false, source.getParent());
     }
 
     private void canonicalizeVideo(Path source, Path canonical, String declaredMimeType)
@@ -390,19 +395,24 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                 "-hide_banner",
                 "-loglevel", "error",
                 "-protocol_whitelist", "file,pipe",
-                "-i", source.toString(),
+                "-i", sandboxPath(source),
                 "-map", "0:v:0",
                 "-map", "0:a:0",
                 "-map_metadata", "-1",
                 "-map_chapters", "-1"
         ));
         command.addAll(codecs);
-        command.addAll(List.of("-movflags", "+faststart", "-f", "mp4", canonical.toString()));
-        run(command, false);
+        command.addAll(List.of("-movflags", "+faststart", "-f", "mp4", sandboxPath(canonical)));
+        run(command, false, source.getParent());
     }
 
-    private byte[] run(List<String> command, boolean captureOutput) throws IOException, InterruptedException {
-        ProcessBuilder builder = new ProcessBuilder(command);
+    private byte[] run(
+            List<String> command,
+            boolean captureOutput,
+            Path workspace
+    ) throws IOException, InterruptedException {
+        ProcessBuilder builder = new ProcessBuilder(sandboxedCommand(command, workspace));
+        builder.directory(workspace.toFile());
         builder.redirectError(ProcessBuilder.Redirect.DISCARD);
         if (!captureOutput) {
             builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
@@ -450,6 +460,69 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                 process.destroyForcibly();
             }
         }
+    }
+
+    private List<String> sandboxedCommand(List<String> target, Path workspace) throws IOException {
+        Path canonicalWorkspace = workspace.toRealPath(LinkOption.NOFOLLOW_LINKS);
+        if (!canonicalWorkspace.startsWith(media.getWorkspaceRoot().toRealPath(LinkOption.NOFOLLOW_LINKS))) {
+            throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
+        }
+        long fileSizeLimit = Math.max(media.getMaximumInputBytes(), media.getMaximumNormalizedBytes());
+        long cpuSeconds = Math.max(1L, media.getProcessTimeout().toSeconds());
+        java.util.ArrayList<String> command = new java.util.ArrayList<>(List.of(
+                media.getSandboxPythonBinary(),
+                canonicalWorkspace.resolve("media_sandbox.py").toString(),
+                "--expected-parent-pid", Long.toString(ProcessHandle.current().pid()),
+                "--cpu-seconds", Long.toString(cpuSeconds),
+                "--address-space-bytes", Long.toString(media.getSandboxAddressSpaceBytes()),
+                "--file-size-bytes", Long.toString(fileSizeLimit),
+                "--"
+        ));
+        command.addAll(target);
+        return List.copyOf(command);
+    }
+
+    private static byte[] loadSandboxLauncher() {
+        try (InputStream input = FfmpegS3RecordingMediaNormalizer.class.getResourceAsStream(
+                "/media-sandbox/media_sandbox.py"
+        )) {
+            if (input == null) {
+                throw new IOException();
+            }
+            byte[] payload = input.readNBytes(MAXIMUM_SANDBOX_LAUNCHER_BYTES + 1);
+            if (payload.length == 0 || payload.length > MAXIMUM_SANDBOX_LAUNCHER_BYTES) {
+                throw new IOException();
+            }
+            return payload;
+        } catch (IOException error) {
+            throw new IllegalStateException("media_normalization_sandbox_unavailable");
+        }
+    }
+
+    private void writeSandboxLauncher(Path workspace) {
+        Path launcher = workspace.resolve("media_sandbox.py");
+        try (FileChannel channel = FileChannel.open(
+                launcher,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE
+        )) {
+            ByteBuffer buffer = ByteBuffer.wrap(sandboxLauncher);
+            while (buffer.hasRemaining()) {
+                channel.write(buffer);
+            }
+            channel.force(true);
+            Files.setPosixFilePermissions(launcher, READ_ONLY_FILE_PERMISSIONS);
+        } catch (IOException error) {
+            throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
+        }
+    }
+
+    private static String sandboxPath(Path path) {
+        Path fileName = path.getFileName();
+        if (fileName == null || !path.isAbsolute()) {
+            throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
+        }
+        return fileName.toString();
     }
 
     private long validateProbe(ProbeDocument probe, String declaredMimeType) {
@@ -607,6 +680,11 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                 || media.getWorkspaceRoot() == null
                 || !media.getWorkspaceRoot().isAbsolute()
                 || Path.of("/").equals(media.getWorkspaceRoot())
+                || media.getSandboxPythonBinary() == null
+                || !Path.of(media.getSandboxPythonBinary()).isAbsolute()
+                || !isExecutableRegularFile(Path.of(media.getSandboxPythonBinary()))
+                || media.getSandboxAddressSpaceBytes() < 256L * 1024L * 1024L
+                || media.getSandboxAddressSpaceBytes() > 16L * 1024L * 1024L * 1024L
                 || media.getFfmpegBinary() == null
                 || !Path.of(media.getFfmpegBinary()).isAbsolute()
                 || !isExecutableRegularFile(Path.of(media.getFfmpegBinary()))

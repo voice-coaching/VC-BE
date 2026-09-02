@@ -70,6 +70,8 @@ storage:
   media-normalization:
     enabled: ${MEDIA_NORMALIZATION_ENABLED:false}
     workspace-root: ${MEDIA_NORMALIZATION_WORKSPACE_ROOT:/tmp/voice-coach-media-normalization}
+    sandbox-python-binary: ${MEDIA_NORMALIZATION_SANDBOX_PYTHON_BINARY:/usr/bin/python3.12}
+    sandbox-address-space-bytes: ${MEDIA_NORMALIZATION_SANDBOX_ADDRESS_SPACE_BYTES:2147483648}
     ffmpeg-binary: ${MEDIA_NORMALIZATION_FFMPEG_BINARY:/usr/bin/ffmpeg}
     ffprobe-binary: ${MEDIA_NORMALIZATION_FFPROBE_BINARY:/usr/bin/ffprobe}
     process-timeout: ${MEDIA_NORMALIZATION_PROCESS_TIMEOUT:PT30S}
@@ -95,6 +97,8 @@ analysis:
     redis-command-timeout: ${ANALYSIS_REDIS_COMMAND_TIMEOUT:PT5S}
     redis-shutdown-timeout: ${ANALYSIS_REDIS_SHUTDOWN_TIMEOUT:PT1S}
     request-stream: ${ANALYSIS_REQUEST_STREAM:analysis:request:v1}
+    request-consumer-group: ${ANALYSIS_REQUEST_CONSUMER_GROUP:analysis-workers}
+    request-dead-letter-stream: ${ANALYSIS_REQUEST_DLQ_STREAM:analysis:request:dlq:v1}
     result-stream: ${ANALYSIS_RESULT_STREAM:analysis:result:v1}
     result-consumer-group: ${ANALYSIS_RESULT_CONSUMER_GROUP:backend-analysis-result-workers}
     result-consumer-name: ${ANALYSIS_RESULT_CONSUMER_NAME:backend-analysis-result-1}
@@ -104,6 +108,7 @@ analysis:
     cancellation-outbox-poll-interval: ${ANALYSIS_CANCELLATION_OUTBOX_POLL_INTERVAL:PT1S}
     retention-age: ${ANALYSIS_RETENTION_AGE:PT1H}
     retention-poll-interval: ${ANALYSIS_RETENTION_POLL_INTERVAL:PT5M}
+    observation-poll-interval: ${ANALYSIS_OBSERVATION_POLL_INTERVAL:PT30S}
     retention-batch-size: ${ANALYSIS_RETENTION_BATCH_SIZE:100}
     outbox-poll-interval: ${ANALYSIS_OUTBOX_POLL_INTERVAL:PT1S}
     result-poll-interval: ${ANALYSIS_RESULT_POLL_INTERVAL:PT1S}

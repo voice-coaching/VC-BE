@@ -75,6 +75,20 @@ class AnalysisProductionConfigurationGuardTest {
                 .hasMessage("analysis_stream_resource_limits_invalid");
     }
 
+    @Test
+    void refusesMissingRequestConsumerGroupForPelObservation() {
+        AnalysisStreamProperties stream = validStream();
+        stream.setRequestConsumerGroup(" ");
+        ObjectStorageProperties storage = new ObjectStorageProperties();
+        storage.setEnabled(true);
+        MediaNormalizationProperties media = new MediaNormalizationProperties();
+        media.setEnabled(true);
+
+        assertThatThrownBy(() -> new AnalysisProductionConfigurationGuard(storage, media, stream))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("analysis_stream_configuration_invalid");
+    }
+
     private static AnalysisStreamProperties validStream() {
         AnalysisStreamProperties stream = new AnalysisStreamProperties();
         stream.setRedisSslEnabled(true);

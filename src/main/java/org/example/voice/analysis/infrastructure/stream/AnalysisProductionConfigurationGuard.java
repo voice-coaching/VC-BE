@@ -25,6 +25,8 @@ public class AnalysisProductionConfigurationGuard {
                 || stream.getRedisPort() > 65_535
                 || !hasText(stream.getRedisPassword())
                 || !hasText(stream.getRequestStream())
+                || !hasText(stream.getRequestConsumerGroup())
+                || !hasText(stream.getRequestDeadLetterStream())
                 || !hasText(stream.getResultStream())
                 || !hasText(stream.getResultConsumerGroup())
                 || !hasText(stream.getResultConsumerName())
@@ -50,6 +52,7 @@ public class AnalysisProductionConfigurationGuard {
                 || invalidDuration(stream.getCancellationOutboxPollInterval())
                 || invalidDuration(stream.getRetentionAge())
                 || invalidDuration(stream.getRetentionPollInterval())
+                || invalidDuration(stream.getObservationPollInterval())
                 || stream.getRetentionBatchSize() <= 0
                 || stream.getRetentionBatchSize() > 10_000) {
             throw new IllegalStateException("analysis_stream_resource_limits_invalid");

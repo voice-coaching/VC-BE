@@ -40,6 +40,8 @@ job messages.
 | `ANALYSIS_REDIS_COMMAND_TIMEOUT` | Y | Redis command bound, default `PT5S`; must exceed result `BLOCK`. |
 | `ANALYSIS_REDIS_SHUTDOWN_TIMEOUT` | Y | Lettuce shutdown bound, default `PT1S`. |
 | `ANALYSIS_REQUEST_STREAM` | Y | Default `analysis:request:v1`. |
+| `ANALYSIS_REQUEST_CONSUMER_GROUP` | Y | AI-owned group observed by VC-BE for aggregate PEL depth; default `analysis-workers`. |
+| `ANALYSIS_REQUEST_DLQ_STREAM` | Y | AI-owned request DLQ observed by VC-BE; default `analysis:request:dlq:v1`. |
 | `ANALYSIS_RESULT_STREAM` | Y | Default `analysis:result:v1`. |
 | `ANALYSIS_RESULT_CONSUMER_GROUP` | Y | Default `backend-analysis-result-workers`. |
 | `ANALYSIS_RESULT_CONSUMER_NAME` | Y | Unique pod/host instance name. |
@@ -49,6 +51,7 @@ job messages.
 | `ANALYSIS_CANCELLATION_OUTBOX_POLL_INTERVAL` | Y | Durable cancellation dispatch interval, default `PT1S`. |
 | `ANALYSIS_RETENTION_AGE` | Y | Minimum terminal DB evidence age before outbox/marker cleanup, default `PT1H`. |
 | `ANALYSIS_RETENTION_POLL_INTERVAL` / `ANALYSIS_RETENTION_BATCH_SIZE` | Y | Cleanup schedule and bounded batch, defaults `PT5M` / `100`. |
+| `ANALYSIS_OBSERVATION_POLL_INTERVAL` | Y | Aggregate Stream and DB outbox observation interval, default `PT30S`. |
 | `ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES` | Y | UTF-8 request/result payload cap, default `65536`, range `1024..1048576`; configure the AI worker's result cap to the same value. |
 | `ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH` | Y | Approximate result DLQ cap, default `10000`. |
 | `ANALYSIS_PENDING_CLAIM_IDLE` | Y | Minimum pending idle time before reclaim; default `PT5M`. |
@@ -68,6 +71,8 @@ job messages.
 | `OBJECT_STORAGE_RECORDINGS_PREFIX` | Y | Private relative key prefix; default `recordings/`. |
 | `MEDIA_NORMALIZATION_ENABLED` | Y | Must be `true` with Stream analysis; enables backend-owned probe, decode, technical QC and canonical WAV upload. |
 | `MEDIA_NORMALIZATION_WORKSPACE_ROOT` | Y | Absolute owner-only temporary workspace root. |
+| `MEDIA_NORMALIZATION_SANDBOX_PYTHON_BINARY` | Y | Absolute reviewed Python 3.12 executable used by the packaged seccomp launcher. |
+| `MEDIA_NORMALIZATION_SANDBOX_ADDRESS_SPACE_BYTES` | Y | Per-media-process address-space limit, default 2 GiB, range 256 MiB..16 GiB. |
 | `MEDIA_NORMALIZATION_FFMPEG_BINARY` / `MEDIA_NORMALIZATION_FFPROBE_BINARY` | Y | Absolute reviewed executable paths. |
 | `MEDIA_NORMALIZATION_PROCESS_TIMEOUT` | Y | Per-process timeout, default `PT30S`, maximum `PT2M`. |
 
@@ -76,7 +81,7 @@ Redis URL/password in messages, or use the ordinary cache endpoint for Stream da
 TLS peer verification remains enabled. A private Redis CA must be installed in the
 JVM trust store supplied to VC-BE; disabling certificate verification is unsupported.
 The Backend Redis ACL needs the existing request/result Stream commands plus
-`GET`, `SET`, `DEL`, `XRANGE`, and `EVAL` for request indexing, cancellation and
+`GET`, `SET`, `DEL`, `XRANGE`, `XLEN`, `XPENDING`, and `EVAL` for request indexing, cancellation, observation and
 retention. The AI ACL needs `EXISTS`, `DEL`, and `EVAL` in addition to its Stream
 commands. Fixed Lua scripts atomically publish/index a request, check cancellation
 before result `XADD`, or combine `XACK` with `XDEL`.
@@ -203,6 +208,14 @@ MP4/QuickTime accepts H.264 or HEVC with AAC; WebM video accepts VP8 or VP9 with
 Opus or Vorbis and is transcoded to the canonical MP4 contract. Unsupported or
 ambiguous streams fail closed.
 
+The bundled media launcher applies `no_new_privs`, denies network, `io_uring` and
+process-escape syscalls through libseccomp, permits only thread-style clone, and
+sets CPU, address-space, output-file, file-descriptor and core-dump limits before
+executing the reviewed ffmpeg/ffprobe binary. Each invocation runs in its owner-only
+workspace with a cleared environment and a `file,pipe` protocol allowlist. This is
+not a mount namespace: production still runs VC-BE as an unprivileged service in a
+read-only container or host filesystem with only the media workspace writable.
+
 The payload intentionally excludes `userId`, `sessionId`, `recordingId`, file paths,
 presigned URLs, and raw consent material. Both analyze and retry REST calls require
 `{"accepted":true,"policyRevision":"..."}` from the authenticated owner. Before
@@ -322,6 +335,9 @@ the request; the request remains pending until the worker publishes a terminal
   instead of publishing duplicate work.
 - Each outbox publish runs in its own bounded DB transaction. Redis failure therefore
   holds at most one outbox row lock for at most the configured command timeout.
+- Recording-object deletion similarly locks and delivers one outbox item per independent
+  transaction. A failed storage call schedules bounded retry without rolling back other
+  candidates; terminal failures remain visible for operator action.
 - PostgreSQL is the permanent result store. Redis holds transport messages only; no
   audio blob, token, URL, raw exception, or user identifier is placed in a stream.
 - Analysis admission takes a pessimistic lock on the owning user row before counting
@@ -378,7 +394,16 @@ VC-BE exposes management endpoints on `127.0.0.1:9091` by default:
 - `/internal/actuator/health` includes the dedicated analysis Redis readiness check.
 - `/internal/actuator/prometheus` exports bounded-cardinality publish, ingestion,
   delivery-failure, DLQ, execution-timeout, cancellation-delivery, and retention
-  cleanup/failure counters.
+  cleanup/failure counters. It also exports request/result outstanding Stream entries,
+  request/result PEL and DLQ depths, pending request/cancellation outbox counts and
+  oldest ages, plus recording-deletion pending/failed counts and oldest age. `-1`
+  means the observation source was unavailable, and a paired observation-failure
+  counter is incremented.
+
+Because terminal handoff performs `XACK` plus `XDEL`, an outstanding Stream-entry
+gauge covers both unclaimed and pending transport work. It is intentionally not a
+consumer-offset lag estimate. Metrics have no user, session, recording, event,
+object, payload, failure-reason, or exception labels.
 
 No user, session, recording, event, object key, payload, or exception is used as a
 metric label or health detail. If the management address is changed from loopback,

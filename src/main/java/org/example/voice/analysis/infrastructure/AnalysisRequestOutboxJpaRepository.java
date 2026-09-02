@@ -32,6 +32,12 @@ public interface AnalysisRequestOutboxJpaRepository extends JpaRepository<Analys
 
     List<AnalysisRequestOutbox> findByAnalysisResultIdOrderByIdAsc(Long analysisId);
 
+    long countByStatus(AnalysisRequestOutboxStatus status);
+
+    Optional<AnalysisRequestOutbox> findFirstByStatusOrderByCreatedAtAsc(
+            AnalysisRequestOutboxStatus status
+    );
+
     @Query("""
             select outbox.id from AnalysisRequestOutbox outbox
             where outbox.retentionProtocolVersion = :protocolVersion

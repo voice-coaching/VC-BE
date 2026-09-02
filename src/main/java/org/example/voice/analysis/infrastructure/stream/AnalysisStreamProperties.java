@@ -24,6 +24,8 @@ public class AnalysisStreamProperties {
     private Duration redisCommandTimeout = Duration.ofSeconds(5);
     private Duration redisShutdownTimeout = Duration.ofSeconds(1);
     private String requestStream = "analysis:request:v1";
+    private String requestConsumerGroup = "analysis-workers";
+    private String requestDeadLetterStream = "analysis:request:dlq:v1";
     private String resultStream = "analysis:result:v1";
     private String resultConsumerGroup = "backend-analysis-result-workers";
     private String resultConsumerName = "backend-analysis-result-1";
@@ -33,6 +35,7 @@ public class AnalysisStreamProperties {
     private Duration cancellationOutboxPollInterval = Duration.ofSeconds(1);
     private Duration retentionAge = Duration.ofHours(1);
     private Duration retentionPollInterval = Duration.ofMinutes(5);
+    private Duration observationPollInterval = Duration.ofSeconds(30);
     private int retentionBatchSize = 100;
     private Duration outboxPollInterval = Duration.ofSeconds(1);
     private Duration resultPollInterval = Duration.ofSeconds(1);
