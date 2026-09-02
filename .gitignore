@@ -66,7 +66,7 @@ replay_pid*
 
 ### Uploaded / generated local files ###
 uploads/
-storage/
+/storage/
 tmp/
 temp/
 *.tmp

@@ -1,5 +1,7 @@
 package org.example.voice.training.infrastructure;
 
+import org.example.voice.common.exception.BaseException;
+import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.training.domain.port.RecordingObjectStoragePort;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -54,7 +56,17 @@ public class PresignedUrlProvider implements RecordingObjectStoragePort {
     }
 
     @Override
-    public void assertUploadedObject(String objectKey, String mimeType, long fileSizeBytes) {
+    public void assertUploadedObject(
+            Long userId,
+            Long sessionId,
+            String objectKey,
+            String mimeType,
+            long fileSizeBytes
+    ) {
         // Development mode has no object store. Stream analysis is guarded from using this adapter.
+        String ownerPrefix = "recordings/users/%d/sessions/%d/".formatted(userId, sessionId);
+        if (objectKey == null || !objectKey.startsWith(ownerPrefix) || objectKey.length() <= ownerPrefix.length()) {
+            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
+        }
     }
 }

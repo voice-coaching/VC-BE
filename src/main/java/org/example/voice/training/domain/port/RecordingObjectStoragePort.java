@@ -17,5 +17,11 @@ public interface RecordingObjectStoragePort {
 
     Map<String, String> requiredHeaders(String mimeType, long fileSizeBytes);
 
-    void assertUploadedObject(String objectKey, String mimeType, long fileSizeBytes);
+    void assertUploadedObject(
+            Long userId,
+            Long sessionId,
+            String objectKey,
+            String mimeType,
+            long fileSizeBytes
+    );
 }

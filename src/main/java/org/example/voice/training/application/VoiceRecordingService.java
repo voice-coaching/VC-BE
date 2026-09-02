@@ -38,7 +38,11 @@ public class VoiceRecordingService {
             throw new BaseException(ErrorCode.RECORDING_ALREADY_REGISTERED);
         }
         objectStorage.assertUploadedObject(
-                request.objectKey(), request.mimeType(), request.fileSizeBytes()
+                userId,
+                sessionId,
+                request.objectKey(),
+                request.mimeType(),
+                request.fileSizeBytes()
         );
 
         int attemptNo = voiceRecordingReader.countBySessionId(sessionId) + 1;
