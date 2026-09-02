@@ -18,7 +18,6 @@ import org.example.voice.training.domain.port.TrainingAnalysisWriter;
 import org.example.voice.training.domain.port.TrainingSessionWriter;
 import org.example.voice.training.domain.port.VoiceRecordingReader;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
-import org.example.voice.training.domain.type.TrainingSessionStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,8 +32,6 @@ import java.util.UUID;
 public class TrainingAnalysisRequestService {
 
     // 분석 요청의 도메인 검증과 transaction 경계를 소유한다. Redis Stream I/O는 publisher adapter에 숨긴다.
-    private static final int MAX_RETRY_COUNT = 3;
-
     private final TrainingSessionService trainingSessionService;
     private final VoiceRecordingReader voiceRecordingReader;
     private final TrainingAnalysisReader trainingAnalysisReader;
@@ -56,10 +53,13 @@ public class TrainingAnalysisRequestService {
         if (trainingAnalysisReader.existsRunningAnalysis(source.recordingId())) {
             throw new BaseException(ErrorCode.ANALYSIS_ALREADY_RUNNING);
         }
+        if (trainingAnalysisReader.existsAnalysis(source.recordingId())) {
+            throw new BaseException(ErrorCode.ANALYSIS_ALREADY_REQUESTED);
+        }
 
+        trainingSessionWriter.startAnalysis(sessionId);
         UUID requestEventId = UUID.randomUUID();
         AnalysisRequestData result = trainingAnalysisWriter.createPending(source.recordingId(), requestEventId);
-        trainingSessionWriter.updateStatus(sessionId, TrainingSessionStatus.ANALYZING);
         analysisJobPublisher.publish(toWorkerRequest(
                 result.analysisId(), requestEventId, source, consent.policyRevision()
         ));
@@ -82,22 +82,15 @@ public class TrainingAnalysisRequestService {
         validateConsent(consent);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
+        trainingSessionWriter.assertAnalysisRetryAllowed(sessionId);
         AnalysisProgressData failed = trainingAnalysisReader.findLatestFailedBySelectedRecording(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FAILED));
-
-        int retryCount = trainingAnalysisReader.countFailedAnalysis(source.recordingId());
-        if (retryCount >= MAX_RETRY_COUNT) {
-            throw new BaseException(ErrorCode.MAX_RETRY_EXCEEDED);
-        }
 
         UUID requestEventId = UUID.randomUUID();
         AnalysisRetryData result = trainingAnalysisWriter.retry(
                 failed.analysisId(),
-                source.recordingId(),
-                retryCount + 1,
                 requestEventId
         );
-        trainingSessionWriter.updateStatus(sessionId, TrainingSessionStatus.ANALYZING);
         analysisJobPublisher.publish(toWorkerRequest(
                 result.analysisId(), requestEventId, source, consent.policyRevision()
         ));

@@ -10,6 +10,8 @@ import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.practicecontent.domain.type.LearningFocus;
 import org.example.voice.training.domain.model.AnalysisRequestData;
 import org.example.voice.training.domain.model.AnalysisConsentData;
+import org.example.voice.training.domain.model.AnalysisProgressData;
+import org.example.voice.training.domain.model.AnalysisRetryData;
 import org.example.voice.training.domain.model.SelectedRecordingAnalysisData;
 import org.example.voice.training.domain.port.AnalysisJobPublisher;
 import org.example.voice.training.domain.port.TrainingAnalysisReader;
@@ -17,7 +19,6 @@ import org.example.voice.training.domain.port.TrainingAnalysisWriter;
 import org.example.voice.training.domain.port.TrainingSessionWriter;
 import org.example.voice.training.domain.port.VoiceRecordingReader;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
-import org.example.voice.training.domain.type.TrainingSessionStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -76,7 +77,7 @@ class TrainingAnalysisRequestServiceTest {
 
         ArgumentCaptor<AnalysisWorkerRequest> request = ArgumentCaptor.forClass(AnalysisWorkerRequest.class);
         verify(analysisJobPublisher).publish(request.capture());
-        verify(trainingSessionWriter).updateStatus(7L, TrainingSessionStatus.ANALYZING);
+        verify(trainingSessionWriter).startAnalysis(7L);
         verify(trainingAnalysisWriter).createPending(eq(50L), eq(request.getValue().eventId()));
         assertThat(request.getValue().analysisId()).isEqualTo(35L);
         assertThat(request.getValue().contentId()).isEqualTo(12L);
@@ -125,6 +126,39 @@ class TrainingAnalysisRequestServiceTest {
 
         verify(trainingAnalysisWriter, never()).createPending(any(), any());
         verify(analysisJobPublisher, never()).publish(any());
+    }
+
+    @Test
+    void retriesTheLockedFailedGenerationUsingItsPersistedCount() {
+        SelectedRecordingAnalysisData source = new SelectedRecordingAnalysisData(
+                50L,
+                12L,
+                "2026-09-02T00:00:00Z",
+                "안녕하세요. 오늘 날씨가 좋습니다.",
+                "recordings/50.wav",
+                "audio/wav",
+                1234L,
+                1200,
+                "d".repeat(64),
+                LearningFocus.PRONUNCIATION,
+                RecordingQualityStatus.PASS
+        );
+        OffsetDateTime failedAt = OffsetDateTime.now();
+        when(voiceRecordingReader.findSelectedForAnalysis(7L, 9L)).thenReturn(Optional.of(source));
+        when(trainingAnalysisReader.findLatestFailedBySelectedRecording(7L, 9L)).thenReturn(Optional.of(
+                new AnalysisProgressData(35L, AnalysisStatus.FAILED, "FAILED", 0, "temporary", failedAt)
+        ));
+        when(trainingAnalysisWriter.retry(eq(35L), any())).thenReturn(
+                new AnalysisRetryData(35L, AnalysisStatus.PENDING, 2, failedAt)
+        );
+        allowAuthorization();
+
+        var result = service().retry(7L, 9L, consent());
+
+        assertThat(result.retryCount()).isEqualTo(2);
+        verify(trainingSessionWriter).assertAnalysisRetryAllowed(7L);
+        verify(trainingAnalysisWriter).retry(eq(35L), any());
+        verify(analysisJobPublisher).publish(any());
     }
 
     private TrainingAnalysisRequestService service() {

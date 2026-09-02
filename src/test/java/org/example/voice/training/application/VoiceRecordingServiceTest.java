@@ -40,7 +40,7 @@ class VoiceRecordingServiceTest {
         NormalizedRecordingData normalized = normalized();
         when(normalization.normalize(9L, 7L, request.objectKey(), request.mimeType(), request.fileSizeBytes()))
                 .thenReturn(normalized);
-        when(writer.register(7L, normalized, 1)).thenReturn(
+        when(writer.register(7L, normalized)).thenReturn(
                 new VoiceRecordingRegisteredData(
                         50L,
                         1,
@@ -56,7 +56,7 @@ class VoiceRecordingServiceTest {
         verify(objectStorage).assertUploadedObject(
                 9L, 7L, request.objectKey(), request.mimeType(), request.fileSizeBytes()
         );
-        verify(writer).register(7L, normalized, 1);
+        verify(writer).register(7L, normalized);
     }
 
     @Test
@@ -85,7 +85,7 @@ class VoiceRecordingServiceTest {
         NormalizedRecordingData normalized = normalized();
         when(normalization.normalize(9L, 7L, request.objectKey(), request.mimeType(), request.fileSizeBytes()))
                 .thenReturn(normalized);
-        when(writer.register(7L, normalized, 1)).thenThrow(new IllegalStateException("database unavailable"));
+        when(writer.register(7L, normalized)).thenThrow(new IllegalStateException("database unavailable"));
 
         assertThatThrownBy(() -> service().register(7L, request, 9L))
                 .isInstanceOf(IllegalStateException.class);

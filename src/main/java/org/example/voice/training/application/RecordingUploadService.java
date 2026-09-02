@@ -6,6 +6,7 @@ import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.training.controller.dto.RecordingUploadUrlRequestDto;
 import org.example.voice.training.domain.model.RecordingUploadUrlData;
 import org.example.voice.training.domain.port.RecordingObjectStoragePort;
+import org.example.voice.training.domain.port.TrainingSessionWriter;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
@@ -22,10 +23,12 @@ public class RecordingUploadService {
 
     private final RecordingObjectStoragePort objectStorage;
     private final TrainingSessionService trainingSessionService;
+    private final TrainingSessionWriter trainingSessionWriter;
 
     public RecordingUploadUrlData createUploadUrl(Long sessionId, RecordingUploadUrlRequestDto request, Long userId) {
         trainingSessionService.assertSessionExists(sessionId, userId);
         validate(request);
+        trainingSessionWriter.beginUpload(sessionId);
 
         // 현재는 개발용 URL을 반환하지만, objectKey/expiresAt/requiredHeaders 구조는 실제 Presigned URL과 동일하게 맞춰뒀다.
         OffsetDateTime expiresAt = OffsetDateTime.now(ZoneId.of("Asia/Seoul")).plusMinutes(10);

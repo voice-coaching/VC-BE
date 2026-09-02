@@ -113,6 +113,9 @@ public class AnalysisResult {
     @Column(name = "feedback_regeneration_count", nullable = false)
     private Integer feedbackRegenerationCount;
 
+    @Column(name = "retry_count", nullable = false)
+    private Integer retryCount;
+
     @Column(name = "feedback_regenerated_at")
     private OffsetDateTime feedbackRegeneratedAt;
 
@@ -124,6 +127,7 @@ public class AnalysisResult {
         this.status = AnalysisStatus.PENDING;
         this.activeRequestEventId = requestEventId.toString();
         this.feedbackRegenerationCount = 0;
+        this.retryCount = 0;
         this.createdAt = OffsetDateTime.now(SEOUL_ZONE_ID);
         this.analyzedAt = this.createdAt;
     }
@@ -135,6 +139,7 @@ public class AnalysisResult {
     public void retry(UUID requestEventId) {
         this.status = AnalysisStatus.PENDING;
         this.activeRequestEventId = requestEventId.toString();
+        this.retryCount += 1;
         clearWorkerResult();
         this.analyzedAt = OffsetDateTime.now(SEOUL_ZONE_ID);
     }

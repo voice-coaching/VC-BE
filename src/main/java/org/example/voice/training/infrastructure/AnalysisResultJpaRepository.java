@@ -27,6 +27,8 @@ public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResul
 
     boolean existsByRecordingIdAndStatus(Long recordingId, AnalysisStatus status);
 
+    boolean existsByRecordingId(Long recordingId);
+
     boolean existsByRecordingTrainingSessionIdAndRecordingTrainingSessionUserIdAndRecordingSelectedTrueAndRecordingDeletedAtIsNullAndStatus(
             Long sessionId,
             Long userId,
@@ -44,5 +46,4 @@ public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResul
             AnalysisStatus status
     );
 
-    int countByRecordingIdAndStatus(Long recordingId, AnalysisStatus status);
 }

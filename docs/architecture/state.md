@@ -138,7 +138,7 @@
 | `PENDING` | `PROCESSING` | AI worker processing result 수신 | `requestEventId` 일치 | 현재 generation의 상태만 갱신 |
 | `PENDING` or `PROCESSING` | `COMPLETED` | AI worker terminal success 수신 | outcome 및 payload schema 검증 | 결과와 segment를 원자 반영 |
 | `PENDING` or `PROCESSING` | `FAILED` | AI worker 실패, outbox retry 소진, 또는 결과 delivery retry 소진 | `requestEventId`와 안전한 실패 코드 일치 | retry 가능 상태 |
-| `FAILED` | `PENDING` | `POST /api/training-sessions/{sessionId}/analysis/retry` | 실패 상태, retry count 제한 | 새 request generation과 outbox record 생성 |
+| `FAILED` | `PENDING` | `POST /api/training-sessions/{sessionId}/analysis/retry` | 실패 상태, 영속 retry count 3회 제한 | 잠근 분석 행의 retry count 증가, 새 request generation과 outbox record 생성 |
 | none | `CourseProgressStatus.NOT_STARTED` | 진도 조회 시 record 없음 | 사용자/클래스 존재 | 응답용 기본 상태 |
 | none | `CourseProgressStatus.IN_PROGRESS` | `POST /api/courses/{courseId}/start` | 클래스 존재, 게시 상태 | `user_course_progress` 생성 |
 | `NOT_STARTED` | `IN_PROGRESS` | 진도 갱신 | 유효한 step/progress | 시작 상태로 전환 |

@@ -9,5 +9,5 @@ public interface TrainingAnalysisWriter {
 
     AnalysisRequestData createPending(Long recordingId, UUID requestEventId);
 
-    AnalysisRetryData retry(Long previousAnalysisId, Long recordingId, Integer retryCount, UUID requestEventId);
+    AnalysisRetryData retry(Long previousAnalysisId, UUID requestEventId);
 }

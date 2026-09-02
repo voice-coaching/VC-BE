@@ -27,6 +27,11 @@ public class TrainingAnalysisReaderImpl implements TrainingAnalysisReader {
     }
 
     @Override
+    public boolean existsAnalysis(Long recordingId) {
+        return analysisResultJpaRepository.existsByRecordingId(recordingId);
+    }
+
+    @Override
     public Optional<AnalysisProgressData> findLatestBySelectedRecording(Long sessionId, Long userId) {
         return analysisResultJpaRepository
                 .findFirstByRecordingTrainingSessionIdAndRecordingTrainingSessionUserIdAndRecordingSelectedTrueAndRecordingDeletedAtIsNullOrderByCreatedAtDescIdDesc(
@@ -55,11 +60,6 @@ public class TrainingAnalysisReaderImpl implements TrainingAnalysisReader {
                         userId,
                         AnalysisStatus.COMPLETED
                 );
-    }
-
-    @Override
-    public int countFailedAnalysis(Long recordingId) {
-        return analysisResultJpaRepository.countByRecordingIdAndStatus(recordingId, AnalysisStatus.FAILED);
     }
 
     private AnalysisProgressData toProgressData(AnalysisResult analysisResult) {

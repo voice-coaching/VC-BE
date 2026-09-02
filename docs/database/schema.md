@@ -229,6 +229,7 @@
 | feedback_regeneration_count | integer | Y | 0 | - | - | 종합 피드백 재생성 횟수 |
 | feedback_regenerated_at | timestamptz | N | - | - | - | 마지막 종합 피드백 재생성 시각 |
 | active_request_event_id | varchar(36) | N | - | Index | - | 현재 분석 요청 generation UUID. 이전 재시도 결과를 거부한다. |
+| retry_count | integer | Y | 0 | CHECK | - | 동일 분석 행의 누적 사용자 재시도 횟수(0~3). 상태 변경이나 서버 재시작으로 초기화되지 않는다. |
 | analysis_outcome | varchar(40) | N | - | - | - | 완료된 분석의 근거 제한 outcome |
 | failure_code | varchar(100) | N | - | - | - | 내부 안정 실패 코드. public API에는 노출하지 않는다. |
 | worker_revision | varchar(100) | N | - | - | - | worker revision receipt |

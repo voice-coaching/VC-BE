@@ -59,9 +59,8 @@ public class VoiceRecordingService {
                 request.fileSizeBytes()
         );
 
-        int attemptNo = voiceRecordingReader.countBySessionId(sessionId) + 1;
         try {
-            return voiceRecordingWriter.register(sessionId, normalized, attemptNo);
+            return voiceRecordingWriter.register(sessionId, normalized);
         } catch (RuntimeException error) {
             try {
                 mediaNormalization.deleteNormalizedObject(userId, sessionId, normalized.objectKey());
@@ -102,7 +101,7 @@ public class VoiceRecordingService {
         if (voiceRecordingReader.hasCompletedAnalysis(recordingId)) {
             throw new BaseException(ErrorCode.ANALYZED_RECORDING_CANNOT_DELETE);
         }
-        voiceRecordingWriter.delete(recordingId);
+        voiceRecordingWriter.delete(sessionId, recordingId);
     }
 
     public RecordingPlaybackUrlData getPlaybackUrl(Long recordingId, Long userId) {

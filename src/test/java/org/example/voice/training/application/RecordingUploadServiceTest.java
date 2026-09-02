@@ -4,6 +4,7 @@ import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.training.controller.dto.RecordingUploadUrlRequestDto;
 import org.example.voice.training.domain.port.RecordingObjectStoragePort;
+import org.example.voice.training.domain.port.TrainingSessionWriter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -22,6 +23,7 @@ import static org.mockito.Mockito.when;
 class RecordingUploadServiceTest {
     @Mock private RecordingObjectStoragePort objectStorage;
     @Mock private TrainingSessionService sessions;
+    @Mock private TrainingSessionWriter sessionWriter;
 
     @Test
     void acceptsSupportedVideoWithinTheVideoLimit() {
@@ -64,6 +66,6 @@ class RecordingUploadServiceTest {
     }
 
     private RecordingUploadService service() {
-        return new RecordingUploadService(objectStorage, sessions);
+        return new RecordingUploadService(objectStorage, sessions, sessionWriter);
     }
 }

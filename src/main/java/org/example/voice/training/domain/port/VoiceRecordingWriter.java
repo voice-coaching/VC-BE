@@ -8,11 +8,10 @@ public interface VoiceRecordingWriter {
 
     VoiceRecordingRegisteredData register(
             Long sessionId,
-            NormalizedRecordingData recording,
-            Integer attemptNo
+            NormalizedRecordingData recording
     );
 
     RecordingSelectionData select(Long sessionId, Long recordingId);
 
-    void delete(Long recordingId);
+    void delete(Long sessionId, Long recordingId);
 }
