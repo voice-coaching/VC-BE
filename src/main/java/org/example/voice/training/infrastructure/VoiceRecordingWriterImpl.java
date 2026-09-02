@@ -9,6 +9,8 @@ import org.example.voice.training.domain.model.RecordingSelectionData;
 import org.example.voice.training.domain.model.NormalizedRecordingData;
 import org.example.voice.training.domain.model.VoiceRecordingRegisteredData;
 import org.example.voice.training.domain.port.VoiceRecordingWriter;
+import org.example.voice.training.domain.port.RecordingDeletionScheduler;
+import org.example.voice.training.domain.type.RecordingDeletionReason;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,7 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
 
     private final TrainingSessionJpaRepository trainingSessionJpaRepository;
     private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;
+    private final RecordingDeletionScheduler recordingDeletionScheduler;
 
     @Override
     @Transactional
@@ -91,6 +94,12 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
             throw new BaseException(ErrorCode.RECORDING_NOT_FOUND);
         }
         recording.delete();
+        recordingDeletionScheduler.schedule(
+                recording.getTrainingSession().getUserId(),
+                sessionId,
+                recording.getAudioUrl(),
+                RecordingDeletionReason.RECORDING_DELETED
+        );
     }
 
     private TrainingSession findMutableSession(Long sessionId) {

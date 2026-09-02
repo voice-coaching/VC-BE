@@ -14,6 +14,7 @@ import org.example.voice.training.domain.port.VoiceRecordingReader;
 import org.example.voice.training.domain.port.VoiceRecordingWriter;
 import org.example.voice.training.domain.port.RecordingObjectStoragePort;
 import org.example.voice.training.domain.port.RecordingMediaNormalizationPort;
+import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,7 @@ public class VoiceRecordingService {
     private final RecordingObjectStoragePort objectStorage;
     private final RecordingMediaNormalizationPort mediaNormalization;
     private final ProcessingConsentLedger processingConsentLedger;
+    private final RecordingUploadIntentRegistry uploadIntentRegistry;
 
     @Transactional
     public VoiceRecordingRegisteredData register(Long sessionId, RecordingRegisterRequestDto request, Long userId) {
@@ -70,6 +72,7 @@ public class VoiceRecordingService {
         );
 
         try {
+            uploadIntentRegistry.markConsumed(userId, sessionId, request.objectKey());
             return voiceRecordingWriter.register(sessionId, normalized);
         } catch (RuntimeException error) {
             try {

@@ -9,6 +9,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -119,6 +120,19 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
         }
     }
 
+    @Override
+    public void deleteObject(Long userId, Long sessionId, String objectKey) {
+        requireDeletableOwnedKey(userId, sessionId, objectKey);
+        try {
+            s3Client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(properties.getBucket())
+                    .key(objectKey)
+                    .build());
+        } catch (SdkException error) {
+            throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
+        }
+    }
+
     private void requireOwnedKey(String objectKey) {
         if (objectKey == null
                 || !objectKey.startsWith(properties.getRecordingsPrefix())
@@ -142,6 +156,25 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
         if (!objectKey.startsWith(ownerPrefix)
                 || objectKey.length() <= ownerPrefix.length()
                 || objectKey.substring(ownerPrefix.length()).contains("/")) {
+            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
+        }
+    }
+
+    private void requireDeletableOwnedKey(Long userId, Long sessionId, String objectKey) {
+        if (userId == null || userId <= 0 || sessionId == null || sessionId <= 0) {
+            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
+        }
+        requireOwnedKey(objectKey);
+        String ownerPrefix = "%susers/%d/sessions/%d/".formatted(
+                properties.getRecordingsPrefix(), userId, sessionId
+        );
+        if (!objectKey.startsWith(ownerPrefix) || objectKey.length() <= ownerPrefix.length()) {
+            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
+        }
+        String relativeKey = objectKey.substring(ownerPrefix.length());
+        boolean directUpload = !relativeKey.contains("/");
+        boolean normalizedWav = relativeKey.matches("normalized/[0-9a-fA-F-]{36}\\.wav");
+        if (!directUpload && !normalizedWav) {
             throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
         }
     }

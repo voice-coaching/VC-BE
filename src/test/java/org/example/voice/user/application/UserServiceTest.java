@@ -11,6 +11,9 @@ import org.example.voice.user.domain.port.UserWriter;
 import org.example.voice.user.domain.type.UserStatus;
 import org.example.voice.user.exception.NicknameAlreadyExistsException;
 import org.example.voice.user.exception.WithdrawalAlreadyProcessedException;
+import org.example.voice.training.domain.port.RecordingDeletionScheduler;
+import org.example.voice.training.domain.type.RecordingDeletionReason;
+import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -30,6 +33,8 @@ class UserServiceTest {
     private UserSessionRevoker userSessionRevoker;
     private OnboardingProfileReader onboardingProfileReader;
     private ProcessingConsentLedger processingConsentLedger;
+    private RecordingDeletionScheduler recordingDeletionScheduler;
+    private RecordingUploadIntentRegistry uploadIntentRegistry;
     private UserService userService;
 
     @BeforeEach
@@ -40,13 +45,17 @@ class UserServiceTest {
         userSessionRevoker = mock(UserSessionRevoker.class);
         onboardingProfileReader = mock(OnboardingProfileReader.class);
         processingConsentLedger = mock(ProcessingConsentLedger.class);
+        recordingDeletionScheduler = mock(RecordingDeletionScheduler.class);
+        uploadIntentRegistry = mock(RecordingUploadIntentRegistry.class);
         userService = new UserService(
                 userReader,
                 userWriter,
                 loginProviderReader,
                 userSessionRevoker,
                 onboardingProfileReader,
-                processingConsentLedger
+                processingConsentLedger,
+                recordingDeletionScheduler,
+                uploadIntentRegistry
         );
     }
 
@@ -109,6 +118,8 @@ class UserServiceTest {
         verify(userWriter).save(user);
         verify(userSessionRevoker).revokeAll(1L);
         verify(processingConsentLedger).revokeForUser(1L);
+        verify(recordingDeletionScheduler).scheduleAllForUser(1L, RecordingDeletionReason.USER_WITHDRAWN);
+        verify(uploadIntentRegistry).expireForUser(1L);
     }
 
     @Test
@@ -119,6 +130,12 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> userService.withdraw(1L))
                 .isInstanceOf(WithdrawalAlreadyProcessedException.class);
-        verifyNoInteractions(userWriter, userSessionRevoker, processingConsentLedger);
+        verifyNoInteractions(
+                userWriter,
+                userSessionRevoker,
+                processingConsentLedger,
+                recordingDeletionScheduler,
+                uploadIntentRegistry
+        );
     }
 }

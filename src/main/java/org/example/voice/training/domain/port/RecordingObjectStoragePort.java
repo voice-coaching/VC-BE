@@ -24,4 +24,6 @@ public interface RecordingObjectStoragePort {
             String mimeType,
             long fileSizeBytes
     );
+
+    void deleteObject(Long userId, Long sessionId, String objectKey);
 }

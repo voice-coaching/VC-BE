@@ -293,7 +293,7 @@ Content-Type: application/json
 - Error cases: See common error codes
 
 ### DELETE /api/training-sessions/{sessionId}/recordings/{recordingId}
-- Description: 녹음 시도 삭제 - 재녹음으로 버린 파일을 DB와 스토리지에서 삭제. 분석 완료 녹음은 정책에 따라 제한
+- Description: 녹음 시도 삭제 - DB soft delete와 durable storage deletion outbox를 같은 transaction에 기록. 분석 완료 녹음은 정책에 따라 제한
 - Auth: Bearer accessToken
 - Path params: `sessionId`, `recordingId`
 - Query params: None

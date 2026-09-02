@@ -396,8 +396,10 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   1. `TrainingSessionService`가 세션 존재와 소유권을 확인한다.
   2. 완료 요청은 선택 녹음의 분석 완료 여부를 확인한다.
   3. 완료 가능한 경우 세션 상태를 COMPLETED로 변경하고 완료 시간을 기록한다.
-  4. 취소 요청은 세션 상태를 CANCELED로 변경한다.
-  5. 삭제 요청은 정책에 따라 DB record와 storage file 삭제 대상 여부를 확인한다.
+  4. 취소 요청은 세션 상태를 CANCELED로 변경하고 활성 동의 receipt를 철회한다.
+  5. 삭제 요청은 DB 참조 순서를 지켜 request outbox, segment, analysis, recording, session을 제거한다.
+  6. 녹음 객체와 만료·미완료 upload intent는 같은 DB transaction에서 `recording_deletion_outbox`에 기록한다.
+  7. 삭제 dispatcher가 owner/session/key를 재검증하고 객체 저장소 삭제를 최대 10회 재시도한다.
 - Validation:
   - session owner 일치 여부
   - 분석 완료 여부
@@ -414,9 +416,11 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 - Retry or recovery:
   - 분석 미완료면 분석 완료 후 다시 완료 요청한다.
   - 취소 후 같은 세션은 되돌리지 않는다.
+  - 객체 삭제는 idempotent하며 실패 시 지수 backoff로 최대 10회 재시도하고, 소진된 row는 `FAILED`로 보존한다.
+  - 등록되지 않은 upload intent는 presigned URL 만료 뒤 sweeper가 자동으로 삭제 대상으로 전환한다.
 - Side effects:
   - 세션 상태와 완료/취소 시간이 갱신된다.
-  - 삭제 API는 DB record 또는 storage 삭제 대상을 만들 수 있다.
+  - 삭제 API는 DB record를 정리하고 storage 객체를 durable 삭제 대상으로 만든다.
 - Related API:
   - `POST /api/training-sessions/{sessionId}/complete`
   - `POST /api/training-sessions/{sessionId}/cancel`
@@ -425,7 +429,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 - Related modules:
   - `training`, `analysis`, `common/storage`
 - Related DB tables:
-  - `training_sessions`, `voice_recordings`, `analysis_results`, `analysis_segments`
+  - `training_sessions`, `voice_recordings`, `recording_upload_intents`, `recording_deletion_outbox`, `analysis_results`, `analysis_segments`, `analysis_request_outbox`
 
 ## 클래스 학습 흐름
 

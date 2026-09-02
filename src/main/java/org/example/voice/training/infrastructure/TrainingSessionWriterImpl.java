@@ -14,6 +14,8 @@ import org.example.voice.training.domain.model.TrainingSessionCancellationData;
 import org.example.voice.training.domain.model.TrainingSessionCompletionData;
 import org.example.voice.training.domain.model.TrainingSessionCreatedData;
 import org.example.voice.training.domain.port.TrainingSessionWriter;
+import org.example.voice.training.domain.port.RecordingDeletionScheduler;
+import org.example.voice.training.domain.type.RecordingDeletionReason;
 import org.example.voice.training.domain.type.TrainingSessionStatus;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
@@ -27,6 +29,7 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     private final PracticeContentJpaRepository practiceContentJpaRepository;
     private final TrainingSessionJpaRepository trainingSessionJpaRepository;
     private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;
+    private final RecordingDeletionScheduler recordingDeletionScheduler;
 
     @Override
     @Transactional
@@ -132,8 +135,15 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
                         session.getUserId()
                 )
                 .stream()
-                .filter(recording -> !recording.getSelected())
-                .forEach(VoiceRecording::delete);
+                .forEach(recording -> {
+                    recording.delete();
+                    recordingDeletionScheduler.schedule(
+                            session.getUserId(),
+                            sessionId,
+                            recording.getAudioUrl(),
+                            RecordingDeletionReason.SESSION_CANCELED
+                    );
+                });
         return new TrainingSessionCancellationData(session.getId(), session.getStatus(), session.getCompletedAt());
     }
 }

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.example.voice.training.controller.dto.TrainingSessionCreateRequestDto;
 import org.example.voice.training.domain.model.TrainingSessionCancellationData;
 import org.example.voice.training.domain.model.TrainingSessionCompletionData;
@@ -26,6 +27,7 @@ public class TrainingSessionService {
     private final TrainingSessionWriter trainingSessionWriter;
     private final TrainingAnalysisReader trainingAnalysisReader;
     private final ProcessingConsentLedger processingConsentLedger;
+    private final RecordingUploadIntentRegistry uploadIntentRegistry;
 
     @Transactional
     public TrainingSessionCreatedData create(TrainingSessionCreateRequestDto request, Long userId) {
@@ -73,6 +75,7 @@ public class TrainingSessionService {
         }
         TrainingSessionCancellationData canceled = trainingSessionWriter.cancel(sessionId);
         processingConsentLedger.revokeForSession(userId, sessionId);
+        uploadIntentRegistry.expireForSession(userId, sessionId);
         return canceled;
     }
 

@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -17,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 class S3PresignedUrlProviderTest {
@@ -80,6 +82,22 @@ class S3PresignedUrlProviderTest {
         assertThatThrownBy(() -> S3ObjectStorageConfiguration.validate(properties))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("object_storage_configuration_invalid");
+    }
+
+    @Test
+    void deletesOnlyAnOwnedCanonicalRecordingKey() {
+        S3PresignedUrlProvider provider = provider();
+        String key = "recordings/users/9/sessions/7/normalized/4adfe173-0691-4e89-b94e-a5c5c5085826.wav";
+
+        provider.deleteObject(9L, 7L, key);
+
+        ArgumentCaptor<DeleteObjectRequest> request = ArgumentCaptor.forClass(DeleteObjectRequest.class);
+        verify(s3Client).deleteObject(request.capture());
+        assertThat(request.getValue().bucket()).isEqualTo("private-recordings");
+        assertThat(request.getValue().key()).isEqualTo(key);
+        assertThatThrownBy(() -> provider.deleteObject(10L, 7L, key))
+                .isInstanceOfSatisfying(BaseException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.RECORDING_ACCESS_DENIED));
     }
 
     private S3PresignedUrlProvider provider() {

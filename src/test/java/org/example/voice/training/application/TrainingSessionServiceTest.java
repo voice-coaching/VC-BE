@@ -5,6 +5,7 @@ import org.example.voice.training.domain.model.TrainingSessionCancellationData;
 import org.example.voice.training.domain.port.TrainingAnalysisReader;
 import org.example.voice.training.domain.port.TrainingSessionReader;
 import org.example.voice.training.domain.port.TrainingSessionWriter;
+import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.example.voice.training.domain.type.TrainingSessionStatus;
 import org.junit.jupiter.api.Test;
 
@@ -23,11 +24,13 @@ class TrainingSessionServiceTest {
         TrainingSessionReader reader = mock(TrainingSessionReader.class);
         TrainingSessionWriter writer = mock(TrainingSessionWriter.class);
         ProcessingConsentLedger consentLedger = mock(ProcessingConsentLedger.class);
+        RecordingUploadIntentRegistry uploadIntentRegistry = mock(RecordingUploadIntentRegistry.class);
         TrainingSessionService service = new TrainingSessionService(
                 reader,
                 writer,
                 mock(TrainingAnalysisReader.class),
-                consentLedger
+                consentLedger,
+                uploadIntentRegistry
         );
         OffsetDateTime canceledAt = OffsetDateTime.now();
         when(reader.findSessionStatus(7L, 9L)).thenReturn(Optional.of(TrainingSessionStatus.ANALYZING));
@@ -39,5 +42,6 @@ class TrainingSessionServiceTest {
 
         assertThat(result.canceledAt()).isEqualTo(canceledAt);
         verify(consentLedger).revokeForSession(9L, 7L);
+        verify(uploadIntentRegistry).expireForSession(9L, 7L);
     }
 }

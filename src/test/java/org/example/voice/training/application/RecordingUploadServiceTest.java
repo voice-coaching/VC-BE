@@ -5,6 +5,7 @@ import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.training.controller.dto.RecordingUploadUrlRequestDto;
 import org.example.voice.training.domain.port.RecordingObjectStoragePort;
 import org.example.voice.training.domain.port.TrainingSessionWriter;
+import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -18,12 +19,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class RecordingUploadServiceTest {
     @Mock private RecordingObjectStoragePort objectStorage;
     @Mock private TrainingSessionService sessions;
     @Mock private TrainingSessionWriter sessionWriter;
+    @Mock private RecordingUploadIntentRegistry uploadIntentRegistry;
 
     @Test
     void acceptsSupportedVideoWithinTheVideoLimit() {
@@ -42,6 +45,14 @@ class RecordingUploadServiceTest {
         var result = service().createUploadUrl(7L, request, 9L);
 
         assertThat(result.objectKey()).isEqualTo(key);
+        verify(uploadIntentRegistry).recordIssued(
+                9L,
+                7L,
+                key,
+                request.mimeType(),
+                request.fileSizeBytes(),
+                result.expiresAt()
+        );
     }
 
     @Test
@@ -66,6 +77,6 @@ class RecordingUploadServiceTest {
     }
 
     private RecordingUploadService service() {
-        return new RecordingUploadService(objectStorage, sessions, sessionWriter);
+        return new RecordingUploadService(objectStorage, sessions, sessionWriter, uploadIntentRegistry);
     }
 }

@@ -73,4 +73,19 @@ public class PresignedUrlProvider implements RecordingObjectStoragePort {
             throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
         }
     }
+
+    @Override
+    public void deleteObject(Long userId, Long sessionId, String objectKey) {
+        String ownerPrefix = "recordings/users/%d/sessions/%d/".formatted(userId, sessionId);
+        if (objectKey == null || !objectKey.startsWith(ownerPrefix)) {
+            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
+        }
+        String relativeKey = objectKey.substring(ownerPrefix.length());
+        if (relativeKey.isBlank()
+                || (relativeKey.contains("/")
+                && !relativeKey.matches("normalized/[0-9a-fA-F-]{36}\\.wav"))) {
+            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
+        }
+        // Development adapter owns no real object store. Validation still prevents cross-owner deletion.
+    }
 }

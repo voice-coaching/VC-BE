@@ -14,6 +14,9 @@ import org.example.voice.user.domain.port.UserWriter;
 import org.example.voice.user.exception.NicknameAlreadyExistsException;
 import org.example.voice.user.exception.UserNotFoundException;
 import org.example.voice.user.exception.WithdrawalAlreadyProcessedException;
+import org.example.voice.training.domain.port.RecordingDeletionScheduler;
+import org.example.voice.training.domain.type.RecordingDeletionReason;
+import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +35,8 @@ public class UserService {
     private final UserSessionRevoker userSessionRevoker;
     private final OnboardingProfileReader onboardingProfileReader;
     private final ProcessingConsentLedger processingConsentLedger;
+    private final RecordingDeletionScheduler recordingDeletionScheduler;
+    private final RecordingUploadIntentRegistry uploadIntentRegistry;
 
     @Transactional(readOnly = true)
     public UserProfile getMyProfile(Long userId) {
@@ -79,6 +84,8 @@ public class UserService {
         userWriter.save(user);
         userSessionRevoker.revokeAll(userId);
         processingConsentLedger.revokeForUser(userId);
+        recordingDeletionScheduler.scheduleAllForUser(userId, RecordingDeletionReason.USER_WITHDRAWN);
+        uploadIntentRegistry.expireForUser(userId);
         return new WithdrawalResult(now);
     }
 

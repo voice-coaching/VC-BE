@@ -3,6 +3,7 @@ package org.example.voice.mypage.infrastructure;
 import jakarta.persistence.EntityManager;
 import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.entity.AnalysisSegment;
+import org.example.voice.analysis.domain.entity.AnalysisRequestOutbox;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.analysis.domain.type.SegmentMatchType;
 import org.example.voice.analysis.domain.type.SegmentResultStatus;
@@ -68,6 +69,11 @@ class MyPagePersistenceAdapterTest {
         set(analysis, "overallScore", new BigDecimal("80")); set(analysis, "pronunciationScore", new BigDecimal("70"));
         set(analysis, "intonationScore", new BigDecimal("90")); set(analysis, "analyzedAt", now);
         entityManager.persist(analysis);
+        entityManager.persist(AnalysisRequestOutbox.pending(
+                java.util.UUID.randomUUID(),
+                analysis,
+                "{\"audioObjectKey\":\"audio\"}"
+        ));
         for (int i = 1; i <= 3; i++) {
             AnalysisSegment segment = construct(AnalysisSegment.class);
             set(segment, "analysisResult", analysis); set(segment, "sequenceNo", i); set(segment, "expectedText", "쌀");
@@ -91,6 +97,9 @@ class MyPagePersistenceAdapterTest {
 
         adapter.deleteHistory(session.getId()); entityManager.flush(); entityManager.clear();
         assertThat(adapter.sessionExists(session.getId())).isFalse();
+        assertThat(entityManager.createQuery(
+                "select count(d) from RecordingDeletionOutbox d", Long.class
+        ).getSingleResult()).isEqualTo(1L);
     }
 
     private <T> T construct(Class<T> type) throws Exception {

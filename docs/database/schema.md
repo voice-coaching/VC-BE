@@ -300,6 +300,46 @@
 | intonation_score | numeric(5,2) | N | - | - | - | 억양 점수 |
 | feedback | varchar(1000) | N | - | - | - | 세부 피드백 |
 
+### recording_upload_intents
+- 목적: presigned URL 발급 후 등록되지 않은 원본 업로드도 만료 시 회수할 수 있게 한다.
+- 해당 모듈: training/storage
+- Migration: `V8__create_recording_upload_intents.sql`
+
+| Column | Type | Required | Default | Index | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- |
+| id | bigint | Y | identity | PK | Y | 업로드 intent ID |
+| user_id | bigint | Y | - | Index | - | 발급 사용자 ID snapshot |
+| training_session_id | bigint | Y | - | Index | - | 발급 세션 ID snapshot |
+| object_key | varchar(1000) | Y | - | - | Y | 발급된 private source object key |
+| mime_type | varchar(100) | Y | - | - | - | 요청 MIME |
+| file_size_bytes | bigint | Y | - | CHECK | - | 요청 바이트 크기 |
+| expires_at | timestamptz | Y | - | Index | - | presigned URL 만료 시각 |
+| status | varchar(20) | Y | - | Index | - | `ISSUED`, `CONSUMED`, `EXPIRED` |
+| created_at | timestamptz | Y | now() | - | - | 발급 시각 |
+| resolved_at | timestamptz | N | - | - | - | 소비 또는 만료 처리 시각 |
+
+### recording_deletion_outbox
+- 목적: DB 변경과 객체 저장소 삭제 사이의 간극을 idempotent 재시도로 해소한다.
+- 해당 모듈: training/storage
+- Migration: `V7__create_recording_deletion_outbox.sql`
+
+| Column | Type | Required | Default | Index | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- |
+| id | bigint | Y | identity | PK | Y | 삭제 작업 ID |
+| user_id | bigint | Y | - | Index | - | key 소유자 ID snapshot |
+| training_session_id | bigint | Y | - | - | - | key 소유 세션 ID snapshot |
+| object_key | varchar(1000) | Y | - | - | Y | 삭제할 private object key |
+| reason | varchar(40) | Y | - | CHECK | - | 삭제 발생 원인 |
+| status | varchar(20) | Y | - | Index | - | `PENDING`, `DELETED`, `FAILED` |
+| attempt_count | integer | Y | 0 | CHECK | - | 객체 삭제 시도 횟수(최대 10) |
+| next_attempt_at | timestamptz | Y | now() | Index | - | 다음 재시도 시각 |
+| last_error_code | varchar(100) | N | - | - | - | 비민감 안정 오류 코드 |
+| created_at | timestamptz | Y | now() | - | - | 삭제 요청 시각 |
+| deleted_at | timestamptz | N | - | - | - | 객체 삭제 완료 시각 |
+
+완료된 upload intent와 삭제 outbox는 30일 뒤 제거한다. 삭제 재시도 소진 row는 운영자
+복구 근거로 보존하며 자동 삭제하지 않는다.
+
 ## 관계
 
 | From | To | Cardinality | Delete Behavior | Notes |

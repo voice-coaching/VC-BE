@@ -3,6 +3,8 @@ package org.example.voice.mypage.application;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.example.voice.mypage.domain.model.MyPageData;
 import org.example.voice.mypage.domain.port.MyPageReader;
 import org.example.voice.mypage.domain.port.MyPageWriter;
@@ -25,6 +27,8 @@ public class MyPageService {
     private static final int MINIMUM_ATTEMPTS = 3;
     private final MyPageReader reader;
     private final MyPageWriter writer;
+    private final ProcessingConsentLedger processingConsentLedger;
+    private final RecordingUploadIntentRegistry uploadIntentRegistry;
 
     @Transactional(readOnly = true)
     public MyPageData.HistoryPage getHistory(Long userId, String type, String status, LocalDate from,
@@ -43,6 +47,8 @@ public class MyPageService {
     @Transactional
     public void deleteHistory(Long userId, Long sessionId) {
         if (!reader.sessionOwned(userId, sessionId)) throw sessionError(sessionId);
+        processingConsentLedger.revokeForSession(userId, sessionId);
+        uploadIntentRegistry.expireForSession(userId, sessionId);
         writer.deleteHistory(sessionId);
     }
 

@@ -7,6 +7,7 @@ import org.example.voice.training.controller.dto.RecordingRegisterRequestDto;
 import org.example.voice.training.domain.model.NormalizedRecordingData;
 import org.example.voice.training.domain.model.VoiceRecordingRegisteredData;
 import org.example.voice.training.domain.port.RecordingMediaNormalizationPort;
+import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.example.voice.training.domain.port.RecordingObjectStoragePort;
 import org.example.voice.training.domain.port.VoiceRecordingReader;
 import org.example.voice.training.domain.port.VoiceRecordingWriter;
@@ -35,6 +36,7 @@ class VoiceRecordingServiceTest {
     @Mock private RecordingObjectStoragePort objectStorage;
     @Mock private RecordingMediaNormalizationPort normalization;
     @Mock private ProcessingConsentLedger consentLedger;
+    @Mock private RecordingUploadIntentRegistry uploadIntentRegistry;
 
     @Test
     void storesOnlyBackendNormalizedMediaAndMeasuredQuality() {
@@ -58,6 +60,7 @@ class VoiceRecordingServiceTest {
         verify(objectStorage).assertUploadedObject(
                 9L, 7L, request.objectKey(), request.mimeType(), request.fileSizeBytes()
         );
+        verify(uploadIntentRegistry).markConsumed(9L, 7L, request.objectKey());
         verify(writer).register(7L, normalized);
     }
 
@@ -133,7 +136,15 @@ class VoiceRecordingServiceTest {
     }
 
     private VoiceRecordingService service() {
-        return new VoiceRecordingService(reader, writer, sessions, objectStorage, normalization, consentLedger);
+        return new VoiceRecordingService(
+                reader,
+                writer,
+                sessions,
+                objectStorage,
+                normalization,
+                consentLedger,
+                uploadIntentRegistry
+        );
     }
 
     private static RecordingRegisterRequestDto audioRequest() {

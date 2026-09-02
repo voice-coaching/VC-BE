@@ -51,6 +51,8 @@ public enum ErrorCode {
     AUDIO_FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "업로드 가능한 녹음 파일 크기를 초과했습니다."),
     VIDEO_PROCESSING_CONSENT_REQUIRED(HttpStatus.BAD_REQUEST, "얼굴 영상 처리에 대한 명시적 동의가 필요합니다."),
     UPLOADED_OBJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "업로드된 음성 파일을 찾을 수 없습니다."),
+    UPLOAD_INTENT_NOT_FOUND(HttpStatus.CONFLICT, "백엔드가 발급한 유효한 업로드 요청을 찾을 수 없습니다."),
+    UPLOAD_INTENT_NOT_ACTIVE(HttpStatus.CONFLICT, "이미 완료되었거나 만료된 업로드 요청입니다."),
     RECORDING_ALREADY_REGISTERED(HttpStatus.CONFLICT, "이미 등록된 음성 파일입니다."),
     RECORDING_NOT_FOUND(HttpStatus.NOT_FOUND, "녹음 파일을 찾을 수 없습니다."),
     RECORDING_QUALITY_FAILED(HttpStatus.CONFLICT, "음질 검사를 통과하지 못한 녹음입니다."),
