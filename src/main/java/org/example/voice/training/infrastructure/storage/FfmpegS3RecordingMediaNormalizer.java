@@ -16,6 +16,9 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
@@ -108,16 +111,25 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
         boolean sourceDownloaded = false;
         boolean normalizedUploaded = false;
         boolean visualUploaded = false;
+        SourceObjectInspection sourceInspection = null;
         RuntimeException failure = null;
         try {
-            s3Client.getObject(
-                    GetObjectRequest.builder()
-                            .bucket(storage.getBucket())
-                            .key(sourceObjectKey)
-                            .build(),
+            sourceInspection = inspectSourceObject(
+                    sourceObjectKey, declaredMimeType, declaredFileSizeBytes
+            );
+            GetObjectRequest.Builder getRequest = GetObjectRequest.builder()
+                    .bucket(storage.getBucket())
+                    .key(sourceObjectKey)
+                    .ifMatch(sourceInspection.eTag());
+            if (sourceInspection.versionId() != null) {
+                getRequest.versionId(sourceInspection.versionId());
+            }
+            GetObjectResponse download = s3Client.getObject(
+                    getRequest.build(),
                     source
             );
             sourceDownloaded = true;
+            requireSameSourceObject(download, sourceInspection);
             Files.setPosixFilePermissions(source, READ_ONLY_FILE_PERMISSIONS);
             requireRestrictedRegularFile(source, declaredFileSizeBytes, media.getMaximumInputBytes());
             ProbeDocument probe = probe(source);
@@ -199,10 +211,14 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             RuntimeException mandatoryCleanupFailure = null;
             if (sourceDownloaded) {
                 try {
-                    s3Client.deleteObject(DeleteObjectRequest.builder()
+                    DeleteObjectRequest.Builder deleteRequest = DeleteObjectRequest.builder()
                             .bucket(storage.getBucket())
                             .key(sourceObjectKey)
-                            .build());
+                            .ifMatch(sourceInspection.eTag());
+                    if (sourceInspection.versionId() != null) {
+                        deleteRequest.versionId(sourceInspection.versionId());
+                    }
+                    s3Client.deleteObject(deleteRequest.build());
                 } catch (RuntimeException cleanupFailure) {
                     mandatoryCleanupFailure = new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
                 }
@@ -244,6 +260,62 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                 throw mandatoryCleanupFailure;
             }
         }
+    }
+
+    private SourceObjectInspection inspectSourceObject(
+            String objectKey,
+            String declaredMimeType,
+            long declaredFileSizeBytes
+    ) {
+        HeadObjectResponse response = s3Client.headObject(HeadObjectRequest.builder()
+                .bucket(storage.getBucket())
+                .key(objectKey)
+                .build());
+        String eTag = response.eTag();
+        String versionId = normalizeVersionId(response.versionId());
+        if (response.contentLength() == null
+                || response.contentLength() != declaredFileSizeBytes
+                || response.contentType() == null
+                || !response.contentType().equalsIgnoreCase(declaredMimeType)
+                || !isSafeObjectIdentity(eTag)
+                || (versionId != null && !isSafeObjectIdentity(versionId))) {
+            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
+        }
+        return new SourceObjectInspection(
+                eTag,
+                versionId,
+                response.contentLength(),
+                response.contentType()
+        );
+    }
+
+    private static void requireSameSourceObject(
+            GetObjectResponse response,
+            SourceObjectInspection inspection
+    ) {
+        if (response.contentLength() == null
+                || response.contentLength() != inspection.contentLength()
+                || response.contentType() == null
+                || !response.contentType().equalsIgnoreCase(inspection.contentType())
+                || !inspection.eTag().equals(response.eTag())
+                || (inspection.versionId() != null
+                    && !inspection.versionId().equals(response.versionId()))) {
+            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
+        }
+    }
+
+    private static String normalizeVersionId(String versionId) {
+        return versionId == null || versionId.isBlank() || versionId.equals("null")
+                ? null
+                : versionId;
+    }
+
+    private static boolean isSafeObjectIdentity(String value) {
+        return value != null
+                && !value.isBlank()
+                && value.length() <= 1_024
+                && value.indexOf('\r') < 0
+                && value.indexOf('\n') < 0;
     }
 
     @Override
@@ -692,6 +764,14 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             @JsonProperty("codec_name") String codecName,
             @JsonProperty("sample_rate") String sampleRate,
             Integer channels
+    ) {
+    }
+
+    private record SourceObjectInspection(
+            String eTag,
+            String versionId,
+            long contentLength,
+            String contentType
     ) {
     }
 

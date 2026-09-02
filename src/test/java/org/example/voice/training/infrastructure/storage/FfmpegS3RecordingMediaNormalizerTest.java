@@ -19,6 +19,8 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
@@ -71,7 +73,14 @@ class FfmpegS3RecordingMediaNormalizerTest {
                 .putObject(put.capture(), any(RequestBody.class));
         assertThat(put.getAllValues()).extracting(PutObjectRequest::contentType)
                 .containsExactlyInAnyOrder("audio/wav", "video/mp4");
-        verify(s3Client).deleteObject(any(DeleteObjectRequest.class));
+        ArgumentCaptor<GetObjectRequest> get = ArgumentCaptor.forClass(GetObjectRequest.class);
+        verify(s3Client).getObject(get.capture(), any(Path.class));
+        assertThat(get.getValue().ifMatch()).isEqualTo("source-etag");
+        assertThat(get.getValue().versionId()).isEqualTo("source-version");
+        ArgumentCaptor<DeleteObjectRequest> delete = ArgumentCaptor.forClass(DeleteObjectRequest.class);
+        verify(s3Client).deleteObject(delete.capture());
+        assertThat(delete.getValue().ifMatch()).isEqualTo("source-etag");
+        assertThat(delete.getValue().versionId()).isEqualTo("source-version");
         try (var workspaces = Files.list(workspaceRoot())) {
             assertThat(workspaces).isEmpty();
         }
@@ -122,10 +131,23 @@ class FfmpegS3RecordingMediaNormalizerTest {
     }
 
     private void stubStorageDownload(Path source) {
+        when(s3Client.headObject(any(HeadObjectRequest.class))).thenReturn(
+                HeadObjectResponse.builder()
+                        .contentLength(source.toFile().length())
+                        .contentType("video/mp4")
+                        .eTag("source-etag")
+                        .versionId("source-version")
+                        .build()
+        );
         when(s3Client.getObject(any(GetObjectRequest.class), any(Path.class))).thenAnswer(invocation -> {
             Path destination = invocation.getArgument(1);
             Files.copy(source, destination);
-            return GetObjectResponse.builder().contentLength(Files.size(source)).build();
+            return GetObjectResponse.builder()
+                    .contentLength(Files.size(source))
+                    .contentType("video/mp4")
+                    .eTag("source-etag")
+                    .versionId("source-version")
+                    .build();
         });
     }
 

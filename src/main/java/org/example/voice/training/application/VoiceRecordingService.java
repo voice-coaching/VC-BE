@@ -1,6 +1,7 @@
 package org.example.voice.training.application;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.consent.domain.port.ProcessingConsentLedger;
@@ -20,11 +21,14 @@ import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class VoiceRecordingService {
 
     private static final String VIDEO_PROCESSING_CONSENT_POLICY_REVISION =
@@ -78,24 +82,42 @@ public class VoiceRecordingService {
                 request.fileSizeBytes(),
                 visualAuthorization
         );
+        CanonicalMediaRollbackCleanup rollbackCleanup = new CanonicalMediaRollbackCleanup(
+                userId, sessionId, normalized
+        );
+        registerRollbackCleanup(rollbackCleanup);
 
         try {
             uploadIntentRegistry.markConsumed(userId, sessionId, request.objectKey());
             return voiceRecordingWriter.register(sessionId, normalized);
         } catch (RuntimeException error) {
             try {
-                mediaNormalization.deleteNormalizedObject(userId, sessionId, normalized.objectKey());
-                if (normalized.visual() != null) {
-                    mediaNormalization.deleteNormalizedObject(
-                            userId, sessionId, normalized.visual().objectKey()
-                    );
-                }
+                rollbackCleanup.cleanup();
             } catch (RuntimeException cleanupFailure) {
                 cleanupFailure.addSuppressed(error);
                 throw cleanupFailure;
             }
             throw error;
         }
+    }
+
+    private static void registerRollbackCleanup(CanonicalMediaRollbackCleanup cleanup) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_COMMITTED) {
+                    return;
+                }
+                try {
+                    cleanup.cleanup();
+                } catch (RuntimeException ignored) {
+                    log.error("Canonical media rollback cleanup requires operator reconciliation");
+                }
+            }
+        });
     }
 
     public List<VoiceRecordingData> getRecordings(Long sessionId, Long userId) {
@@ -156,6 +178,54 @@ public class VoiceRecordingService {
                         request.videoProcessingConsentPolicyRevision()
                 )) {
             throw new BaseException(ErrorCode.VIDEO_PROCESSING_CONSENT_REQUIRED);
+        }
+    }
+
+    private final class CanonicalMediaRollbackCleanup {
+        private final Long userId;
+        private final Long sessionId;
+        private final NormalizedRecordingData normalized;
+        private boolean completed;
+
+        private CanonicalMediaRollbackCleanup(
+                Long userId,
+                Long sessionId,
+                NormalizedRecordingData normalized
+        ) {
+            this.userId = userId;
+            this.sessionId = sessionId;
+            this.normalized = normalized;
+        }
+
+        private synchronized void cleanup() {
+            if (completed) {
+                return;
+            }
+            RuntimeException failure = null;
+            try {
+                mediaNormalization.deleteNormalizedObject(
+                        userId, sessionId, normalized.objectKey()
+                );
+            } catch (RuntimeException error) {
+                failure = error;
+            }
+            if (normalized.visual() != null) {
+                try {
+                    mediaNormalization.deleteNormalizedObject(
+                            userId, sessionId, normalized.visual().objectKey()
+                    );
+                } catch (RuntimeException error) {
+                    if (failure == null) {
+                        failure = error;
+                    } else {
+                        failure.addSuppressed(error);
+                    }
+                }
+            }
+            if (failure != null) {
+                throw failure;
+            }
+            completed = true;
         }
     }
 }

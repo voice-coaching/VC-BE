@@ -5,6 +5,7 @@ import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.training.controller.dto.RecordingRegisterRequestDto;
 import org.example.voice.training.domain.model.NormalizedRecordingData;
+import org.example.voice.training.domain.model.NormalizedVisualData;
 import org.example.voice.training.domain.model.VoiceRecordingRegisteredData;
 import org.example.voice.consent.domain.model.ProcessingConsentReceipt;
 import org.example.voice.training.domain.port.RecordingMediaNormalizationPort;
@@ -17,9 +18,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -152,6 +156,40 @@ class VoiceRecordingServiceTest {
         verify(normalization).deleteNormalizedObject(9L, 7L, normalized.objectKey());
     }
 
+    @Test
+    void deletesEveryCanonicalObjectWhenTransactionRollsBackAfterServiceReturns() {
+        RecordingRegisterRequestDto request = audioRequest();
+        NormalizedRecordingData normalized = normalizedWithVisual();
+        when(normalization.normalize(
+                9L, 7L, request.objectKey(), request.mimeType(), request.fileSizeBytes(), null
+        )).thenReturn(normalized);
+        when(writer.register(7L, normalized)).thenReturn(
+                new VoiceRecordingRegisteredData(
+                        50L,
+                        1,
+                        RecordingQualityStatus.PASS,
+                        false,
+                        OffsetDateTime.now()
+                )
+        );
+
+        TransactionSynchronizationManager.initSynchronization();
+        List<TransactionSynchronization> synchronizations;
+        try {
+            service().register(7L, request, 9L);
+            synchronizations = TransactionSynchronizationManager.getSynchronizations();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        assertThat(synchronizations).hasSize(1);
+        synchronizations.getFirst().afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+        verify(normalization).deleteNormalizedObject(9L, 7L, normalized.objectKey());
+        verify(normalization).deleteNormalizedObject(
+                9L, 7L, normalized.visual().objectKey()
+        );
+    }
+
     private VoiceRecordingService service() {
         return new VoiceRecordingService(
                 reader,
@@ -185,6 +223,27 @@ class VoiceRecordingServiceTest {
                 RecordingQualityStatus.PASS,
                 BigDecimal.valueOf(75),
                 null
+        );
+    }
+
+    private static NormalizedRecordingData normalizedWithVisual() {
+        return new NormalizedRecordingData(
+                "recordings/analysis-audio/00000000-0000-0000-0000-000000000001.wav",
+                "audio/wav",
+                32_044L,
+                1_000,
+                "a".repeat(64),
+                RecordingQualityStatus.PASS,
+                BigDecimal.valueOf(75),
+                null,
+                new NormalizedVisualData(
+                        "recordings/analysis-video/00000000-0000-0000-0000-000000000002.mp4",
+                        "video/mp4",
+                        64_000L,
+                        "b".repeat(64),
+                        "c".repeat(64),
+                        "voice-video-processing-consent-v1"
+                )
         );
     }
 }

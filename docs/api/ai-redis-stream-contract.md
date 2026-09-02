@@ -192,7 +192,11 @@ Before this payload exists, VC-BE verifies that the upload key belongs to the
 authenticated user and session, probes the real container and codecs, extracts exactly
 one audio stream, writes 16 kHz mono signed PCM WAV, performs technical audio QC,
 stores it under an opaque backend-only key, calculates `audioSha256`, and deletes
-the client-uploaded source. For consented video, VC-BE also strips container metadata,
+the client-uploaded source. The normalizer binds its source GET and DELETE to the ETag
+and optional VersionId observed immediately before download, so a replaced upload fails
+closed and is not accidentally deleted. A database rollback after canonical upload
+triggers best-effort cleanup of every unregistered canonical audio/video object. For
+consented video, VC-BE also strips container metadata,
 canonicalizes the media to MP4 H.264/HEVC plus AAC, stores it under a second opaque
 key, and binds its digest, size, MIME and face-consent receipt into the request.
 MP4/QuickTime accepts H.264 or HEVC with AAC; WebM video accepts VP8 or VP9 with
@@ -221,7 +225,8 @@ expired window, a TTL over ten minutes, a policy mismatch, missing cleanup, or e
 remote egress fail before object storage access. Legacy request v1-v3 and grant v1-v2 are unsupported.
 
 The AI worker uses a restricted object-storage adapter for the configured bucket and
-must verify the key, MIME type, registered size, locally calculated digest against
+must inspect each object, condition the streaming GET on its ETag and optional VersionId,
+verify the returned object identity, key, MIME type, registered size, locally calculated digest against
 `audioSha256`, and cleanup
 policy. VC-BE rejects a legacy URL or traversal-like key before publishing; the
 request transaction rolls back instead of leaving a stranded pending analysis. A

@@ -149,8 +149,10 @@ MEDIA_NORMALIZATION_MAXIMUM_DURATION_MS=180000
 Stream 분석이 켜져 있는데 실제 S3 호환 저장소 또는 서명 설정이 빠지면 VC-BE는
 개발용 URL로 대체하지 않고 기동에 실패한다. SDK 자격 증명은 배포 환경의 기본
 credential chain으로 주입하며 `.env`나 문서에 값을 기록하지 않는다.
-VC-BE storage role은 owner-bound upload presign/HEAD 외에 원본 GET, canonical WAV PUT,
-처리 원본 및 실패 canonical 객체 DELETE 권한이 필요하다. 클라이언트는 normalized
+VC-BE storage role은 owner-bound upload presign/HEAD 외에 조건부 원본 GET, canonical
+WAV/MP4 PUT, 조건부 처리 원본 DELETE 및 rollback canonical 객체 DELETE 권한이 필요하다.
+배포 전 사용하는 S3 호환 구현이 ETag 기반 `If-Match` GET/DELETE와 VersionId를 지원하는지
+검증한다. 클라이언트는 normalized
 prefix에 대한 PUT 권한을 받지 않는다. ffmpeg/ffprobe는 고정된 절대 경로의 검토된
 binary를 사용하고 workspace root는 서비스 계정만 접근할 수 있어야 한다.
 

@@ -267,10 +267,13 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   6. 업로드 완료 후 `VoiceRecordingService`가 objectKey의 사용자·세션 소유권을 검증한다.
   7. 영상이면 얼굴 영상 처리 동의를 먼저 확인하고, backend normalizer가 실제
      container/codec을 probe한 뒤 단일 audio stream을 16 kHz mono PCM WAV로 추출한다.
+     normalizer는 HEAD에서 확인한 ETag/VersionId를 GET과 원본 DELETE에 조건으로 걸어
+     검사·다운로드·삭제 사이에 교체된 객체를 처리하거나 지우지 않는다.
   8. backend가 canonical WAV의 duration, SHA-256, 음량·speech/clipping 기반 기술 QC를
      계산하고 backend-only key로 저장한 다음 client upload 원본을 삭제한다.
-  9. 측정된 metadata와 terminal quality status로 녹음을 등록한다. DB 실패 시 canonical
-     객체도 삭제한다.
+  9. 측정된 metadata와 terminal quality status로 녹음을 등록한다. 메서드 내부 DB 오류뿐
+     아니라 트랜잭션 커밋 rollback에서도 등록되지 않은 canonical audio/video 객체를 모두
+     보상 삭제한다.
   10. 사용자는 녹음 목록을 조회하고 `PASS` 녹음만 최종 선택한다.
 - Validation:
   - contentId 필수
