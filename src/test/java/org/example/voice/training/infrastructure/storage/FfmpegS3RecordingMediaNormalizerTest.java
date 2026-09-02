@@ -8,6 +8,7 @@ import org.example.voice.training.domain.model.VisualProcessingAuthorizationData
 import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -60,7 +61,7 @@ class FfmpegS3RecordingMediaNormalizerTest {
     void parsesSupportedMp4AndStoresCanonicalAudioWithDigest() throws Exception {
         assumeFfmpeg();
         Path source = createVideo("libx264");
-        stubStorageDownload(source);
+        stubStorageDownload(source, "video/mp4");
         when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                 .thenReturn(PutObjectResponse.builder().build());
         when(s3Client.deleteObject(any(DeleteObjectRequest.class)))
@@ -104,10 +105,44 @@ class FfmpegS3RecordingMediaNormalizerTest {
     }
 
     @Test
+    void normalizesHevcQuickTimeForTheCanonicalAiVideoContract() throws Exception {
+        assertSupportedVideo(
+                createVideo("hevc-mov", ".mov", "libx265", "aac", "mov"),
+                "video/quicktime"
+        );
+    }
+
+    @Test
+    void normalizesVp8VorbisWebmForTheCanonicalAiVideoContract() throws Exception {
+        assertSupportedVideo(
+                createVideo("vp8-vorbis", ".webm", "libvpx", "libvorbis", "webm"),
+                "video/webm"
+        );
+    }
+
+    @Test
+    void normalizesVp9OpusWebmForTheCanonicalAiVideoContract() throws Exception {
+        assertSupportedVideo(
+                createVideo("vp9-opus", ".webm", "libvpx-vp9", "libopus", "webm"),
+                "video/webm"
+        );
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "VC_BE_PRIVATE_MEDIA_SAMPLE", matches = ".+")
+    void normalizesAnApprovedPrivateDeviceCaptureWithoutCommittingIt() throws Exception {
+        Path source = Path.of(System.getenv("VC_BE_PRIVATE_MEDIA_SAMPLE"))
+                .toRealPath(java.nio.file.LinkOption.NOFOLLOW_LINKS);
+        assertThat(Files.isRegularFile(source, java.nio.file.LinkOption.NOFOLLOW_LINKS)).isTrue();
+
+        assertSupportedVideo(source, "video/mp4");
+    }
+
+    @Test
     void rejectsMp4WithUnapprovedVideoCodecBeforeUpload() throws Exception {
         assumeFfmpeg();
         Path source = createVideo("mpeg4");
-        stubStorageDownload(source);
+        stubStorageDownload(source, "video/mp4");
 
         assertThatThrownBy(() -> normalizer().normalize(
                 9L,
@@ -147,11 +182,41 @@ class FfmpegS3RecordingMediaNormalizerTest {
         );
     }
 
-    private void stubStorageDownload(Path source) {
+    private void assertSupportedVideo(Path source, String declaredMimeType) throws Exception {
+        assumeFfmpeg();
+        stubStorageDownload(source, declaredMimeType);
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenReturn(PutObjectResponse.builder().build());
+        when(s3Client.deleteObject(any(DeleteObjectRequest.class)))
+                .thenReturn(DeleteObjectResponse.builder().build());
+
+        NormalizedRecordingData normalized = normalizer().normalize(
+                9L,
+                7L,
+                "recordings/users/9/sessions/7/source" + extension(source),
+                declaredMimeType,
+                Files.size(source),
+                visualAuthorization()
+        );
+
+        assertThat(normalized.mimeType()).isEqualTo("audio/wav");
+        assertThat(normalized.durationMs()).isBetween(
+                mediaProperties().getMinimumDurationMs(),
+                mediaProperties().getMaximumDurationMs()
+        );
+        assertThat(normalized.visual()).isNotNull();
+        assertThat(normalized.visual().mimeType()).isEqualTo("video/mp4");
+        assertThat(normalized.visual().visualSha256()).matches("[0-9a-f]{64}");
+        assertThat(normalized.visual().consentReceiptSha256()).isEqualTo("f".repeat(64));
+        verify(s3Client, org.mockito.Mockito.times(2))
+                .putObject(any(PutObjectRequest.class), any(RequestBody.class));
+    }
+
+    private void stubStorageDownload(Path source, String mimeType) {
         when(s3Client.headObject(any(HeadObjectRequest.class))).thenReturn(
                 HeadObjectResponse.builder()
                         .contentLength(source.toFile().length())
-                        .contentType("video/mp4")
+                        .contentType(mimeType)
                         .eTag("source-etag")
                         .versionId("source-version")
                         .build()
@@ -161,7 +226,7 @@ class FfmpegS3RecordingMediaNormalizerTest {
             Files.copy(source, destination);
             return GetObjectResponse.builder()
                     .contentLength(Files.size(source))
-                    .contentType("video/mp4")
+                    .contentType(mimeType)
                     .eTag("source-etag")
                     .versionId("source-version")
                     .build();
@@ -169,24 +234,51 @@ class FfmpegS3RecordingMediaNormalizerTest {
     }
 
     private Path createVideo(String codec) throws Exception {
-        Path output = temporaryDirectory.resolve(codec + ".mp4");
-        Process process = new ProcessBuilder(
+        return createVideo(codec, ".mp4", codec, "aac", "mp4");
+    }
+
+    private Path createVideo(
+            String name,
+            String extension,
+            String videoCodec,
+            String audioCodec,
+            String format
+    ) throws Exception {
+        assumeFfmpeg();
+        Path output = temporaryDirectory.resolve(name + extension);
+        java.util.ArrayList<String> command = new java.util.ArrayList<>(java.util.List.of(
                 "/usr/bin/ffmpeg",
                 "-nostdin",
                 "-hide_banner",
                 "-loglevel", "error",
                 "-f", "lavfi",
-                "-i", "color=c=black:s=64x64:d=1",
+                "-i", "testsrc2=size=320x240:rate=25:duration=1",
                 "-f", "lavfi",
-                "-i", "sine=frequency=1000:duration=1",
-                "-c:v", codec,
+                "-i", "sine=frequency=1000:sample_rate=48000:duration=1",
+                "-c:v", videoCodec,
                 "-pix_fmt", "yuv420p",
-                "-c:a", "aac",
+                "-threads", "1"
+        ));
+        if ("libx265".equals(videoCodec)) {
+            command.addAll(java.util.List.of(
+                    "-tag:v", "hvc1",
+                    "-x265-params", "pools=1:frame-threads=1:log-level=error"
+            ));
+        }
+        command.addAll(java.util.List.of(
+                "-c:a", audioCodec,
                 "-shortest",
+                "-f", format,
                 output.toString()
-        ).start();
+        ));
+        Process process = new ProcessBuilder(command).start();
         assertThat(process.waitFor()).isZero();
         return output;
+    }
+
+    private static String extension(Path path) {
+        String name = path.getFileName().toString();
+        return name.substring(name.lastIndexOf('.'));
     }
 
     private ObjectStorageProperties storageProperties() {

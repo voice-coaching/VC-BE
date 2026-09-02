@@ -173,6 +173,19 @@ root filesystem은 read-only로 두며 media workspace만 쓰기 가능하게 mo
 Recording deletion dispatcher는 객체 하나마다 별도 DB transaction을 사용하므로 느린 S3
 삭제 하나가 전체 100개 batch의 lock과 rollback 범위를 확장하지 않는다.
 
+배포 이미지의 실제 ffmpeg build에 대해 합성 H.264/AAC MP4, HEVC/AAC MOV,
+VP8/Vorbis WebM, VP9/Opus WebM matrix를 실행한다. 승인된 비공개 기기 표본은 Git이나
+이미지에 복사하지 않고 다음 opt-in test에 절대 경로로만 주입한다.
+
+```bash
+VC_BE_PRIVATE_MEDIA_SAMPLE=/private/path/capture.mp4 ./gradlew test \
+  --tests org.example.voice.training.infrastructure.storage.FfmpegS3RecordingMediaNormalizerTest
+```
+
+이 검사는 원본을 수정하거나 외부 저장소에 쓰지 않으며 mock S3 경계 안에서 probe,
+canonical video/audio 생성, digest, cleanup을 실행한다. 한 표본 통과를 전체 iOS/Android
+기기·OS·촬영 설정 호환성으로 해석하지 않는다.
+
 Spring Boot 애플리케이션을 EC2 호스트에서 JAR로 직접 실행하면 `REDIS_HOST=localhost`를 사용한다.
 
 Spring Boot 애플리케이션을 Docker Compose 내부 서비스로 함께 실행하는 경우에는 Redis 컨테이너 이름을 기준으로 `REDIS_HOST=redis`를 사용한다.

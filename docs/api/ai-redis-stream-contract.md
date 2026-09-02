@@ -208,6 +208,14 @@ MP4/QuickTime accepts H.264 or HEVC with AAC; WebM video accepts VP8 or VP9 with
 Opus or Vorbis and is transcoded to the canonical MP4 contract. Unsupported or
 ambiguous streams fail closed.
 
+The executable compatibility matrix covers H.264/AAC MP4, HEVC/AAC QuickTime,
+VP8/Vorbis WebM and VP9/Opus WebM. Every accepted input is re-probed after
+canonicalization as a single H.264-or-HEVC video stream plus one AAC audio stream
+inside MP4. An opt-in test accepts `VC_BE_PRIVATE_MEDIA_SAMPLE` so an approved local
+device capture can traverse the same S3-stubbed normalizer without copying the media
+into this repository. The current local smoke passed with an HEVC/AAC portrait capture;
+this single sample does not establish broad device compatibility.
+
 The bundled media launcher applies `no_new_privs`, denies network, `io_uring` and
 process-escape syscalls through libseccomp, permits only thread-style clone, and
 sets CPU, address-space, output-file, file-descriptor and core-dump limits before
