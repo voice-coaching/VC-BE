@@ -45,7 +45,10 @@ job messages.
 | `ANALYSIS_RESULT_CONSUMER_NAME` | Y | Unique pod/host instance name. |
 | `ANALYSIS_RESULT_DLQ_STREAM` | Y | Default `analysis:result:dlq:v1`. |
 | `ANALYSIS_CANCELLATION_KEY_PREFIX` | Y | Default `analysis:canceled:v1:`; only an opaque request event UUID is appended. |
+| `ANALYSIS_REQUEST_INDEX_KEY_PREFIX` | Y | Default `analysis:request-index:v1:`; maps one request event to its idempotent Stream ID. |
 | `ANALYSIS_CANCELLATION_OUTBOX_POLL_INTERVAL` | Y | Durable cancellation dispatch interval, default `PT1S`. |
+| `ANALYSIS_RETENTION_AGE` | Y | Minimum terminal DB evidence age before outbox/marker cleanup, default `PT1H`. |
+| `ANALYSIS_RETENTION_POLL_INTERVAL` / `ANALYSIS_RETENTION_BATCH_SIZE` | Y | Cleanup schedule and bounded batch, defaults `PT5M` / `100`. |
 | `ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES` | Y | UTF-8 request/result payload cap, default `65536`. |
 | `ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH` | Y | Approximate result DLQ cap, default `10000`. |
 | `ANALYSIS_PENDING_CLAIM_IDLE` | Y | Minimum pending idle time before reclaim; default `PT5M`. |
@@ -72,9 +75,11 @@ The Redis port is private-network only. Do not open it to the internet, transmit
 Redis URL/password in messages, or use the ordinary cache endpoint for Stream data.
 TLS peer verification remains enabled. A private Redis CA must be installed in the
 JVM trust store supplied to VC-BE; disabling certificate verification is unsupported.
-The Backend Redis ACL needs the existing request/result Stream commands plus `SET`
-for cancellation tombstones. The AI ACL needs `EXISTS` and `EVAL` in addition to its
-Stream commands; `EVAL` performs the final tombstone check and result `XADD` atomically.
+The Backend Redis ACL needs the existing request/result Stream commands plus
+`GET`, `SET`, `DEL`, `XRANGE`, and `EVAL` for request indexing, cancellation and
+retention. The AI ACL needs `EXISTS`, `DEL`, and `EVAL` in addition to its Stream
+commands. Fixed Lua scripts atomically publish/index a request, check cancellation
+before result `XADD`, or combine `XACK` with `XDEL`.
 
 ## Stream ownership
 
@@ -100,9 +105,11 @@ containing UTF-8 JSON. Producer and consumer reject unknown fields and unsupport
 `payload` for deliberate recovery.
 Payload size is measured as UTF-8 bytes before JSON decoding. An oversized result is
 never copied into the DLQ body; only its source Stream ID and stable failure code are
-retained. Result DLQ trimming is approximate and bounded. Request/result Streams are
-not automatically trimmed because deleting a pending or not-yet-persisted message
-would violate at-least-once delivery.
+retained. Result DLQ trimming is approximate and bounded. Request/result Streams do
+not use age- or length-based trimming. The AI worker atomically `XACK`+`XDEL`s a
+request only after its terminal result/DLQ write, and VC-BE atomically `XACK`+`XDEL`s
+a result only after its PostgreSQL transaction commits. This removes acknowledged
+entries without risking pending or unpersisted work.
 VC-BE also rejects an oversized request payload before writing its durable outbox row;
 the dispatcher repeats the check immediately before Redis I/O as defense in depth.
 
@@ -305,6 +312,9 @@ the request; the request remains pending until the worker publishes a terminal
   `analysisId`; a failed result stores stable failure code/reason.
 - `analysis_request_outbox` persists request payloads before Redis I/O. Its final
   dispatch failure changes the matching analysis to `FAILED`.
+- Request publication atomically creates the Stream entry and an opaque event-to-ID
+  index. A retry after an uncertain DB commit returns the same indexed Stream ID
+  instead of publishing duplicate work.
 - Each outbox publish runs in its own bounded DB transaction. Redis failure therefore
   holds at most one outbox row lock for at most the configured command timeout.
 - PostgreSQL is the permanent result store. Redis holds transport messages only; no
@@ -312,6 +322,12 @@ the request; the request remains pending until the worker publishes a terminal
 - Analysis admission takes a pessimistic lock on the owning user row before counting
   PENDING/PROCESSING jobs. This makes the per-user concurrent cap effective across
   backend instances rather than being an in-memory rate limit.
+- The retention sweeper considers only protocol-v1 request outboxes whose analysis
+  and outbox states are terminal and older than `ANALYSIS_RETENTION_AGE`. It verifies
+  that the exact indexed request Stream entry is absent, requires any cancellation
+  outbox to be published, then deletes the request payload row, cancellation row,
+  request index, and tombstone. Legacy rows with no retention protocol marker are
+  deliberately left for reviewed migration rather than guessed safe.
 
 ## Retry, reclaim, and dead letter handling
 
@@ -354,7 +370,8 @@ VC-BE exposes management endpoints on `127.0.0.1:9091` by default:
 
 - `/internal/actuator/health` includes the dedicated analysis Redis readiness check.
 - `/internal/actuator/prometheus` exports bounded-cardinality publish, ingestion,
-  delivery-failure, DLQ, execution-timeout, and cancellation-delivery counters.
+  delivery-failure, DLQ, execution-timeout, cancellation-delivery, and retention
+  cleanup/failure counters.
 
 No user, session, recording, event, object key, payload, or exception is used as a
 metric label or health detail. If the management address is changed from loopback,

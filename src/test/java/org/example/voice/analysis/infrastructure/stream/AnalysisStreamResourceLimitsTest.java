@@ -4,6 +4,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -25,7 +27,7 @@ class AnalysisStreamResourceLimitsTest {
                 new AnalysisStreamMetrics(new SimpleMeterRegistry())
         );
 
-        assertThatThrownBy(() -> publisher.publish("가"))
+        assertThatThrownBy(() -> publisher.publish(UUID.randomUUID(), "가"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("analysis_request_payload_size_invalid");
     }

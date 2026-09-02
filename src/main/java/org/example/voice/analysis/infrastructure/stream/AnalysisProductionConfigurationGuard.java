@@ -30,6 +30,7 @@ public class AnalysisProductionConfigurationGuard {
                 || !hasText(stream.getResultConsumerName())
                 || !hasText(stream.getResultDeadLetterStream())
                 || !validCancellationPrefix(stream.getCancellationKeyPrefix())
+                || !validCancellationPrefix(stream.getRequestIndexKeyPrefix())
                 || stream.getBatchSize() <= 0
                 || stream.getMaxRetries() <= 0
                 || stream.getPendingClaimIdle() == null
@@ -46,7 +47,11 @@ public class AnalysisProductionConfigurationGuard {
                 || stream.getMaximumPayloadBytes() > 1_048_576
                 || stream.getDeadLetterMaximumLength() <= 0
                 || stream.getDeadLetterMaximumLength() > 1_000_000
-                || invalidDuration(stream.getCancellationOutboxPollInterval())) {
+                || invalidDuration(stream.getCancellationOutboxPollInterval())
+                || invalidDuration(stream.getRetentionAge())
+                || invalidDuration(stream.getRetentionPollInterval())
+                || stream.getRetentionBatchSize() <= 0
+                || stream.getRetentionBatchSize() > 10_000) {
             throw new IllegalStateException("analysis_stream_resource_limits_invalid");
         }
         if (stream.getMaxConcurrentPerUser() <= 0

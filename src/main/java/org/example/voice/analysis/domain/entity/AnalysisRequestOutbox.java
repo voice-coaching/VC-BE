@@ -29,6 +29,8 @@ import java.util.UUID;
 @Table(name = "analysis_request_outbox")
 public class AnalysisRequestOutbox {
 
+    public static final int RETENTION_PROTOCOL_VERSION = 1;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -62,6 +64,12 @@ public class AnalysisRequestOutbox {
     @Column(name = "published_at")
     private OffsetDateTime publishedAt;
 
+    @Column(name = "request_stream_id", length = 64)
+    private String requestStreamId;
+
+    @Column(name = "retention_protocol_version")
+    private Integer retentionProtocolVersion;
+
     private AnalysisRequestOutbox(UUID eventId, AnalysisResult analysisResult, String payload) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         this.eventId = eventId.toString();
@@ -71,14 +79,19 @@ public class AnalysisRequestOutbox {
         this.attemptCount = 0;
         this.nextAttemptAt = now;
         this.createdAt = now;
+        this.retentionProtocolVersion = RETENTION_PROTOCOL_VERSION;
     }
 
     public static AnalysisRequestOutbox pending(UUID eventId, AnalysisResult analysisResult, String payload) {
         return new AnalysisRequestOutbox(eventId, analysisResult, payload);
     }
 
-    public void markPublished() {
+    public void markPublished(String streamId) {
+        if (streamId == null || !streamId.matches("[0-9]+-[0-9]+") || streamId.length() > 64) {
+            throw new IllegalArgumentException("analysis request stream ID is invalid");
+        }
         this.status = AnalysisRequestOutboxStatus.PUBLISHED;
+        this.requestStreamId = streamId;
         this.publishedAt = OffsetDateTime.now(ZoneOffset.UTC);
         this.lastErrorCode = null;
     }

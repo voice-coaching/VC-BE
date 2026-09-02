@@ -15,6 +15,9 @@ public interface AnalysisCancellationOutboxJpaRepository
     boolean existsByRequestEventId(String requestEventId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<AnalysisCancellationOutbox> findByRequestEventId(String requestEventId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<AnalysisCancellationOutbox> findFirstByStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(
             AnalysisCancellationOutboxStatus status,
             OffsetDateTime now

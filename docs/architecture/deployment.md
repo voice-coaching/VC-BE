@@ -44,11 +44,12 @@ Management health and Prometheus endpoints bind to `127.0.0.1:9091` by default u
 `MANAGEMENT_SERVER_ADDRESS` is changed to a non-loopback address, security-group and
 network-policy rules must restrict `MANAGEMENT_SERVER_PORT`; it is not a public API.
 
-Do not apply an unconditional `MAXLEN` to the request or result Stream. Before pruning,
-operators must check consumer-group lag and pending entries, preserve the incident
-window, and trim only IDs that every required consumer has ACKed and PostgreSQL has
-persisted. The result DLQ alone uses approximate automatic trimming with
-`ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH`.
+Do not apply an unconditional `MAXLEN` to the request or result Stream. Each service
+atomically deletes its own entry with `XACK` only after its durable handoff completes.
+The Backend retention sweeper then requires terminal PostgreSQL state, a minimum age,
+and absence of the exact indexed request entry before removing DB outboxes, request
+indexes, or cancellation tombstones. The result DLQ alone uses approximate automatic
+trimming with `ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH`.
 
 `scripts/run_analysis_redis_integration.sh`는 digest-pinned 임시 Redis와 합성
 TLS 인증서를 만들고 request XADD, result ingest 후 ACK를 검증한 뒤 모두 제거한다.
@@ -117,7 +118,11 @@ ANALYSIS_REQUEST_STREAM=analysis:request:v1
 ANALYSIS_RESULT_STREAM=analysis:result:v1
 ANALYSIS_RESULT_CONSUMER_NAME=<unique-host-or-pod-name>
 ANALYSIS_CANCELLATION_KEY_PREFIX=analysis:canceled:v1:
+ANALYSIS_REQUEST_INDEX_KEY_PREFIX=analysis:request-index:v1:
 ANALYSIS_CANCELLATION_OUTBOX_POLL_INTERVAL=PT1S
+ANALYSIS_RETENTION_AGE=PT1H
+ANALYSIS_RETENTION_POLL_INTERVAL=PT5M
+ANALYSIS_RETENTION_BATCH_SIZE=100
 ANALYSIS_AUTHORIZATION_KEY_ID=<active-key-id>
 ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64=<secret-manager-value>
 ANALYSIS_CONSENT_POLICY_REVISION=<active-consent-revision>

@@ -20,6 +20,7 @@ import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +36,14 @@ import java.util.Map;
 @Component
 @ConditionalOnProperty(prefix = "analysis.stream", name = "enabled", havingValue = "true")
 public class RedisAnalysisResultConsumer {
+
+    private static final DefaultRedisScript<Long> ACKNOWLEDGE_AND_DELETE = new DefaultRedisScript<>("""
+            local acknowledged = redis.call('XACK', KEYS[1], ARGV[1], ARGV[2])
+            if acknowledged == 1 then
+                redis.call('XDEL', KEYS[1], ARGV[2])
+            end
+            return acknowledged
+            """, Long.class);
 
     private static final String PAYLOAD_FIELD = "payload";
     private static final String DLQ_FAILURE_CODE = "analysis_result_retry_exhausted";
@@ -142,11 +151,7 @@ public class RedisAnalysisResultConsumer {
                 }
                 AnalysisResultIngestionDisposition disposition = ingestionService.ingest(codec.decodeResult(payload));
                 metrics.resultIngested(disposition);
-                stringRedisTemplate.opsForStream().acknowledge(
-                        properties.getResultStream(),
-                        properties.getResultConsumerGroup(),
-                        record.getId()
-                );
+                acknowledge(record.getId());
             } catch (RuntimeException error) {
                 metrics.resultDeliveryFailed();
                 log.warn("analysis result stream record was not acknowledged: streamRecordId={}", record.getId());
@@ -202,12 +207,16 @@ public class RedisAnalysisResultConsumer {
         metrics.resultDeadLettered();
     }
 
-    private void acknowledge(RecordId recordId) {
-        stringRedisTemplate.opsForStream().acknowledge(
-                properties.getResultStream(),
+    void acknowledge(RecordId recordId) {
+        Long acknowledged = stringRedisTemplate.execute(
+                ACKNOWLEDGE_AND_DELETE,
+                List.of(properties.getResultStream()),
                 properties.getResultConsumerGroup(),
-                recordId
+                recordId.getValue()
         );
+        if (!Long.valueOf(1L).equals(acknowledged)) {
+            throw new IllegalStateException("analysis_result_acknowledgement_unconfirmed");
+        }
     }
 
     private AnalysisWorkerResult tryDecode(String payload) {

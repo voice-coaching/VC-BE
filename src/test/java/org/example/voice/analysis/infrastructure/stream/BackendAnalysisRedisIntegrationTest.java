@@ -36,8 +36,12 @@ class BackendAnalysisRedisIntegrationTest {
         StringRedisTemplate redis = configuration.analysisStreamRedisTemplate(connectionFactory);
         redis.afterPropertiesSet();
         AnalysisStreamMetrics metrics = new AnalysisStreamMetrics(new SimpleMeterRegistry());
+        UUID requestEventId = UUID.randomUUID();
         try {
-            new RedisAnalysisRequestPublisher(redis, properties, metrics).publish("{\"synthetic\":true}");
+            new RedisAnalysisRequestPublisher(redis, properties, metrics).publish(
+                    requestEventId,
+                    "{\"synthetic\":true}"
+            );
             List<MapRecord<String, Object, Object>> requests = redis.opsForStream().range(
                     properties.getRequestStream(),
                     org.springframework.data.domain.Range.unbounded()
@@ -65,6 +69,7 @@ class BackendAnalysisRedisIntegrationTest {
             assertThat(redis.opsForStream().pending(
                     properties.getResultStream(), properties.getResultConsumerGroup()
             ).getTotalPendingMessages()).isZero();
+            assertThat(redis.opsForStream().size(properties.getResultStream())).isZero();
 
             properties.setMaximumPayloadBytes(128);
             properties.setMaxRetries(1);
@@ -88,11 +93,13 @@ class BackendAnalysisRedisIntegrationTest {
             assertThat(redis.opsForStream().pending(
                     properties.getResultStream(), properties.getResultConsumerGroup()
             ).getTotalPendingMessages()).isZero();
+            assertThat(redis.opsForStream().size(properties.getResultStream())).isZero();
         } finally {
             redis.delete(List.of(
                     properties.getRequestStream(),
                     properties.getResultStream(),
-                    properties.getResultDeadLetterStream()
+                    properties.getResultDeadLetterStream(),
+                    properties.getRequestIndexKeyPrefix() + requestEventId
             ));
             connectionFactory.destroy();
         }

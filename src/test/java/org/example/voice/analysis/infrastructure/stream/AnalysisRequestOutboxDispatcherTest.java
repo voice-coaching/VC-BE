@@ -12,6 +12,7 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -26,11 +27,14 @@ class AnalysisRequestOutboxDispatcherTest {
     void commitsEachPublishedOutboxRecordInItsOwnTransaction() {
         AnalysisRequestOutboxJpaRepository outbox = mock(AnalysisRequestOutboxJpaRepository.class);
         AnalysisRequestOutbox event = mock(AnalysisRequestOutbox.class);
+        UUID eventId = UUID.randomUUID();
+        when(event.getEventId()).thenReturn(eventId.toString());
         when(event.getPayload()).thenReturn("synthetic-payload");
         when(outbox.findFirstByStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(
                 eq(AnalysisRequestOutboxStatus.PENDING), any(OffsetDateTime.class)
         )).thenReturn(Optional.of(event), Optional.empty());
         RedisAnalysisRequestPublisher publisher = mock(RedisAnalysisRequestPublisher.class);
+        when(publisher.publish(eventId, "synthetic-payload")).thenReturn("1-0");
         PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
         when(transactionManager.getTransaction(any(TransactionDefinition.class)))
                 .thenAnswer(ignored -> new SimpleTransactionStatus());
@@ -44,8 +48,8 @@ class AnalysisRequestOutboxDispatcherTest {
                 transactionManager
         ).dispatchPending();
 
-        verify(publisher).publish("synthetic-payload");
-        verify(event).markPublished();
+        verify(publisher).publish(eventId, "synthetic-payload");
+        verify(event).markPublished("1-0");
         verify(transactionManager, times(2)).commit(any());
     }
 }

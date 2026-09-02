@@ -20,6 +20,8 @@ public class AnalysisStreamMetrics {
     private final Counter executionTimeouts;
     private final Counter cancellationsPublished;
     private final Counter cancellationPublishFailures;
+    private final Counter retentionCleanups;
+    private final Counter retentionFailures;
 
     public AnalysisStreamMetrics(MeterRegistry registry) {
         requestsPublished = registry.counter("voice.analysis.stream.requests.published");
@@ -31,6 +33,8 @@ public class AnalysisStreamMetrics {
         executionTimeouts = registry.counter("voice.analysis.execution.timeouts");
         cancellationsPublished = registry.counter("voice.analysis.cancellations.published");
         cancellationPublishFailures = registry.counter("voice.analysis.cancellations.publish.failures");
+        retentionCleanups = registry.counter("voice.analysis.retention.cleaned");
+        retentionFailures = registry.counter("voice.analysis.retention.failures");
     }
 
     public void requestPublished() {
@@ -67,5 +71,13 @@ public class AnalysisStreamMetrics {
 
     public void cancellationPublishFailed() {
         cancellationPublishFailures.increment();
+    }
+
+    public void retentionCleaned() {
+        retentionCleanups.increment();
+    }
+
+    public void retentionFailed() {
+        retentionFailures.increment();
     }
 }

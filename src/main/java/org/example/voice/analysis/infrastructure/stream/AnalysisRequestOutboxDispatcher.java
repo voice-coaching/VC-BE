@@ -71,8 +71,11 @@ public class AnalysisRequestOutboxDispatcher {
 
     private void dispatch(AnalysisRequestOutbox event) {
         try {
-            redisPublisher.publish(event.getPayload());
-            event.markPublished();
+            String streamId = redisPublisher.publish(
+                    UUID.fromString(event.getEventId()),
+                    event.getPayload()
+            );
+            event.markPublished(streamId);
         } catch (RuntimeException error) {
             metrics.requestPublishFailed();
             log.warn("analysis request stream publish failed: eventId={}", event.getEventId());
