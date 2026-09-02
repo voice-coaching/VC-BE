@@ -30,7 +30,7 @@ jobs:
           cache: gradle
 
       - name: Grant execute permission for scripts
-        run: chmod +x gradlew
+        run: chmod +x gradlew scripts/deploy.sh
 
       - name: Test and build
         run: ./gradlew clean test bootJar --no-daemon
@@ -61,6 +61,7 @@ jobs:
           JAR_PATH: ${{ steps.artifact.outputs.path }}
         run: |
           scp -i ~/.ssh/alpha-deploy "$JAR_PATH" "$EC2_USER@$EC2_HOST:/tmp/alpha-${GITHUB_SHA}.jar"
+          scp -i ~/.ssh/alpha-deploy scripts/deploy.sh "$EC2_USER@$EC2_HOST:/tmp/alpha-deploy-${GITHUB_SHA}.sh"
 
       - name: Activate release
         env:
@@ -68,7 +69,4 @@ jobs:
           EC2_USER: ${{ secrets.EC2_USER }}
         run: |
           ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
-            "sudo /usr/local/sbin/alpha-deploy '$GITHUB_SHA'"
-
-      - name: Verify public HTTPS endpoint
-        run: curl --fail --silent --show-error --retry 5 --retry-delay 3 https://api.voice-coaching.site/v3/api-docs > /dev/null
+            "sudo bash '/tmp/alpha-deploy-${GITHUB_SHA}.sh' '$GITHUB_SHA'; status=\$?; rm -f '/tmp/alpha-deploy-${GITHUB_SHA}.sh'; exit \$status"

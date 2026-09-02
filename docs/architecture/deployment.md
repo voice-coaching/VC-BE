@@ -173,6 +173,19 @@ root filesystem은 read-only로 두며 media workspace만 쓰기 가능하게 mo
 Recording deletion dispatcher는 객체 하나마다 별도 DB transaction을 사용하므로 느린 S3
 삭제 하나가 전체 100개 batch의 lock과 rollback 범위를 확장하지 않는다.
 
+Production workflow는 빌드한 JAR와 해당 commit의 `scripts/deploy.sh`를 함께 전송한다.
+배포 스크립트는 새 symlink를 활성화한 뒤 loopback Actuator health와 public HTTPS
+OpenAPI를 모두 확인한다. Actuator가 dedicated analysis Redis를 `DOWN`으로 보고하거나
+public routing이 실패하면 이전 release symlink를 복원하고 service를 재시작한 뒤 이전
+release health까지 재검증한다. 따라서 `/v3/api-docs` 응답만으로 내부 분석 준비 상태를
+대체하지 않는다.
+
+Backend와 AI worker의 request-v4/result-v3 전환은 각각 독립적으로 자동 배포하지 않는다.
+새 분석 admission을 중지하고 기존 request/result Stream 및 PEL을 drain 또는 명시적으로
+종결한 후 Backend를 배포하고, 같은 계약의 worker image preload/health를 통과시킨 뒤
+admission을 재개한다. 어느 단계에서든 실패하면 이전 Backend release와 이전 worker image를
+각각 복구한 뒤 동일한 health gate를 다시 통과해야 한다.
+
 배포 이미지의 실제 ffmpeg build에 대해 합성 H.264/AAC MP4, HEVC/AAC MOV,
 VP8/Vorbis WebM, VP9/Opus WebM matrix를 실행한다. 승인된 비공개 기기 표본은 Git이나
 이미지에 복사하지 않고 다음 opt-in test에 절대 경로로만 주입한다.
