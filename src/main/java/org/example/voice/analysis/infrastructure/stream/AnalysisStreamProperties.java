@@ -28,6 +28,8 @@ public class AnalysisStreamProperties {
     private String resultConsumerGroup = "backend-analysis-result-workers";
     private String resultConsumerName = "backend-analysis-result-1";
     private String resultDeadLetterStream = "analysis:result:dlq:v1";
+    private String cancellationKeyPrefix = "analysis:canceled:v1:";
+    private Duration cancellationOutboxPollInterval = Duration.ofSeconds(1);
     private Duration outboxPollInterval = Duration.ofSeconds(1);
     private Duration resultPollInterval = Duration.ofSeconds(1);
     private Duration resultBlock = Duration.ofSeconds(1);

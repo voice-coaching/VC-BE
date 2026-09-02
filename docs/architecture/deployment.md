@@ -13,6 +13,7 @@ fail-closed하며 PENDING 결과나 outbox event를 저장하지 않는다.
 - Request stream: `analysis:request:v1`
 - Result stream: `analysis:result:v1`
 - Result DLQ: `analysis:result:dlq:v1`
+- Cancellation tombstone: `analysis:canceled:v1:<opaque-request-event-id>`
 - Result consumer group: `backend-analysis-result-workers`
 - Authentication: Redis ACL plus TLS for cross-host traffic
 - Resource bounds: 5-second connect/command timeouts, 64 KiB payload cap, bounded result DLQ
@@ -28,9 +29,10 @@ payloads, ACK timing, reclaim and retry policy.
 
 The timeout must exceed the approved worst-case worker wall time plus queue and result
 ingestion delay. Lowering it during a backlog can deliberately fail valid jobs, so
-change it only after checking Redis group lag and pending counts. A session cancel or
-timeout makes the DB generation terminal; later Stream delivery is harmless and is
-ACKed without restoring the result.
+change it only after checking Redis group lag and pending counts. A session cancel,
+history deletion, user withdrawal, or timeout makes the DB generation terminal and
+persists a cancellation outbox record. Its Redis tombstone stops or skips the matching
+AI generation; later Stream delivery is ACKed without restoring the result.
 
 Redis TLS certificate verification is mandatory. Install a private CA through the JVM
 trust store (`-Djavax.net.ssl.trustStore=...`) mounted from the deployment secret
@@ -114,6 +116,8 @@ ANALYSIS_REDIS_SSL_ENABLED=true
 ANALYSIS_REQUEST_STREAM=analysis:request:v1
 ANALYSIS_RESULT_STREAM=analysis:result:v1
 ANALYSIS_RESULT_CONSUMER_NAME=<unique-host-or-pod-name>
+ANALYSIS_CANCELLATION_KEY_PREFIX=analysis:canceled:v1:
+ANALYSIS_CANCELLATION_OUTBOX_POLL_INTERVAL=PT1S
 ANALYSIS_AUTHORIZATION_KEY_ID=<active-key-id>
 ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64=<secret-manager-value>
 ANALYSIS_CONSENT_POLICY_REVISION=<active-consent-revision>

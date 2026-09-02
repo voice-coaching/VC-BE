@@ -3,13 +3,15 @@ package org.example.voice.analysis.infrastructure;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.port.AnalysisCancellation;
-import org.example.voice.analysis.domain.type.AnalysisRequestOutboxStatus;
+import org.example.voice.analysis.domain.port.AnalysisCancellationSignal;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.analysis.infrastructure.cache.AnalysisCacheNames;
 import org.example.voice.training.infrastructure.AnalysisResultJpaRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Repository;
+
+import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
@@ -21,6 +23,7 @@ public class JpaAnalysisCancellation implements AnalysisCancellation {
     private final AnalysisResultJpaRepository resultRepository;
     private final AnalysisRequestOutboxJpaRepository outboxRepository;
     private final AnalysisSegmentJpaRepository segmentRepository;
+    private final AnalysisCancellationSignal cancellationSignal;
 
     @Override
     @Caching(evict = {
@@ -29,10 +32,20 @@ public class JpaAnalysisCancellation implements AnalysisCancellation {
             @CacheEvict(cacheNames = AnalysisCacheNames.SEGMENTS, allEntries = true)
     })
     public void cancelForSession(Long sessionId) {
-        for (AnalysisResult result : resultRepository.findCancelableForUpdate(sessionId, AnalysisStatus.FAILED)) {
-            outboxRepository.findByAnalysisResultIdAndStatus(
-                    result.getId(), AnalysisRequestOutboxStatus.PENDING
-            ).forEach(outbox -> outbox.cancelPending(CANCELED_CODE));
+        cancel(resultRepository.findCancelableForUpdate(sessionId, AnalysisStatus.FAILED));
+    }
+
+    @Override
+    public void cancelForUser(Long userId) {
+        cancel(resultRepository.findCancelableForUserForUpdate(userId, AnalysisStatus.FAILED));
+    }
+
+    private void cancel(java.util.List<AnalysisResult> results) {
+        for (AnalysisResult result : results) {
+            outboxRepository.findByAnalysisResultIdOrderByIdAsc(result.getId()).forEach(outbox -> {
+                outbox.cancelPending(CANCELED_CODE);
+                cancellationSignal.schedule(UUID.fromString(outbox.getEventId()));
+            });
             segmentRepository.deleteByAnalysisResultId(result.getId());
             result.cancel(CANCELED_CODE, CANCELED_REASON);
         }

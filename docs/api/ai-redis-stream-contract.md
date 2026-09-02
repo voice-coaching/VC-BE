@@ -44,6 +44,8 @@ job messages.
 | `ANALYSIS_RESULT_CONSUMER_GROUP` | Y | Default `backend-analysis-result-workers`. |
 | `ANALYSIS_RESULT_CONSUMER_NAME` | Y | Unique pod/host instance name. |
 | `ANALYSIS_RESULT_DLQ_STREAM` | Y | Default `analysis:result:dlq:v1`. |
+| `ANALYSIS_CANCELLATION_KEY_PREFIX` | Y | Default `analysis:canceled:v1:`; only an opaque request event UUID is appended. |
+| `ANALYSIS_CANCELLATION_OUTBOX_POLL_INTERVAL` | Y | Durable cancellation dispatch interval, default `PT1S`. |
 | `ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES` | Y | UTF-8 request/result payload cap, default `65536`. |
 | `ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH` | Y | Approximate result DLQ cap, default `10000`. |
 | `ANALYSIS_PENDING_CLAIM_IDLE` | Y | Minimum pending idle time before reclaim; default `PT5M`. |
@@ -70,6 +72,9 @@ The Redis port is private-network only. Do not open it to the internet, transmit
 Redis URL/password in messages, or use the ordinary cache endpoint for Stream data.
 TLS peer verification remains enabled. A private Redis CA must be installed in the
 JVM trust store supplied to VC-BE; disabling certificate verification is unsupported.
+The Backend Redis ACL needs the existing request/result Stream commands plus `SET`
+for cancellation tombstones. The AI ACL needs `EXISTS` and `EVAL` in addition to its
+Stream commands; `EVAL` performs the final tombstone check and result `XADD` atomically.
 
 ## Stream ownership
 
@@ -79,6 +84,14 @@ JVM trust store supplied to VC-BE; disabling certificate verification is unsuppo
 | `analysis:result:v1` | intelligentAI worker | `backend-analysis-result-workers` | VC-BE result consumer | VC-BE after DB transaction commits |
 | `analysis:request:dlq:v1` | intelligentAI worker | operator-only | restricted operator tooling | n/a |
 | `analysis:result:dlq:v1` | VC-BE result consumer | operator-only | operator tooling | n/a |
+
+Cancellation is a shared Redis key rather than a consumer-group message because every
+worker must observe it. VC-BE first commits one idempotent row in
+`analysis_cancellation_outbox`, then retries `SET analysis:canceled:v1:<eventId> 1`
+until it succeeds. The tombstone has no TTL: expiring it while an old request remains
+in a Stream or PEL could re-authorize compute after revocation. It is deleted only by
+the DB-aware acknowledged-message retention workflow. The key contains no user,
+session, recording, object, or consent identifier.
 
 Normal request/result Stream entries have exactly one string field, `payload`,
 containing UTF-8 JSON. Producer and consumer reject unknown fields and unsupported
@@ -323,12 +336,17 @@ the request; the request remains pending until the worker publishes a terminal
    operator actions.
 7. A DB sweeper changes a generation that exceeds `ANALYSIS_EXECUTION_TIMEOUT` to
    `FAILED`, prevents an unpublished outbox record from being dispatched, and revokes
-   active processing consent for that session. A result that arrives after that point
+   active processing consent for that session. It also persists a cancellation
+   tombstone outbox row. A result that arrives after that point
    is ACKed as a duplicate and cannot revive the failed generation.
 8. Session cancellation fails and clears every non-failed analysis result, deletes its
    derived segments, and prevents pending outbox dispatch before consent and media are
-   revoked. Cancellation deliberately wins even when a terminal result arrived just
-   before the session transaction acquired the analysis lock.
+   revoked. History deletion and user withdrawal use the same cancellation path.
+   Cancellation schedules tombstones for every previously issued request generation
+   in the aggregate and deliberately wins even when a terminal result arrived just
+   before the session transaction acquired the analysis lock. The AI worker checks a
+   tombstone before work, polls it while the model runs, interrupts the isolated
+   Seungun process when observed, and atomically rechecks it with result publication.
 
 ## Health and metrics
 
@@ -336,7 +354,7 @@ VC-BE exposes management endpoints on `127.0.0.1:9091` by default:
 
 - `/internal/actuator/health` includes the dedicated analysis Redis readiness check.
 - `/internal/actuator/prometheus` exports bounded-cardinality publish, ingestion,
-  delivery-failure, DLQ, and execution-timeout counters.
+  delivery-failure, DLQ, execution-timeout, and cancellation-delivery counters.
 
 No user, session, recording, event, object key, payload, or exception is used as a
 metric label or health detail. If the management address is changed from loopback,

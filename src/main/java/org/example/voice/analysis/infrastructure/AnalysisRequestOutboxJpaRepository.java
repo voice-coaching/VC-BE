@@ -23,4 +23,6 @@ public interface AnalysisRequestOutboxJpaRepository extends JpaRepository<Analys
             Long analysisId,
             AnalysisRequestOutboxStatus status
     );
+
+    List<AnalysisRequestOutbox> findByAnalysisResultIdOrderByIdAsc(Long analysisId);
 }

@@ -3,6 +3,7 @@ package org.example.voice.mypage.application;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.analysis.domain.port.AnalysisCancellation;
 import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.example.voice.mypage.domain.model.MyPageData;
 import org.example.voice.mypage.domain.port.MyPageReader;
@@ -30,13 +31,17 @@ class MyPageServiceTest {
     private MyPageService service;
     private ProcessingConsentLedger processingConsentLedger;
     private RecordingUploadIntentRegistry uploadIntentRegistry;
+    private AnalysisCancellation analysisCancellation;
 
     @BeforeEach void setUp() {
         reader = mock(MyPageReader.class);
         writer = mock(MyPageWriter.class);
         processingConsentLedger = mock(ProcessingConsentLedger.class);
         uploadIntentRegistry = mock(RecordingUploadIntentRegistry.class);
-        service = new MyPageService(reader, writer, processingConsentLedger, uploadIntentRegistry);
+        analysisCancellation = mock(AnalysisCancellation.class);
+        service = new MyPageService(
+                reader, writer, processingConsentLedger, uploadIntentRegistry, analysisCancellation
+        );
     }
 
     @Test void historyDetailDistinguishesMissingAndForbiddenSession() {
@@ -50,6 +55,7 @@ class MyPageServiceTest {
         when(reader.sessionOwned(1L, 9L)).thenReturn(true);
         service.deleteHistory(1L, 9L);
         verify(processingConsentLedger).revokeForSession(1L, 9L);
+        verify(analysisCancellation).cancelForSession(9L);
         verify(uploadIntentRegistry).expireForSession(1L, 9L);
         verify(writer).deleteHistory(9L);
     }

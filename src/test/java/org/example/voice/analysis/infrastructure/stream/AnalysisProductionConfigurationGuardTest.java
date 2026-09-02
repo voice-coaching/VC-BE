@@ -4,6 +4,7 @@ import org.example.voice.training.infrastructure.storage.ObjectStorageProperties
 import org.example.voice.training.infrastructure.storage.MediaNormalizationProperties;
 import org.junit.jupiter.api.Test;
 
+
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -44,6 +45,20 @@ class AnalysisProductionConfigurationGuardTest {
         assertThatThrownBy(() -> new AnalysisProductionConfigurationGuard(storage, media, stream))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("analysis_media_normalization_must_be_enabled");
+    }
+
+    @Test
+    void refusesAnInvalidCancellationTombstonePrefix() {
+        AnalysisStreamProperties stream = validStream();
+        stream.setCancellationKeyPrefix("invalid prefix:");
+        ObjectStorageProperties storage = new ObjectStorageProperties();
+        storage.setEnabled(true);
+        MediaNormalizationProperties media = new MediaNormalizationProperties();
+        media.setEnabled(true);
+
+        assertThatThrownBy(() -> new AnalysisProductionConfigurationGuard(storage, media, stream))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("analysis_stream_configuration_invalid");
     }
 
     private static AnalysisStreamProperties validStream() {

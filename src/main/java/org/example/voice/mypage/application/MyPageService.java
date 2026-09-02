@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.analysis.domain.port.AnalysisCancellation;
 import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.example.voice.mypage.domain.model.MyPageData;
 import org.example.voice.mypage.domain.port.MyPageReader;
@@ -29,6 +30,7 @@ public class MyPageService {
     private final MyPageWriter writer;
     private final ProcessingConsentLedger processingConsentLedger;
     private final RecordingUploadIntentRegistry uploadIntentRegistry;
+    private final AnalysisCancellation analysisCancellation;
 
     @Transactional(readOnly = true)
     public MyPageData.HistoryPage getHistory(Long userId, String type, String status, LocalDate from,
@@ -47,6 +49,7 @@ public class MyPageService {
     @Transactional
     public void deleteHistory(Long userId, Long sessionId) {
         if (!reader.sessionOwned(userId, sessionId)) throw sessionError(sessionId);
+        analysisCancellation.cancelForSession(sessionId);
         processingConsentLedger.revokeForSession(userId, sessionId);
         uploadIntentRegistry.expireForSession(userId, sessionId);
         writer.deleteHistory(sessionId);

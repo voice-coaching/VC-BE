@@ -41,6 +41,18 @@ public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResul
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select a from AnalysisResult a
+            where a.recording.trainingSession.userId = :userId
+              and a.status <> :failedStatus
+            order by a.id
+            """)
+    List<AnalysisResult> findCancelableForUserForUpdate(
+            @Param("userId") Long userId,
+            @Param("failedStatus") AnalysisStatus failedStatus
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select a from AnalysisResult a
             where a.status in :statuses
               and a.analyzedAt <= :cutoff
             order by a.analyzedAt, a.id

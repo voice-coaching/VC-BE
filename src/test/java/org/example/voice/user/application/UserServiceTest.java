@@ -3,6 +3,7 @@ package org.example.voice.user.application;
 import org.example.voice.onboarding.domain.entity.OnboardingProfile;
 import org.example.voice.onboarding.domain.port.OnboardingProfileReader;
 import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.analysis.domain.port.AnalysisCancellation;
 import org.example.voice.user.domain.entity.User;
 import org.example.voice.user.domain.port.LoginProviderReader;
 import org.example.voice.user.domain.port.UserReader;
@@ -35,6 +36,7 @@ class UserServiceTest {
     private ProcessingConsentLedger processingConsentLedger;
     private RecordingDeletionScheduler recordingDeletionScheduler;
     private RecordingUploadIntentRegistry uploadIntentRegistry;
+    private AnalysisCancellation analysisCancellation;
     private UserService userService;
 
     @BeforeEach
@@ -47,6 +49,7 @@ class UserServiceTest {
         processingConsentLedger = mock(ProcessingConsentLedger.class);
         recordingDeletionScheduler = mock(RecordingDeletionScheduler.class);
         uploadIntentRegistry = mock(RecordingUploadIntentRegistry.class);
+        analysisCancellation = mock(AnalysisCancellation.class);
         userService = new UserService(
                 userReader,
                 userWriter,
@@ -55,7 +58,8 @@ class UserServiceTest {
                 onboardingProfileReader,
                 processingConsentLedger,
                 recordingDeletionScheduler,
-                uploadIntentRegistry
+                uploadIntentRegistry,
+                analysisCancellation
         );
     }
 
@@ -117,6 +121,7 @@ class UserServiceTest {
         verify(user).withdraw(result.withdrawnAt());
         verify(userWriter).save(user);
         verify(userSessionRevoker).revokeAll(1L);
+        verify(analysisCancellation).cancelForUser(1L);
         verify(processingConsentLedger).revokeForUser(1L);
         verify(recordingDeletionScheduler).scheduleAllForUser(1L, RecordingDeletionReason.USER_WITHDRAWN);
         verify(uploadIntentRegistry).expireForUser(1L);
@@ -135,7 +140,8 @@ class UserServiceTest {
                 userSessionRevoker,
                 processingConsentLedger,
                 recordingDeletionScheduler,
-                uploadIntentRegistry
+                uploadIntentRegistry,
+                analysisCancellation
         );
     }
 }

@@ -4,6 +4,7 @@ import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.type.AnalysisRequestOutboxStatus;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.analysis.infrastructure.AnalysisRequestOutboxJpaRepository;
+import org.example.voice.analysis.domain.port.AnalysisCancellationSignal;
 import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.training.domain.entity.TrainingSession;
 import org.example.voice.training.domain.entity.VoiceRecording;
@@ -32,7 +33,8 @@ class AnalysisExecutionTimeoutSweeperTest {
         when(session.getUserId()).thenReturn(9L);
         VoiceRecording recording = mock(VoiceRecording.class);
         when(recording.getTrainingSession()).thenReturn(session);
-        AnalysisResult result = AnalysisResult.pending(recording, UUID.randomUUID());
+        UUID requestEventId = UUID.randomUUID();
+        AnalysisResult result = AnalysisResult.pending(recording, requestEventId);
 
         AnalysisResultJpaRepository results = mock(AnalysisResultJpaRepository.class);
         when(results.findStaleForUpdate(
@@ -44,15 +46,19 @@ class AnalysisExecutionTimeoutSweeperTest {
         when(outbox.findByAnalysisResultIdAndStatus(null, AnalysisRequestOutboxStatus.PENDING))
                 .thenReturn(List.of());
         ProcessingConsentLedger consent = mock(ProcessingConsentLedger.class);
+        AnalysisCancellationSignal cancellationSignal = mock(AnalysisCancellationSignal.class);
 
         AnalysisStreamProperties properties = new AnalysisStreamProperties();
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         AnalysisStreamMetrics metrics = new AnalysisStreamMetrics(registry);
-        new AnalysisExecutionTimeoutSweeper(results, outbox, consent, properties, metrics).failStaleAnalyses();
+        new AnalysisExecutionTimeoutSweeper(
+                results, outbox, consent, properties, metrics, cancellationSignal
+        ).failStaleAnalyses();
 
         assertThat(result.getStatus()).isEqualTo(AnalysisStatus.FAILED);
         assertThat(result.getFailureCode()).isEqualTo(AnalysisExecutionTimeoutSweeper.TIMEOUT_CODE);
         verify(consent).revokeForSession(9L, 7L);
+        verify(cancellationSignal).schedule(requestEventId);
         assertThat(registry.get("voice.analysis.execution.timeouts").counter().count()).isEqualTo(1.0);
     }
 }

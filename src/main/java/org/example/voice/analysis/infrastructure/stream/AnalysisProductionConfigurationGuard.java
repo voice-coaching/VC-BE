@@ -29,6 +29,7 @@ public class AnalysisProductionConfigurationGuard {
                 || !hasText(stream.getResultConsumerGroup())
                 || !hasText(stream.getResultConsumerName())
                 || !hasText(stream.getResultDeadLetterStream())
+                || !validCancellationPrefix(stream.getCancellationKeyPrefix())
                 || stream.getBatchSize() <= 0
                 || stream.getMaxRetries() <= 0
                 || stream.getPendingClaimIdle() == null
@@ -44,7 +45,8 @@ public class AnalysisProductionConfigurationGuard {
                 || stream.getMaximumPayloadBytes() <= 0
                 || stream.getMaximumPayloadBytes() > 1_048_576
                 || stream.getDeadLetterMaximumLength() <= 0
-                || stream.getDeadLetterMaximumLength() > 1_000_000) {
+                || stream.getDeadLetterMaximumLength() > 1_000_000
+                || invalidDuration(stream.getCancellationOutboxPollInterval())) {
             throw new IllegalStateException("analysis_stream_resource_limits_invalid");
         }
         if (stream.getMaxConcurrentPerUser() <= 0
@@ -61,5 +63,12 @@ public class AnalysisProductionConfigurationGuard {
 
     private static boolean invalidDuration(java.time.Duration value) {
         return value == null || value.isZero() || value.isNegative();
+    }
+
+    private static boolean validCancellationPrefix(String value) {
+        return value != null
+                && value.length() <= 100
+                && value.endsWith(":")
+                && value.matches("[A-Za-z0-9:_-]+");
     }
 }

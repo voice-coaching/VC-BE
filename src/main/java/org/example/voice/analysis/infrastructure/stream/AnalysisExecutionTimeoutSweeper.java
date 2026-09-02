@@ -5,6 +5,7 @@ import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.type.AnalysisRequestOutboxStatus;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.analysis.infrastructure.AnalysisRequestOutboxJpaRepository;
+import org.example.voice.analysis.domain.port.AnalysisCancellationSignal;
 import org.example.voice.analysis.infrastructure.cache.AnalysisCacheNames;
 import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.training.infrastructure.AnalysisResultJpaRepository;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -33,6 +35,7 @@ public class AnalysisExecutionTimeoutSweeper {
     private final ProcessingConsentLedger consentLedger;
     private final AnalysisStreamProperties properties;
     private final AnalysisStreamMetrics metrics;
+    private final AnalysisCancellationSignal cancellationSignal;
 
     @Scheduled(fixedDelayString = "${analysis.stream.timeout-sweep-interval:PT1M}")
     @Transactional
@@ -49,6 +52,7 @@ public class AnalysisExecutionTimeoutSweeper {
                 PageRequest.of(0, properties.getTimeoutSweepBatchSize())
         );
         for (AnalysisResult result : stale) {
+            cancellationSignal.schedule(UUID.fromString(result.getActiveRequestEventId()));
             outboxRepository.findByAnalysisResultIdAndStatus(
                     result.getId(), AnalysisRequestOutboxStatus.PENDING
             ).forEach(outbox -> outbox.cancelPending(TIMEOUT_CODE));

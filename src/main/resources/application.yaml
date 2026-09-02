@@ -99,6 +99,8 @@ analysis:
     result-consumer-group: ${ANALYSIS_RESULT_CONSUMER_GROUP:backend-analysis-result-workers}
     result-consumer-name: ${ANALYSIS_RESULT_CONSUMER_NAME:backend-analysis-result-1}
     result-dead-letter-stream: ${ANALYSIS_RESULT_DLQ_STREAM:analysis:result:dlq:v1}
+    cancellation-key-prefix: ${ANALYSIS_CANCELLATION_KEY_PREFIX:analysis:canceled:v1:}
+    cancellation-outbox-poll-interval: ${ANALYSIS_CANCELLATION_OUTBOX_POLL_INTERVAL:PT1S}
     outbox-poll-interval: ${ANALYSIS_OUTBOX_POLL_INTERVAL:PT1S}
     result-poll-interval: ${ANALYSIS_RESULT_POLL_INTERVAL:PT1S}
     result-block: ${ANALYSIS_RESULT_BLOCK:PT1S}
