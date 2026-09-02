@@ -6,6 +6,7 @@ import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.training.domain.entity.TrainingSession;
 import org.example.voice.training.domain.entity.VoiceRecording;
 import org.example.voice.training.domain.model.RecordingSelectionData;
+import org.example.voice.training.domain.model.NormalizedRecordingData;
 import org.example.voice.training.domain.model.VoiceRecordingRegisteredData;
 import org.example.voice.training.domain.port.VoiceRecordingWriter;
 import org.springframework.stereotype.Repository;
@@ -25,16 +26,24 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
     @Transactional
     public VoiceRecordingRegisteredData register(
             Long sessionId,
-            String objectKey,
-            String mimeType,
-            Long fileSizeBytes,
-            Integer durationMs,
+            NormalizedRecordingData normalized,
             Integer attemptNo
     ) {
         TrainingSession session = trainingSessionJpaRepository.findById(sessionId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
         VoiceRecording recording = voiceRecordingJpaRepository.save(
-                VoiceRecording.create(session, attemptNo, objectKey, mimeType, fileSizeBytes, durationMs)
+                VoiceRecording.create(
+                        session,
+                        attemptNo,
+                        normalized.objectKey(),
+                        normalized.mimeType(),
+                        normalized.fileSizeBytes(),
+                        normalized.durationMs(),
+                        normalized.audioSha256(),
+                        normalized.qualityStatus(),
+                        normalized.volumeScore(),
+                        normalized.noiseScore()
+                )
         );
         return new VoiceRecordingRegisteredData(
                 recording.getId(),

@@ -52,6 +52,10 @@ job messages.
 | `OBJECT_STORAGE_ENDPOINT` | Provider-specific | HTTPS-only endpoint override for NCP/R2/MinIO-compatible deployments. |
 | `OBJECT_STORAGE_PATH_STYLE_ACCESS` | N | Enables path-style access only when the provider requires it. |
 | `OBJECT_STORAGE_RECORDINGS_PREFIX` | Y | Private relative key prefix; default `recordings/`. |
+| `MEDIA_NORMALIZATION_ENABLED` | Y | Must be `true` with Stream analysis; enables backend-owned probe, decode, technical QC and canonical WAV upload. |
+| `MEDIA_NORMALIZATION_WORKSPACE_ROOT` | Y | Absolute owner-only temporary workspace root. |
+| `MEDIA_NORMALIZATION_FFMPEG_BINARY` / `MEDIA_NORMALIZATION_FFPROBE_BINARY` | Y | Absolute reviewed executable paths. |
+| `MEDIA_NORMALIZATION_PROCESS_TIMEOUT` | Y | Per-process timeout, default `PT30S`, maximum `PT2M`. |
 
 The Redis port is private-network only. Do not open it to the internet, transmit a
 Redis URL/password in messages, or use the ordinary cache endpoint for Stream data.
@@ -71,11 +75,11 @@ containing UTF-8 JSON. Producer and consumer reject unknown fields and unsupport
 `sourceStreamId`, `failureCode`, and, when an original payload existed, that raw
 `payload` for deliberate recovery.
 
-## Request payload: `voice-coaching.analysis-request.v2`
+## Request payload: `voice-coaching.analysis-request.v3`
 
 ```json
 {
-  "schemaVersion": "voice-coaching.analysis-request.v2",
+  "schemaVersion": "voice-coaching.analysis-request.v3",
   "eventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
   "analysisId": 35,
   "contentId": 12,
@@ -83,12 +87,13 @@ containing UTF-8 JSON. Producer and consumer reject unknown fields and unsupport
   "scriptText": "안녕하세요. 오늘 날씨가 좋습니다.",
   "scriptSha256": "lower-case sha256 hex",
   "audioObjectKey": "recordings/50.wav",
+  "audioSha256": "lower-case sha256 of the normalized WAV bytes",
   "mimeType": "audio/wav",
   "fileSizeBytes": 1234,
   "durationMs": 1200,
   "learningFocus": "PRONUNCIATION",
   "authorizationGrant": {
-    "grantVersion": "voice-coaching.analysis-authorization.v1",
+    "grantVersion": "voice-coaching.analysis-authorization.v2",
     "keyId": "backend-2026-09",
     "requestEventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
     "analysisId": 35,
@@ -96,6 +101,7 @@ containing UTF-8 JSON. Producer and consumer reject unknown fields and unsupport
     "promptRevision": "2026-09-02T00:00:00Z",
     "scriptSha256": "lower-case sha256 hex",
     "audioObjectKeySha256": "lower-case sha256 hex",
+    "audioSha256": "lower-case sha256 of the normalized WAV bytes",
     "mimeType": "audio/wav",
     "fileSizeBytes": 1234,
     "durationMs": 1200,
@@ -123,17 +129,25 @@ containing UTF-8 JSON. Producer and consumer reject unknown fields and unsupport
 | `scriptText` | Y | Trusted content text, maximum 10,000 characters. |
 | `scriptSha256` | Y | Lower-case SHA-256 of UTF-8 `scriptText`. |
 | `audioObjectKey` | Y | Storage object key, never a URL or path. |
+| `audioSha256` | Y | Backend-calculated SHA-256 of the canonical object. The worker must match it before inference. |
 | `mimeType` | N | Registered media MIME type. |
 | `fileSizeBytes` / `durationMs` | N | Non-negative registered metadata. |
 | `learningFocus` | Y | `PRONUNCIATION`, `INTONATION`, or `BOTH`. Unsupported worker focus fails closed. |
 | `authorizationGrant` | Y | Signed, short-lived, same-request processing authority described below. |
 
+Before this payload exists, VC-BE verifies that the upload key belongs to the
+authenticated user and session, probes the real container and codecs, extracts exactly
+one audio stream, writes 16 kHz mono signed PCM WAV, performs technical audio QC,
+stores it under a backend-only normalized key, calculates `audioSha256`, and deletes
+the client-uploaded source. MP4/QuickTime accepts H.264 or HEVC with AAC; WebM video
+accepts VP8 or VP9 with Opus or Vorbis. Unsupported or ambiguous streams fail closed.
+
 The payload intentionally excludes `userId`, `sessionId`, `recordingId`, file paths,
 presigned URLs, and raw consent material. Both analyze and retry REST calls require
 `{"accepted":true,"policyRevision":"..."}` from the authenticated owner. VC-BE
-generates an opaque random receipt digest and signs a five-minute grant. The grant
-binds request event, analysis/content/prompt, script digest, object-key digest, MIME,
-size, duration, learning focus, policy, purpose, data category, cleanup and egress
+generates an opaque random receipt digest and signs a five-minute grant. The v2 grant
+binds request event, analysis/content/prompt, script digest, object-key digest,
+normalized audio digest, MIME, size, duration, learning focus, policy, purpose, data category, cleanup and egress
 policy. A retry receives a new request event, receipt and signature.
 
 The signature is HMAC-SHA256 over the fields above in listed order, excluding
@@ -142,10 +156,11 @@ The signature is HMAC-SHA256 over the fields above in listed order, excluding
 UTC JSON strings. The AI keyring selects the secret by `keyId` and compares the
 signature in constant time. Unknown keys, signature/binding differences, a future or
 expired window, a TTL over ten minutes, a policy mismatch, missing cleanup, or enabled
-remote egress fail before object storage access. Legacy request v1 is unsupported.
+remote egress fail before object storage access. Legacy request v1/v2 and grant v1 are unsupported.
 
 The AI worker uses a restricted object-storage adapter for the configured bucket and
-must verify the key, MIME type, registered size, locally calculated digest, and cleanup
+must verify the key, MIME type, registered size, locally calculated digest against
+`audioSha256`, and cleanup
 policy. VC-BE rejects a legacy URL or traversal-like key before publishing; the
 request transaction rolls back instead of leaving a stranded pending analysis. A
 worker deployment without an approved authorization, storage, and Seungun composition

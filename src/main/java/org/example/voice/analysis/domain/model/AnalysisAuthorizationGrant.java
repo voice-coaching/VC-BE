@@ -19,6 +19,7 @@ public record AnalysisAuthorizationGrant(
         String promptRevision,
         String scriptSha256,
         String audioObjectKeySha256,
+        String audioSha256,
         String mimeType,
         Long fileSizeBytes,
         Integer durationMs,
@@ -33,7 +34,7 @@ public record AnalysisAuthorizationGrant(
         boolean remoteEgressAllowed,
         String signature
 ) {
-    public static final String GRANT_VERSION = "voice-coaching.analysis-authorization.v1";
+    public static final String GRANT_VERSION = "voice-coaching.analysis-authorization.v2";
     public static final String PURPOSE = "pronunciation_coaching";
     public static final String DATA_CATEGORY = "learner_voice_recording";
 
@@ -46,14 +47,15 @@ public record AnalysisAuthorizationGrant(
         requireText(promptRevision, 100, "promptRevision");
         requireSha256(scriptSha256, "scriptSha256");
         requireSha256(audioObjectKeySha256, "audioObjectKeySha256");
-        if (mimeType != null && (mimeType.isBlank() || mimeType.length() > 100)) {
-            throw new IllegalArgumentException("mimeType is invalid");
+        requireSha256(audioSha256, "audioSha256");
+        if (!"audio/wav".equals(mimeType)) {
+            throw new IllegalArgumentException("mimeType must identify canonical WAV audio");
         }
-        if (fileSizeBytes != null && fileSizeBytes < 0) {
-            throw new IllegalArgumentException("fileSizeBytes must not be negative");
+        if (fileSizeBytes == null || fileSizeBytes <= 0) {
+            throw new IllegalArgumentException("fileSizeBytes must be positive");
         }
-        if (durationMs != null && durationMs < 0) {
-            throw new IllegalArgumentException("durationMs must not be negative");
+        if (durationMs == null || durationMs <= 0) {
+            throw new IllegalArgumentException("durationMs must be positive");
         }
         Objects.requireNonNull(learningFocus, "learningFocus");
         requireSha256(consentReceiptSha256, "consentReceiptSha256");
@@ -85,6 +87,7 @@ public record AnalysisAuthorizationGrant(
         append(value, "promptRevision", promptRevision);
         append(value, "scriptSha256", scriptSha256);
         append(value, "audioObjectKeySha256", audioObjectKeySha256);
+        append(value, "audioSha256", audioSha256);
         append(value, "mimeType", mimeType);
         append(value, "fileSizeBytes", fileSizeBytes);
         append(value, "durationMs", durationMs);

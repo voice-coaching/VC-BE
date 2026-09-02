@@ -1,6 +1,7 @@
 package org.example.voice.analysis.infrastructure.stream;
 
 import org.example.voice.training.infrastructure.storage.ObjectStorageProperties;
+import org.example.voice.training.infrastructure.storage.MediaNormalizationProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -9,10 +10,14 @@ import org.springframework.stereotype.Component;
 public class AnalysisProductionConfigurationGuard {
     public AnalysisProductionConfigurationGuard(
             ObjectStorageProperties storage,
+            MediaNormalizationProperties mediaNormalization,
             AnalysisStreamProperties stream
     ) {
         if (!storage.isEnabled()) {
             throw new IllegalStateException("analysis_object_storage_must_be_enabled");
+        }
+        if (!mediaNormalization.isEnabled()) {
+            throw new IllegalStateException("analysis_media_normalization_must_be_enabled");
         }
         if (!stream.isRedisSslEnabled()
                 || !hasText(stream.getRedisHost())

@@ -12,6 +12,7 @@ public record AnalysisAuthorizationIssue(
         String promptRevision,
         String scriptSha256,
         String audioObjectKey,
+        String audioSha256,
         String mimeType,
         Long fileSizeBytes,
         Integer durationMs,

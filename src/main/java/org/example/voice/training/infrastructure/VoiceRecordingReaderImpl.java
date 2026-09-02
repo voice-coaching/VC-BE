@@ -99,6 +99,7 @@ public class VoiceRecordingReaderImpl implements VoiceRecordingReader {
                         recording.getMimeType(),
                         recording.getFileSizeBytes(),
                         recording.getDurationMs(),
+                        recording.getAudioSha256(),
                         recording.getTrainingSession().getLearningFocus(),
                         recording.getQualityStatus()
                 ));

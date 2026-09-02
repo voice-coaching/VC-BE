@@ -49,7 +49,18 @@ class MyPagePersistenceAdapterTest {
         TrainingSession session = TrainingSession.create(1L, content, null, LearningFocus.PRONUNCIATION);
         set(session, "status", TrainingSessionStatus.COMPLETED); set(session, "completedAt", now);
         set(session, "totalLearningSeconds", 120); entityManager.persist(session);
-        VoiceRecording recording = VoiceRecording.create(session, 1, "audio", "audio/webm", 100L, 1000);
+        VoiceRecording recording = VoiceRecording.create(
+                session,
+                1,
+                "audio",
+                "audio/wav",
+                100L,
+                1000,
+                "a".repeat(64),
+                RecordingQualityStatus.PASS,
+                null,
+                null
+        );
         set(recording, "selected", true); set(recording, "qualityStatus", RecordingQualityStatus.PASS);
         entityManager.persist(recording);
         AnalysisResult analysis = AnalysisResult.pending(recording, java.util.UUID.randomUUID());

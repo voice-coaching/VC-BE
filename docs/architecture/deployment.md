@@ -87,11 +87,24 @@ OBJECT_STORAGE_REGION=ap-northeast-2
 OBJECT_STORAGE_ENDPOINT=<https-provider-endpoint-if-required>
 OBJECT_STORAGE_PATH_STYLE_ACCESS=false
 OBJECT_STORAGE_RECORDINGS_PREFIX=recordings/
+MEDIA_NORMALIZATION_ENABLED=true
+MEDIA_NORMALIZATION_WORKSPACE_ROOT=/var/lib/voice-coach/media-normalization
+MEDIA_NORMALIZATION_FFMPEG_BINARY=/usr/bin/ffmpeg
+MEDIA_NORMALIZATION_FFPROBE_BINARY=/usr/bin/ffprobe
+MEDIA_NORMALIZATION_PROCESS_TIMEOUT=PT30S
+MEDIA_NORMALIZATION_MAXIMUM_INPUT_BYTES=104857600
+MEDIA_NORMALIZATION_MAXIMUM_OUTPUT_BYTES=20971520
+MEDIA_NORMALIZATION_MINIMUM_DURATION_MS=500
+MEDIA_NORMALIZATION_MAXIMUM_DURATION_MS=180000
 ```
 
 Stream 분석이 켜져 있는데 실제 S3 호환 저장소 또는 서명 설정이 빠지면 VC-BE는
 개발용 URL로 대체하지 않고 기동에 실패한다. SDK 자격 증명은 배포 환경의 기본
 credential chain으로 주입하며 `.env`나 문서에 값을 기록하지 않는다.
+VC-BE storage role은 owner-bound upload presign/HEAD 외에 원본 GET, canonical WAV PUT,
+처리 원본 및 실패 canonical 객체 DELETE 권한이 필요하다. 클라이언트는 normalized
+prefix에 대한 PUT 권한을 받지 않는다. ffmpeg/ffprobe는 고정된 절대 경로의 검토된
+binary를 사용하고 workspace root는 서비스 계정만 접근할 수 있어야 한다.
 
 Spring Boot 애플리케이션을 EC2 호스트에서 JAR로 직접 실행하면 `REDIS_HOST=localhost`를 사용한다.
 

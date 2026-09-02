@@ -5,12 +5,14 @@ import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.training.controller.dto.RecordingRegisterRequestDto;
 import org.example.voice.training.domain.model.RecordingPlaybackUrlData;
+import org.example.voice.training.domain.model.NormalizedRecordingData;
 import org.example.voice.training.domain.model.RecordingSelectionData;
 import org.example.voice.training.domain.model.VoiceRecordingData;
 import org.example.voice.training.domain.model.VoiceRecordingRegisteredData;
 import org.example.voice.training.domain.port.VoiceRecordingReader;
 import org.example.voice.training.domain.port.VoiceRecordingWriter;
 import org.example.voice.training.domain.port.RecordingObjectStoragePort;
+import org.example.voice.training.domain.port.RecordingMediaNormalizationPort;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,12 +23,16 @@ import java.util.List;
 @RequiredArgsConstructor
 public class VoiceRecordingService {
 
+    private static final String VIDEO_PROCESSING_CONSENT_POLICY_REVISION =
+            "voice-video-processing-consent-v1";
+
     // 녹음 파일 메타데이터를 관리한다.
     // 실제 파일 업로드는 프론트가 Presigned URL로 직접 수행하고, 백엔드는 업로드 후 metadata만 등록한다.
     private final VoiceRecordingReader voiceRecordingReader;
     private final VoiceRecordingWriter voiceRecordingWriter;
     private final TrainingSessionService trainingSessionService;
     private final RecordingObjectStoragePort objectStorage;
+    private final RecordingMediaNormalizationPort mediaNormalization;
 
     @Transactional
     public VoiceRecordingRegisteredData register(Long sessionId, RecordingRegisterRequestDto request, Long userId) {
@@ -37,7 +43,15 @@ public class VoiceRecordingService {
         if (voiceRecordingReader.existsByObjectKey(request.objectKey())) {
             throw new BaseException(ErrorCode.RECORDING_ALREADY_REGISTERED);
         }
+        validateVideoConsent(request);
         objectStorage.assertUploadedObject(
+                userId,
+                sessionId,
+                request.objectKey(),
+                request.mimeType(),
+                request.fileSizeBytes()
+        );
+        NormalizedRecordingData normalized = mediaNormalization.normalize(
                 userId,
                 sessionId,
                 request.objectKey(),
@@ -46,16 +60,17 @@ public class VoiceRecordingService {
         );
 
         int attemptNo = voiceRecordingReader.countBySessionId(sessionId) + 1;
-        // 음질검사 AI가 아직 없으므로 등록 직후 qualityStatus는 PENDING이다.
-        // Swagger 테스트에서 선택까지 진행하려면 DB에서 PASS로 변경해야 한다.
-        return voiceRecordingWriter.register(
-                sessionId,
-                request.objectKey(),
-                request.mimeType(),
-                request.fileSizeBytes(),
-                request.durationMs(),
-                attemptNo
-        );
+        try {
+            return voiceRecordingWriter.register(sessionId, normalized, attemptNo);
+        } catch (RuntimeException error) {
+            try {
+                mediaNormalization.deleteNormalizedObject(userId, sessionId, normalized.objectKey());
+            } catch (RuntimeException cleanupFailure) {
+                cleanupFailure.addSuppressed(error);
+                throw cleanupFailure;
+            }
+            throw error;
+        }
     }
 
     public List<VoiceRecordingData> getRecordings(Long sessionId, Long userId) {
@@ -104,6 +119,18 @@ public class VoiceRecordingService {
                 || request.durationMs() == null
                 || request.durationMs() <= 0) {
             throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+    }
+
+    private static void validateVideoConsent(RecordingRegisterRequestDto request) {
+        if (!request.mimeType().startsWith("video/")) {
+            return;
+        }
+        if (!Boolean.TRUE.equals(request.videoProcessingConsentAccepted())
+                || !VIDEO_PROCESSING_CONSENT_POLICY_REVISION.equals(
+                        request.videoProcessingConsentPolicyRevision()
+                )) {
+            throw new BaseException(ErrorCode.VIDEO_PROCESSING_CONSENT_REQUIRED);
         }
     }
 }

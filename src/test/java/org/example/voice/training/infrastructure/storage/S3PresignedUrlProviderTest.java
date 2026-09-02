@@ -64,6 +64,10 @@ class S3PresignedUrlProviderTest {
                 9L, 7L, "recordings/users/9/sessions/8/attempt.wav", "audio/wav", 1234L
         )).isInstanceOfSatisfying(BaseException.class,
                 error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.RECORDING_ACCESS_DENIED));
+        assertThatThrownBy(() -> provider.assertUploadedObject(
+                9L, 7L, "recordings/users/9/sessions/7/normalized/attempt.wav", "audio/wav", 1234L
+        )).isInstanceOfSatisfying(BaseException.class,
+                error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.RECORDING_ACCESS_DENIED));
 
         verify(s3Client, org.mockito.Mockito.never()).headObject(any(HeadObjectRequest.class));
     }

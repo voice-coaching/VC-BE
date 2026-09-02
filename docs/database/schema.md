@@ -190,6 +190,7 @@
 | mime_type | varchar(100) | N | - | - | - | MIME 타입 |
 | file_size_bytes | bigint | N | - | - | - | 파일 크기(byte) |
 | duration_ms | integer | N | - | - | - | 재생 길이(ms) |
+| audio_sha256 | varchar(64) | N | - | CHECK | - | backend-normalized WAV 바이트의 SHA-256. 과거 row는 null 가능 |
 | quality_status | varchar(30) | Y | - | CHECK | - | 품질 검사 상태 |
 | volume_score | numeric(5,2) | N | - | - | - | 볼륨 점수 |
 | noise_score | numeric(5,2) | N | - | - | - | 노이즈 점수 |

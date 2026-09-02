@@ -74,7 +74,7 @@
 | `TrainingSessionStatus` | `COMPLETED` | 학습 완료 | Yes | 완료된 학습 세션 |
 | `TrainingSessionStatus` | `FAILED` | 학습 흐름 실패 | Yes | 복구 정책 필요 |
 | `TrainingSessionStatus` | `CANCELED` | 사용자가 취소 | Yes | 취소된 학습 세션 |
-| `RecordingQualityStatus` | `PENDING` | 품질 검사 대기 | No | 녹음 등록 직후 기본 상태 |
+| `RecordingQualityStatus` | `PENDING` | 과거 비동기 품질 검사 대기 | No | 신규 backend-normalized 등록에서는 생성하지 않음 |
 | `RecordingQualityStatus` | `PASS` | 분석 가능 | No | 분석 요청 가능 |
 | `RecordingQualityStatus` | `LOW_VOLUME` | 음량 부족 | Yes | 재녹음 필요 |
 | `RecordingQualityStatus` | `TOO_NOISY` | 잡음 과다 | Yes | 재녹음 필요 |
@@ -128,13 +128,12 @@
 | `ANALYZING` | `COMPLETED` | `POST /api/training-sessions/{sessionId}/complete` | 선택 녹음의 분석 완료 | 완료 시간 저장 |
 | `RECORDING` or `UPLOADING` or `ANALYZING` | `CANCELED` | `POST /api/training-sessions/{sessionId}/cancel` | terminal 상태 아님 | 취소 시간 저장, 임시 녹음 삭제 대상 |
 | any non-terminal | `FAILED` | 내부 처리 실패 | 실패 사유 존재 | 실패 사유 기록 대상 |
-| none | `RecordingQualityStatus.PENDING` | 녹음 등록 | 업로드 object 존재 | `voice_recordings` 생성 |
-| `PENDING` | `PASS` | 품질 검사 통과 | 음질 기준 충족 | 분석 요청 가능 |
-| `PENDING` | `LOW_VOLUME` | 품질 검사 | 음량 부족 | 재녹음 안내 |
-| `PENDING` | `TOO_NOISY` | 품질 검사 | 잡음 과다 | 재녹음 안내 |
-| `PENDING` | `TOO_SHORT` | 품질 검사 | 길이 부족 | 재녹음 안내 |
-| `PENDING` | `NO_SPEECH` | 품질 검사 | 음성 미감지 | 재녹음 안내 |
-| `PENDING` | `FAILED` | 품질 검사 실패 | 처리 실패 | 재처리 또는 재녹음 |
+| none | `RecordingQualityStatus.PASS` | backend media normalization | owner/consent/container/codec/digest 및 기술 QC 통과 | canonical WAV 등록, 분석 요청 가능 |
+| none | `LOW_VOLUME` | backend media normalization | RMS 기준 미달 | canonical WAV 등록, 재녹음 안내 |
+| none | `TOO_SHORT` | backend media normalization | 측정 duration 기준 미달 | canonical WAV 등록, 재녹음 안내 |
+| none | `NO_SPEECH` | backend media normalization | RMS와 active-sample 기준 미달 | canonical WAV 등록, 재녹음 안내 |
+| none | `FAILED` | backend media normalization | clipping 등 기술 QC 실패 | canonical WAV 등록, 재녹음 안내 |
+| none | request rejected | media normalization failure | 소유권·동의·container/codec·cleanup 불충족 | DB row를 만들지 않고 원본/실패 canonical 삭제 |
 | none | `AnalysisStatus.PENDING` | 분석 요청 생성 | 선택 녹음 존재 | request generation UUID와 durable outbox 생성 |
 | `PENDING` | `PROCESSING` | AI worker processing result 수신 | `requestEventId` 일치 | 현재 generation의 상태만 갱신 |
 | `PENDING` or `PROCESSING` | `COMPLETED` | AI worker terminal success 수신 | outcome 및 payload schema 검증 | 결과와 segment를 원자 반영 |

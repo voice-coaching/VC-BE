@@ -72,6 +72,7 @@ public class HmacAnalysisAuthorizationIssuer implements AnalysisAuthorizationIss
                 issue.promptRevision(),
                 issue.scriptSha256(),
                 sha256(issue.audioObjectKey().getBytes(StandardCharsets.UTF_8)),
+                issue.audioSha256(),
                 issue.mimeType(),
                 issue.fileSizeBytes(),
                 issue.durationMs(),

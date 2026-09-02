@@ -1551,7 +1551,7 @@ Content-Type: application/json
 - Error cases: See common error codes
 
 ### POST /api/training-sessions/{sessionId}/recordings/upload-url
-- Description: 녹음 업로드 URL 발급 - 파일명·MIME 타입을 받아 S3 또는 오브젝트 스토리지 Presigned URL 발급
+- Description: 음성 또는 영상 녹음 업로드 URL 발급 - 파일명·MIME 타입을 받아 private object storage Presigned URL 발급
 - Auth: Bearer accessToken
 - Path params: `sessionId`
 - Query params: None
@@ -1579,11 +1579,13 @@ Content-Type: application/json
   }
 }
 ```
-- Status codes: 200 OK
+- 허용 형식: `audio/webm`, `audio/mpeg`, `audio/wav`는 최대 20 MiB;
+  `video/mp4`, `video/quicktime`, `video/webm`은 최대 100 MiB이다.
+- Status codes: 200 OK, 400 unsupported format, 413 size limit
 - Error cases: See common error codes
 
 ### POST /api/training-sessions/{sessionId}/recordings
-- Description: 녹음 업로드 완료 등록 - 업로드된 객체 키·재생 시간·파일 크기를 등록하고 녹음 시도 번호 생성
+- Description: 업로드 객체를 소유권·실제 container/codec 기준으로 검사하고 backend에서 16 kHz mono PCM WAV로 정규화한 뒤 녹음 시도를 등록
 - Auth: Bearer accessToken
 - Path params: `sessionId`
 - Query params: None
@@ -1593,9 +1595,17 @@ Content-Type: application/json
   "objectKey": "String",
   "mimeType": "String",
   "fileSizeBytes": "Integer",
-  "durationMs": "Integer"
+  "durationMs": "Integer",
+  "videoProcessingConsentAccepted": "Boolean | null",
+  "videoProcessingConsentPolicyRevision": "String | null"
 }
 ```
+- `durationMs`는 클라이언트 표시용 주장이고 영속 값은 정규화 WAV에서 다시 측정한다.
+- 영상 MIME이면 두 consent 필드가 각각 `true`,
+  `voice-video-processing-consent-v1`이어야 하며, 동의 검증 전에 영상을 decode하지 않는다.
+- object key는 인증 사용자와 path의 `sessionId`에 발급된 prefix와 정확히 일치해야 한다.
+- 원본 업로드 객체는 성공·실패와 무관하게 처리 후 삭제한다. DB에는 backend-only
+  정규화 WAV key, 실제 크기·duration, SHA-256, 기술 품질 상태만 저장한다.
 - Response body:
 ```json
 {
@@ -1610,7 +1620,8 @@ Content-Type: application/json
   }
 }
 ```
-- Status codes: 200 OK
+- Status codes: 200 OK, 400 missing video consent, 403 object owner mismatch,
+  422 invalid container/codec or technical quality result, 503 unavailable normalizer/storage
 - Error cases: See common error codes
 
 ### GET /api/training-sessions/{sessionId}/recordings

@@ -62,6 +62,7 @@ class TrainingAnalysisRequestServiceTest {
                 "audio/wav",
                 1234L,
                 1200,
+                "d".repeat(64),
                 LearningFocus.PRONUNCIATION,
                 RecordingQualityStatus.PASS
         );
@@ -81,7 +82,8 @@ class TrainingAnalysisRequestServiceTest {
         assertThat(request.getValue().contentId()).isEqualTo(12L);
         assertThat(request.getValue().audioObjectKey()).isEqualTo("recordings/50.wav");
         assertThat(request.getValue().scriptSha256()).hasSize(64);
-        assertThat(request.getValue().schemaVersion()).isEqualTo("voice-coaching.analysis-request.v2");
+        assertThat(request.getValue().schemaVersion()).isEqualTo("voice-coaching.analysis-request.v3");
+        assertThat(request.getValue().audioSha256()).isEqualTo("d".repeat(64));
         assertThat(request.getValue().authorizationGrant().requestEventId())
                 .isEqualTo(request.getValue().eventId());
     }
@@ -97,6 +99,7 @@ class TrainingAnalysisRequestServiceTest {
                 "audio/wav",
                 1234L,
                 1200,
+                "d".repeat(64),
                 LearningFocus.PRONUNCIATION,
                 RecordingQualityStatus.PASS
         );
@@ -149,6 +152,7 @@ class TrainingAnalysisRequestServiceTest {
                     issue.promptRevision(),
                     issue.scriptSha256(),
                     sha256(issue.audioObjectKey()),
+                    issue.audioSha256(),
                     issue.mimeType(),
                     issue.fileSizeBytes(),
                     issue.durationMs(),

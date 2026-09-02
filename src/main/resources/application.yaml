@@ -62,6 +62,16 @@ storage:
   endpoint: ${OBJECT_STORAGE_ENDPOINT:}
   path-style-access: ${OBJECT_STORAGE_PATH_STYLE_ACCESS:false}
   recordings-prefix: ${OBJECT_STORAGE_RECORDINGS_PREFIX:recordings/}
+  media-normalization:
+    enabled: ${MEDIA_NORMALIZATION_ENABLED:false}
+    workspace-root: ${MEDIA_NORMALIZATION_WORKSPACE_ROOT:/tmp/voice-coach-media-normalization}
+    ffmpeg-binary: ${MEDIA_NORMALIZATION_FFMPEG_BINARY:/usr/bin/ffmpeg}
+    ffprobe-binary: ${MEDIA_NORMALIZATION_FFPROBE_BINARY:/usr/bin/ffprobe}
+    process-timeout: ${MEDIA_NORMALIZATION_PROCESS_TIMEOUT:PT30S}
+    maximum-input-bytes: ${MEDIA_NORMALIZATION_MAXIMUM_INPUT_BYTES:104857600}
+    maximum-normalized-bytes: ${MEDIA_NORMALIZATION_MAXIMUM_OUTPUT_BYTES:20971520}
+    minimum-duration-ms: ${MEDIA_NORMALIZATION_MINIMUM_DURATION_MS:500}
+    maximum-duration-ms: ${MEDIA_NORMALIZATION_MAXIMUM_DURATION_MS:180000}
 
 analysis:
   authorization:

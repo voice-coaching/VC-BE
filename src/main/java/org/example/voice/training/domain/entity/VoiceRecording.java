@@ -51,6 +51,9 @@ public class VoiceRecording {
     @Column(name = "duration_ms")
     private Integer durationMs;
 
+    @Column(name = "audio_sha256", length = 64)
+    private String audioSha256;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "quality_status", nullable = false)
     private RecordingQualityStatus qualityStatus;
@@ -76,7 +79,11 @@ public class VoiceRecording {
             String audioUrl,
             String mimeType,
             Long fileSizeBytes,
-            Integer durationMs
+            Integer durationMs,
+            String audioSha256,
+            RecordingQualityStatus qualityStatus,
+            BigDecimal volumeScore,
+            BigDecimal noiseScore
     ) {
         this.trainingSession = trainingSession;
         this.attemptNo = attemptNo;
@@ -84,7 +91,10 @@ public class VoiceRecording {
         this.mimeType = mimeType;
         this.fileSizeBytes = fileSizeBytes;
         this.durationMs = durationMs;
-        this.qualityStatus = RecordingQualityStatus.PENDING;
+        this.audioSha256 = audioSha256;
+        this.qualityStatus = qualityStatus;
+        this.volumeScore = volumeScore;
+        this.noiseScore = noiseScore;
         this.selected = false;
         this.createdAt = OffsetDateTime.now(SEOUL_ZONE_ID);
     }
@@ -95,9 +105,24 @@ public class VoiceRecording {
             String audioUrl,
             String mimeType,
             Long fileSizeBytes,
-            Integer durationMs
+            Integer durationMs,
+            String audioSha256,
+            RecordingQualityStatus qualityStatus,
+            BigDecimal volumeScore,
+            BigDecimal noiseScore
     ) {
-        return new VoiceRecording(trainingSession, attemptNo, audioUrl, mimeType, fileSizeBytes, durationMs);
+        return new VoiceRecording(
+                trainingSession,
+                attemptNo,
+                audioUrl,
+                mimeType,
+                fileSizeBytes,
+                durationMs,
+                audioSha256,
+                qualityStatus,
+                volumeScore,
+                noiseScore
+        );
     }
 
     public void select() {

@@ -19,7 +19,8 @@ public class PresignedUrlProvider implements RecordingObjectStoragePort {
     public String createObjectKey(Long userId, Long sessionId, String fileName) {
         String extension = "";
         if (fileName != null && fileName.contains(".")) {
-            extension = fileName.substring(fileName.lastIndexOf('.'));
+            String candidate = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+            extension = candidate.matches("\\.(webm|mp3|wav|mp4|mov)") ? candidate : "";
         }
         return "recordings/users/%d/sessions/%d/%s%s".formatted(userId, sessionId, UUID.randomUUID(), extension);
     }
@@ -65,7 +66,10 @@ public class PresignedUrlProvider implements RecordingObjectStoragePort {
     ) {
         // Development mode has no object store. Stream analysis is guarded from using this adapter.
         String ownerPrefix = "recordings/users/%d/sessions/%d/".formatted(userId, sessionId);
-        if (objectKey == null || !objectKey.startsWith(ownerPrefix) || objectKey.length() <= ownerPrefix.length()) {
+        if (objectKey == null
+                || !objectKey.startsWith(ownerPrefix)
+                || objectKey.length() <= ownerPrefix.length()
+                || objectKey.substring(ownerPrefix.length()).contains("/")) {
             throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
         }
     }

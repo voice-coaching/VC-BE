@@ -25,13 +25,14 @@ public record AnalysisWorkerRequest(
         String scriptText,
         String scriptSha256,
         String audioObjectKey,
+        String audioSha256,
         String mimeType,
         Long fileSizeBytes,
         Integer durationMs,
         LearningFocus learningFocus,
         AnalysisAuthorizationGrant authorizationGrant
 ) {
-    public static final String SCHEMA_VERSION = "voice-coaching.analysis-request.v2";
+    public static final String SCHEMA_VERSION = "voice-coaching.analysis-request.v3";
 
     public AnalysisWorkerRequest {
         requireEquals(SCHEMA_VERSION, schemaVersion, "schemaVersion");
@@ -42,19 +43,20 @@ public record AnalysisWorkerRequest(
         requireText(scriptText, 10_000, "scriptText");
         requireSha256(scriptSha256, "scriptSha256");
         requireText(audioObjectKey, 1_000, "audioObjectKey");
+        requireSha256(audioSha256, "audioSha256");
         if (audioObjectKey.startsWith("http://") || audioObjectKey.startsWith("https://")
                 || audioObjectKey.startsWith("/") || audioObjectKey.contains("\\")
                 || hasTraversalSegment(audioObjectKey)) {
             throw new IllegalArgumentException("audioObjectKey must be a relative, non-traversing object key");
         }
-        if (mimeType != null && (mimeType.isBlank() || mimeType.length() > 100)) {
-            throw new IllegalArgumentException("mimeType is invalid");
+        if (!"audio/wav".equals(mimeType)) {
+            throw new IllegalArgumentException("mimeType must identify canonical WAV audio");
         }
-        if (fileSizeBytes != null && fileSizeBytes < 0) {
-            throw new IllegalArgumentException("fileSizeBytes must not be negative");
+        if (fileSizeBytes == null || fileSizeBytes <= 0) {
+            throw new IllegalArgumentException("fileSizeBytes must be positive");
         }
-        if (durationMs != null && durationMs < 0) {
-            throw new IllegalArgumentException("durationMs must not be negative");
+        if (durationMs == null || durationMs <= 0) {
+            throw new IllegalArgumentException("durationMs must be positive");
         }
         Objects.requireNonNull(learningFocus, "learningFocus");
         Objects.requireNonNull(authorizationGrant, "authorizationGrant");
@@ -67,6 +69,7 @@ public record AnalysisWorkerRequest(
                 || !promptRevision.equals(authorizationGrant.promptRevision())
                 || !scriptSha256.equals(authorizationGrant.scriptSha256())
                 || !sha256(audioObjectKey).equals(authorizationGrant.audioObjectKeySha256())
+                || !audioSha256.equals(authorizationGrant.audioSha256())
                 || !Objects.equals(mimeType, authorizationGrant.mimeType())
                 || !Objects.equals(fileSizeBytes, authorizationGrant.fileSizeBytes())
                 || !Objects.equals(durationMs, authorizationGrant.durationMs())

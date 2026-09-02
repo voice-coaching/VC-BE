@@ -262,16 +262,25 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   1. `TrainingSessionService`가 콘텐츠 존재 여부와 사용 가능 여부를 확인한다.
   2. 학습 세션을 생성하고 초기 상태를 저장한다.
   3. 사용자가 녹음 파일 업로드 URL을 요청한다.
-  4. `RecordingUploadService`가 파일명, MIME type, 크기를 검증하고 presigned URL을 발급한다.
+  4. `RecordingUploadService`가 파일명, 허용 MIME type, 크기를 검증하고 owner/session prefix의 presigned URL을 발급한다.
   5. 클라이언트가 storage에 파일을 업로드한다.
-  6. 업로드 완료 후 `VoiceRecordingService`가 objectKey, duration, file size를 등록한다.
-  7. 사용자는 녹음 목록을 조회하고 최종 녹음을 선택한다.
+  6. 업로드 완료 후 `VoiceRecordingService`가 objectKey의 사용자·세션 소유권을 검증한다.
+  7. 영상이면 얼굴 영상 처리 동의를 먼저 확인하고, backend normalizer가 실제
+     container/codec을 probe한 뒤 단일 audio stream을 16 kHz mono PCM WAV로 추출한다.
+  8. backend가 canonical WAV의 duration, SHA-256, 음량·speech/clipping 기반 기술 QC를
+     계산하고 backend-only key로 저장한 다음 client upload 원본을 삭제한다.
+  9. 측정된 metadata와 terminal quality status로 녹음을 등록한다. DB 실패 시 canonical
+     객체도 삭제한다.
+  10. 사용자는 녹음 목록을 조회하고 `PASS` 녹음만 최종 선택한다.
 - Validation:
   - contentId 필수
   - learningFocus 필수
   - session owner 일치 여부
   - 파일 크기와 MIME type
   - 업로드된 object 존재 여부
+  - object key의 인증 사용자·세션 prefix
+  - 실제 container/codec과 선언 MIME 일치
+  - 영상 처리 동의와 canonical audio SHA-256
   - 선택 가능한 녹음 상태 여부
 - Empty state:
   - 녹음 목록이 없으면 빈 목록을 반환한다.

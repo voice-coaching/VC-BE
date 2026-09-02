@@ -18,6 +18,7 @@ public class RecordingUploadService {
     // 업로드 URL 발급 정책만 담당한다.
     // 실제 파일 저장은 프론트가 uploadUrl로 직접 업로드하고, 완료 후 VoiceRecordingService에 metadata를 등록한다.
     private static final long MAX_AUDIO_FILE_SIZE_BYTES = 20L * 1024L * 1024L;
+    private static final long MAX_VIDEO_FILE_SIZE_BYTES = 100L * 1024L * 1024L;
 
     private final RecordingObjectStoragePort objectStorage;
     private final TrainingSessionService trainingSessionService;
@@ -48,11 +49,26 @@ public class RecordingUploadService {
                 || request.fileSizeBytes() <= 0) {
             throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
         }
-        if (!request.mimeType().equals("audio/webm") && !request.mimeType().equals("audio/mpeg") && !request.mimeType().equals("audio/wav")) {
+        if (!isSupportedAudio(request.mimeType()) && !isSupportedVideo(request.mimeType())) {
             throw new BaseException(ErrorCode.UNSUPPORTED_AUDIO_FORMAT);
         }
-        if (request.fileSizeBytes() > MAX_AUDIO_FILE_SIZE_BYTES) {
+        long maximumBytes = isSupportedVideo(request.mimeType())
+                ? MAX_VIDEO_FILE_SIZE_BYTES
+                : MAX_AUDIO_FILE_SIZE_BYTES;
+        if (request.fileSizeBytes() > maximumBytes) {
             throw new BaseException(ErrorCode.AUDIO_FILE_TOO_LARGE);
         }
+    }
+
+    private static boolean isSupportedAudio(String mimeType) {
+        return mimeType.equals("audio/webm")
+                || mimeType.equals("audio/mpeg")
+                || mimeType.equals("audio/wav");
+    }
+
+    private static boolean isSupportedVideo(String mimeType) {
+        return mimeType.equals("video/mp4")
+                || mimeType.equals("video/quicktime")
+                || mimeType.equals("video/webm");
     }
 }

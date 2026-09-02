@@ -139,7 +139,9 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
         String ownerPrefix = "%susers/%d/sessions/%d/".formatted(
                 properties.getRecordingsPrefix(), userId, sessionId
         );
-        if (!objectKey.startsWith(ownerPrefix) || objectKey.length() <= ownerPrefix.length()) {
+        if (!objectKey.startsWith(ownerPrefix)
+                || objectKey.length() <= ownerPrefix.length()
+                || objectKey.substring(ownerPrefix.length()).contains("/")) {
             throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
         }
     }
@@ -149,7 +151,7 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
             return "";
         }
         String extension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-        return extension.matches("\\.(webm|mp3|wav)") ? extension : "";
+        return extension.matches("\\.(webm|mp3|wav|mp4|mov)") ? extension : "";
     }
 
     private static Duration signatureDuration(OffsetDateTime expiresAt) {

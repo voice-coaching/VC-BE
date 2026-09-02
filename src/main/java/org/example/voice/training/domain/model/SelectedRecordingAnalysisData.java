@@ -13,6 +13,7 @@ public record SelectedRecordingAnalysisData(
         String mimeType,
         Long fileSizeBytes,
         Integer durationMs,
+        String audioSha256,
         LearningFocus learningFocus,
         RecordingQualityStatus qualityStatus
 ) {

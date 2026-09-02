@@ -53,8 +53,8 @@ This document summarizes the API list exported from the local API spec directory
 | POST | `/api/courses/{courseId}/complete` | Bearer accessToken | 클래스 완료 처리 - 모든 필수 단계 완료 여부를 확인한 뒤 COMPLETED 상태로 변경 |
 | POST | `/api/training-sessions` | Bearer accessToken | 학습 세션 생성 - contentId·courseStepId(선택)·learningFocus를 받아 학습 세션 생성 |
 | GET | `/api/training-sessions/{sessionId}` | Bearer accessToken | 학습 세션 조회 - 세션 상태·콘텐츠·녹음 시도·분석 가능 여부를 조회 |
-| POST | `/api/training-sessions/{sessionId}/recordings/upload-url` | Bearer accessToken | 녹음 업로드 URL 발급 - 파일명·MIME 타입을 받아 S3 또는 오브젝트 스토리지 Presigned URL 발급 |
-| POST | `/api/training-sessions/{sessionId}/recordings` | Bearer accessToken | 녹음 업로드 완료 등록 - 업로드된 객체 키·재생 시간·파일 크기를 등록하고 녹음 시도 번호 생성 |
+| POST | `/api/training-sessions/{sessionId}/recordings/upload-url` | Bearer accessToken | 음성·영상 녹음 업로드 URL 발급 - 허용 MIME/크기를 검사해 private object storage Presigned URL 발급 |
+| POST | `/api/training-sessions/{sessionId}/recordings` | Bearer accessToken | 업로드 소유권·영상 동의·실제 codec을 검사하고 canonical WAV와 기술 품질 결과를 등록 |
 | GET | `/api/training-sessions/{sessionId}/recordings` | Bearer accessToken | 녹음 시도 목록 조회 - 해당 학습 세션의 녹음 시도와 품질 검사 상태 조회 |
 | PATCH | `/api/training-sessions/{sessionId}/recordings/{recordingId}/select` | Bearer accessToken | 최종 녹음 선택 - 분석에 사용할 최종 녹음을 선택하고 다른 시도는 선택 해제 |
 

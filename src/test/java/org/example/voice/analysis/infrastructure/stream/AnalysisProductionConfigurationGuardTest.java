@@ -1,6 +1,7 @@
 package org.example.voice.analysis.infrastructure.stream;
 
 import org.example.voice.training.infrastructure.storage.ObjectStorageProperties;
+import org.example.voice.training.infrastructure.storage.MediaNormalizationProperties;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -12,8 +13,10 @@ class AnalysisProductionConfigurationGuardTest {
         AnalysisStreamProperties stream = validStream();
         ObjectStorageProperties storage = new ObjectStorageProperties();
         storage.setEnabled(true);
+        MediaNormalizationProperties media = new MediaNormalizationProperties();
+        media.setEnabled(true);
 
-        assertThatCode(() -> new AnalysisProductionConfigurationGuard(storage, stream))
+        assertThatCode(() -> new AnalysisProductionConfigurationGuard(storage, media, stream))
                 .doesNotThrowAnyException();
     }
 
@@ -23,10 +26,24 @@ class AnalysisProductionConfigurationGuardTest {
         stream.setRedisSslEnabled(false);
         ObjectStorageProperties storage = new ObjectStorageProperties();
         storage.setEnabled(true);
+        MediaNormalizationProperties media = new MediaNormalizationProperties();
+        media.setEnabled(true);
 
-        assertThatThrownBy(() -> new AnalysisProductionConfigurationGuard(storage, stream))
+        assertThatThrownBy(() -> new AnalysisProductionConfigurationGuard(storage, media, stream))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("analysis_stream_configuration_invalid");
+    }
+
+    @Test
+    void refusesStreamAnalysisWithoutBackendMediaNormalization() {
+        AnalysisStreamProperties stream = validStream();
+        ObjectStorageProperties storage = new ObjectStorageProperties();
+        storage.setEnabled(true);
+        MediaNormalizationProperties media = new MediaNormalizationProperties();
+
+        assertThatThrownBy(() -> new AnalysisProductionConfigurationGuard(storage, media, stream))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("analysis_media_normalization_must_be_enabled");
     }
 
     private static AnalysisStreamProperties validStream() {

@@ -31,10 +31,11 @@ class HmacAnalysisAuthorizationIssuerTest {
         assertThat(grant.expiresAtUtc()).isEqualTo(NOW.plusSeconds(300));
         assertThat(grant.consentReceiptSha256()).hasSize(64);
         assertThat(grant.audioObjectKeySha256()).hasSize(64);
+        assertThat(grant.audioSha256()).isEqualTo("d".repeat(64));
         assertThat(grant.signature()).hasSize(64);
         assertThat(grant.signature()).isNotEqualTo("0".repeat(64));
         assertThat(grant.signature())
-                .isEqualTo("11ad6131b706c345d16c491cc8534d0ec3f8a8a057763589eccd1293e21db55c");
+                .isEqualTo("79f14f0ef0f388ef3efc30e6870662636694caafeb6767d078c9d166777c84bf");
         assertThat(new String(grant.canonicalSigningInput())).contains("scriptSha256:64:");
     }
 
@@ -86,6 +87,7 @@ class HmacAnalysisAuthorizationIssuerTest {
                 "2026-09-02T00:00:00Z",
                 "a".repeat(64),
                 "recordings/users/9/sessions/7/attempt.wav",
+                "d".repeat(64),
                 "audio/wav",
                 1234L,
                 1200,
