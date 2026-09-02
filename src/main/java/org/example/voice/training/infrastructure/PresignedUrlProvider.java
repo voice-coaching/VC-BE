@@ -1,5 +1,7 @@
 package org.example.voice.training.infrastructure;
 
+import org.example.voice.training.domain.port.RecordingObjectStoragePort;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
@@ -7,7 +9,8 @@ import java.util.Map;
 import java.util.UUID;
 
 @Component
-public class PresignedUrlProvider {
+@ConditionalOnProperty(prefix = "storage", name = "enabled", havingValue = "false", matchIfMissing = true)
+public class PresignedUrlProvider implements RecordingObjectStoragePort {
 
     // 실제 스토리지 연동 전까지 objectKey 규칙만 먼저 고정한다.
     // S3/Cloudflare R2/NCP Object Storage를 붙여도 이 key를 그대로 파일 경로로 사용할 수 있다.
@@ -21,7 +24,12 @@ public class PresignedUrlProvider {
 
     // 개발용 upload URL이다.
     // 실제 Presigned URL 발급은 이 메서드 내부를 SDK 호출로 바꾸거나 별도 구현체로 분리하면 된다.
-    public String createUploadUrl(String objectKey, OffsetDateTime expiresAt) {
+    public String createUploadUrl(
+            String objectKey,
+            String mimeType,
+            long fileSizeBytes,
+            OffsetDateTime expiresAt
+    ) {
         return "https://storage.example.com/%s?signature=dev-upload&expiresAt=%s"
                 .formatted(objectKey, expiresAt);
     }
@@ -38,7 +46,15 @@ public class PresignedUrlProvider {
 
     // Presigned PUT 요청에서 프론트가 함께 보내야 하는 헤더다.
     // 실제 스토리지 정책에 따라 Content-MD5, x-amz-* 같은 헤더가 추가될 수 있다.
-    public Map<String, String> requiredHeaders(String mimeType) {
-        return Map.of("Content-Type", mimeType);
+    public Map<String, String> requiredHeaders(String mimeType, long fileSizeBytes) {
+        return Map.of(
+                "Content-Type", mimeType,
+                "Content-Length", Long.toString(fileSizeBytes)
+        );
+    }
+
+    @Override
+    public void assertUploadedObject(String objectKey, String mimeType, long fileSizeBytes) {
+        // Development mode has no object store. Stream analysis is guarded from using this adapter.
     }
 }

@@ -5,7 +5,7 @@ import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.training.controller.dto.RecordingUploadUrlRequestDto;
 import org.example.voice.training.domain.model.RecordingUploadUrlData;
-import org.example.voice.training.infrastructure.PresignedUrlProvider;
+import org.example.voice.training.domain.port.RecordingObjectStoragePort;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
@@ -19,7 +19,7 @@ public class RecordingUploadService {
     // 실제 파일 저장은 프론트가 uploadUrl로 직접 업로드하고, 완료 후 VoiceRecordingService에 metadata를 등록한다.
     private static final long MAX_AUDIO_FILE_SIZE_BYTES = 20L * 1024L * 1024L;
 
-    private final PresignedUrlProvider presignedUrlProvider;
+    private final RecordingObjectStoragePort objectStorage;
     private final TrainingSessionService trainingSessionService;
 
     public RecordingUploadUrlData createUploadUrl(Long sessionId, RecordingUploadUrlRequestDto request, Long userId) {
@@ -28,17 +28,24 @@ public class RecordingUploadService {
 
         // 현재는 개발용 URL을 반환하지만, objectKey/expiresAt/requiredHeaders 구조는 실제 Presigned URL과 동일하게 맞춰뒀다.
         OffsetDateTime expiresAt = OffsetDateTime.now(ZoneId.of("Asia/Seoul")).plusMinutes(10);
-        String objectKey = presignedUrlProvider.createObjectKey(userId, sessionId, request.fileName());
+        String objectKey = objectStorage.createObjectKey(userId, sessionId, request.fileName());
         return new RecordingUploadUrlData(
                 objectKey,
-                presignedUrlProvider.createUploadUrl(objectKey, expiresAt),
+                objectStorage.createUploadUrl(
+                        objectKey, request.mimeType(), request.fileSizeBytes(), expiresAt
+                ),
                 expiresAt,
-                presignedUrlProvider.requiredHeaders(request.mimeType())
+                objectStorage.requiredHeaders(request.mimeType(), request.fileSizeBytes())
         );
     }
 
     private void validate(RecordingUploadUrlRequestDto request) {
-        if (request == null || request.fileName() == null || request.mimeType() == null || request.fileSizeBytes() == null) {
+        if (request == null
+                || request.fileName() == null
+                || request.fileName().isBlank()
+                || request.mimeType() == null
+                || request.fileSizeBytes() == null
+                || request.fileSizeBytes() <= 0) {
             throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
         }
         if (!request.mimeType().equals("audio/webm") && !request.mimeType().equals("audio/mpeg") && !request.mimeType().equals("audio/wav")) {

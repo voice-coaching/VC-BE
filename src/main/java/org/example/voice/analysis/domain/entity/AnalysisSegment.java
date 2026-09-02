@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.example.voice.analysis.domain.model.AnalysisWorkerSegment;
 import org.example.voice.analysis.domain.type.SegmentMatchType;
 import org.example.voice.analysis.domain.type.SegmentResultStatus;
 
@@ -70,4 +71,24 @@ public class AnalysisSegment {
 
     @Column(name = "feedback")
     private String feedback;
+
+    private AnalysisSegment(AnalysisResult analysisResult, AnalysisWorkerSegment source) {
+        this.analysisResult = analysisResult;
+        this.sequenceNo = source.sequenceNo();
+        this.expectedText = source.expectedText();
+        this.recognizedText = source.recognizedText();
+        this.startMs = source.startMs();
+        this.endMs = source.endMs();
+        this.matchType = source.matchType();
+        this.resultStatus = source.resultStatus();
+        this.targetUnit = source.targetUnit();
+        this.errorType = source.errorType();
+        this.pronunciationScore = source.pronunciationScore();
+        this.intonationScore = source.intonationScore();
+        this.feedback = source.feedback();
+    }
+
+    public static AnalysisSegment from(AnalysisResult analysisResult, AnalysisWorkerSegment source) {
+        return new AnalysisSegment(analysisResult, source);
+    }
 }

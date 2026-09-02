@@ -1,11 +1,17 @@
 package org.example.voice.training.application;
 
 import lombok.RequiredArgsConstructor;
+import org.example.voice.analysis.domain.model.AnalysisWorkerRequest;
+import org.example.voice.analysis.domain.model.AnalysisAuthorizationIssue;
+import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
+import org.example.voice.analysis.domain.port.AnalysisAuthorizationIssuer;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.training.domain.model.AnalysisProgressData;
 import org.example.voice.training.domain.model.AnalysisRequestData;
 import org.example.voice.training.domain.model.AnalysisRetryData;
+import org.example.voice.training.domain.model.AnalysisConsentData;
+import org.example.voice.training.domain.model.SelectedRecordingAnalysisData;
 import org.example.voice.training.domain.port.AnalysisJobPublisher;
 import org.example.voice.training.domain.port.TrainingAnalysisReader;
 import org.example.voice.training.domain.port.TrainingAnalysisWriter;
@@ -16,13 +22,17 @@ import org.example.voice.training.domain.type.TrainingSessionStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class TrainingAnalysisRequestService {
 
-    // AI 분석 연동의 중심 서비스다.
-    // 현재는 analysis_results 상태만 만들고 mock publisher를 호출하지만,
-    // 이후 Redis Queue를 붙일 때도 서비스는 AnalysisJobPublisher 포트만 호출하게 유지한다.
+    // 분석 요청의 도메인 검증과 transaction 경계를 소유한다. Redis Stream I/O는 publisher adapter에 숨긴다.
     private static final int MAX_RETRY_COUNT = 3;
 
     private final TrainingSessionService trainingSessionService;
@@ -31,30 +41,28 @@ public class TrainingAnalysisRequestService {
     private final TrainingAnalysisWriter trainingAnalysisWriter;
     private final TrainingSessionWriter trainingSessionWriter;
     private final AnalysisJobPublisher analysisJobPublisher;
+    private final AnalysisAuthorizationIssuer analysisAuthorizationIssuer;
 
     @Transactional
-    public AnalysisRequestData requestAnalysis(Long sessionId, Long userId) {
+    public AnalysisRequestData requestAnalysis(Long sessionId, Long userId, AnalysisConsentData consent) {
         // 1. 분석 요청은 "사용자 소유 세션 + 최종 선택 녹음 + 통과한 음질"이 모두 만족될 때만 가능하다.
         trainingSessionService.assertSessionExists(sessionId, userId);
-        Long recordingId = voiceRecordingReader.findSelectedRecordingId(sessionId, userId)
+        validateConsent(consent);
+        SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.SELECTED_RECORDING_NOT_FOUND));
-        RecordingQualityStatus qualityStatus = voiceRecordingReader.findSelectedRecordingQualityStatus(sessionId, userId)
-                .orElseThrow(() -> new BaseException(ErrorCode.SELECTED_RECORDING_NOT_FOUND));
-        if (qualityStatus != RecordingQualityStatus.PASS) {
+        if (source.qualityStatus() != RecordingQualityStatus.PASS) {
             throw new BaseException(ErrorCode.AUDIO_QUALITY_NOT_ACCEPTABLE);
         }
-        if (trainingAnalysisReader.existsRunningAnalysis(recordingId)) {
+        if (trainingAnalysisReader.existsRunningAnalysis(source.recordingId())) {
             throw new BaseException(ErrorCode.ANALYSIS_ALREADY_RUNNING);
         }
 
-        // 2. 먼저 DB에 PENDING 분석 row를 만든다.
-        // Queue 발행 전 DB 기록을 남겨야, 비동기 작업자가 analysisId로 상태를 추적할 수 있다.
-        AnalysisRequestData result = trainingAnalysisWriter.createPending(recordingId);
+        UUID requestEventId = UUID.randomUUID();
+        AnalysisRequestData result = trainingAnalysisWriter.createPending(source.recordingId(), requestEventId);
         trainingSessionWriter.updateStatus(sessionId, TrainingSessionStatus.ANALYZING);
-
-        // 3. 지금은 로그만 찍는 mock publisher지만, 나중에는 Redis Queue에
-        // analysisId/sessionId/recordingId payload를 넣는 구현체로 교체하면 된다.
-        analysisJobPublisher.publish(result.analysisId(), sessionId, recordingId);
+        analysisJobPublisher.publish(toWorkerRequest(
+                result.analysisId(), requestEventId, source, consent.policyRevision()
+        ));
         return result;
     }
 
@@ -67,23 +75,94 @@ public class TrainingAnalysisRequestService {
     }
 
     @Transactional
-    public AnalysisRetryData retry(Long sessionId, Long userId) {
+    public AnalysisRetryData retry(Long sessionId, Long userId, AnalysisConsentData consent) {
         // 재시도는 실패한 분석만 대상으로 한다.
-        // 실패 row를 다시 PENDING으로 돌리고 같은 최종 녹음을 Redis Queue에 다시 발행하는 흐름을 의도했다.
+        // 실패 row를 새 request event id의 PENDING 상태로 전환하고 outbox에 다시 기록한다.
         trainingSessionService.assertSessionExists(sessionId, userId);
-        Long recordingId = voiceRecordingReader.findSelectedRecordingId(sessionId, userId)
+        validateConsent(consent);
+        SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
         AnalysisProgressData failed = trainingAnalysisReader.findLatestFailedBySelectedRecording(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FAILED));
 
-        int retryCount = trainingAnalysisReader.countFailedAnalysis(recordingId);
+        int retryCount = trainingAnalysisReader.countFailedAnalysis(source.recordingId());
         if (retryCount >= MAX_RETRY_COUNT) {
             throw new BaseException(ErrorCode.MAX_RETRY_EXCEEDED);
         }
 
-        AnalysisRetryData result = trainingAnalysisWriter.retry(failed.analysisId(), recordingId, retryCount + 1);
+        UUID requestEventId = UUID.randomUUID();
+        AnalysisRetryData result = trainingAnalysisWriter.retry(
+                failed.analysisId(),
+                source.recordingId(),
+                retryCount + 1,
+                requestEventId
+        );
         trainingSessionWriter.updateStatus(sessionId, TrainingSessionStatus.ANALYZING);
-        analysisJobPublisher.publish(result.analysisId(), sessionId, recordingId);
+        analysisJobPublisher.publish(toWorkerRequest(
+                result.analysisId(), requestEventId, source, consent.policyRevision()
+        ));
         return result;
+    }
+
+    private AnalysisWorkerRequest toWorkerRequest(
+            Long analysisId,
+            UUID requestEventId,
+            SelectedRecordingAnalysisData source,
+            String consentPolicyRevision
+    ) {
+        try {
+            String scriptSha256 = sha256(source.scriptText());
+            AnalysisAuthorizationGrant grant = analysisAuthorizationIssuer.issue(
+                    new AnalysisAuthorizationIssue(
+                            requestEventId,
+                            analysisId,
+                            source.contentId(),
+                            source.promptRevision(),
+                            scriptSha256,
+                            source.audioObjectKey(),
+                            source.mimeType(),
+                            source.fileSizeBytes(),
+                            source.durationMs(),
+                            source.learningFocus(),
+                            consentPolicyRevision
+                    )
+            );
+            return new AnalysisWorkerRequest(
+                    AnalysisWorkerRequest.SCHEMA_VERSION,
+                    requestEventId,
+                    analysisId,
+                    source.contentId(),
+                    source.promptRevision(),
+                    source.scriptText(),
+                    scriptSha256,
+                    source.audioObjectKey(),
+                    source.mimeType(),
+                    source.fileSizeBytes(),
+                    source.durationMs(),
+                    source.learningFocus(),
+                    grant
+            );
+        } catch (IllegalArgumentException error) {
+            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
+        }
+    }
+
+    private static void validateConsent(AnalysisConsentData consent) {
+        if (consent == null
+                || !Boolean.TRUE.equals(consent.accepted())
+                || consent.policyRevision() == null
+                || consent.policyRevision().isBlank()
+                || consent.policyRevision().length() > 100) {
+            throw new BaseException(ErrorCode.ANALYSIS_CONSENT_REQUIRED);
+        }
+    }
+
+    private static String sha256(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException error) {
+            throw new IllegalStateException("SHA-256 is unavailable", error);
+        }
     }
 }

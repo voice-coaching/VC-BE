@@ -25,6 +25,11 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
         return repository.findOwnedForUpdate(analysisId, userId);
     }
 
+    @Override
+    public Optional<AnalysisResult> findForIngestion(Long analysisId) {
+        return repository.findForIngestion(analysisId);
+    }
+
     public Optional<AnalysisResult> findLatestBySession(Long sessionId, Long userId) {
         return repository
                 .findFirstByRecordingTrainingSessionIdAndRecordingTrainingSessionUserIdAndRecordingSelectedTrueAndRecordingDeletedAtIsNullOrderByCreatedAtDescIdDesc(
@@ -63,6 +68,7 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
         return new AnalysisResultData(
                 result.getId(),
                 result.getStatus(),
+                result.getAnalysisOutcome(),
                 result.getTranscript(),
                 result.getSttConfidence(),
                 result.getOverallScore(),

@@ -7,6 +7,9 @@ import org.example.voice.training.application.TrainingAnalysisRequestService;
 import org.example.voice.training.controller.dto.AnalysisProgressResponseDto;
 import org.example.voice.training.controller.dto.AnalysisRequestResponseDto;
 import org.example.voice.training.controller.dto.AnalysisRetryResponseDto;
+import org.example.voice.training.controller.dto.AnalysisConsentRequestDto;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,11 +27,14 @@ public class TrainingAnalysisController {
     @PostMapping("/{sessionId}/analyze")
     public ApiResponse<AnalysisRequestResponseDto> requestAnalysis(
             @AuthenticationPrincipal LoginUser user,
-            @PathVariable Long sessionId
+            @PathVariable Long sessionId,
+            @Valid @RequestBody AnalysisConsentRequestDto request
     ) {
         return ApiResponse.success(
                 "음성 분석을 요청했습니다.",
-                AnalysisRequestResponseDto.from(trainingAnalysisRequestService.requestAnalysis(sessionId, user.id()))
+                AnalysisRequestResponseDto.from(
+                        trainingAnalysisRequestService.requestAnalysis(sessionId, user.id(), request.toData())
+                )
         );
     }
 
@@ -46,11 +52,14 @@ public class TrainingAnalysisController {
     @PostMapping("/{sessionId}/analysis/retry")
     public ApiResponse<AnalysisRetryResponseDto> retryAnalysis(
             @AuthenticationPrincipal LoginUser user,
-            @PathVariable Long sessionId
+            @PathVariable Long sessionId,
+            @Valid @RequestBody AnalysisConsentRequestDto request
     ) {
         return ApiResponse.success(
                 "음성 분석을 다시 요청했습니다.",
-                AnalysisRetryResponseDto.from(trainingAnalysisRequestService.retry(sessionId, user.id()))
+                AnalysisRetryResponseDto.from(
+                        trainingAnalysisRequestService.retry(sessionId, user.id(), request.toData())
+                )
         );
     }
 }

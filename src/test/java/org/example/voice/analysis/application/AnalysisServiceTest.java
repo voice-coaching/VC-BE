@@ -35,7 +35,7 @@ class AnalysisServiceTest {
     }
 
     private AnalysisResultData result(AnalysisStatus status) {
-        return new AnalysisResultData(1L, status, null, null, null, null, null,
+        return new AnalysisResultData(1L, status, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null);
     }
 }

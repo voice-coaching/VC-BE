@@ -19,6 +19,10 @@ public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResul
     @Query("select a from AnalysisResult a where a.id = :analysisId and a.recording.trainingSession.userId = :userId")
     Optional<AnalysisResult> findOwnedForUpdate(@Param("analysisId") Long analysisId, @Param("userId") Long userId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from AnalysisResult a where a.id = :analysisId")
+    Optional<AnalysisResult> findForIngestion(@Param("analysisId") Long analysisId);
+
     boolean existsByRecordingIdAndStatusIn(Long recordingId, Collection<AnalysisStatus> statuses);
 
     boolean existsByRecordingIdAndStatus(Long recordingId, AnalysisStatus status);

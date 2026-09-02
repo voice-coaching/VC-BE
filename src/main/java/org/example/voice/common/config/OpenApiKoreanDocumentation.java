@@ -92,6 +92,7 @@ public class OpenApiKoreanDocumentation {
                 Map.entry("totalLearningSeconds", "실제 학습한 총 시간(초)"), Map.entry("fileName", "업로드할 원본 음성 파일명"),
                 Map.entry("mimeType", "음성 파일 MIME 타입"), Map.entry("fileSizeBytes", "음성 파일 크기(byte)"),
                 Map.entry("objectKey", "업로드 URL 발급 시 받은 스토리지 객체 키"), Map.entry("durationMs", "녹음 재생 시간(ms)"),
+                Map.entry("accepted", "현재 정책에 따른 음성 분석 처리 명시적 동의 여부"), Map.entry("policyRevision", "화면에 표시한 음성 분석 동의 정책 revision"),
                 Map.entry("feedbackStyle", "재생성할 피드백 스타일"), Map.entry("lastStepId", "마지막으로 완료한 클래스 단계 ID"),
                 Map.entry("progressPercent", "클래스 전체 진행률(0~100)"), Map.entry("type", "조회할 콘텐츠 또는 클래스 유형"),
                 Map.entry("difficulty", "학습 난이도"), Map.entry("status", "조회할 상태"), Map.entry("category", "콘텐츠 카테고리"),
@@ -104,6 +105,7 @@ public class OpenApiKoreanDocumentation {
                 Map.entry("contentId", 1), Map.entry("courseStepId", 3), Map.entry("totalLearningSeconds", 180),
                 Map.entry("fileName", "recording.webm"), Map.entry("mimeType", "audio/webm"), Map.entry("fileSizeBytes", 245760),
                 Map.entry("objectKey", "recordings/1/sample.webm"), Map.entry("durationMs", 15000), Map.entry("feedbackStyle", "COACHING"),
+                Map.entry("accepted", true), Map.entry("policyRevision", "voice-analysis-consent-v1"),
                 Map.entry("progressPercent", 50.0), Map.entry("page", 0), Map.entry("size", 20), Map.entry("limit", 5)
         );
         openApi.getComponents().getSchemas().values().forEach(schema -> {
@@ -159,9 +161,9 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.PATCH, "/api/training-sessions/{sessionId}/recordings/{recordingId}/select", "학습 세션", "분석 대상 녹음 선택", "분석에 사용할 녹음 하나를 선택하고 기존 선택 녹음은 해제합니다.", false);
         add(map, PathItem.HttpMethod.DELETE, "/api/training-sessions/{sessionId}/recordings/{recordingId}", "학습 세션", "녹음 삭제", "내 학습 세션의 녹음을 삭제 처리하며 선택된 녹음이라면 선택 상태도 해제합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/recordings/{recordingId}/playback-url", "학습 세션", "내 녹음 재생 URL 발급", "등록된 내 녹음을 제한된 시간 동안 재생할 수 있는 URL을 발급합니다.", false);
-        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/analyze", "학습 세션", "음성 분석 요청", "선택된 녹음에 대해 STT와 발음·억양 분석 작업을 요청하고 분석 ID를 반환합니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/analyze", "학습 세션", "음성 분석 요청", "명시적 동의를 확인하고 선택된 녹음에 대해 Seungun 발음 분석 작업을 요청합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/training-sessions/{sessionId}/analysis/status", "학습 세션", "음성 분석 진행 상태 조회", "학습 세션의 최신 분석 작업이 대기, 처리, 완료 또는 실패 중 어느 상태인지 조회합니다.", false);
-        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/analysis/retry", "학습 세션", "실패한 음성 분석 재시도", "실패한 최신 분석 작업을 다시 대기 상태로 전환해 재처리를 요청합니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/analysis/retry", "학습 세션", "실패한 음성 분석 재시도", "새 명시적 동의를 확인하고 실패한 최신 분석 작업을 새 request generation으로 재요청합니다.", false);
 
         add(map, PathItem.HttpMethod.GET, "/api/analyses/{analysisId}", "분석 결과", "종합 분석 결과 조회", "완료된 분석의 STT 문장, 종합·발음·억양·속도 점수와 강점, 개선점, 종합 피드백을 조회합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/analyses/{analysisId}/segments", "분석 결과", "음절별 분석 결과 조회", "분석 결과의 구간별 기대 문장, 인식 문장, 시간 범위, 일치 유형, 점수와 피드백을 페이지로 조회합니다.", false);

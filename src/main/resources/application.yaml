@@ -55,4 +55,35 @@ app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
+storage:
+  enabled: ${OBJECT_STORAGE_ENABLED:false}
+  bucket: ${OBJECT_STORAGE_BUCKET:}
+  region: ${OBJECT_STORAGE_REGION:}
+  endpoint: ${OBJECT_STORAGE_ENDPOINT:}
+  path-style-access: ${OBJECT_STORAGE_PATH_STYLE_ACCESS:false}
+  recordings-prefix: ${OBJECT_STORAGE_RECORDINGS_PREFIX:recordings/}
 
+analysis:
+  authorization:
+    key-id: ${ANALYSIS_AUTHORIZATION_KEY_ID:}
+    signing-secret-base64: ${ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64:}
+    consent-policy-revision: ${ANALYSIS_CONSENT_POLICY_REVISION:}
+    grant-ttl: ${ANALYSIS_AUTHORIZATION_GRANT_TTL:PT5M}
+  stream:
+    enabled: ${ANALYSIS_STREAM_ENABLED:false}
+    redis-host: ${ANALYSIS_REDIS_HOST:localhost}
+    redis-port: ${ANALYSIS_REDIS_PORT:6379}
+    redis-username: ${ANALYSIS_REDIS_USERNAME:}
+    redis-password: ${ANALYSIS_REDIS_PASSWORD:}
+    redis-ssl-enabled: ${ANALYSIS_REDIS_SSL_ENABLED:false}
+    request-stream: ${ANALYSIS_REQUEST_STREAM:analysis:request:v1}
+    result-stream: ${ANALYSIS_RESULT_STREAM:analysis:result:v1}
+    result-consumer-group: ${ANALYSIS_RESULT_CONSUMER_GROUP:backend-analysis-result-workers}
+    result-consumer-name: ${ANALYSIS_RESULT_CONSUMER_NAME:backend-analysis-result-1}
+    result-dead-letter-stream: ${ANALYSIS_RESULT_DLQ_STREAM:analysis:result:dlq:v1}
+    outbox-poll-interval: ${ANALYSIS_OUTBOX_POLL_INTERVAL:PT1S}
+    result-poll-interval: ${ANALYSIS_RESULT_POLL_INTERVAL:PT1S}
+    result-block: ${ANALYSIS_RESULT_BLOCK:PT1S}
+    pending-claim-idle: ${ANALYSIS_PENDING_CLAIM_IDLE:PT5M}
+    batch-size: ${ANALYSIS_STREAM_BATCH_SIZE:25}
+    max-retries: ${ANALYSIS_STREAM_MAX_RETRIES:3}

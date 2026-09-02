@@ -1,0 +1,166 @@
+package org.example.voice.analysis.domain.model;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.example.voice.analysis.domain.type.AnalysisOutcome;
+import org.example.voice.analysis.domain.type.AnalysisStatus;
+import org.example.voice.analysis.domain.type.SpeedStatus;
+
+import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+
+/** Versioned AI-to-Backend result payload. */
+@JsonIgnoreProperties(ignoreUnknown = false)
+public record AnalysisWorkerResult(
+        String schemaVersion,
+        UUID eventId,
+        UUID requestEventId,
+        Long analysisId,
+        AnalysisStatus status,
+        AnalysisOutcome outcome,
+        String failureCode,
+        String failureReason,
+        String transcript,
+        BigDecimal sttConfidence,
+        String sttModelName,
+        BigDecimal overallScore,
+        BigDecimal pronunciationScore,
+        BigDecimal intonationScore,
+        BigDecimal speedWpm,
+        SpeedStatus speedStatus,
+        BigDecimal stressScore,
+        BigDecimal pauseScore,
+        String strengthsText,
+        String weaknessesText,
+        String summaryFeedback,
+        String workerRevision,
+        String pipelineRevision,
+        String audioSha256,
+        List<AnalysisWorkerSegment> segments
+) {
+    public static final String SCHEMA_VERSION = "voice-coaching.analysis-result.v1";
+
+    public AnalysisWorkerResult {
+        requireEquals(SCHEMA_VERSION, schemaVersion, "schemaVersion");
+        Objects.requireNonNull(eventId, "eventId");
+        Objects.requireNonNull(requestEventId, "requestEventId");
+        requirePositive(analysisId, "analysisId");
+        Objects.requireNonNull(status, "status");
+        segments = segments == null ? List.of() : List.copyOf(segments);
+        validateTerminalState(status, outcome, failureCode, failureReason, segments);
+        requireLength(transcript, 20_000, "transcript");
+        requireLength(sttModelName, 100, "sttModelName");
+        requireLength(failureCode, 100, "failureCode");
+        requireLength(failureReason, 500, "failureReason");
+        requireLength(strengthsText, 20_000, "strengthsText");
+        requireLength(weaknessesText, 20_000, "weaknessesText");
+        requireLength(summaryFeedback, 20_000, "summaryFeedback");
+        requireLength(workerRevision, 100, "workerRevision");
+        requireLength(pipelineRevision, 100, "pipelineRevision");
+        requireSha256(audioSha256, "audioSha256");
+        requireScore(overallScore, "overallScore");
+        requireScore(pronunciationScore, "pronunciationScore");
+        requireScore(intonationScore, "intonationScore");
+        requireScore(stressScore, "stressScore");
+        requireScore(pauseScore, "pauseScore");
+        if (status != AnalysisStatus.COMPLETED && hasAnalysisPayload(
+                transcript,
+                sttConfidence,
+                sttModelName,
+                overallScore,
+                pronunciationScore,
+                intonationScore,
+                speedWpm,
+                speedStatus,
+                stressScore,
+                pauseScore,
+                strengthsText,
+                weaknessesText,
+                summaryFeedback,
+                audioSha256
+        )) {
+            throw new IllegalArgumentException(status + " result must not contain analysis payload");
+        }
+        if (sttConfidence != null && (sttConfidence.signum() < 0 || sttConfidence.compareTo(BigDecimal.ONE) > 0)) {
+            throw new IllegalArgumentException("sttConfidence must be between 0 and 1");
+        }
+        if (speedWpm != null && speedWpm.signum() < 0) {
+            throw new IllegalArgumentException("speedWpm must not be negative");
+        }
+        Set<Integer> sequenceNumbers = new HashSet<>();
+        for (AnalysisWorkerSegment segment : segments) {
+            if (!sequenceNumbers.add(segment.sequenceNo())) {
+                throw new IllegalArgumentException("segments contain duplicate sequenceNo");
+            }
+        }
+    }
+
+    private static void validateTerminalState(
+            AnalysisStatus status,
+            AnalysisOutcome outcome,
+            String failureCode,
+            String failureReason,
+            List<AnalysisWorkerSegment> segments
+    ) {
+        switch (status) {
+            case PROCESSING -> {
+                if (outcome != null || failureCode != null || failureReason != null || !segments.isEmpty()) {
+                    throw new IllegalArgumentException("PROCESSING result must not contain terminal payload");
+                }
+            }
+            case COMPLETED -> {
+                if (outcome == null || failureCode != null || failureReason != null) {
+                    throw new IllegalArgumentException("COMPLETED result must contain only an outcome");
+                }
+            }
+            case FAILED -> {
+                if (outcome != null || failureCode == null || failureReason == null || !segments.isEmpty()) {
+                    throw new IllegalArgumentException("FAILED result must contain a failure code and reason only");
+                }
+            }
+            case PENDING -> throw new IllegalArgumentException("PENDING is not a worker result status");
+        }
+    }
+
+    private static void requireEquals(String expected, String value, String field) {
+        if (!expected.equals(value)) {
+            throw new IllegalArgumentException(field + " is unsupported");
+        }
+    }
+
+    private static void requirePositive(Long value, String field) {
+        if (value == null || value <= 0) {
+            throw new IllegalArgumentException(field + " must be positive");
+        }
+    }
+
+    private static void requireLength(String value, int maxLength, String field) {
+        if (value != null && value.length() > maxLength) {
+            throw new IllegalArgumentException(field + " is too long");
+        }
+    }
+
+    private static void requireSha256(String value, String field) {
+        if (value != null && !value.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException(field + " must be a lower-case SHA-256 digest");
+        }
+    }
+
+    private static void requireScore(BigDecimal value, String field) {
+        if (value != null && (value.signum() < 0 || value.compareTo(BigDecimal.valueOf(100)) > 0)) {
+            throw new IllegalArgumentException(field + " must be between 0 and 100");
+        }
+    }
+
+    private static boolean hasAnalysisPayload(Object... values) {
+        for (Object value : values) {
+            if (value != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+}

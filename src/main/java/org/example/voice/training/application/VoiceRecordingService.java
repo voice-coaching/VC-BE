@@ -10,6 +10,7 @@ import org.example.voice.training.domain.model.VoiceRecordingData;
 import org.example.voice.training.domain.model.VoiceRecordingRegisteredData;
 import org.example.voice.training.domain.port.VoiceRecordingReader;
 import org.example.voice.training.domain.port.VoiceRecordingWriter;
+import org.example.voice.training.domain.port.RecordingObjectStoragePort;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class VoiceRecordingService {
     private final VoiceRecordingReader voiceRecordingReader;
     private final VoiceRecordingWriter voiceRecordingWriter;
     private final TrainingSessionService trainingSessionService;
+    private final RecordingObjectStoragePort objectStorage;
 
     @Transactional
     public VoiceRecordingRegisteredData register(Long sessionId, RecordingRegisterRequestDto request, Long userId) {
@@ -35,6 +37,9 @@ public class VoiceRecordingService {
         if (voiceRecordingReader.existsByObjectKey(request.objectKey())) {
             throw new BaseException(ErrorCode.RECORDING_ALREADY_REGISTERED);
         }
+        objectStorage.assertUploadedObject(
+                request.objectKey(), request.mimeType(), request.fileSizeBytes()
+        );
 
         int attemptNo = voiceRecordingReader.countBySessionId(sessionId) + 1;
         // 음질검사 AI가 아직 없으므로 등록 직후 qualityStatus는 PENDING이다.
@@ -87,7 +92,13 @@ public class VoiceRecordingService {
     }
 
     private void validateRegisterRequest(RecordingRegisterRequestDto request) {
-        if (request == null || request.objectKey() == null || request.mimeType() == null) {
+        if (request == null
+                || request.objectKey() == null
+                || request.mimeType() == null
+                || request.fileSizeBytes() == null
+                || request.fileSizeBytes() <= 0
+                || request.durationMs() == null
+                || request.durationMs() <= 0) {
             throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
         }
     }

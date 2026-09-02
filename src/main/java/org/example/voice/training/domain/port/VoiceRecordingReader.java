@@ -1,6 +1,7 @@
 package org.example.voice.training.domain.port;
 
 import org.example.voice.training.domain.model.RecordingPlaybackUrlData;
+import org.example.voice.training.domain.model.SelectedRecordingAnalysisData;
 import org.example.voice.training.domain.model.VoiceRecordingData;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
 
@@ -24,6 +25,8 @@ public interface VoiceRecordingReader {
     Optional<Long> findSelectedRecordingId(Long sessionId, Long userId);
 
     Optional<RecordingQualityStatus> findSelectedRecordingQualityStatus(Long sessionId, Long userId);
+
+    Optional<SelectedRecordingAnalysisData> findSelectedForAnalysis(Long sessionId, Long userId);
 
     Optional<RecordingPlaybackUrlData> findPlaybackUrl(Long recordingId, Long userId);
 }

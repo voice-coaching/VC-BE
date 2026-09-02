@@ -52,7 +52,7 @@ class MyPagePersistenceAdapterTest {
         VoiceRecording recording = VoiceRecording.create(session, 1, "audio", "audio/webm", 100L, 1000);
         set(recording, "selected", true); set(recording, "qualityStatus", RecordingQualityStatus.PASS);
         entityManager.persist(recording);
-        AnalysisResult analysis = AnalysisResult.pending(recording);
+        AnalysisResult analysis = AnalysisResult.pending(recording, java.util.UUID.randomUUID());
         set(analysis, "status", AnalysisStatus.COMPLETED); set(analysis, "transcript", "쌀을 씻어요");
         set(analysis, "overallScore", new BigDecimal("80")); set(analysis, "pronunciationScore", new BigDecimal("70"));
         set(analysis, "intonationScore", new BigDecimal("90")); set(analysis, "analyzedAt", now);
