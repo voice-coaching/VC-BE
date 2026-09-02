@@ -102,3 +102,7 @@ analysis:
     pending-claim-idle: ${ANALYSIS_PENDING_CLAIM_IDLE:PT5M}
     batch-size: ${ANALYSIS_STREAM_BATCH_SIZE:25}
     max-retries: ${ANALYSIS_STREAM_MAX_RETRIES:3}
+    max-concurrent-per-user: ${ANALYSIS_MAX_CONCURRENT_PER_USER:3}
+    execution-timeout: ${ANALYSIS_EXECUTION_TIMEOUT:PT15M}
+    timeout-sweep-interval: ${ANALYSIS_TIMEOUT_SWEEP_INTERVAL:PT1M}
+    timeout-sweep-batch-size: ${ANALYSIS_TIMEOUT_SWEEP_BATCH_SIZE:100}

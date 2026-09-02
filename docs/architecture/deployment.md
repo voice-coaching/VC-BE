@@ -15,6 +15,8 @@ fail-closed하며 PENDING 결과나 outbox event를 저장하지 않는다.
 - Result DLQ: `analysis:result:dlq:v1`
 - Result consumer group: `backend-analysis-result-workers`
 - Authentication: Redis ACL plus TLS for cross-host traffic
+- Admission: `ANALYSIS_MAX_CONCURRENT_PER_USER` (default `3`), serialized by a PostgreSQL user-row lock
+- Stale job recovery: `ANALYSIS_EXECUTION_TIMEOUT=PT15M`, `ANALYSIS_TIMEOUT_SWEEP_INTERVAL=PT1M`
 
 The analysis worker must run on the same private network. Neither Redis endpoint is
 publicly exposed. Secrets are injected at deployment time and never committed in an
@@ -22,6 +24,12 @@ environment file tracked by Git.
 
 See [the versioned Backend-AI contract](../api/ai-redis-stream-contract.md) for
 payloads, ACK timing, reclaim and retry policy.
+
+The timeout must exceed the approved worst-case worker wall time plus queue and result
+ingestion delay. Lowering it during a backlog can deliberately fail valid jobs, so
+change it only after checking Redis group lag and pending counts. A session cancel or
+timeout makes the DB generation terminal; later Stream delivery is harmless and is
+ACKed without restoring the result.
 
 `scripts/run_analysis_redis_integration.sh`는 digest-pinned 임시 Redis와 합성
 TLS 인증서를 만들고 request XADD, result ingest 후 ACK를 검증한 뒤 모두 제거한다.

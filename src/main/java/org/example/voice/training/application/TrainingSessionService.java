@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.analysis.domain.port.AnalysisCancellation;
 import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.example.voice.training.controller.dto.TrainingSessionCreateRequestDto;
 import org.example.voice.training.domain.model.TrainingSessionCancellationData;
@@ -28,6 +29,7 @@ public class TrainingSessionService {
     private final TrainingAnalysisReader trainingAnalysisReader;
     private final ProcessingConsentLedger processingConsentLedger;
     private final RecordingUploadIntentRegistry uploadIntentRegistry;
+    private final AnalysisCancellation analysisCancellation;
 
     @Transactional
     public TrainingSessionCreatedData create(TrainingSessionCreateRequestDto request, Long userId) {
@@ -74,6 +76,7 @@ public class TrainingSessionService {
             throw new BaseException(ErrorCode.SESSION_ALREADY_FINISHED);
         }
         TrainingSessionCancellationData canceled = trainingSessionWriter.cancel(sessionId);
+        analysisCancellation.cancelForSession(sessionId);
         processingConsentLedger.revokeForSession(userId, sessionId);
         uploadIntentRegistry.expireForSession(userId, sessionId);
         return canceled;

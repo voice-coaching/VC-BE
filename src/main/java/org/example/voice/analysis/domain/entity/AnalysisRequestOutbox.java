@@ -83,6 +83,15 @@ public class AnalysisRequestOutbox {
         this.lastErrorCode = null;
     }
 
+    public boolean cancelPending(String errorCode) {
+        if (status != AnalysisRequestOutboxStatus.PENDING) {
+            return false;
+        }
+        this.status = AnalysisRequestOutboxStatus.FAILED;
+        this.lastErrorCode = errorCode;
+        return true;
+    }
+
     /** @return true when this record reached its final delivery failure. */
     public boolean recordDispatchFailure(String errorCode, int maxAttempts) {
         this.attemptCount += 1;

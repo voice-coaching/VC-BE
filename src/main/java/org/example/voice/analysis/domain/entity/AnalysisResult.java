@@ -237,6 +237,23 @@ public class AnalysisResult {
         return true;
     }
 
+    /**
+     * Discards every result for a session the user canceled. A completed AI
+     * result is still non-authoritative until the training session itself is
+     * completed, so cancellation deliberately wins a concurrent late result.
+     */
+    public boolean cancel(String code, String reason) {
+        if (status == AnalysisStatus.FAILED && code.equals(failureCode)) {
+            return false;
+        }
+        clearWorkerResult();
+        this.status = AnalysisStatus.FAILED;
+        this.failureCode = code;
+        this.failureReason = reason;
+        this.analyzedAt = OffsetDateTime.now(SEOUL_ZONE_ID);
+        return true;
+    }
+
     public OffsetDateTime updatedAt() {
         return analyzedAt == null ? createdAt : analyzedAt;
     }

@@ -43,6 +43,10 @@ job messages.
 | `ANALYSIS_RESULT_DLQ_STREAM` | Y | Default `analysis:result:dlq:v1`. |
 | `ANALYSIS_PENDING_CLAIM_IDLE` | Y | Minimum pending idle time before reclaim; default `PT5M`. |
 | `ANALYSIS_STREAM_MAX_RETRIES` | Y | Dispatch/result retry cap; default `3`. |
+| `ANALYSIS_MAX_CONCURRENT_PER_USER` | Y | DB-serialized per-user concurrent job cap; default `3`. |
+| `ANALYSIS_EXECUTION_TIMEOUT` | Y | Maximum time a generation may remain PENDING/PROCESSING; default `PT15M`. |
+| `ANALYSIS_TIMEOUT_SWEEP_INTERVAL` | Y | Stale-generation sweep interval; default `PT1M`. |
+| `ANALYSIS_TIMEOUT_SWEEP_BATCH_SIZE` | Y | Maximum rows locked by one timeout transaction; default `100`. |
 | `ANALYSIS_AUTHORIZATION_KEY_ID` | Y | Active HMAC key identifier; `[A-Za-z0-9._-]`, max 100. |
 | `ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64` | Y | Secret-manager value decoding to at least 32 bytes. Never log or commit it. |
 | `ANALYSIS_CONSENT_POLICY_REVISION` | Y | Exact active consent revision accepted from the client. |
@@ -245,6 +249,9 @@ the request; the request remains pending until the worker publishes a terminal
   dispatch failure changes the matching analysis to `FAILED`.
 - PostgreSQL is the permanent result store. Redis holds transport messages only; no
   audio blob, token, URL, raw exception, or user identifier is placed in a stream.
+- Analysis admission takes a pessimistic lock on the owning user row before counting
+  PENDING/PROCESSING jobs. This makes the per-user concurrent cap effective across
+  backend instances rather than being an in-memory rate limit.
 
 ## Retry, reclaim, and dead letter handling
 
@@ -267,6 +274,14 @@ the request; the request remains pending until the worker publishes a terminal
    `analysis:request:dlq:v1` with only the source Stream ID, original payload, and a
    stable failure code, then ACKs it. Request-DLQ access and replay are restricted
    operator actions.
+7. A DB sweeper changes a generation that exceeds `ANALYSIS_EXECUTION_TIMEOUT` to
+   `FAILED`, prevents an unpublished outbox record from being dispatched, and revokes
+   active processing consent for that session. A result that arrives after that point
+   is ACKed as a duplicate and cannot revive the failed generation.
+8. Session cancellation fails and clears every non-failed analysis result, deletes its
+   derived segments, and prevents pending outbox dispatch before consent and media are
+   revoked. Cancellation deliberately wins even when a terminal result arrived just
+   before the session transaction acquired the analysis lock.
 
 ## Public API impact
 

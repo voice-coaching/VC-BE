@@ -16,6 +16,7 @@ import org.example.voice.training.domain.model.AnalysisProgressData;
 import org.example.voice.training.domain.model.AnalysisRetryData;
 import org.example.voice.training.domain.model.SelectedRecordingAnalysisData;
 import org.example.voice.training.domain.port.AnalysisJobPublisher;
+import org.example.voice.training.domain.port.AnalysisAdmissionGuard;
 import org.example.voice.training.domain.port.TrainingAnalysisReader;
 import org.example.voice.training.domain.port.TrainingAnalysisWriter;
 import org.example.voice.training.domain.port.TrainingSessionWriter;
@@ -42,6 +43,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 @ExtendWith(MockitoExtension.class)
 class TrainingAnalysisRequestServiceTest {
@@ -54,6 +56,7 @@ class TrainingAnalysisRequestServiceTest {
     @Mock private AnalysisJobPublisher analysisJobPublisher;
     @Mock private AnalysisAuthorizationIssuer analysisAuthorizationIssuer;
     @Mock private ProcessingConsentLedger processingConsentLedger;
+    @Mock private AnalysisAdmissionGuard analysisAdmissionGuard;
 
     @Test
     void createsTrustedWorkerRequestAndPersistsItsEventGeneration() {
@@ -133,6 +136,20 @@ class TrainingAnalysisRequestServiceTest {
     }
 
     @Test
+    void rejectsAUserWhoseConcurrentAnalysisQuotaIsExhaustedBeforeConsent() {
+        doThrow(new BaseException(ErrorCode.ANALYSIS_CONCURRENT_LIMIT_EXCEEDED))
+                .when(analysisAdmissionGuard).acquireAndAssertAvailable(9L);
+
+        assertThatThrownBy(() -> service().requestAnalysis(7L, 9L, consent()))
+                .isInstanceOfSatisfying(BaseException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.ANALYSIS_CONCURRENT_LIMIT_EXCEEDED));
+
+        verify(processingConsentLedger, never()).grantVoiceAnalysis(any(), any(), any(), any(), any(), any());
+        verify(trainingAnalysisWriter, never()).createPending(any(), any());
+    }
+
+    @Test
     void rejectsUnsupportedCombinedFocusBeforeConsentOrAnalysisState() {
         SelectedRecordingAnalysisData source = new SelectedRecordingAnalysisData(
                 50L,
@@ -201,7 +218,8 @@ class TrainingAnalysisRequestServiceTest {
                 trainingSessionWriter,
                 analysisJobPublisher,
                 analysisAuthorizationIssuer,
-                processingConsentLedger
+                processingConsentLedger,
+                analysisAdmissionGuard
         );
     }
 

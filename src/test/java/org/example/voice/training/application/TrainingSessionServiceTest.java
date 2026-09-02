@@ -1,6 +1,7 @@
 package org.example.voice.training.application;
 
 import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.analysis.domain.port.AnalysisCancellation;
 import org.example.voice.training.domain.model.TrainingSessionCancellationData;
 import org.example.voice.training.domain.port.TrainingAnalysisReader;
 import org.example.voice.training.domain.port.TrainingSessionReader;
@@ -25,12 +26,14 @@ class TrainingSessionServiceTest {
         TrainingSessionWriter writer = mock(TrainingSessionWriter.class);
         ProcessingConsentLedger consentLedger = mock(ProcessingConsentLedger.class);
         RecordingUploadIntentRegistry uploadIntentRegistry = mock(RecordingUploadIntentRegistry.class);
+        AnalysisCancellation analysisCancellation = mock(AnalysisCancellation.class);
         TrainingSessionService service = new TrainingSessionService(
                 reader,
                 writer,
                 mock(TrainingAnalysisReader.class),
                 consentLedger,
-                uploadIntentRegistry
+                uploadIntentRegistry,
+                analysisCancellation
         );
         OffsetDateTime canceledAt = OffsetDateTime.now();
         when(reader.findSessionStatus(7L, 9L)).thenReturn(Optional.of(TrainingSessionStatus.ANALYZING));
@@ -43,5 +46,6 @@ class TrainingSessionServiceTest {
         assertThat(result.canceledAt()).isEqualTo(canceledAt);
         verify(consentLedger).revokeForSession(9L, 7L);
         verify(uploadIntentRegistry).expireForSession(9L, 7L);
+        verify(analysisCancellation).cancelForSession(7L);
     }
 }

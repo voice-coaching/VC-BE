@@ -16,4 +16,10 @@ public interface AnalysisRequestOutboxJpaRepository extends JpaRepository<Analys
             AnalysisRequestOutboxStatus status,
             OffsetDateTime now
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<AnalysisRequestOutbox> findByAnalysisResultIdAndStatus(
+            Long analysisId,
+            AnalysisRequestOutboxStatus status
+    );
 }

@@ -16,6 +16,7 @@ import org.example.voice.training.domain.model.AnalysisRetryData;
 import org.example.voice.training.domain.model.AnalysisConsentData;
 import org.example.voice.training.domain.model.SelectedRecordingAnalysisData;
 import org.example.voice.training.domain.port.AnalysisJobPublisher;
+import org.example.voice.training.domain.port.AnalysisAdmissionGuard;
 import org.example.voice.training.domain.port.TrainingAnalysisReader;
 import org.example.voice.training.domain.port.TrainingAnalysisWriter;
 import org.example.voice.training.domain.port.TrainingSessionWriter;
@@ -43,11 +44,13 @@ public class TrainingAnalysisRequestService {
     private final AnalysisJobPublisher analysisJobPublisher;
     private final AnalysisAuthorizationIssuer analysisAuthorizationIssuer;
     private final ProcessingConsentLedger processingConsentLedger;
+    private final AnalysisAdmissionGuard analysisAdmissionGuard;
 
     @Transactional
     public AnalysisRequestData requestAnalysis(Long sessionId, Long userId, AnalysisConsentData consent) {
         // 1. 분석 요청은 "사용자 소유 세션 + 최종 선택 녹음 + 통과한 음질"이 모두 만족될 때만 가능하다.
         trainingSessionService.assertSessionExists(sessionId, userId);
+        analysisAdmissionGuard.acquireAndAssertAvailable(userId);
         validateConsent(consent);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.SELECTED_RECORDING_NOT_FOUND));
@@ -92,6 +95,7 @@ public class TrainingAnalysisRequestService {
         // 재시도는 실패한 분석만 대상으로 한다.
         // 실패 row를 새 request event id의 PENDING 상태로 전환하고 outbox에 다시 기록한다.
         trainingSessionService.assertSessionExists(sessionId, userId);
+        analysisAdmissionGuard.acquireAndAssertAvailable(userId);
         validateConsent(consent);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));

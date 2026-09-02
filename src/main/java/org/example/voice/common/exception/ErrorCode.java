@@ -66,6 +66,7 @@ public enum ErrorCode {
     ANALYSIS_CONSENT_REQUIRED(HttpStatus.BAD_REQUEST, "음성 분석을 위한 명시적 동의가 필요합니다."),
     ANALYSIS_CONSENT_POLICY_MISMATCH(HttpStatus.CONFLICT, "현재 동의 정책을 다시 확인해 주세요."),
     ANALYSIS_ALREADY_RUNNING(HttpStatus.CONFLICT, "이미 분석이 진행 중입니다."),
+    ANALYSIS_CONCURRENT_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "동시에 처리할 수 있는 분석 요청 수를 초과했습니다."),
     ANALYSIS_ALREADY_REQUESTED(HttpStatus.CONFLICT, "이미 분석 요청 이력이 있습니다. 실패한 요청은 재시도 API를 이용해 주세요."),
     ANALYSIS_NOT_FOUND(HttpStatus.NOT_FOUND, "분석 요청 기록이 없습니다."),
     ANALYSIS_NOT_FAILED(HttpStatus.CONFLICT, "실패한 분석만 재시도할 수 있습니다."),

@@ -126,7 +126,7 @@
 | `RECORDING` | `UPLOADING` | 녹음 업로드 URL 발급 또는 업로드 시작 | 세션 소유권, 파일 조건 | presigned URL 발급 |
 | `RECORDING` or `UPLOADING` | `ANALYZING` | `POST /api/training-sessions/{sessionId}/analyze` | 최종 녹음 선택, 품질 `PASS`, 분석 중복 없음 | `analysis_results`와 request outbox를 한 transaction으로 생성 |
 | `ANALYZING` | `COMPLETED` | `POST /api/training-sessions/{sessionId}/complete` | 선택 녹음의 분석 완료 | 완료 시간 저장 |
-| `RECORDING` or `UPLOADING` or `ANALYZING` | `CANCELED` | `POST /api/training-sessions/{sessionId}/cancel` | terminal 상태 아님 | 취소 시간 저장, active processing consent 철회, 모든 세션 녹음과 미완료 upload intent를 durable 삭제 outbox에 기록 |
+| `RECORDING` or `UPLOADING` or `ANALYZING` | `CANCELED` | `POST /api/training-sessions/{sessionId}/cancel` | terminal 상태 아님 | 취소 시간 저장, 미발행 분석 중단/파생 결과 폐기, active processing consent 철회, 모든 세션 녹음과 미완료 upload intent를 durable 삭제 outbox에 기록 |
 | any non-terminal | `FAILED` | 내부 처리 실패 | 실패 사유 존재 | 실패 사유 기록 대상 |
 | none | `RecordingQualityStatus.PASS` | backend media normalization | owner/consent/container/codec/digest 및 기술 QC 통과 | canonical WAV 등록, 분석 요청 가능 |
 | none | `LOW_VOLUME` | backend media normalization | RMS 기준 미달 | canonical WAV 등록, 재녹음 안내 |
@@ -137,7 +137,8 @@
 | none | `AnalysisStatus.PENDING` | 분석 요청 생성 | 선택 녹음 존재 | request generation UUID와 durable outbox 생성 |
 | `PENDING` | `PROCESSING` | AI worker processing result 수신 | `requestEventId` 일치 | 현재 generation의 상태만 갱신 |
 | `PENDING` or `PROCESSING` | `COMPLETED` | AI worker terminal success 수신 | outcome 및 payload schema 검증 | 결과와 segment를 원자 반영 |
-| `PENDING` or `PROCESSING` | `FAILED` | AI worker 실패, outbox retry 소진, 또는 결과 delivery retry 소진 | `requestEventId`와 안전한 실패 코드 일치 | retry 가능 상태 |
+| `PENDING` or `PROCESSING` | `FAILED` | AI worker 실패, outbox/result retry 소진, 실행 timeout, 또는 세션 취소 | active generation과 안전한 실패 코드 | retry 가능 상태; 세션 취소면 재시도 불가 |
+| `COMPLETED` | `FAILED` | 분석 완료 후 세션 취소 | 세션이 아직 terminal completed가 아님 | 파생 결과/segment 폐기, 늦은 결과 재적용 금지 |
 | `FAILED` | `PENDING` | `POST /api/training-sessions/{sessionId}/analysis/retry` | 실패 상태, 영속 retry count 3회 제한 | 잠근 분석 행의 retry count 증가, 새 request generation과 outbox record 생성 |
 | none | `CourseProgressStatus.NOT_STARTED` | 진도 조회 시 record 없음 | 사용자/클래스 존재 | 응답용 기본 상태 |
 | none | `CourseProgressStatus.IN_PROGRESS` | `POST /api/courses/{courseId}/start` | 클래스 존재, 게시 상태 | `user_course_progress` 생성 |

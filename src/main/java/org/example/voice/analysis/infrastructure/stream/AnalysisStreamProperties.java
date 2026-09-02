@@ -31,4 +31,8 @@ public class AnalysisStreamProperties {
     private Duration pendingClaimIdle = Duration.ofMinutes(5);
     private int batchSize = 25;
     private int maxRetries = 3;
+    private int maxConcurrentPerUser = 3;
+    private Duration executionTimeout = Duration.ofMinutes(15);
+    private Duration timeoutSweepInterval = Duration.ofMinutes(1);
+    private int timeoutSweepBatchSize = 100;
 }

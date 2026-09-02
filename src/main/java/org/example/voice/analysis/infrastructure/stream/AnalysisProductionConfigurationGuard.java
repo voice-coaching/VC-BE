@@ -36,9 +36,19 @@ public class AnalysisProductionConfigurationGuard {
                 || stream.getPendingClaimIdle().isNegative()) {
             throw new IllegalStateException("analysis_stream_configuration_invalid");
         }
+        if (stream.getMaxConcurrentPerUser() <= 0
+                || invalidDuration(stream.getExecutionTimeout())
+                || invalidDuration(stream.getTimeoutSweepInterval())
+                || stream.getTimeoutSweepBatchSize() <= 0) {
+            throw new IllegalStateException("analysis_execution_configuration_invalid");
+        }
     }
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private static boolean invalidDuration(java.time.Duration value) {
+        return value == null || value.isZero() || value.isNegative();
     }
 }

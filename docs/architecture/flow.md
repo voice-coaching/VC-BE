@@ -327,7 +327,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - 녹음 품질이 분석 가능한 상태여야 한다.
 - Steps:
   1. `TrainingAnalysisRequestService`가 세션과 최종 녹음 존재 여부를 확인한다.
-  2. 이미 진행 중인 분석이 있는지 확인한다.
+  2. 사용자 row를 잠근 뒤 전체 세션의 동시 PENDING/PROCESSING 분석 수와 선택 녹음의 중복 요청을 확인한다.
   3. 명시적 동의를 owner/session/recording/request generation/policy/audio digest와 결합한 opaque receipt로 영속화한다.
   4. 분석 결과 row를 `PENDING`과 새 request event id로 만들고, 같은 DB transaction에 outbox event를 저장한다.
   5. outbox dispatcher가 versioned request payload를 전용 Redis Stream에 at-least-once로 발행한다.
@@ -342,6 +342,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - 선택된 녹음 존재 여부
   - 분석 가능한 녹음 품질
   - 분석 중복 요청 여부와 active request event id 일치 여부
+  - 사용자별 동시 분석 상한
   - retry 가능 상태와 최대 재시도 횟수
 - Empty state:
   - 분석 결과가 아직 없으면 상태 API에서 진행 중 상태를 반환한다.
@@ -352,6 +353,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - 품질 미달은 422
   - 안전한 object key가 아닌 legacy URL 또는 유효하지 않은 분석 source는 422
   - 이미 분석 중이면 409
+  - 사용자별 동시 분석 상한을 넘으면 429
   - 분석 결과 없음은 404
   - 재시도 불가능 상태는 409
   - 전용 분석 Stream이 비활성화되었거나 구성되지 않았으면 503
@@ -360,6 +362,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 - Retry or recovery:
   - FAILED 상태의 분석은 retry API로 재시도할 수 있다. 재시도마다 새 request event id를 사용하므로 이전 결과는 반영하지 않는다.
   - 요청 발행 또는 결과 반영이 최대 횟수를 넘기면 원본 event를 DLQ에 남기고 현재 분석을 `FAILED`로 종료한다.
+  - PENDING/PROCESSING generation이 설정된 실행 제한 시간을 넘기면 sweeper가 `FAILED`로 종료하고 동의를 철회한다.
   - 피드백 재생성은 분석 데이터는 유지하고 AI summary만 다시 생성한다.
   - 캐시 값은 TTL 만료 후 다음 조회에서 DB 값으로 다시 채워진다.
 - Side effects:
@@ -396,7 +399,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   1. `TrainingSessionService`가 세션 존재와 소유권을 확인한다.
   2. 완료 요청은 선택 녹음의 분석 완료 여부를 확인한다.
   3. 완료 가능한 경우 세션 상태를 COMPLETED로 변경하고 완료 시간을 기록한다.
-  4. 취소 요청은 세션 상태를 CANCELED로 변경하고 활성 동의 receipt를 철회한다.
+  4. 취소 요청은 세션 상태를 CANCELED로 변경하고, 미발행 outbox를 중단하며, 분석 결과/세그먼트를 폐기한 뒤 활성 동의 receipt를 철회한다.
   5. 삭제 요청은 DB 참조 순서를 지켜 request outbox, segment, analysis, recording, session을 제거한다.
   6. 녹음 객체와 만료·미완료 upload intent는 같은 DB transaction에서 `recording_deletion_outbox`에 기록한다.
   7. 삭제 dispatcher가 owner/session/key를 재검증하고 객체 저장소 삭제를 최대 10회 재시도한다.
@@ -416,6 +419,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 - Retry or recovery:
   - 분석 미완료면 분석 완료 후 다시 완료 요청한다.
   - 취소 후 같은 세션은 되돌리지 않는다.
+  - 취소 transaction과 경합한 늦은 worker 결과는 취소된 분석을 다시 완료 상태로 만들 수 없다.
   - 객체 삭제는 idempotent하며 실패 시 지수 backoff로 최대 10회 재시도하고, 소진된 row는 `FAILED`로 보존한다.
   - 등록되지 않은 upload intent는 presigned URL 만료 뒤 sweeper가 자동으로 삭제 대상으로 전환한다.
 - Side effects:

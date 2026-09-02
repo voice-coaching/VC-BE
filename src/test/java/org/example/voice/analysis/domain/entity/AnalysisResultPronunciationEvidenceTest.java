@@ -37,6 +37,21 @@ class AnalysisResultPronunciationEvidenceTest {
         assertThat(entity.getPronunciationEvidenceSchemaVersion()).isNull();
     }
 
+    @Test
+    void sessionCancellationDiscardsAnAlreadyArrivedResultAndWinsLateDelivery() {
+        UUID requestEventId = UUID.randomUUID();
+        AnalysisResult entity = AnalysisResult.pending(mock(VoiceRecording.class), requestEventId);
+        assertThat(entity.complete(completed(requestEventId))).isTrue();
+
+        assertThat(entity.cancel("analysis_session_canceled", "canceled")).isTrue();
+
+        assertThat(entity.getStatus()).isEqualTo(AnalysisStatus.FAILED);
+        assertThat(entity.getFailureCode()).isEqualTo("analysis_session_canceled");
+        assertThat(entity.getSelectedPhone()).isNull();
+        assertThat(entity.getSummaryFeedback()).isNull();
+        assertThat(entity.complete(completed(requestEventId))).isFalse();
+    }
+
     private AnalysisWorkerResult completed(UUID requestEventId) {
         return new AnalysisWorkerResult(
                 AnalysisWorkerResult.SCHEMA_VERSION,
