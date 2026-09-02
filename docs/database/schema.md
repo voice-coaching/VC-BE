@@ -227,6 +227,31 @@
 
 | feedback_regeneration_count | integer | Y | 0 | - | - | 종합 피드백 재생성 횟수 |
 | feedback_regenerated_at | timestamptz | N | - | - | - | 마지막 종합 피드백 재생성 시각 |
+| active_request_event_id | varchar(36) | N | - | Index | - | 현재 분석 요청 generation UUID. 이전 재시도 결과를 거부한다. |
+| analysis_outcome | varchar(40) | N | - | - | - | 완료된 분석의 근거 제한 outcome |
+| failure_code | varchar(100) | N | - | - | - | 내부 안정 실패 코드. public API에는 노출하지 않는다. |
+| worker_revision | varchar(100) | N | - | - | - | worker revision receipt |
+| pipeline_revision | varchar(100) | N | - | - | - | pipeline revision receipt |
+| audio_sha256 | varchar(64) | N | - | - | - | 처리한 audio digest receipt |
+
+### analysis_request_outbox
+- 목적: DB 분석 요청과 Redis Stream `XADD` 사이의 at-least-once dispatch를 보장한다.
+- 해당 모듈: analysis/training AI integration
+- Soft delete: 없음
+- Migration: `V3__add_analysis_stream_integration.sql`
+
+| Column | Type | Required | Default | Index | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- |
+| id | bigint | Y | identity | PK | Y | outbox ID |
+| event_id | varchar(36) | Y | - | - | Y | request generation UUID |
+| analysis_id | bigint | Y | - | FK | - | 대상 `analysis_results.id` |
+| payload | text | Y | - | - | - | versioned request JSON |
+| status | varchar(20) | Y | - | Index | - | `PENDING`, `PUBLISHED`, `FAILED` |
+| attempt_count | integer | Y | 0 | - | - | dispatch attempt count |
+| next_attempt_at | timestamptz | Y | now() | Index | - | next retry time |
+| last_error_code | varchar(100) | N | - | - | - | stable dispatch failure code |
+| created_at | timestamptz | Y | now() | - | - | enqueue time |
+| published_at | timestamptz | N | - | - | - | successful XADD time |
 
 ### analysis_segments
 - 목적: 분석 결과의 문장/구간별 매칭 및 세부 피드백을 저장한다.
@@ -269,6 +294,7 @@
 | voice_recordings.training_session_id | training_sessions.id | N:1 | 기본 FK 동작 | 세션별 녹음 시도 |
 | analysis_results.recording_id | voice_recordings.id | 1:1 | 기본 FK 동작 | 녹음 1개당 분석 결과 1개 |
 | analysis_segments.analysis_result_id | analysis_results.id | N:1 | 기본 FK 동작 | 분석 결과별 세그먼트 |
+| analysis_request_outbox.analysis_id | analysis_results.id | N:1 | 기본 FK 동작 | 분석 요청 Stream dispatch 기록 |
 
 ## Enum 값
 
@@ -334,6 +360,14 @@
 | analysis_results | status | PROCESSING | 분석 중 |
 | analysis_results | status | COMPLETED | 분석 완료 |
 | analysis_results | status | FAILED | 분석 실패 |
+| analysis_results | analysis_outcome | COACHING_READY | 코칭 가능한 근거가 확인됨 |
+| analysis_results | analysis_outcome | COMPLETED_NO_ISSUE | 관찰된 개선 이슈 없음 |
+| analysis_results | analysis_outcome | RERECORD_REQUIRED | 내용/품질 사유로 재녹음 필요 |
+| analysis_results | analysis_outcome | UNCERTAIN | 근거 부족으로 안전한 결론 불가 |
+| analysis_results | analysis_outcome | FAILED_CLOSED | 안전 gate가 fail-closed 됨 |
+| analysis_request_outbox | status | PENDING | Stream 발행 대기 |
+| analysis_request_outbox | status | PUBLISHED | Stream 발행 완료 |
+| analysis_request_outbox | status | FAILED | dispatch 재시도 소진 |
 | analysis_segments | match_type | MATCH | 일치 |
 | analysis_segments | match_type | SUBSTITUTION | 대체 |
 | analysis_segments | match_type | OMISSION | 누락 |

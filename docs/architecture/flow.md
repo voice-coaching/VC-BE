@@ -319,10 +319,10 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 - Steps:
   1. `TrainingAnalysisRequestService`가 세션과 최종 녹음 존재 여부를 확인한다.
   2. 이미 진행 중인 분석이 있는지 확인한다.
-  3. 분석 요청 기록을 생성하고 상태를 PENDING 또는 PROCESSING으로 둔다.
-  4. `AnalysisJobPublisher`가 비동기 분석 작업을 발행한다.
-  5. 외부 STT/AI provider가 녹음 파일을 분석한다.
-  6. `analysis` 모듈이 분석 결과와 세그먼트 결과를 저장한다.
+  3. 분석 결과 row를 `PENDING`과 새 request event id로 만들고, 같은 DB transaction에 outbox event를 저장한다.
+  4. outbox dispatcher가 versioned request payload를 전용 Redis Stream에 at-least-once로 발행한다.
+  5. worker는 자기 객체 저장소 권한으로 object key를 해석해 녹음을 분석하고 versioned result event를 반환한다.
+  6. result consumer는 active request event id가 일치할 때만 `analysis_results`와 세그먼트를 저장하고 그 뒤 ACK한다.
   7. 사용자는 상태 API로 진행률을 조회한다.
   8. 완료 후 종합 분석과 세그먼트 분석을 조회한다.
   9. 완료된 분석 결과 조회는 Redis Cache에 저장될 수 있다.
@@ -331,7 +331,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - session owner 일치 여부
   - 선택된 녹음 존재 여부
   - 분석 가능한 녹음 품질
-  - 분석 중복 요청 여부
+  - 분석 중복 요청 여부와 active request event id 일치 여부
   - retry 가능 상태와 최대 재시도 횟수
 - Empty state:
   - 분석 결과가 아직 없으면 상태 API에서 진행 중 상태를 반환한다.
@@ -340,19 +340,21 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - 세션 없음은 404
   - 선택된 녹음 없음은 409
   - 품질 미달은 422
+  - 안전한 object key가 아닌 legacy URL 또는 유효하지 않은 분석 source는 422
   - 이미 분석 중이면 409
   - 분석 결과 없음은 404
   - 재시도 불가능 상태는 409
+  - 전용 분석 Stream이 비활성화되었거나 구성되지 않았으면 503
 - Permission behavior:
   - 본인 세션, 녹음, 분석 결과만 조회/요청할 수 있다.
 - Retry or recovery:
-  - FAILED 상태의 분석은 retry API로 재시도할 수 있다.
+  - FAILED 상태의 분석은 retry API로 재시도할 수 있다. 재시도마다 새 request event id를 사용하므로 이전 결과는 반영하지 않는다.
+  - 요청 발행 또는 결과 반영이 최대 횟수를 넘기면 원본 event를 DLQ에 남기고 현재 분석을 `FAILED`로 종료한다.
   - 피드백 재생성은 분석 데이터는 유지하고 AI summary만 다시 생성한다.
   - 캐시 값은 TTL 만료 후 다음 조회에서 DB 값으로 다시 채워진다.
 - Side effects:
-  - `analysis_results`, `analysis_segments`가 생성 또는 갱신된다.
-  - 분석 job이 발행된다.
-  - 외부 STT/AI provider가 호출된다.
+  - `analysis_results`, `analysis_segments`, `analysis_request_outbox`가 생성 또는 갱신된다.
+  - 분석 job은 전용 Redis Stream으로 발행되며, 유효한 결과가 DB transaction으로 저장된 뒤에만 ACK한다.
   - 완료된 분석 결과 상세, 학습 세션 기준 분석 결과, 세그먼트 목록 조회는 Redis cache entry를 생성할 수 있다.
   - 피드백 재생성은 분석 상세 캐시를 무효화한다.
 - Related API:
@@ -366,7 +368,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 - Related modules:
   - `training`, `analysis`, `common/storage`
 - Related DB tables:
-  - `training_sessions`, `voice_recordings`, `analysis_results`, `analysis_segments`
+  - `training_sessions`, `voice_recordings`, `analysis_results`, `analysis_segments`, `analysis_request_outbox`
 
 ## 학습 세션 완료 및 취소
 

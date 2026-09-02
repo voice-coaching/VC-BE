@@ -27,6 +27,8 @@
 | 학습 세션 상태 | `training` | `TrainingSessionStatus` | `training_sessions.status` | 학습 세션 생명주기이다. |
 | 녹음 품질 상태 | `training` | `RecordingQualityStatus` | `voice_recordings.quality_status` | 녹음 파일의 분석 가능 여부이다. |
 | 분석 상태 | `analysis`, `training` | `AnalysisStatus` | `analysis_results.status` | 분석 작업 진행 상태이다. |
+| 분석 결과 outcome | `analysis` | `AnalysisOutcome` | `analysis_results.analysis_outcome` | 완료된 worker 분석의 안전한 결과 의미다. |
+| 분석 요청 outbox 상태 | `analysis` | `AnalysisRequestOutboxStatus` | `analysis_request_outbox.status` | DB와 Redis Stream 사이 dispatch 상태다. |
 | 세그먼트 결과 상태 | `analysis` | `SegmentResultStatus` | `analysis_segments.result_status` | 문장/구간별 평가 상태이다. |
 | 세그먼트 매칭 유형 | `analysis` | `SegmentMatchType` | `analysis_segments.match_type` | 예상 문장과 인식 문장의 매칭 유형이다. |
 | 말하기 속도 상태 | `analysis` | `SpeedStatus` | `analysis_results.speed_status` | 말하기 속도 평가 결과이다. |
@@ -83,6 +85,14 @@
 | `AnalysisStatus` | `PROCESSING` | 분석 처리 중 | No | 외부 분석 진행 중 |
 | `AnalysisStatus` | `COMPLETED` | 분석 완료 | Yes | 결과 조회 가능 |
 | `AnalysisStatus` | `FAILED` | 분석 실패 | Yes | 재시도 가능 대상 |
+| `AnalysisOutcome` | `COACHING_READY` | 근거 제한 코칭 가능 | Yes | `COMPLETED` 분석 결과 |
+| `AnalysisOutcome` | `COMPLETED_NO_ISSUE` | 관찰 이슈 없음 | Yes | `COMPLETED` 분석 결과 |
+| `AnalysisOutcome` | `RERECORD_REQUIRED` | 재녹음 필요 | Yes | `COMPLETED` 분석 결과 |
+| `AnalysisOutcome` | `UNCERTAIN` | 근거 부족 | Yes | `COMPLETED` 분석 결과 |
+| `AnalysisOutcome` | `FAILED_CLOSED` | 안전상 피드백 생략 | Yes | `COMPLETED` 분석 결과 |
+| `AnalysisRequestOutboxStatus` | `PENDING` | Redis 발행 대기 | No | retry 가능 |
+| `AnalysisRequestOutboxStatus` | `PUBLISHED` | Redis XADD 완료 | Yes | worker ACK와 별개 |
+| `AnalysisRequestOutboxStatus` | `FAILED` | dispatch 재시도 소진 | Yes | 같은 request generation의 분석도 실패 처리 |
 | `SegmentResultStatus` | `NORMAL` | 정상 | No | 개선 필요 낮음 |
 | `SegmentResultStatus` | `CAUTION` | 주의 | No | 일부 개선 필요 |
 | `SegmentResultStatus` | `NEEDS_IMPROVEMENT` | 개선 필요 | No | 우선 개선 대상 |
@@ -114,7 +124,7 @@
 | onboarding completed | onboarding updated | `PATCH /api/onboarding/me` | 수정 허용 필드 | 온보딩 목표/응답 일부 갱신 |
 | none | `TrainingSessionStatus.RECORDING` | `POST /api/training-sessions` | 콘텐츠 존재, 게시/학습 가능 | `training_sessions` 생성 |
 | `RECORDING` | `UPLOADING` | 녹음 업로드 URL 발급 또는 업로드 시작 | 세션 소유권, 파일 조건 | presigned URL 발급 |
-| `RECORDING` or `UPLOADING` | `ANALYZING` | `POST /api/training-sessions/{sessionId}/analyze` | 최종 녹음 선택, 품질 `PASS`, 분석 중복 없음 | `analysis_results` 생성, 분석 job 발행 |
+| `RECORDING` or `UPLOADING` | `ANALYZING` | `POST /api/training-sessions/{sessionId}/analyze` | 최종 녹음 선택, 품질 `PASS`, 분석 중복 없음 | `analysis_results`와 request outbox를 한 transaction으로 생성 |
 | `ANALYZING` | `COMPLETED` | `POST /api/training-sessions/{sessionId}/complete` | 선택 녹음의 분석 완료 | 완료 시간 저장 |
 | `RECORDING` or `UPLOADING` or `ANALYZING` | `CANCELED` | `POST /api/training-sessions/{sessionId}/cancel` | terminal 상태 아님 | 취소 시간 저장, 임시 녹음 삭제 대상 |
 | any non-terminal | `FAILED` | 내부 처리 실패 | 실패 사유 존재 | 실패 사유 기록 대상 |
@@ -125,11 +135,11 @@
 | `PENDING` | `TOO_SHORT` | 품질 검사 | 길이 부족 | 재녹음 안내 |
 | `PENDING` | `NO_SPEECH` | 품질 검사 | 음성 미감지 | 재녹음 안내 |
 | `PENDING` | `FAILED` | 품질 검사 실패 | 처리 실패 | 재처리 또는 재녹음 |
-| none | `AnalysisStatus.PENDING` | 분석 요청 생성 | 선택 녹음 존재 | 분석 요청 record 생성 |
-| `PENDING` | `PROCESSING` | 분석 worker 시작 | job 수신 | 외부 STT/AI provider 호출 |
-| `PROCESSING` | `COMPLETED` | 분석 성공 | 결과 필수값 존재 | 분석 결과와 세그먼트 저장 |
-| `PROCESSING` | `FAILED` | 분석 실패 | 실패 사유 존재 | retry 가능 상태 |
-| `FAILED` | `PENDING` | `POST /api/training-sessions/{sessionId}/analysis/retry` | 실패 상태, retry count 제한 | 새 분석 요청 또는 상태 재설정 |
+| none | `AnalysisStatus.PENDING` | 분석 요청 생성 | 선택 녹음 존재 | request generation UUID와 durable outbox 생성 |
+| `PENDING` | `PROCESSING` | AI worker processing result 수신 | `requestEventId` 일치 | 현재 generation의 상태만 갱신 |
+| `PENDING` or `PROCESSING` | `COMPLETED` | AI worker terminal success 수신 | outcome 및 payload schema 검증 | 결과와 segment를 원자 반영 |
+| `PENDING` or `PROCESSING` | `FAILED` | AI worker 실패, outbox retry 소진, 또는 결과 delivery retry 소진 | `requestEventId`와 안전한 실패 코드 일치 | retry 가능 상태 |
+| `FAILED` | `PENDING` | `POST /api/training-sessions/{sessionId}/analysis/retry` | 실패 상태, retry count 제한 | 새 request generation과 outbox record 생성 |
 | none | `CourseProgressStatus.NOT_STARTED` | 진도 조회 시 record 없음 | 사용자/클래스 존재 | 응답용 기본 상태 |
 | none | `CourseProgressStatus.IN_PROGRESS` | `POST /api/courses/{courseId}/start` | 클래스 존재, 게시 상태 | `user_course_progress` 생성 |
 | `NOT_STARTED` | `IN_PROGRESS` | 진도 갱신 | 유효한 step/progress | 시작 상태로 전환 |

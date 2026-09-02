@@ -15,11 +15,11 @@ This document summarizes the API list exported from the local API spec directory
 | DELETE | `/api/users/me` | Bearer accessToken | 회원 탈퇴 - 회원 상태를 탈퇴 처리하고 사용자 녹음 파일 및 연관 데이터 삭제 절차 수행 |
 | DELETE | `/api/training-sessions/{sessionId}/recordings/{recordingId}` | Bearer accessToken | 녹음 시도 삭제 - 재녹음으로 버린 파일을 DB와 스토리지에서 삭제. 분석 완료 녹음은 정책에 따라 제한 |
 | GET | `/api/onboarding/me` | Bearer accessToken | 온보딩 정보 조회 - 현재 수준·학습 목표·목표 학습량·설문 응답 JSON 조회 |
-| POST | `/api/training-sessions/{sessionId}/analyze` | Bearer accessToken | 음성 분석 요청 - 선택된 녹음의 음질을 확인하고 STT·발음·억양 분석 작업을 비동기로 요청 |
+| POST | `/api/training-sessions/{sessionId}/analyze` | Bearer accessToken | 명시적 동의 본문을 확인하고 선택된 녹음의 분석 작업을 비동기로 요청 |
 | PUT | `/api/onboarding/me` | Bearer accessToken | 온보딩 저장 및 완료 - 온보딩 전체 응답을 저장하고 completedAt을 기록. 최초 완료와 재저장 모두 지원 |
 | GET | `/api/training-sessions/{sessionId}/analysis/status` | Bearer accessToken | 분석 진행 상태 조회 - PENDING·PROCESSING·COMPLETED·FAILED 상태와 진행 단계 반환 |
 | PATCH | `/api/onboarding/me` | Bearer accessToken | 온보딩 일부 수정 - 학습 목적·개선 영역·목표 학습량 등 일부 항목만 변경 |
-| POST | `/api/training-sessions/{sessionId}/analysis/retry` | Bearer accessToken | 분석 재시도 - 일시적 오류로 실패한 분석 작업을 같은 최종 녹음으로 다시 요청 |
+| POST | `/api/training-sessions/{sessionId}/analysis/retry` | Bearer accessToken | 새 명시적 동의와 권한 grant로 실패한 분석 작업을 같은 최종 녹음에 재요청 |
 | GET | `/api/home` | Bearer accessToken | 홈 대시보드 조회 - 오늘의 학습 현황·추천 카드·최근 학습·클래스 진행률을 한 번에 반환 |
 | POST | `/api/training-sessions/{sessionId}/complete` | Bearer accessToken | 학습 세션 완료 - 분석 완료 여부를 확인하고 학습 시간과 완료 일시를 저장 |
 | GET | `/api/recommendations` | Bearer accessToken | 개인화 추천 목록 조회 - Query: type, limit. 온보딩과 최근 분석 결과를 기준으로 추천 콘텐츠 반환 |
@@ -128,10 +128,10 @@ This document summarizes the API list exported from the local API spec directory
 
 | Method | URL | Auth | Implementation Status | Description |
 | --- | --- | --- | --- | --- |
-| GET | `/api/analyses/{analysisId}` | Bearer accessToken | 시작 전 | 종합 분석 결과 조회 |
-| GET | `/api/analyses/{analysisId}/segments` | Bearer accessToken | 시작 전 | 음절별 분석 결과 조회 |
-| GET | `/api/training-sessions/{sessionId}/analysis` | Bearer accessToken | 시작 전 | 학습 세션 분석 결과 조회 |
-| POST | `/api/analyses/{analysisId}/feedback/regenerate` | Bearer accessToken | 시작 전 | 분석 결과 요약 재생성 |
+| GET | `/api/analyses/{analysisId}` | Bearer accessToken | 완료 | 종합 분석 결과 조회 |
+| GET | `/api/analyses/{analysisId}/segments` | Bearer accessToken | 완료 | 음절별 분석 결과 조회 |
+| GET | `/api/training-sessions/{sessionId}/analysis` | Bearer accessToken | 완료 | 학습 세션 분석 결과 조회 |
+| POST | `/api/analyses/{analysisId}/feedback/regenerate` | Bearer accessToken | 완료 | 분석 결과 요약 재생성 |
 
 ### 마이페이지
 

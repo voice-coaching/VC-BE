@@ -45,7 +45,7 @@ src/main/java/org/example/voice
 | Path | Responsibility |
 | --- | --- |
 | `VoiceApplication.java` | Spring Boot application entry point |
-| `analysis` | 음성 분석 결과, 세그먼트 분석, 피드백 재생성 |
+| `analysis` | 음성 분석 결과, 세그먼트 분석, Redis Stream 결과 반영, 피드백 재생성 |
 | `auth` | 회원가입, 로그인, 소셜 로그인, JWT, refresh token |
 | `common` | 공통 설정, 응답, 예외, 보안, 저장소, 유틸리티 |
 | `course` | 클래스, 클래스 단계, 사용자 클래스 진도 |
@@ -134,6 +134,7 @@ common
 | `practicecontent/infrastructure/cache` | 학습 콘텐츠 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `PracticeContentCacheNames`, `PracticeContentCacheKeys`, `PracticeContentCacheTtlProvider` |
 | `course/infrastructure/cache` | 클래스 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `CourseCacheNames`, `CourseCacheKeys`, `CourseCacheTtlProvider` |
 | `analysis/infrastructure/cache` | 분석 결과 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `AnalysisCacheNames`, `AnalysisCacheKeys`, `AnalysisCacheTtlProvider` |
+| `analysis/infrastructure/stream` | 전용 Redis Stream codec, request outbox dispatcher, result consumer 구현 | `AnalysisStreamProperties`, `RedisAnalysisResultConsumer` |
 | `mypage/infrastructure/cache` | 마이페이지 학습 기록/통계 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `MyPageCacheNames`, `MyPageCacheKeys`, `MyPageCacheTtlProvider` |
 | `home/infrastructure/cache` | 홈 화면 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `HomeCacheNames`, `HomeCacheKeys`, `HomeCacheTtlProvider` |
 

@@ -2,9 +2,36 @@
 
 이 문서는 EC2 배포 환경에서 운영 보조 서비스에 접근하는 방식을 기록한다.
 
-## Redis and Redis Insight
+## Redis Streams for AI analysis
 
-Redis와 Redis Insight는 Docker Compose로 실행한다.
+AI analysis uses a dedicated private Redis endpoint configured by
+`ANALYSIS_REDIS_*`. It is separate from the Redis endpoint used by Spring Cache.
+VC-BE starts the Stream outbox dispatcher and result consumer only when
+`ANALYSIS_STREAM_ENABLED=true`. 이 값이 false이면 분석 요청 API는 `503`으로
+fail-closed하며 PENDING 결과나 outbox event를 저장하지 않는다.
+
+- Request stream: `analysis:request:v1`
+- Result stream: `analysis:result:v1`
+- Result DLQ: `analysis:result:dlq:v1`
+- Result consumer group: `backend-analysis-result-workers`
+- Authentication: Redis ACL plus TLS for cross-host traffic
+
+The analysis worker must run on the same private network. Neither Redis endpoint is
+publicly exposed. Secrets are injected at deployment time and never committed in an
+environment file tracked by Git.
+
+See [the versioned Backend-AI contract](../api/ai-redis-stream-contract.md) for
+payloads, ACK timing, reclaim and retry policy.
+
+`scripts/run_analysis_redis_integration.sh`는 digest-pinned 임시 Redis와 합성
+TLS 인증서를 만들고 request XADD, result ingest 후 ACK를 검증한 뒤 모두 제거한다.
+운영 자격 증명이나 실제 음성은 사용하지 않는다. 실행 전에 `JAVA_HOME`을 설치된
+Java 21 JDK로 지정한다.
+
+## Redis Cache and Redis Insight
+
+Redis와 Redis Insight는 Docker Compose로 실행한다. 이 인스턴스는 Spring Cache 전용이며
+AI 분석 Stream 트래픽에는 사용하지 않는다.
 
 - Redis: `127.0.0.1:6379`
 - Redis Insight: `127.0.0.1:5540`
@@ -40,7 +67,31 @@ EC2의 `.env`에는 Redis 비밀번호를 설정해야 한다.
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=<redis-password>
+
+ANALYSIS_STREAM_ENABLED=true
+ANALYSIS_REDIS_HOST=<private-analysis-redis-host>
+ANALYSIS_REDIS_PORT=6379
+ANALYSIS_REDIS_USERNAME=<analysis-acl-user>
+ANALYSIS_REDIS_PASSWORD=<analysis-acl-password>
+ANALYSIS_REDIS_SSL_ENABLED=true
+ANALYSIS_REQUEST_STREAM=analysis:request:v1
+ANALYSIS_RESULT_STREAM=analysis:result:v1
+ANALYSIS_RESULT_CONSUMER_NAME=<unique-host-or-pod-name>
+ANALYSIS_AUTHORIZATION_KEY_ID=<active-key-id>
+ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64=<secret-manager-value>
+ANALYSIS_CONSENT_POLICY_REVISION=<active-consent-revision>
+ANALYSIS_AUTHORIZATION_GRANT_TTL=PT5M
+OBJECT_STORAGE_ENABLED=true
+OBJECT_STORAGE_BUCKET=<private-recording-bucket>
+OBJECT_STORAGE_REGION=ap-northeast-2
+OBJECT_STORAGE_ENDPOINT=<https-provider-endpoint-if-required>
+OBJECT_STORAGE_PATH_STYLE_ACCESS=false
+OBJECT_STORAGE_RECORDINGS_PREFIX=recordings/
 ```
+
+Stream 분석이 켜져 있는데 실제 S3 호환 저장소 또는 서명 설정이 빠지면 VC-BE는
+개발용 URL로 대체하지 않고 기동에 실패한다. SDK 자격 증명은 배포 환경의 기본
+credential chain으로 주입하며 `.env`나 문서에 값을 기록하지 않는다.
 
 Spring Boot 애플리케이션을 EC2 호스트에서 JAR로 직접 실행하면 `REDIS_HOST=localhost`를 사용한다.
 

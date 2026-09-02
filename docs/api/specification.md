@@ -353,13 +353,16 @@ Content-Type: application/json
 - Error cases: See common error codes
 
 ### POST /api/training-sessions/{sessionId}/analyze
-- Description: 음성 분석 요청 - 선택된 녹음의 음질을 확인하고 STT·발음·억양 분석 작업을 비동기로 요청
+- Description: 음성 분석 요청 - 명시적 동의와 선택된 녹음의 음질을 확인하고 Seungun 발음 분석 작업을 비동기로 요청
 - Auth: Bearer accessToken
 - Path params: `sessionId`
 - Query params: None
 - Request body:
 ```json
-// Body 없음
+{
+  "accepted": true,
+  "policyRevision": "String"
+}
 ```
 - Response body:
 ```json
@@ -478,13 +481,16 @@ Content-Type: application/json
 - Error cases: See common error codes
 
 ### POST /api/training-sessions/{sessionId}/analysis/retry
-- Description: 분석 재시도 - 일시적 오류로 실패한 분석 작업을 같은 최종 녹음으로 다시 요청
+- Description: 분석 재시도 - 새 명시적 동의와 단기 권한 grant로 실패한 분석 작업을 같은 최종 녹음으로 다시 요청
 - Auth: Bearer accessToken
 - Path params: `sessionId`
 - Query params: None
 - Request body:
 ```json
-// Body 없음
+{
+  "accepted": true,
+  "policyRevision": "String"
+}
 ```
 - Response body:
 ```json
@@ -731,6 +737,7 @@ Content-Type: application/json
   "data": {
     "id": "Long",
     "status": "String", // AnalysisStatus; analysis_results.status; 값: PENDING, PROCESSING, COMPLETED, FAILED
+    "outcome": "String | null", // AnalysisOutcome; COMPLETED일 때만 COACHING_READY, COMPLETED_NO_ISSUE, RERECORD_REQUIRED, UNCERTAIN, FAILED_CLOSED
     "transcript": "String",
     "sttConfidence": "Number",
     "overallScore": "Number",
@@ -877,6 +884,7 @@ Content-Type: application/json
     "sessionId": "Long",
     "analysisId": "Long",
     "status": "String", // AnalysisStatus; analysis_results.status; 값: PENDING, PROCESSING, COMPLETED, FAILED
+    "outcome": "String | null", // AnalysisOutcome; COMPLETED일 때만 설정
     "overallScore": "Number",
     "pronunciationScore": "Number",
     "intonationScore": "Number"
@@ -1565,7 +1573,8 @@ Content-Type: application/json
     "uploadUrl": "String (URL)",
     "expiresAt": "String (ISO-8601)",
     "requiredHeaders": {
-      "Content-Type": "String"
+      "Content-Type": "String",
+      "Content-Length": "String"
     }
   }
 }
@@ -1660,5 +1669,8 @@ Content-Type: application/json
 
 ## Internal API Mapping
 
-- No upstream API contract is fixed in the exported source documents.
-- STT, AI feedback generation, and Presigned URL issuance should link provider-specific contracts when implementation details are finalized.
+- VC-BE와 AI worker 간 분석 요청/결과 계약은
+  [versioned Redis Stream contract](ai-redis-stream-contract.md)를 따른다.
+- 이 공개 REST API는 분석 요청과 상태·결과 조회만 제공한다. worker는 직접 HTTP callback이나
+  사용자별 Presigned URL을 사용하지 않으며, 전용 Redis Stream과 worker 권한의 객체 저장소로 연동한다.
+- STT와 AI 피드백 구현 세부사항은 worker 내부 계약이며 공개 API DTO에 직접 노출하지 않는다.
