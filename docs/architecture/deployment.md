@@ -59,6 +59,18 @@ TTL은 cache name별로 애플리케이션 설정에서 관리한다. 현재 학
 
 홈 조회 캐시는 사용자별 대시보드 구성 데이터를 포함하므로 cache key에 `userId`와 추천 조회 조건을 포함한다. 학습 세션 생성/상태 변경/완료/취소, 클래스 진도 변경, 온보딩 목표 변경, 마이페이지 학습 기록 삭제는 관련 홈 조회 캐시를 무효화한다.
 
+## PostgreSQL migration
+
+운영 애플리케이션은 Flyway migration을 먼저 적용하고 Hibernate `ddl-auto=validate`로
+entity/schema 일치를 확인한다. 빈 PostgreSQL에는 V0 core baseline부터 현재 version까지
+순서대로 적용한다. 기존 pg_dump 기반 non-empty DB는 `baseline-on-migrate=true`,
+`baseline-version=0`으로 표시한 뒤 V1 이상만 적용하므로, V0은 기존 table을 다시 만들지 않는다.
+V1 이상 Flyway 이력이 이미 존재하는 배포에는 V0이 뒤늦게 추가된 과거 migration으로 보이므로
+`ignore-migration-patterns=*:ignored`를 사용한다. 이 예외는 installed version보다 낮은 migration에만
+적용하며 pending, missing, failed, checksum mismatch는 계속 배포를 실패시킨다.
+배포 전에는 빈 PostgreSQL migration, 동일 DB 재기동 시 no-op migration, Hibernate validate를
+모두 검사한다. migration 실패 상태에서 `ddl-auto=update`로 우회하지 않는다.
+
 ## Environment
 
 EC2의 `.env`에는 Redis 비밀번호를 설정해야 한다.

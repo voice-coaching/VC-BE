@@ -88,7 +88,7 @@ public class AnalysisResult {
     @Column(name = "analyzed_at")
     private OffsetDateTime analyzedAt;
 
-    @Column(name = "failure_reason")
+    @Column(name = "failure_reason", length = 500)
     private String failureReason;
 
     @Column(name = "failure_code")
