@@ -15,6 +15,7 @@ fail-closed하며 PENDING 결과나 outbox event를 저장하지 않는다.
 - Result DLQ: `analysis:result:dlq:v1`
 - Result consumer group: `backend-analysis-result-workers`
 - Authentication: Redis ACL plus TLS for cross-host traffic
+- Resource bounds: 5-second connect/command timeouts, 64 KiB payload cap, bounded result DLQ
 - Admission: `ANALYSIS_MAX_CONCURRENT_PER_USER` (default `3`), serialized by a PostgreSQL user-row lock
 - Stale job recovery: `ANALYSIS_EXECUTION_TIMEOUT=PT15M`, `ANALYSIS_TIMEOUT_SWEEP_INTERVAL=PT1M`
 
@@ -30,6 +31,22 @@ ingestion delay. Lowering it during a backlog can deliberately fail valid jobs, 
 change it only after checking Redis group lag and pending counts. A session cancel or
 timeout makes the DB generation terminal; later Stream delivery is harmless and is
 ACKed without restoring the result.
+
+Redis TLS certificate verification is mandatory. Install a private CA through the JVM
+trust store (`-Djavax.net.ssl.trustStore=...`) mounted from the deployment secret
+mechanism; never use an insecure trust-all client. The command timeout must remain
+greater than `ANALYSIS_RESULT_BLOCK`.
+
+Management health and Prometheus endpoints bind to `127.0.0.1:9091` by default under
+`/internal/actuator`. A reverse proxy or agent on the same host may scrape them. If
+`MANAGEMENT_SERVER_ADDRESS` is changed to a non-loopback address, security-group and
+network-policy rules must restrict `MANAGEMENT_SERVER_PORT`; it is not a public API.
+
+Do not apply an unconditional `MAXLEN` to the request or result Stream. Before pruning,
+operators must check consumer-group lag and pending entries, preserve the incident
+window, and trim only IDs that every required consumer has ACKed and PostgreSQL has
+persisted. The result DLQ alone uses approximate automatic trimming with
+`ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH`.
 
 `scripts/run_analysis_redis_integration.sh`는 digest-pinned 임시 Redis와 합성
 TLS 인증서를 만들고 request XADD, result ingest 후 ACK를 검증한 뒤 모두 제거한다.

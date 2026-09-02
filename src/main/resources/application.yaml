@@ -91,6 +91,9 @@ analysis:
     redis-username: ${ANALYSIS_REDIS_USERNAME:}
     redis-password: ${ANALYSIS_REDIS_PASSWORD:}
     redis-ssl-enabled: ${ANALYSIS_REDIS_SSL_ENABLED:false}
+    redis-connect-timeout: ${ANALYSIS_REDIS_CONNECT_TIMEOUT:PT5S}
+    redis-command-timeout: ${ANALYSIS_REDIS_COMMAND_TIMEOUT:PT5S}
+    redis-shutdown-timeout: ${ANALYSIS_REDIS_SHUTDOWN_TIMEOUT:PT1S}
     request-stream: ${ANALYSIS_REQUEST_STREAM:analysis:request:v1}
     result-stream: ${ANALYSIS_RESULT_STREAM:analysis:result:v1}
     result-consumer-group: ${ANALYSIS_RESULT_CONSUMER_GROUP:backend-analysis-result-workers}
@@ -102,7 +105,22 @@ analysis:
     pending-claim-idle: ${ANALYSIS_PENDING_CLAIM_IDLE:PT5M}
     batch-size: ${ANALYSIS_STREAM_BATCH_SIZE:25}
     max-retries: ${ANALYSIS_STREAM_MAX_RETRIES:3}
+    maximum-payload-bytes: ${ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES:65536}
+    dead-letter-maximum-length: ${ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH:10000}
     max-concurrent-per-user: ${ANALYSIS_MAX_CONCURRENT_PER_USER:3}
     execution-timeout: ${ANALYSIS_EXECUTION_TIMEOUT:PT15M}
     timeout-sweep-interval: ${ANALYSIS_TIMEOUT_SWEEP_INTERVAL:PT1M}
     timeout-sweep-batch-size: ${ANALYSIS_TIMEOUT_SWEEP_BATCH_SIZE:100}
+
+management:
+  server:
+    address: ${MANAGEMENT_SERVER_ADDRESS:127.0.0.1}
+    port: ${MANAGEMENT_SERVER_PORT:9091}
+  endpoints:
+    web:
+      base-path: /internal/actuator
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never

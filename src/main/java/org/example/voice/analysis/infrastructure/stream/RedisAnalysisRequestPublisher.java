@@ -15,19 +15,28 @@ public class RedisAnalysisRequestPublisher {
 
     private final StringRedisTemplate stringRedisTemplate;
     private final AnalysisStreamProperties properties;
+    private final AnalysisStreamMetrics metrics;
 
     public RedisAnalysisRequestPublisher(
             @Qualifier("analysisStreamRedisTemplate") StringRedisTemplate stringRedisTemplate,
-            AnalysisStreamProperties properties
+            AnalysisStreamProperties properties,
+            AnalysisStreamMetrics metrics
     ) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.properties = properties;
+        this.metrics = metrics;
     }
 
     public void publish(String payload) {
+        if (payload == null
+                || payload.getBytes(java.nio.charset.StandardCharsets.UTF_8).length
+                > properties.getMaximumPayloadBytes()) {
+            throw new IllegalArgumentException("analysis_request_payload_size_invalid");
+        }
         stringRedisTemplate.opsForStream().add(
                 StreamRecords.mapBacked(Map.of("payload", payload))
                         .withStreamKey(properties.getRequestStream())
         );
+        metrics.requestPublished();
     }
 }

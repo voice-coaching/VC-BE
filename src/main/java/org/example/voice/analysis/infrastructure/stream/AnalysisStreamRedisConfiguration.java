@@ -1,5 +1,7 @@
 package org.example.voice.analysis.infrastructure.stream;
 
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.SocketOptions;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -35,9 +37,22 @@ public class AnalysisStreamRedisConfiguration {
         if (StringUtils.hasText(properties.getRedisPassword())) {
             standalone.setPassword(properties.getRedisPassword());
         }
+        ClientOptions clientOptions = ClientOptions.builder()
+                .autoReconnect(true)
+                .socketOptions(SocketOptions.builder()
+                        .connectTimeout(properties.getRedisConnectTimeout())
+                        .keepAlive(true)
+                        .tcpNoDelay(true)
+                        .build())
+                .build();
+        LettuceClientConfiguration.LettuceClientConfigurationBuilder clientBuilder =
+                LettuceClientConfiguration.builder()
+                        .commandTimeout(properties.getRedisCommandTimeout())
+                        .shutdownTimeout(properties.getRedisShutdownTimeout())
+                        .clientOptions(clientOptions);
         LettuceClientConfiguration client = properties.isRedisSslEnabled()
-                ? LettuceClientConfiguration.builder().useSsl().build()
-                : LettuceClientConfiguration.defaultConfiguration();
+                ? clientBuilder.useSsl().build()
+                : clientBuilder.build();
         return new LettuceConnectionFactory(standalone, client);
     }
 

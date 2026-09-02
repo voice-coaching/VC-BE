@@ -9,6 +9,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import java.time.Duration;
 import java.util.List;
@@ -34,8 +35,9 @@ class BackendAnalysisRedisIntegrationTest {
         connectionFactory.start();
         StringRedisTemplate redis = configuration.analysisStreamRedisTemplate(connectionFactory);
         redis.afterPropertiesSet();
+        AnalysisStreamMetrics metrics = new AnalysisStreamMetrics(new SimpleMeterRegistry());
         try {
-            new RedisAnalysisRequestPublisher(redis, properties).publish("{\"synthetic\":true}");
+            new RedisAnalysisRequestPublisher(redis, properties, metrics).publish("{\"synthetic\":true}");
             List<MapRecord<String, Object, Object>> requests = redis.opsForStream().range(
                     properties.getRequestStream(),
                     org.springframework.data.domain.Range.unbounded()
@@ -55,9 +57,34 @@ class BackendAnalysisRedisIntegrationTest {
                             .withStreamKey(properties.getResultStream())
             );
 
-            new RedisAnalysisResultConsumer(redis, properties, codec, ingestion).consume();
+            RedisAnalysisResultConsumer consumer =
+                    new RedisAnalysisResultConsumer(redis, properties, codec, ingestion, metrics);
+            consumer.consume();
 
             verify(ingestion).ingest(any(AnalysisWorkerResult.class));
+            assertThat(redis.opsForStream().pending(
+                    properties.getResultStream(), properties.getResultConsumerGroup()
+            ).getTotalPendingMessages()).isZero();
+
+            properties.setMaximumPayloadBytes(128);
+            properties.setMaxRetries(1);
+            redis.opsForStream().add(
+                    org.springframework.data.redis.connection.stream.StreamRecords
+                            .mapBacked(Map.of("payload", "x".repeat(129)))
+                            .withStreamKey(properties.getResultStream())
+            );
+            consumer.consume();
+            Thread.sleep(20);
+            consumer.consume();
+
+            List<MapRecord<String, Object, Object>> deadLetters = redis.opsForStream().range(
+                    properties.getResultDeadLetterStream(),
+                    org.springframework.data.domain.Range.unbounded()
+            );
+            assertThat(deadLetters).hasSize(1);
+            assertThat(deadLetters.getFirst().getValue())
+                    .containsEntry("payload", "")
+                    .containsEntry("failureCode", "analysis_result_payload_too_large");
             assertThat(redis.opsForStream().pending(
                     properties.getResultStream(), properties.getResultConsumerGroup()
             ).getTotalPendingMessages()).isZero();

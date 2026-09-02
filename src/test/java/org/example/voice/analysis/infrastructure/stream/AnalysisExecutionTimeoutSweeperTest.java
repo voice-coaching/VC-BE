@@ -10,6 +10,7 @@ import org.example.voice.training.domain.entity.VoiceRecording;
 import org.example.voice.training.infrastructure.AnalysisResultJpaRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Pageable;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -45,10 +46,13 @@ class AnalysisExecutionTimeoutSweeperTest {
         ProcessingConsentLedger consent = mock(ProcessingConsentLedger.class);
 
         AnalysisStreamProperties properties = new AnalysisStreamProperties();
-        new AnalysisExecutionTimeoutSweeper(results, outbox, consent, properties).failStaleAnalyses();
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        AnalysisStreamMetrics metrics = new AnalysisStreamMetrics(registry);
+        new AnalysisExecutionTimeoutSweeper(results, outbox, consent, properties, metrics).failStaleAnalyses();
 
         assertThat(result.getStatus()).isEqualTo(AnalysisStatus.FAILED);
         assertThat(result.getFailureCode()).isEqualTo(AnalysisExecutionTimeoutSweeper.TIMEOUT_CODE);
         verify(consent).revokeForSession(9L, 7L);
+        assertThat(registry.get("voice.analysis.execution.timeouts").counter().count()).isEqualTo(1.0);
     }
 }

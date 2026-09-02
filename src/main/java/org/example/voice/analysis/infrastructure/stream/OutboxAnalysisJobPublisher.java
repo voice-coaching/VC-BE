@@ -20,6 +20,7 @@ public class OutboxAnalysisJobPublisher implements AnalysisJobPublisher {
     private final AnalysisRequestOutboxJpaRepository outboxRepository;
     private final AnalysisResultJpaRepository analysisResultRepository;
     private final AnalysisStreamCodec codec;
+    private final AnalysisStreamProperties properties;
 
     @Override
     @Transactional
@@ -29,10 +30,14 @@ public class OutboxAnalysisJobPublisher implements AnalysisJobPublisher {
         if (!analysisResult.isForActiveRequest(request.eventId())) {
             throw new IllegalStateException("analysis request event does not match active analysis request");
         }
+        String payload = codec.encodeRequest(request);
+        if (RedisAnalysisResultConsumer.payloadBytes(payload) > properties.getMaximumPayloadBytes()) {
+            throw new IllegalStateException("analysis_request_payload_size_invalid");
+        }
         outboxRepository.save(AnalysisRequestOutbox.pending(
                 request.eventId(),
                 analysisResult,
-                codec.encodeRequest(request)
+                payload
         ));
     }
 }

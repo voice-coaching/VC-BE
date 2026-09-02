@@ -4,10 +4,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.example.voice.analysis.application.AnalysisResultIngestionService;
 import org.example.voice.analysis.domain.model.AnalysisWorkerResult;
+import org.example.voice.analysis.domain.type.AnalysisResultIngestionDisposition;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.stream.Consumer;
+import org.springframework.data.redis.connection.RedisStreamCommands;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.PendingMessage;
 import org.springframework.data.redis.connection.stream.PendingMessages;
@@ -40,11 +42,13 @@ public class RedisAnalysisResultConsumer {
     private static final String MISSING_PAYLOAD_DLQ_FAILURE_CODE = "analysis_result_missing_payload";
     private static final String SOURCE_RECORD_MISSING_DLQ_FAILURE_CODE = "analysis_result_source_record_missing";
     private static final String UNKNOWN_ANALYSIS_DLQ_FAILURE_CODE = "analysis_result_unknown_analysis";
+    private static final String OVERSIZED_PAYLOAD_DLQ_FAILURE_CODE = "analysis_result_payload_too_large";
 
     private final StringRedisTemplate stringRedisTemplate;
     private final AnalysisStreamProperties properties;
     private final AnalysisStreamCodec codec;
     private final AnalysisResultIngestionService ingestionService;
+    private final AnalysisStreamMetrics metrics;
 
     private volatile boolean consumerGroupReady;
 
@@ -52,12 +56,14 @@ public class RedisAnalysisResultConsumer {
             @Qualifier("analysisStreamRedisTemplate") StringRedisTemplate stringRedisTemplate,
             AnalysisStreamProperties properties,
             AnalysisStreamCodec codec,
-            AnalysisResultIngestionService ingestionService
+            AnalysisResultIngestionService ingestionService,
+            AnalysisStreamMetrics metrics
     ) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.properties = properties;
         this.codec = codec;
         this.ingestionService = ingestionService;
+        this.metrics = metrics;
     }
 
     @Scheduled(fixedDelayString = "${analysis.stream.result-poll-interval:PT1S}")
@@ -131,13 +137,18 @@ public class RedisAnalysisResultConsumer {
                 if (payload == null || payload.isBlank()) {
                     throw new IllegalArgumentException("stream record has no payload");
                 }
-                ingestionService.ingest(codec.decodeResult(payload));
+                if (payloadBytes(payload) > properties.getMaximumPayloadBytes()) {
+                    throw new IllegalArgumentException("analysis result payload exceeds configured maximum");
+                }
+                AnalysisResultIngestionDisposition disposition = ingestionService.ingest(codec.decodeResult(payload));
+                metrics.resultIngested(disposition);
                 stringRedisTemplate.opsForStream().acknowledge(
                         properties.getResultStream(),
                         properties.getResultConsumerGroup(),
                         record.getId()
                 );
             } catch (RuntimeException error) {
+                metrics.resultDeliveryFailed();
                 log.warn("analysis result stream record was not acknowledged: streamRecordId={}", record.getId());
             }
         }
@@ -156,6 +167,11 @@ public class RedisAnalysisResultConsumer {
         String payload = payloadOf(source.getFirst());
         if (payload == null || payload.isBlank()) {
             moveToDeadLetter(recordId, "", MISSING_PAYLOAD_DLQ_FAILURE_CODE);
+            acknowledge(recordId);
+            return;
+        }
+        if (payloadBytes(payload) > properties.getMaximumPayloadBytes()) {
+            moveToDeadLetter(recordId, "", OVERSIZED_PAYLOAD_DLQ_FAILURE_CODE);
             acknowledge(recordId);
             return;
         }
@@ -178,8 +194,12 @@ public class RedisAnalysisResultConsumer {
                         PAYLOAD_FIELD, payload,
                         "sourceStreamId", recordId.getValue(),
                         "failureCode", failureCode
-                )).withStreamKey(properties.getResultDeadLetterStream())
+                )).withStreamKey(properties.getResultDeadLetterStream()),
+                RedisStreamCommands.XAddOptions
+                        .maxlen(properties.getDeadLetterMaximumLength())
+                        .approximateTrimming(true)
         );
+        metrics.resultDeadLettered();
     }
 
     private void acknowledge(RecordId recordId) {
@@ -205,6 +225,10 @@ public class RedisAnalysisResultConsumer {
 
     private static byte[] bytes(String value) {
         return value.getBytes(StandardCharsets.UTF_8);
+    }
+
+    static int payloadBytes(String value) {
+        return value.getBytes(StandardCharsets.UTF_8).length;
     }
 
     private static boolean hasBusyGroup(DataAccessException error) {

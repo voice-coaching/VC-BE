@@ -20,6 +20,9 @@ public class AnalysisStreamProperties {
     private String redisUsername;
     private String redisPassword;
     private boolean redisSslEnabled;
+    private Duration redisConnectTimeout = Duration.ofSeconds(5);
+    private Duration redisCommandTimeout = Duration.ofSeconds(5);
+    private Duration redisShutdownTimeout = Duration.ofSeconds(1);
     private String requestStream = "analysis:request:v1";
     private String resultStream = "analysis:result:v1";
     private String resultConsumerGroup = "backend-analysis-result-workers";
@@ -31,6 +34,8 @@ public class AnalysisStreamProperties {
     private Duration pendingClaimIdle = Duration.ofMinutes(5);
     private int batchSize = 25;
     private int maxRetries = 3;
+    private int maximumPayloadBytes = 65_536;
+    private long deadLetterMaximumLength = 10_000;
     private int maxConcurrentPerUser = 3;
     private Duration executionTimeout = Duration.ofMinutes(15);
     private Duration timeoutSweepInterval = Duration.ofMinutes(1);

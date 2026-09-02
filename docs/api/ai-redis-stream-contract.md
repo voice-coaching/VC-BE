@@ -36,11 +36,16 @@ job messages.
 | `ANALYSIS_REDIS_USERNAME` | N | Redis ACL username. |
 | `ANALYSIS_REDIS_PASSWORD` | Y | Secret-manager injected Redis ACL password. Never log or commit it. |
 | `ANALYSIS_REDIS_SSL_ENABLED` | Y | Must be `true`; Stream-enabled startup otherwise fails closed. |
+| `ANALYSIS_REDIS_CONNECT_TIMEOUT` | Y | TCP connect bound, default `PT5S`. |
+| `ANALYSIS_REDIS_COMMAND_TIMEOUT` | Y | Redis command bound, default `PT5S`; must exceed result `BLOCK`. |
+| `ANALYSIS_REDIS_SHUTDOWN_TIMEOUT` | Y | Lettuce shutdown bound, default `PT1S`. |
 | `ANALYSIS_REQUEST_STREAM` | Y | Default `analysis:request:v1`. |
 | `ANALYSIS_RESULT_STREAM` | Y | Default `analysis:result:v1`. |
 | `ANALYSIS_RESULT_CONSUMER_GROUP` | Y | Default `backend-analysis-result-workers`. |
 | `ANALYSIS_RESULT_CONSUMER_NAME` | Y | Unique pod/host instance name. |
 | `ANALYSIS_RESULT_DLQ_STREAM` | Y | Default `analysis:result:dlq:v1`. |
+| `ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES` | Y | UTF-8 request/result payload cap, default `65536`. |
+| `ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH` | Y | Approximate result DLQ cap, default `10000`. |
 | `ANALYSIS_PENDING_CLAIM_IDLE` | Y | Minimum pending idle time before reclaim; default `PT5M`. |
 | `ANALYSIS_STREAM_MAX_RETRIES` | Y | Dispatch/result retry cap; default `3`. |
 | `ANALYSIS_MAX_CONCURRENT_PER_USER` | Y | DB-serialized per-user concurrent job cap; default `3`. |
@@ -63,6 +68,8 @@ job messages.
 
 The Redis port is private-network only. Do not open it to the internet, transmit a
 Redis URL/password in messages, or use the ordinary cache endpoint for Stream data.
+TLS peer verification remains enabled. A private Redis CA must be installed in the
+JVM trust store supplied to VC-BE; disabling certificate verification is unsupported.
 
 ## Stream ownership
 
@@ -78,6 +85,13 @@ containing UTF-8 JSON. Producer and consumer reject unknown fields and unsupport
 `schemaVersion` values. DLQ entries are restricted operator records: they contain
 `sourceStreamId`, `failureCode`, and, when an original payload existed, that raw
 `payload` for deliberate recovery.
+Payload size is measured as UTF-8 bytes before JSON decoding. An oversized result is
+never copied into the DLQ body; only its source Stream ID and stable failure code are
+retained. Result DLQ trimming is approximate and bounded. Request/result Streams are
+not automatically trimmed because deleting a pending or not-yet-persisted message
+would violate at-least-once delivery.
+VC-BE also rejects an oversized request payload before writing its durable outbox row;
+the dispatcher repeats the check immediately before Redis I/O as defense in depth.
 
 ## Request payload: `voice-coaching.analysis-request.v3`
 
@@ -247,6 +261,8 @@ the request; the request remains pending until the worker publishes a terminal
   `analysisId`; a failed result stores stable failure code/reason.
 - `analysis_request_outbox` persists request payloads before Redis I/O. Its final
   dispatch failure changes the matching analysis to `FAILED`.
+- Each outbox publish runs in its own bounded DB transaction. Redis failure therefore
+  holds at most one outbox row lock for at most the configured command timeout.
 - PostgreSQL is the permanent result store. Redis holds transport messages only; no
   audio blob, token, URL, raw exception, or user identifier is placed in a stream.
 - Analysis admission takes a pessimistic lock on the owning user row before counting
@@ -282,6 +298,18 @@ the request; the request remains pending until the worker publishes a terminal
    derived segments, and prevents pending outbox dispatch before consent and media are
    revoked. Cancellation deliberately wins even when a terminal result arrived just
    before the session transaction acquired the analysis lock.
+
+## Health and metrics
+
+VC-BE exposes management endpoints on `127.0.0.1:9091` by default:
+
+- `/internal/actuator/health` includes the dedicated analysis Redis readiness check.
+- `/internal/actuator/prometheus` exports bounded-cardinality publish, ingestion,
+  delivery-failure, DLQ, and execution-timeout counters.
+
+No user, session, recording, event, object key, payload, or exception is used as a
+metric label or health detail. If the management address is changed from loopback,
+the deployment must restrict the port to the health checker and metrics collector.
 
 ## Public API impact
 

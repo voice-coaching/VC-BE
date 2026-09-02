@@ -32,6 +32,7 @@ public class AnalysisExecutionTimeoutSweeper {
     private final AnalysisRequestOutboxJpaRepository outboxRepository;
     private final ProcessingConsentLedger consentLedger;
     private final AnalysisStreamProperties properties;
+    private final AnalysisStreamMetrics metrics;
 
     @Scheduled(fixedDelayString = "${analysis.stream.timeout-sweep-interval:PT1M}")
     @Transactional
@@ -52,6 +53,7 @@ public class AnalysisExecutionTimeoutSweeper {
                     result.getId(), AnalysisRequestOutboxStatus.PENDING
             ).forEach(outbox -> outbox.cancelPending(TIMEOUT_CODE));
             if (result.fail(TIMEOUT_CODE, TIMEOUT_REASON, null, null)) {
+                metrics.executionTimedOut();
                 consentLedger.revokeForSession(
                         result.getRecording().getTrainingSession().getUserId(),
                         result.getRecording().getTrainingSession().getId()

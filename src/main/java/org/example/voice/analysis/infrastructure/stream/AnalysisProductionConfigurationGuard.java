@@ -36,6 +36,17 @@ public class AnalysisProductionConfigurationGuard {
                 || stream.getPendingClaimIdle().isNegative()) {
             throw new IllegalStateException("analysis_stream_configuration_invalid");
         }
+        if (invalidDuration(stream.getResultBlock())
+                || invalidDuration(stream.getRedisConnectTimeout())
+                || invalidDuration(stream.getRedisCommandTimeout())
+                || invalidDuration(stream.getRedisShutdownTimeout())
+                || stream.getRedisCommandTimeout().compareTo(stream.getResultBlock()) <= 0
+                || stream.getMaximumPayloadBytes() <= 0
+                || stream.getMaximumPayloadBytes() > 1_048_576
+                || stream.getDeadLetterMaximumLength() <= 0
+                || stream.getDeadLetterMaximumLength() > 1_000_000) {
+            throw new IllegalStateException("analysis_stream_resource_limits_invalid");
+        }
         if (stream.getMaxConcurrentPerUser() <= 0
                 || invalidDuration(stream.getExecutionTimeout())
                 || invalidDuration(stream.getTimeoutSweepInterval())
