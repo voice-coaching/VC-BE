@@ -27,6 +27,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -159,8 +162,8 @@ class FfmpegS3RecordingMediaNormalizerTest {
     }
 
     @Test
-    void rejectsObjectOutsideAuthenticatedOwnerPrefixBeforeStorageAccess() {
-        assertThatThrownBy(() -> normalizer().normalize(
+    void rejectsObjectOutsideAuthenticatedOwnerPrefixBeforeStorageAccess() throws Exception {
+        assertThatThrownBy(() -> normalizer(ownerPrefixGuardMediaProperties()).normalize(
                 9L,
                 7L,
                 "recordings/users/10/sessions/7/source.mp4",
@@ -170,13 +173,17 @@ class FfmpegS3RecordingMediaNormalizerTest {
         )).isInstanceOfSatisfying(BaseException.class,
                 error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.RECORDING_ACCESS_DENIED));
 
-        verify(s3Client, never()).getObject(any(GetObjectRequest.class), any(Path.class));
+        verifyNoInteractions(s3Client);
     }
 
     private FfmpegS3RecordingMediaNormalizer normalizer() {
+        return normalizer(mediaProperties());
+    }
+
+    private FfmpegS3RecordingMediaNormalizer normalizer(MediaNormalizationProperties mediaProperties) {
         return new FfmpegS3RecordingMediaNormalizer(
                 storageProperties(),
-                mediaProperties(),
+                mediaProperties,
                 s3Client,
                 new ObjectMapper()
         );
@@ -296,6 +303,20 @@ class FfmpegS3RecordingMediaNormalizerTest {
         properties.setWorkspaceRoot(workspaceRoot());
         properties.setFfmpegBinary("/usr/bin/ffmpeg");
         properties.setFfprobeBinary("/usr/bin/ffprobe");
+        return properties;
+    }
+
+    private MediaNormalizationProperties ownerPrefixGuardMediaProperties() throws Exception {
+        Path unusedExecutable = temporaryDirectory.resolve("unused-media-executable");
+        Files.createFile(unusedExecutable);
+        Files.setPosixFilePermissions(unusedExecutable, Set.of(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_EXECUTE
+        ));
+        MediaNormalizationProperties properties = mediaProperties();
+        properties.setSandboxPythonBinary(unusedExecutable.toString());
+        properties.setFfmpegBinary(unusedExecutable.toString());
+        properties.setFfprobeBinary(unusedExecutable.toString());
         return properties;
     }
 
