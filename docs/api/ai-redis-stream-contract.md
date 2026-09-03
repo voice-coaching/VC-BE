@@ -1,5 +1,9 @@
 # Backend-AI Redis Stream Contract
 
+현재 Backend 구현·검증·운영 gate 요약은
+[intelligentAI 음성·영상 분석 연동 구현 현황](../ai_analysis_integration_implementation.md)을
+참조한다. 이 문서는 교차 저장소 payload와 전달 계약의 정본이다.
+
 ## Purpose and boundary
 
 VC-BE and the intelligentAI worker exchange asynchronous audio-analysis work through
@@ -75,6 +79,22 @@ job messages.
 | `MEDIA_NORMALIZATION_SANDBOX_ADDRESS_SPACE_BYTES` | Y | Per-media-process address-space limit, default 2 GiB, range 256 MiB..16 GiB. |
 | `MEDIA_NORMALIZATION_FFMPEG_BINARY` / `MEDIA_NORMALIZATION_FFPROBE_BINARY` | Y | Absolute reviewed executable paths. |
 | `MEDIA_NORMALIZATION_PROCESS_TIMEOUT` | Y | Per-process timeout, default `PT30S`, maximum `PT2M`. |
+
+The active non-secret deployment identity must be copied exactly into the AI worker
+configuration and its private deployment attestation:
+
+| VC-BE | intelligentAI |
+| --- | --- |
+| deployed Backend/AI compatibility window | exact `AI_ANALYSIS_RELEASE_ID` for the reviewed AI commit |
+| `ANALYSIS_AUTHORIZATION_KEY_ID` | `AI_ANALYSIS_ACTIVE_AUTHORIZATION_KEY_ID` and a matching keyring entry |
+| `ANALYSIS_CONSENT_POLICY_REVISION` | `AI_ANALYSIS_CONSENT_POLICY_REVISION` |
+| secret-manager HMAC bytes | same bytes in `AI_ANALYSIS_AUTHORIZATION_KEYS_FILE`; never in the attestation |
+
+For key rotation, first add the new key to the AI keyring while retaining the old
+verification key, deploy a new content-bound AI attestation naming the new active key,
+then switch VC-BE issuance to that key. Drain every grant signed by the old key before
+removing it from the AI keyring. A key ID, policy, release, device or artifact digest
+mismatch makes the worker refuse startup before Redis/S3 use.
 
 The Redis port is private-network only. Do not open it to the internet, transmit a
 Redis URL/password in messages, or use the ordinary cache endpoint for Stream data.
@@ -236,6 +256,15 @@ normalized audio digest, MIME, size, duration, learning focus, policy, purpose,
 data category, cleanup and egress policy. When visual input is present it additionally
 binds every visual field and its separate face-processing consent. A retry receives
 and persists a new request event, receipt and signature.
+
+Consent issuance is an implemented VC-BE transaction boundary, not an external issuer
+stub. The `processing_consents` ledger stores only the owner/session/recording binding,
+scope, policy, subject digest, request event, opaque receipt digest and grant/revocation
+times. V14 adds validated database constraints for positive subject IDs, safe policy,
+scope-specific binding, request UUID and revocation ordering, plus a partial unique
+index for non-null request events. An existing database that violates these invariants
+must fail migration and be corrected through an audited data migration; constraints
+must not be disabled to start analysis.
 
 The signature is HMAC-SHA256 over the fields above in listed order, excluding
 `signature`. Each line is `name:utf8ByteLength:value\n`; a null value is
