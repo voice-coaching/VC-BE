@@ -12,6 +12,7 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -59,6 +60,21 @@ class JpaProcessingConsentLedgerTest {
         ledger.revokeForSession(9L, 7L);
 
         verify(repository).revokeForSession(9L, 7L, java.time.OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
+    }
+
+    @Test
+    void rejectsAnInvalidFaceVideoSubjectBeforePersistence() {
+        ProcessingConsentJpaRepository repository = mock(ProcessingConsentJpaRepository.class);
+        JpaProcessingConsentLedger ledger = new JpaProcessingConsentLedger(
+                repository,
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                new ZeroSecureRandom()
+        );
+
+        assertThatThrownBy(() -> ledger.grantFaceVideoProcessing(
+                9L, 7L, "voice-video-processing-consent-v1", " "
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("processing consent subject is invalid");
     }
 
     private static final class ZeroSecureRandom extends SecureRandom {

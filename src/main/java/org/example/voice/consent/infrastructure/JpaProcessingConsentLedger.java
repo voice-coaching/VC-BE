@@ -123,6 +123,9 @@ public class JpaProcessingConsentLedger implements ProcessingConsentLedger {
     }
 
     private static String sha256(String value) {
+        if (value == null || value.isBlank() || value.length() > 2_048) {
+            throw new IllegalArgumentException("processing consent subject is invalid");
+        }
         try {
             return HexFormat.of().formatHex(
                     MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))
