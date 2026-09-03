@@ -137,6 +137,15 @@ common
 | `mypage/infrastructure/cache` | 마이페이지 학습 기록/통계 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `MyPageCacheNames`, `MyPageCacheKeys`, `MyPageCacheTtlProvider` |
 | `home/infrastructure/cache` | 홈 화면 조회 캐시 이름, key 생성 규칙, TTL 제공 구현 | `HomeCacheNames`, `HomeCacheKeys`, `HomeCacheTtlProvider` |
 
+## 기능별 Infrastructure Redis Stream 구조
+
+Redis Stream 기반 비동기 연동 구현은 해당 기능의 `infrastructure/redis`에 둔다.
+
+| Path | Responsibility | Examples |
+| --- | --- | --- |
+| `analysis/infrastructure/redis` | AI Worker가 발행한 분석 결과 Stream 소비와 message DTO 변환 | `AnalysisResultStreamConsumer`, `AnalysisResultStreamMessageDto` |
+| `training/infrastructure` | AI Worker로 보낼 분석 요청 Stream 발행 | `RedisAnalysisJobPublisher` |
+
 ## Resources 구조
 
 ```text

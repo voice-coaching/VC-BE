@@ -3,6 +3,7 @@ package org.example.voice.training.application;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.training.domain.model.AnalysisJobRequestData;
 import org.example.voice.training.domain.model.AnalysisProgressData;
 import org.example.voice.training.domain.model.AnalysisRequestData;
 import org.example.voice.training.domain.model.AnalysisRetryData;
@@ -15,6 +16,8 @@ import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.example.voice.training.domain.type.TrainingSessionStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -52,9 +55,10 @@ public class TrainingAnalysisRequestService {
         AnalysisRequestData result = trainingAnalysisWriter.createPending(recordingId);
         trainingSessionWriter.updateStatus(sessionId, TrainingSessionStatus.ANALYZING);
 
-        // 3. 지금은 로그만 찍는 mock publisher지만, 나중에는 Redis Queue에
-        // analysisId/sessionId/recordingId payload를 넣는 구현체로 교체하면 된다.
-        analysisJobPublisher.publish(result.analysisId(), sessionId, recordingId);
+        AnalysisJobRequestData jobRequest = voiceRecordingReader
+                .findAnalysisJobRequest(result.analysisId(), sessionId, recordingId, userId)
+                .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
+        publishAfterCommit(jobRequest);
         return result;
     }
 
@@ -83,7 +87,24 @@ public class TrainingAnalysisRequestService {
 
         AnalysisRetryData result = trainingAnalysisWriter.retry(failed.analysisId(), recordingId, retryCount + 1);
         trainingSessionWriter.updateStatus(sessionId, TrainingSessionStatus.ANALYZING);
-        analysisJobPublisher.publish(result.analysisId(), sessionId, recordingId);
+        AnalysisJobRequestData jobRequest = voiceRecordingReader
+                .findAnalysisJobRequest(result.analysisId(), sessionId, recordingId, userId)
+                .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
+        publishAfterCommit(jobRequest);
         return result;
+    }
+
+    private void publishAfterCommit(AnalysisJobRequestData jobRequest) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            analysisJobPublisher.publish(jobRequest);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                analysisJobPublisher.publish(jobRequest);
+            }
+        });
     }
 }

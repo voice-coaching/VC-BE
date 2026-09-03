@@ -31,3 +31,7 @@ auth:
 app:
   cors:
     allowed-origins: http://localhost:3000
+
+analysis:
+  redis-stream:
+    enabled: false

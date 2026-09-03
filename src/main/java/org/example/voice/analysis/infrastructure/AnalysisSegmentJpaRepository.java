@@ -8,4 +8,5 @@ import java.util.List;
 interface AnalysisSegmentJpaRepository extends JpaRepository<AnalysisSegment, Long> {
     List<AnalysisSegment> findByAnalysisResultIdOrderBySequenceNoAscIdAsc(Long analysisId, Pageable pageable);
     long countByAnalysisResultId(Long analysisId);
+    void deleteByAnalysisResultId(Long analysisId);
 }

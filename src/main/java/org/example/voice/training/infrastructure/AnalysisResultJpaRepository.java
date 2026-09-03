@@ -13,6 +13,10 @@ import java.util.Optional;
 
 public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResult, Long> {
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from AnalysisResult a where a.id = :analysisId")
+    Optional<AnalysisResult> findByIdForUpdate(@Param("analysisId") Long analysisId);
+
     Optional<AnalysisResult> findByIdAndRecordingTrainingSessionUserId(Long id, Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

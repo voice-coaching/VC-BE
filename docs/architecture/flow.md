@@ -320,13 +320,15 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   1. `TrainingAnalysisRequestService`가 세션과 최종 녹음 존재 여부를 확인한다.
   2. 이미 진행 중인 분석이 있는지 확인한다.
   3. 분석 요청 기록을 생성하고 상태를 PENDING 또는 PROCESSING으로 둔다.
-  4. `AnalysisJobPublisher`가 비동기 분석 작업을 발행한다.
+  4. DB transaction commit 이후 `AnalysisJobPublisher` 구현체가 Redis Stream `analysis:request`에 비동기 분석 작업을 발행한다.
   5. 외부 STT/AI provider가 녹음 파일을 분석한다.
-  6. `analysis` 모듈이 분석 결과와 세그먼트 결과를 저장한다.
-  7. 사용자는 상태 API로 진행률을 조회한다.
-  8. 완료 후 종합 분석과 세그먼트 분석을 조회한다.
-  9. 완료된 분석 결과 조회는 Redis Cache에 저장될 수 있다.
-  10. 필요하면 피드백 재생성 API로 AI 요약 피드백만 다시 생성한다.
+  6. AI Worker가 Redis Stream `analysis:result`에 결과를 발행한다.
+  7. `analysis` 모듈의 Redis Stream consumer가 결과를 수신해 분석 결과와 세그먼트 결과를 저장하고 DB 저장 성공 후 ACK한다.
+  8. 처리 실패로 ACK되지 않은 결과 메시지는 idle timeout 이후 consumer가 claim해 재처리한다.
+  9. 사용자는 상태 API로 진행률을 조회한다.
+  10. 완료 후 종합 분석과 세그먼트 분석을 조회한다.
+  11. 완료된 분석 결과 조회는 Redis Cache에 저장될 수 있다.
+  12. 필요하면 피드백 재생성 API로 AI 요약 피드백만 다시 생성한다.
 - Validation:
   - session owner 일치 여부
   - 선택된 녹음 존재 여부
@@ -351,7 +353,8 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - 캐시 값은 TTL 만료 후 다음 조회에서 DB 값으로 다시 채워진다.
 - Side effects:
   - `analysis_results`, `analysis_segments`가 생성 또는 갱신된다.
-  - 분석 job이 발행된다.
+  - Redis Stream `analysis:request`에 분석 job이 발행된다.
+  - Redis Stream `analysis:result` 메시지 처리 성공 시 ACK된다.
   - 외부 STT/AI provider가 호출된다.
   - 완료된 분석 결과 상세, 학습 세션 기준 분석 결과, 세그먼트 목록 조회는 Redis cache entry를 생성할 수 있다.
   - 피드백 재생성은 분석 상세 캐시를 무효화한다.

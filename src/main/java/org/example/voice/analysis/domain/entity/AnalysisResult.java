@@ -115,12 +115,64 @@ public class AnalysisResult {
         this.analyzedAt = OffsetDateTime.now(SEOUL_ZONE_ID);
     }
 
+    public void markProcessing() {
+        this.status = AnalysisStatus.PROCESSING;
+        this.analyzedAt = OffsetDateTime.now(SEOUL_ZONE_ID);
+    }
+
+    public void complete(
+            String transcript,
+            BigDecimal sttConfidence,
+            String sttModelName,
+            BigDecimal overallScore,
+            BigDecimal pronunciationScore,
+            BigDecimal intonationScore,
+            BigDecimal speedWpm,
+            SpeedStatus speedStatus,
+            BigDecimal stressScore,
+            BigDecimal pauseScore,
+            String strengthsText,
+            String weaknessesText,
+            String summaryFeedback
+    ) {
+        this.status = AnalysisStatus.COMPLETED;
+        this.transcript = transcript;
+        this.sttConfidence = sttConfidence;
+        this.sttModelName = sttModelName;
+        this.overallScore = overallScore;
+        this.pronunciationScore = pronunciationScore;
+        this.intonationScore = intonationScore;
+        this.speedWpm = speedWpm;
+        this.speedStatus = speedStatus;
+        this.stressScore = stressScore;
+        this.pauseScore = pauseScore;
+        this.strengthsText = strengthsText;
+        this.weaknessesText = weaknessesText;
+        this.summaryFeedback = summaryFeedback;
+        this.failureReason = null;
+        this.analyzedAt = OffsetDateTime.now(SEOUL_ZONE_ID);
+    }
+
+    public void fail(String failureReason) {
+        this.status = AnalysisStatus.FAILED;
+        this.failureReason = failureReason;
+        this.analyzedAt = OffsetDateTime.now(SEOUL_ZONE_ID);
+    }
+
     public OffsetDateTime updatedAt() {
         return analyzedAt == null ? createdAt : analyzedAt;
     }
 
     public boolean isCompleted() {
         return status == AnalysisStatus.COMPLETED;
+    }
+
+    public boolean canStartProcessing() {
+        return status == AnalysisStatus.PENDING;
+    }
+
+    public boolean canFinish() {
+        return status == AnalysisStatus.PENDING || status == AnalysisStatus.PROCESSING;
     }
 
     public void regenerateFeedback(

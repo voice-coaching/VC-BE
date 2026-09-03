@@ -70,4 +70,66 @@ public class AnalysisSegment {
 
     @Column(name = "feedback")
     private String feedback;
+
+    private AnalysisSegment(
+            AnalysisResult analysisResult,
+            Integer sequenceNo,
+            String expectedText,
+            String recognizedText,
+            Integer startMs,
+            Integer endMs,
+            SegmentMatchType matchType,
+            SegmentResultStatus resultStatus,
+            String targetUnit,
+            String errorType,
+            BigDecimal pronunciationScore,
+            BigDecimal intonationScore,
+            String feedback
+    ) {
+        this.analysisResult = analysisResult;
+        this.sequenceNo = sequenceNo;
+        this.expectedText = expectedText;
+        this.recognizedText = recognizedText;
+        this.startMs = startMs;
+        this.endMs = endMs;
+        this.matchType = matchType;
+        this.resultStatus = resultStatus;
+        this.targetUnit = targetUnit;
+        this.errorType = errorType;
+        this.pronunciationScore = pronunciationScore;
+        this.intonationScore = intonationScore;
+        this.feedback = feedback;
+    }
+
+    public static AnalysisSegment create(
+            AnalysisResult analysisResult,
+            Integer sequenceNo,
+            String expectedText,
+            String recognizedText,
+            Integer startMs,
+            Integer endMs,
+            SegmentMatchType matchType,
+            SegmentResultStatus resultStatus,
+            String targetUnit,
+            String errorType,
+            BigDecimal pronunciationScore,
+            BigDecimal intonationScore,
+            String feedback
+    ) {
+        return new AnalysisSegment(
+                analysisResult,
+                sequenceNo,
+                expectedText,
+                recognizedText,
+                startMs,
+                endMs,
+                matchType,
+                resultStatus,
+                targetUnit,
+                errorType,
+                pronunciationScore,
+                intonationScore,
+                feedback
+        );
+    }
 }

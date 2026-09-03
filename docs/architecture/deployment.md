@@ -32,6 +32,19 @@ TTL은 cache name별로 애플리케이션 설정에서 관리한다. 현재 학
 
 홈 조회 캐시는 사용자별 대시보드 구성 데이터를 포함하므로 cache key에 `userId`와 추천 조회 조건을 포함한다. 학습 세션 생성/상태 변경/완료/취소, 클래스 진도 변경, 온보딩 목표 변경, 마이페이지 학습 기록 삭제는 관련 홈 조회 캐시를 무효화한다.
 
+## Redis Stream Usage
+
+백엔드는 Redis Stream으로 AI Worker와 음성 분석 작업을 주고받는다.
+
+- Request stream: `analysis:request`
+- Result stream: `analysis:result`
+- AI Worker consumer group: `analysis-workers`
+- Backend result consumer group: `backend-analysis-result-workers`
+- Backend publisher: `training/infrastructure/RedisAnalysisJobPublisher`
+- Backend consumer: `analysis/infrastructure/redis/AnalysisResultStreamConsumer`
+
+분석 요청 API가 `analysis_results` row를 `PENDING`으로 생성하고 DB transaction commit 이후 `analysis:request`에 메시지를 발행한다. AI Worker가 `analysis:result`에 결과를 발행하면 백엔드 consumer가 메시지를 읽고 DB 저장 성공 후 ACK한다. 처리 실패 메시지는 ACK하지 않아 pending entry로 남기며, configured idle timeout 이후 백엔드 consumer가 claim해 재처리한다.
+
 ## Environment
 
 EC2의 `.env`에는 Redis 비밀번호를 설정해야 한다.
@@ -40,6 +53,12 @@ EC2의 `.env`에는 Redis 비밀번호를 설정해야 한다.
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=<redis-password>
+ANALYSIS_REDIS_STREAM_ENABLED=true
+ANALYSIS_REQUEST_STREAM=analysis:request
+ANALYSIS_RESULT_STREAM=analysis:result
+ANALYSIS_RESULT_CONSUMER_GROUP=backend-analysis-result-workers
+ANALYSIS_RESULT_CONSUMER_NAME=voice-backend
+ANALYSIS_RESULT_PENDING_TIMEOUT_MILLIS=300000
 ```
 
 Spring Boot 애플리케이션을 EC2 호스트에서 JAR로 직접 실행하면 `REDIS_HOST=localhost`를 사용한다.

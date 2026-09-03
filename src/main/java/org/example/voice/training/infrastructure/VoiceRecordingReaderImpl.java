@@ -3,6 +3,7 @@ package org.example.voice.training.infrastructure;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.training.domain.entity.VoiceRecording;
+import org.example.voice.training.domain.model.AnalysisJobRequestData;
 import org.example.voice.training.domain.model.RecordingPlaybackUrlData;
 import org.example.voice.training.domain.model.VoiceRecordingData;
 import org.example.voice.training.domain.port.VoiceRecordingReader;
@@ -94,6 +95,25 @@ public class VoiceRecordingReaderImpl implements VoiceRecordingReader {
                             expiresAt
                     );
                 });
+    }
+
+    @Override
+    public Optional<AnalysisJobRequestData> findAnalysisJobRequest(
+            Long analysisId,
+            Long sessionId,
+            Long recordingId,
+            Long userId
+    ) {
+        return findRecording(sessionId, recordingId, userId)
+                .map(recording -> new AnalysisJobRequestData(
+                        analysisId,
+                        sessionId,
+                        recordingId,
+                        userId,
+                        recording.getAudioUrl(),
+                        recording.getTrainingSession().getContent().getScriptText(),
+                        recording.getTrainingSession().getLearningFocus()
+                ));
     }
 
     private Optional<VoiceRecording> findRecording(Long sessionId, Long recordingId, Long userId) {
