@@ -110,8 +110,7 @@ public class HmacAnalysisAuthorizationIssuer implements AnalysisAuthorizationIss
         if (properties.getKeyId() == null
                 || !properties.getKeyId().matches("[A-Za-z0-9._-]{1,100}")
                 || properties.getConsentPolicyRevision() == null
-                || properties.getConsentPolicyRevision().isBlank()
-                || properties.getConsentPolicyRevision().length() > 100
+                || !properties.getConsentPolicyRevision().matches("[A-Za-z0-9._-]{1,100}")
                 || properties.getGrantTtl() == null
                 || properties.getGrantTtl().isZero()
                 || properties.getGrantTtl().isNegative()

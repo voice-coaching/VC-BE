@@ -98,6 +98,15 @@ class HmacAnalysisAuthorizationIssuerTest {
                 .hasMessage("analysis_authorization_configuration_invalid");
     }
 
+    @Test
+    void rejectsAConfigurationWithAnUnsafePolicyIdentifier() {
+        AnalysisAuthorizationProperties properties = properties("voice analysis latest");
+
+        assertThatThrownBy(() -> new HmacAnalysisAuthorizationIssuer(properties))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("analysis_authorization_configuration_invalid");
+    }
+
     private static HmacAnalysisAuthorizationIssuer issuer(String policyRevision) {
         return new HmacAnalysisAuthorizationIssuer(
                 properties(policyRevision),
