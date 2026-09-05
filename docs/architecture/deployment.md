@@ -17,7 +17,7 @@ fail-closed하며 PENDING 결과나 outbox event를 저장하지 않는다.
 - Cancellation tombstone: `analysis:canceled:v1:<opaque-request-event-id>`
 - Result consumer group: `backend-analysis-result-workers`
 - Authentication: Redis ACL plus TLS for cross-host traffic
-- Resource bounds: 5-second connect/command timeouts, 64 KiB payload cap, bounded result DLQ
+- Resource bounds: 5-second connect timeout, 30-second command timeout, 64 KiB request cap, 384 MiB closed-beta result cap, bounded result DLQ
 - Admission: `ANALYSIS_MAX_CONCURRENT_PER_USER` (default `3`), serialized by a PostgreSQL user-row lock
 - Stale job recovery: `ANALYSIS_EXECUTION_TIMEOUT=PT15M`, `ANALYSIS_TIMEOUT_SWEEP_INTERVAL=PT1M`
 
@@ -119,6 +119,7 @@ ANALYSIS_REDIS_PORT=6379
 ANALYSIS_REDIS_USERNAME=<analysis-acl-user>
 ANALYSIS_REDIS_PASSWORD=<analysis-acl-password>
 ANALYSIS_REDIS_SSL_ENABLED=true
+ANALYSIS_REDIS_COMMAND_TIMEOUT=PT30S
 ANALYSIS_REQUEST_STREAM=analysis:request:v1
 ANALYSIS_REQUEST_CONSUMER_GROUP=analysis-workers
 ANALYSIS_REQUEST_DLQ_STREAM=analysis:request:dlq:v1
@@ -131,6 +132,8 @@ ANALYSIS_RETENTION_AGE=PT1H
 ANALYSIS_RETENTION_POLL_INTERVAL=PT5M
 ANALYSIS_RETENTION_BATCH_SIZE=100
 ANALYSIS_OBSERVATION_POLL_INTERVAL=PT30S
+ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES=65536
+ANALYSIS_STREAM_MAXIMUM_RESULT_PAYLOAD_BYTES=402653184
 ANALYSIS_AUTHORIZATION_KEY_ID=<active-key-id>
 ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64=<secret-manager-value>
 ANALYSIS_CONSENT_POLICY_REVISION=<active-consent-revision>
@@ -180,7 +183,7 @@ public routing이 실패하면 이전 release symlink를 복원하고 service를
 release health까지 재검증한다. 따라서 `/v3/api-docs` 응답만으로 내부 분석 준비 상태를
 대체하지 않는다.
 
-Backend와 AI worker의 request-v4/result-v3 전환은 각각 독립적으로 자동 배포하지 않는다.
+Backend와 AI worker의 request-v5/result-v4/Seungun-v2 전환은 각각 독립적으로 자동 배포하지 않는다.
 새 분석 admission을 중지하고 기존 request/result Stream 및 PEL을 drain 또는 명시적으로
 종결한 후 Backend를 배포하고, 같은 계약의 worker image preload/health를 통과시킨 뒤
 admission을 재개한다. 어느 단계에서든 실패하면 이전 Backend release와 이전 worker image를

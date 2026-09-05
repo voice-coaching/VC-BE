@@ -2,6 +2,8 @@ package org.example.voice.analysis.controller.dto;
 
 import org.example.voice.analysis.domain.model.VisualSupplementData;
 
+import java.util.Map;
+
 public record VisualSupplementResponseDto(
         String schemaVersion,
         Integer selectedExpectedIndex,
@@ -9,7 +11,8 @@ public record VisualSupplementResponseDto(
         String approvedClaimId,
         String rendererKey,
         String upstreamPhoneAnchorRef,
-        String supplementSha256
+        String supplementSha256,
+        Map<String, Object> closedBetaLipObservation
 ) {
     public static VisualSupplementResponseDto from(VisualSupplementData data) {
         if (data == null) {
@@ -22,7 +25,8 @@ public record VisualSupplementResponseDto(
                 data.approvedClaimId(),
                 data.rendererKey(),
                 data.upstreamPhoneAnchorRef(),
-                data.supplementSha256()
+                data.supplementSha256(),
+                data.closedBetaLipObservation()
         );
     }
 }

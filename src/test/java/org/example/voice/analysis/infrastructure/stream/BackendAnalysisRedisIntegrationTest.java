@@ -72,6 +72,7 @@ class BackendAnalysisRedisIntegrationTest {
             assertThat(redis.opsForStream().size(properties.getResultStream())).isZero();
 
             properties.setMaximumPayloadBytes(128);
+            properties.setMaximumResultPayloadBytes(128);
             properties.setMaxRetries(1);
             redis.opsForStream().add(
                     org.springframework.data.redis.connection.stream.StreamRecords

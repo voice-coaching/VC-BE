@@ -146,7 +146,7 @@ public class RedisAnalysisResultConsumer {
                 if (payload == null || payload.isBlank()) {
                     throw new IllegalArgumentException("stream record has no payload");
                 }
-                if (payloadBytes(payload) > properties.getMaximumPayloadBytes()) {
+                if (payloadBytes(payload) > properties.getMaximumResultPayloadBytes()) {
                     throw new IllegalArgumentException("analysis result payload exceeds configured maximum");
                 }
                 AnalysisResultIngestionDisposition disposition = ingestionService.ingest(codec.decodeResult(payload));
@@ -175,7 +175,7 @@ public class RedisAnalysisResultConsumer {
             acknowledge(recordId);
             return;
         }
-        if (payloadBytes(payload) > properties.getMaximumPayloadBytes()) {
+        if (payloadBytes(payload) > properties.getMaximumResultPayloadBytes()) {
             moveToDeadLetter(recordId, "", OVERSIZED_PAYLOAD_DLQ_FAILURE_CODE);
             acknowledge(recordId);
             return;

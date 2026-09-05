@@ -2,6 +2,8 @@ package org.example.voice.analysis.domain.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import java.util.Map;
+
 /** Privacy-safe projection of an approved same-attempt visual supplement. */
 @JsonIgnoreProperties(ignoreUnknown = false)
 public record AnalysisWorkerVisualSupplement(
@@ -11,9 +13,23 @@ public record AnalysisWorkerVisualSupplement(
         String approvedClaimId,
         String rendererKey,
         String upstreamPhoneAnchorRef,
-        String supplementSha256
+        String supplementSha256,
+        Map<String, Object> closedBetaLipObservation
 ) {
     public static final String SCHEMA_VERSION = "voice-coaching.visual-supplement.v1";
+
+    public AnalysisWorkerVisualSupplement(
+            String schemaVersion,
+            Integer selectedExpectedIndex,
+            String evidenceRelation,
+            String approvedClaimId,
+            String rendererKey,
+            String upstreamPhoneAnchorRef,
+            String supplementSha256
+    ) {
+        this(schemaVersion, selectedExpectedIndex, evidenceRelation, approvedClaimId,
+                rendererKey, upstreamPhoneAnchorRef, supplementSha256, null);
+    }
 
     public AnalysisWorkerVisualSupplement {
         if (!SCHEMA_VERSION.equals(schemaVersion)) {
@@ -29,6 +45,29 @@ public record AnalysisWorkerVisualSupplement(
         requireIdentifier(rendererKey, "rendererKey");
         requireSha256(upstreamPhoneAnchorRef, "upstreamPhoneAnchorRef");
         requireSha256(supplementSha256, "supplementSha256");
+        closedBetaLipObservation = closedBetaLipObservation == null
+                ? null
+                : Map.copyOf(closedBetaLipObservation);
+        if (closedBetaLipObservation != null) {
+            if (!"voice-coaching.closed-beta-lip-observation.v1".equals(
+                    closedBetaLipObservation.get("schemaVersion"))
+                    || !"OBSERVED".equals(closedBetaLipObservation.get("status"))
+                    || !selectedExpectedIndex.equals(
+                    closedBetaLipObservation.get("selectedExpectedIndex"))
+                    || !(closedBetaLipObservation.get("measurements") instanceof Map<?, ?> measurements)
+                    || measurements.isEmpty()
+                    || !Boolean.FALSE.equals(
+                    closedBetaLipObservation.get("containsPronunciationTruth"))
+                    || !Boolean.FALSE.equals(
+                    closedBetaLipObservation.get("containsActionTruth"))) {
+                throw new IllegalArgumentException("closed beta lip observation is invalid");
+            }
+            Object geometrySha256 = closedBetaLipObservation.get("geometryArtifactSha256");
+            if (!(geometrySha256 instanceof String digest)) {
+                throw new IllegalArgumentException("closed beta lip observation is invalid");
+            }
+            requireSha256(digest, "geometryArtifactSha256");
+        }
     }
 
     private static void requireIdentifier(String value, String field) {

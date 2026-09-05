@@ -90,7 +90,10 @@ class TrainingAnalysisRequestServiceTest {
         assertThat(request.getValue().contentId()).isEqualTo(12L);
         assertThat(request.getValue().audioObjectKey()).isEqualTo("recordings/50.wav");
         assertThat(request.getValue().scriptSha256()).hasSize(64);
-        assertThat(request.getValue().schemaVersion()).isEqualTo("voice-coaching.analysis-request.v4");
+        assertThat(request.getValue().schemaVersion()).isEqualTo("voice-coaching.analysis-request.v5");
+        assertThat(request.getValue().closedBetaContext().userId()).isEqualTo(9L);
+        assertThat(request.getValue().closedBetaContext().sessionId()).isEqualTo(7L);
+        assertThat(request.getValue().closedBetaContext().recordingId()).isEqualTo(50L);
         assertThat(request.getValue().audioSha256()).isEqualTo("d".repeat(64));
         assertThat(request.getValue().authorizationGrant().requestEventId())
                 .isEqualTo(request.getValue().eventId());
@@ -98,7 +101,7 @@ class TrainingAnalysisRequestServiceTest {
     }
 
     @Test
-    void bindsCanonicalVisualAndFaceConsentWithoutPublishingOwnerIdentifiers() {
+    void bindsCanonicalVisualAndPublishesSignedClosedBetaOwnerIdentifiers() {
         SelectedRecordingAnalysisData source = new SelectedRecordingAnalysisData(
                 50L,
                 12L,
@@ -136,6 +139,9 @@ class TrainingAnalysisRequestServiceTest {
         assertThat(request.getValue().audioObjectKey()).doesNotContain("users/", "sessions/");
         assertThat(request.getValue().visualInput().objectKey()).doesNotContain("users/", "sessions/");
         assertThat(request.getValue().authorizationGrant().binds(request.getValue().visualInput())).isTrue();
+        assertThat(request.getValue().authorizationGrant().binds(
+                request.getValue().closedBetaContext()
+        )).isTrue();
     }
 
     @Test
@@ -293,6 +299,7 @@ class TrainingAnalysisRequestServiceTest {
                     issue.visualInput() == null ? null : issue.visualInput().fileSizeBytes(),
                     issue.visualInput() == null ? null : issue.visualInput().consentReceiptSha256(),
                     issue.visualInput() == null ? null : issue.visualInput().consentPolicyRevision(),
+                    issue.closedBetaContext().bindingSha256(),
                     issuedAt,
                     issuedAt.plusSeconds(300),
                     AnalysisAuthorizationGrant.PURPOSE,

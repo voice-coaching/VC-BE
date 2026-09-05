@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.domain.model.AnalysisWorkerRequest;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationIssue;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
+import org.example.voice.analysis.domain.model.AnalysisClosedBetaContext;
 import org.example.voice.analysis.domain.model.AnalysisWorkerVisualInput;
 import org.example.voice.analysis.domain.port.AnalysisAuthorizationIssuer;
 import org.example.voice.common.exception.BaseException;
@@ -78,7 +79,8 @@ public class TrainingAnalysisRequestService {
         trainingSessionWriter.startAnalysis(sessionId);
         AnalysisRequestData result = trainingAnalysisWriter.createPending(source.recordingId(), requestEventId);
         analysisJobPublisher.publish(toWorkerRequest(
-                result.analysisId(), requestEventId, source, consent.policyRevision(), consentReceipt.receiptSha256()
+                result.analysisId(), requestEventId, userId, sessionId, source,
+                consent.policyRevision(), consentReceipt.receiptSha256()
         ));
         return result;
     }
@@ -119,7 +121,8 @@ public class TrainingAnalysisRequestService {
                 requestEventId
         );
         analysisJobPublisher.publish(toWorkerRequest(
-                result.analysisId(), requestEventId, source, consent.policyRevision(), consentReceipt.receiptSha256()
+                result.analysisId(), requestEventId, userId, sessionId, source,
+                consent.policyRevision(), consentReceipt.receiptSha256()
         ));
         return result;
     }
@@ -127,6 +130,8 @@ public class TrainingAnalysisRequestService {
     private AnalysisWorkerRequest toWorkerRequest(
             Long analysisId,
             UUID requestEventId,
+            Long userId,
+            Long sessionId,
             SelectedRecordingAnalysisData source,
             String consentPolicyRevision,
             String consentReceiptSha256
@@ -143,6 +148,13 @@ public class TrainingAnalysisRequestService {
                             source.visualConsentReceiptSha256(),
                             source.visualConsentPolicyRevision()
                     );
+            AnalysisClosedBetaContext closedBetaContext =
+                    new AnalysisClosedBetaContext(
+                            AnalysisClosedBetaContext.SCHEMA_VERSION,
+                            userId,
+                            sessionId,
+                            source.recordingId()
+                    );
             AnalysisAuthorizationGrant grant = analysisAuthorizationIssuer.issue(
                     new AnalysisAuthorizationIssue(
                             requestEventId,
@@ -158,6 +170,7 @@ public class TrainingAnalysisRequestService {
                             source.learningFocus(),
                             consentReceiptSha256,
                             consentPolicyRevision,
+                            closedBetaContext,
                             visualInput
                     )
             );
@@ -175,6 +188,7 @@ public class TrainingAnalysisRequestService {
                     source.fileSizeBytes(),
                     source.durationMs(),
                     source.learningFocus(),
+                    closedBetaContext,
                     visualInput,
                     grant
             );

@@ -6,10 +6,57 @@ import org.example.voice.practicecontent.domain.type.LearningFocus;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
+import java.util.List;
+import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AnalysisWorkerPayloadTest {
+
+    @Test
+    void acceptsV4ResultWithSignedContextRawPathsAndMedia() {
+        AnalysisClosedBetaContext context = new AnalysisClosedBetaContext(
+                AnalysisClosedBetaContext.SCHEMA_VERSION,
+                9L,
+                7L,
+                50L
+        );
+        AnalysisClosedBetaDebug debug = new AnalysisClosedBetaDebug(
+                AnalysisClosedBetaDebug.SCHEMA_VERSION,
+                context,
+                "COMPLETE",
+                "recordings/50.wav",
+                null,
+                "/restricted/source.wav",
+                "/restricted/decoded.wav",
+                null,
+                "cmF3",
+                "ZGVjb2RlZA==",
+                null
+        );
+
+        AnalysisWorkerResult result = new AnalysisWorkerResult(
+                AnalysisWorkerResult.SCHEMA_VERSION,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                35L,
+                AnalysisStatus.COMPLETED,
+                AnalysisOutcome.COMPLETED_NO_ISSUE,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null,
+                "worker-v2",
+                "seungun-v2",
+                "a".repeat(64),
+                List.of(),
+                null,
+                Map.of("schema_version", "korean_phone_ctc.production_analysis.v2"),
+                debug
+        );
+
+        assertThat(result.closedBetaDebug().context()).isEqualTo(context);
+        assertThat(result.closedBetaDebug().audioMediaBase64()).isEqualTo("cmF3");
+    }
 
     @Test
     void rejectsPresignedUrlWhereOnlyAnObjectKeyIsAllowed() {

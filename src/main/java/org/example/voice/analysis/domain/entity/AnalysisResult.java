@@ -19,11 +19,14 @@ import org.example.voice.analysis.domain.type.AnalysisOutcome;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.analysis.domain.type.SpeedStatus;
 import org.example.voice.training.domain.entity.VoiceRecording;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.UUID;
+import java.util.Map;
 
 @Entity
 @Getter
@@ -155,6 +158,10 @@ public class AnalysisResult {
     @Column(name = "visual_supplement_sha256", length = 64)
     private String visualSupplementSha256;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "visual_closed_beta_lip_observation", columnDefinition = "jsonb")
+    private Map<String, Object> visualClosedBetaLipObservation;
+
     @Column(name = "feedback_regeneration_count", nullable = false)
     private Integer feedbackRegenerationCount;
 
@@ -242,6 +249,11 @@ public class AnalysisResult {
             this.visualRendererKey = result.visualSupplement().rendererKey();
             this.visualPhoneAnchorRef = result.visualSupplement().upstreamPhoneAnchorRef();
             this.visualSupplementSha256 = result.visualSupplement().supplementSha256();
+            this.visualClosedBetaLipObservation = (
+                    result.visualSupplement().closedBetaLipObservation() == null
+                            ? null
+                            : Map.copyOf(result.visualSupplement().closedBetaLipObservation())
+            );
         }
         this.failureCode = null;
         this.failureReason = null;
@@ -336,5 +348,6 @@ public class AnalysisResult {
         this.visualRendererKey = null;
         this.visualPhoneAnchorRef = null;
         this.visualSupplementSha256 = null;
+        this.visualClosedBetaLipObservation = null;
     }
 }

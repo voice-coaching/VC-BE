@@ -8,6 +8,7 @@ import org.example.voice.analysis.domain.type.SpeedStatus;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -41,9 +42,12 @@ public record AnalysisWorkerResult(
         String pipelineRevision,
         String audioSha256,
         List<AnalysisWorkerSegment> segments,
-        AnalysisWorkerVisualSupplement visualSupplement
+        AnalysisWorkerVisualSupplement visualSupplement,
+        Map<String, Object> seungunProductionEvidence,
+        AnalysisClosedBetaDebug closedBetaDebug
 ) {
-    public static final String SCHEMA_VERSION = "voice-coaching.analysis-result.v3";
+    public static final String SCHEMA_VERSION = "voice-coaching.analysis-result.v4";
+    public static final String LEGACY_SCHEMA_VERSION = "voice-coaching.analysis-result.v3";
 
     public AnalysisWorkerResult(
             String schemaVersion,
@@ -73,21 +77,63 @@ public record AnalysisWorkerResult(
             String audioSha256,
             List<AnalysisWorkerSegment> segments
     ) {
-        this(schemaVersion, eventId, requestEventId, analysisId, status, outcome,
+        this(legacySchema(schemaVersion), eventId, requestEventId, analysisId, status, outcome,
                 failureCode, failureReason, transcript, sttConfidence, sttModelName,
                 overallScore, pronunciationScore, intonationScore, speedWpm,
                 speedStatus, stressScore, pauseScore, strengthsText, weaknessesText,
                 summaryFeedback, pronunciationEvidence, workerRevision,
-                pipelineRevision, audioSha256, segments, null);
+                pipelineRevision, audioSha256, segments, null, null, null);
+    }
+
+    public AnalysisWorkerResult(
+            String schemaVersion,
+            UUID eventId,
+            UUID requestEventId,
+            Long analysisId,
+            AnalysisStatus status,
+            AnalysisOutcome outcome,
+            String failureCode,
+            String failureReason,
+            String transcript,
+            BigDecimal sttConfidence,
+            String sttModelName,
+            BigDecimal overallScore,
+            BigDecimal pronunciationScore,
+            BigDecimal intonationScore,
+            BigDecimal speedWpm,
+            SpeedStatus speedStatus,
+            BigDecimal stressScore,
+            BigDecimal pauseScore,
+            String strengthsText,
+            String weaknessesText,
+            String summaryFeedback,
+            AnalysisWorkerPronunciationEvidence pronunciationEvidence,
+            String workerRevision,
+            String pipelineRevision,
+            String audioSha256,
+            List<AnalysisWorkerSegment> segments,
+            AnalysisWorkerVisualSupplement visualSupplement
+    ) {
+        this(legacySchema(schemaVersion), eventId, requestEventId, analysisId, status, outcome,
+                failureCode, failureReason, transcript, sttConfidence, sttModelName,
+                overallScore, pronunciationScore, intonationScore, speedWpm,
+                speedStatus, stressScore, pauseScore, strengthsText, weaknessesText,
+                summaryFeedback, pronunciationEvidence, workerRevision,
+                pipelineRevision, audioSha256, segments, visualSupplement, null, null);
     }
 
     public AnalysisWorkerResult {
-        requireEquals(SCHEMA_VERSION, schemaVersion, "schemaVersion");
+        if (!SCHEMA_VERSION.equals(schemaVersion) && !LEGACY_SCHEMA_VERSION.equals(schemaVersion)) {
+            throw new IllegalArgumentException("schemaVersion is unsupported");
+        }
         Objects.requireNonNull(eventId, "eventId");
         Objects.requireNonNull(requestEventId, "requestEventId");
         requirePositive(analysisId, "analysisId");
         Objects.requireNonNull(status, "status");
         segments = segments == null ? List.of() : List.copyOf(segments);
+        seungunProductionEvidence = seungunProductionEvidence == null
+                ? null
+                : Map.copyOf(seungunProductionEvidence);
         validateTerminalState(status, outcome, failureCode, failureReason, segments);
         requireLength(transcript, 20_000, "transcript");
         requireLength(sttModelName, 100, "sttModelName");
@@ -125,7 +171,7 @@ public record AnalysisWorkerResult(
         if (status == AnalysisStatus.COMPLETED) {
             if (outcome != AnalysisOutcome.COACHING_READY
                     && outcome != AnalysisOutcome.COMPLETED_NO_ISSUE) {
-                throw new IllegalArgumentException("result v3 outcome is unsupported");
+                throw new IllegalArgumentException("result outcome is unsupported");
             }
             requireText(workerRevision, 100, "workerRevision");
             requireText(pipelineRevision, 100, "pipelineRevision");
@@ -163,7 +209,7 @@ public record AnalysisWorkerResult(
                     weaknessesText
             ) || !segments.isEmpty()) {
                 throw new IllegalArgumentException(
-                        "result v3 does not accept unapproved transcript, score, or segment mappings"
+                        "result does not accept unapproved transcript, score, or segment mappings"
                 );
             }
         } else if (pronunciationEvidence != null || visualSupplement != null) {
@@ -173,6 +219,26 @@ public record AnalysisWorkerResult(
                 && outcome != AnalysisOutcome.COACHING_READY
                 && visualSupplement != null) {
             throw new IllegalArgumentException("visual supplement requires coaching-ready Seungun evidence");
+        }
+        if (SCHEMA_VERSION.equals(schemaVersion)) {
+            if (closedBetaDebug == null) {
+                throw new IllegalArgumentException("result v4 requires closed beta debug payload");
+            }
+            if (status == AnalysisStatus.COMPLETED) {
+                if (seungunProductionEvidence == null
+                        || !"korean_phone_ctc.production_analysis.v2".equals(
+                        seungunProductionEvidence.get("schema_version"))) {
+                    throw new IllegalArgumentException(
+                            "completed result v4 requires Seungun production evidence"
+                    );
+                }
+            } else if (seungunProductionEvidence != null) {
+                throw new IllegalArgumentException(
+                        "non-completed result must not contain Seungun production evidence"
+                );
+            }
+        } else if (closedBetaDebug != null || seungunProductionEvidence != null) {
+            throw new IllegalArgumentException("result v3 must not contain v4 payload");
         }
         if (sttConfidence != null && (sttConfidence.signum() < 0 || sttConfidence.compareTo(BigDecimal.ONE) > 0)) {
             throw new IllegalArgumentException("sttConfidence must be between 0 and 1");
@@ -219,6 +285,13 @@ public record AnalysisWorkerResult(
         if (!expected.equals(value)) {
             throw new IllegalArgumentException(field + " is unsupported");
         }
+    }
+
+    private static String legacySchema(String value) {
+        if (!SCHEMA_VERSION.equals(value) && !LEGACY_SCHEMA_VERSION.equals(value)) {
+            throw new IllegalArgumentException("schemaVersion is unsupported");
+        }
+        return LEGACY_SCHEMA_VERSION;
     }
 
     private static void requirePositive(Long value, String field) {

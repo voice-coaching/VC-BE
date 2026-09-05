@@ -2,6 +2,7 @@ package org.example.voice.analysis.infrastructure.authorization;
 
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationIssue;
+import org.example.voice.analysis.domain.model.AnalysisClosedBetaContext;
 import org.example.voice.analysis.domain.model.AnalysisWorkerVisualInput;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
@@ -35,7 +36,7 @@ class HmacAnalysisAuthorizationIssuerTest {
         assertThat(grant.signature()).hasSize(64);
         assertThat(grant.signature()).isNotEqualTo("0".repeat(64));
         assertThat(grant.signature())
-                .isEqualTo("94416ceb8712c06e9b3798867eb7e8a0e13dfb547f965090aae66da50a1dc353");
+                .isEqualTo("d3a25c63ba8631f80b520c8c739880d7416c0507be613c99a9478b228e367835");
         assertThat(new String(grant.canonicalSigningInput())).contains("scriptSha256:64:");
     }
 
@@ -65,6 +66,7 @@ class HmacAnalysisAuthorizationIssuerTest {
                 base.learningFocus(),
                 base.consentReceiptSha256(),
                 base.consentPolicyRevision(),
+                base.closedBetaContext(),
                 visualInput
         );
 
@@ -73,7 +75,7 @@ class HmacAnalysisAuthorizationIssuerTest {
         assertThat(grant.visualObjectKeySha256())
                 .isEqualTo("350294a93744e37eb7c03f54a50710177c99a7231b485eb39061983c95cba7d6");
         assertThat(grant.signature())
-                .isEqualTo("dc132de88e2cba1bb2e1a6916d7bfc30525eafb77d8b2b943b3a4232c8906208");
+                .isEqualTo("9d8469710fe1a6a4d5c13dbd899b75c3295339022774d209f784c4111aac4a8c");
     }
 
     @Test
@@ -137,7 +139,14 @@ class HmacAnalysisAuthorizationIssuerTest {
                 1200,
                 LearningFocus.PRONUNCIATION,
                 "4bb06f8e4e3a7715d201d573d0aa423762e55dabd61a2c02278fa56cc6d294e0",
-                policyRevision
+                policyRevision,
+                new AnalysisClosedBetaContext(
+                        AnalysisClosedBetaContext.SCHEMA_VERSION,
+                        9L,
+                        7L,
+                        50L
+                ),
+                null
         );
     }
 }

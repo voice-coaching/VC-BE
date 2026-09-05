@@ -32,6 +32,7 @@ public record AnalysisAuthorizationGrant(
         Long visualFileSizeBytes,
         String visualConsentReceiptSha256,
         String visualConsentPolicyRevision,
+        String closedBetaContextSha256,
         Instant issuedAtUtc,
         Instant expiresAtUtc,
         String purpose,
@@ -40,7 +41,8 @@ public record AnalysisAuthorizationGrant(
         boolean remoteEgressAllowed,
         String signature
 ) {
-    public static final String GRANT_VERSION = "voice-coaching.analysis-authorization.v3";
+    public static final String GRANT_VERSION = "voice-coaching.analysis-authorization.v4";
+    public static final String LEGACY_GRANT_VERSION = "voice-coaching.analysis-authorization.v3";
     public static final String PURPOSE = "pronunciation_coaching";
     public static final String DATA_CATEGORY = "learner_voice_recording";
 
@@ -72,13 +74,15 @@ public record AnalysisAuthorizationGrant(
                 promptRevision, scriptSha256, audioObjectKeySha256, audioSha256,
                 mimeType, fileSizeBytes, durationMs, learningFocus,
                 consentReceiptSha256, consentPolicyRevision,
-                null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
                 issuedAtUtc, expiresAtUtc, purpose, dataCategory,
                 deleteOnCompletion, remoteEgressAllowed, signature);
     }
 
     public AnalysisAuthorizationGrant {
-        requireEquals(GRANT_VERSION, grantVersion, "grantVersion");
+        if (!GRANT_VERSION.equals(grantVersion) && !LEGACY_GRANT_VERSION.equals(grantVersion)) {
+            throw new IllegalArgumentException("grantVersion is unsupported");
+        }
         requireIdentifier(keyId, "keyId");
         Objects.requireNonNull(requestEventId, "requestEventId");
         requirePositive(analysisId, "analysisId");
@@ -107,6 +111,11 @@ public record AnalysisAuthorizationGrant(
                 visualConsentReceiptSha256,
                 visualConsentPolicyRevision
         );
+        if (GRANT_VERSION.equals(grantVersion)) {
+            requireSha256(closedBetaContextSha256, "closedBetaContextSha256");
+        } else if (closedBetaContextSha256 != null) {
+            throw new IllegalArgumentException("legacy grant must not bind closed beta context");
+        }
         Objects.requireNonNull(issuedAtUtc, "issuedAtUtc");
         Objects.requireNonNull(expiresAtUtc, "expiresAtUtc");
         if (!expiresAtUtc.isAfter(issuedAtUtc)) {
@@ -147,6 +156,9 @@ public record AnalysisAuthorizationGrant(
         append(value, "visualFileSizeBytes", visualFileSizeBytes);
         append(value, "visualConsentReceiptSha256", visualConsentReceiptSha256);
         append(value, "visualConsentPolicyRevision", visualConsentPolicyRevision);
+        if (GRANT_VERSION.equals(grantVersion)) {
+            append(value, "closedBetaContextSha256", closedBetaContextSha256);
+        }
         append(value, "issuedAtUtc", issuedAtUtc);
         append(value, "expiresAtUtc", expiresAtUtc);
         append(value, "purpose", purpose);
@@ -166,6 +178,15 @@ public record AnalysisAuthorizationGrant(
                 && visualInput.fileSizeBytes().equals(visualFileSizeBytes)
                 && visualInput.consentReceiptSha256().equals(visualConsentReceiptSha256)
                 && visualInput.consentPolicyRevision().equals(visualConsentPolicyRevision);
+    }
+
+    public boolean binds(AnalysisClosedBetaContext context) {
+        if (context == null) {
+            return LEGACY_GRANT_VERSION.equals(grantVersion)
+                    && closedBetaContextSha256 == null;
+        }
+        return GRANT_VERSION.equals(grantVersion)
+                && context.bindingSha256().equals(closedBetaContextSha256);
     }
 
     private static void validateVisualClaims(

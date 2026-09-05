@@ -100,7 +100,8 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
                 result.getVisualApprovedClaimId(),
                 result.getVisualRendererKey(),
                 result.getVisualPhoneAnchorRef(),
-                result.getVisualSupplementSha256()
+                result.getVisualSupplementSha256(),
+                result.getVisualClosedBetaLipObservation()
         );
     }
 

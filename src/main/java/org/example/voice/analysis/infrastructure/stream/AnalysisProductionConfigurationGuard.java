@@ -47,6 +47,8 @@ public class AnalysisProductionConfigurationGuard {
                 || stream.getRedisCommandTimeout().compareTo(stream.getResultBlock()) <= 0
                 || stream.getMaximumPayloadBytes() < 1_024
                 || stream.getMaximumPayloadBytes() > 1_048_576
+                || stream.getMaximumResultPayloadBytes() < 1_024
+                || stream.getMaximumResultPayloadBytes() > 402_653_184
                 || stream.getDeadLetterMaximumLength() <= 0
                 || stream.getDeadLetterMaximumLength() > 1_000_000
                 || invalidDuration(stream.getCancellationOutboxPollInterval())

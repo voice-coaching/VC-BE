@@ -94,7 +94,7 @@ analysis:
     redis-password: ${ANALYSIS_REDIS_PASSWORD:}
     redis-ssl-enabled: ${ANALYSIS_REDIS_SSL_ENABLED:false}
     redis-connect-timeout: ${ANALYSIS_REDIS_CONNECT_TIMEOUT:PT5S}
-    redis-command-timeout: ${ANALYSIS_REDIS_COMMAND_TIMEOUT:PT5S}
+    redis-command-timeout: ${ANALYSIS_REDIS_COMMAND_TIMEOUT:PT30S}
     redis-shutdown-timeout: ${ANALYSIS_REDIS_SHUTDOWN_TIMEOUT:PT1S}
     request-stream: ${ANALYSIS_REQUEST_STREAM:analysis:request:v1}
     request-consumer-group: ${ANALYSIS_REQUEST_CONSUMER_GROUP:analysis-workers}
@@ -117,6 +117,7 @@ analysis:
     batch-size: ${ANALYSIS_STREAM_BATCH_SIZE:25}
     max-retries: ${ANALYSIS_STREAM_MAX_RETRIES:3}
     maximum-payload-bytes: ${ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES:65536}
+    maximum-result-payload-bytes: ${ANALYSIS_STREAM_MAXIMUM_RESULT_PAYLOAD_BYTES:402653184}
     dead-letter-maximum-length: ${ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH:10000}
     max-concurrent-per-user: ${ANALYSIS_MAX_CONCURRENT_PER_USER:3}
     execution-timeout: ${ANALYSIS_EXECUTION_TIMEOUT:PT15M}

@@ -1,5 +1,7 @@
 package org.example.voice.analysis.domain.model;
 
+import java.util.Map;
+
 /** Stored public view of an approved same-attempt visual supplement. */
 public record VisualSupplementData(
         String schemaVersion,
@@ -8,6 +10,7 @@ public record VisualSupplementData(
         String approvedClaimId,
         String rendererKey,
         String upstreamPhoneAnchorRef,
-        String supplementSha256
+        String supplementSha256,
+        Map<String, Object> closedBetaLipObservation
 ) {
 }

@@ -43,7 +43,9 @@ public class HmacAnalysisAuthorizationIssuer implements AnalysisAuthorizationIss
 
     @Override
     public AnalysisAuthorizationGrant issue(AnalysisAuthorizationIssue issue) {
-        if (issue == null || !properties.getConsentPolicyRevision().equals(issue.consentPolicyRevision())) {
+        if (issue == null
+                || issue.closedBetaContext() == null
+                || !properties.getConsentPolicyRevision().equals(issue.consentPolicyRevision())) {
             throw new BaseException(ErrorCode.ANALYSIS_CONSENT_POLICY_MISMATCH);
         }
         Instant issuedAt = clock.instant();
@@ -86,6 +88,9 @@ public class HmacAnalysisAuthorizationIssuer implements AnalysisAuthorizationIss
                 issue.visualInput() == null ? null : issue.visualInput().fileSizeBytes(),
                 issue.visualInput() == null ? null : issue.visualInput().consentReceiptSha256(),
                 issue.visualInput() == null ? null : issue.visualInput().consentPolicyRevision(),
+                issue.closedBetaContext() == null
+                        ? null
+                        : issue.closedBetaContext().bindingSha256(),
                 issuedAt,
                 issuedAt.plus(properties.getGrantTtl()),
                 AnalysisAuthorizationGrant.PURPOSE,

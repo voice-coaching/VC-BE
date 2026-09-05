@@ -11,9 +11,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /**
- * Versioned Backend-to-AI request payload. It contains no user identifier or
- * signed playback URL; the worker resolves the object key through its own
- * restricted storage adapter.
+ * Versioned Backend-to-AI request payload. The v5 closed-beta contract carries
+ * personal identifiers explicitly so the beta security surface can be tested.
  */
 @JsonIgnoreProperties(ignoreUnknown = false)
 public record AnalysisWorkerRequest(
@@ -30,10 +29,12 @@ public record AnalysisWorkerRequest(
         Long fileSizeBytes,
         Integer durationMs,
         LearningFocus learningFocus,
+        AnalysisClosedBetaContext closedBetaContext,
         AnalysisWorkerVisualInput visualInput,
         AnalysisAuthorizationGrant authorizationGrant
 ) {
-    public static final String SCHEMA_VERSION = "voice-coaching.analysis-request.v4";
+    public static final String SCHEMA_VERSION = "voice-coaching.analysis-request.v5";
+    public static final String LEGACY_SCHEMA_VERSION = "voice-coaching.analysis-request.v4";
 
     public AnalysisWorkerRequest(
             String schemaVersion,
@@ -53,11 +54,14 @@ public record AnalysisWorkerRequest(
     ) {
         this(schemaVersion, eventId, analysisId, contentId, promptRevision,
                 scriptText, scriptSha256, audioObjectKey, audioSha256, mimeType,
-                fileSizeBytes, durationMs, learningFocus, null, authorizationGrant);
+                fileSizeBytes, durationMs, learningFocus, null, null,
+                authorizationGrant);
     }
 
     public AnalysisWorkerRequest {
-        requireEquals(SCHEMA_VERSION, schemaVersion, "schemaVersion");
+        if (!SCHEMA_VERSION.equals(schemaVersion) && !LEGACY_SCHEMA_VERSION.equals(schemaVersion)) {
+            throw new IllegalArgumentException("schemaVersion is unsupported");
+        }
         Objects.requireNonNull(eventId, "eventId");
         requirePositive(analysisId, "analysisId");
         requirePositive(contentId, "contentId");
@@ -83,6 +87,22 @@ public record AnalysisWorkerRequest(
         }
         Objects.requireNonNull(learningFocus, "learningFocus");
         Objects.requireNonNull(authorizationGrant, "authorizationGrant");
+        if (SCHEMA_VERSION.equals(schemaVersion)
+                && (closedBetaContext == null
+                || !AnalysisAuthorizationGrant.GRANT_VERSION.equals(
+                authorizationGrant.grantVersion()))) {
+            throw new IllegalArgumentException(
+                    "request v5 requires closed beta context and authorization v4"
+            );
+        }
+        if (LEGACY_SCHEMA_VERSION.equals(schemaVersion)
+                && (closedBetaContext != null
+                || !AnalysisAuthorizationGrant.LEGACY_GRANT_VERSION.equals(
+                authorizationGrant.grantVersion()))) {
+            throw new IllegalArgumentException(
+                    "request v4 requires authorization v3 without closed beta context"
+            );
+        }
         if (!scriptSha256.equals(sha256(scriptText))) {
             throw new IllegalArgumentException("scriptText does not match scriptSha256");
         }
@@ -97,6 +117,7 @@ public record AnalysisWorkerRequest(
                 || !Objects.equals(fileSizeBytes, authorizationGrant.fileSizeBytes())
                 || !Objects.equals(durationMs, authorizationGrant.durationMs())
                 || learningFocus != authorizationGrant.learningFocus()
+                || !authorizationGrant.binds(closedBetaContext)
                 || !authorizationGrant.binds(visualInput)) {
             throw new IllegalArgumentException("authorizationGrant does not bind this request");
         }

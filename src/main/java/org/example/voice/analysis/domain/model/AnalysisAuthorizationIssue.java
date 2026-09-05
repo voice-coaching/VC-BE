@@ -19,6 +19,7 @@ public record AnalysisAuthorizationIssue(
         LearningFocus learningFocus,
         String consentReceiptSha256,
         String consentPolicyRevision,
+        AnalysisClosedBetaContext closedBetaContext,
         AnalysisWorkerVisualInput visualInput
 ) {
     public AnalysisAuthorizationIssue(
@@ -38,6 +39,7 @@ public record AnalysisAuthorizationIssue(
     ) {
         this(requestEventId, analysisId, contentId, promptRevision, scriptSha256,
                 audioObjectKey, audioSha256, mimeType, fileSizeBytes, durationMs,
-                learningFocus, consentReceiptSha256, consentPolicyRevision, null);
+                learningFocus, consentReceiptSha256, consentPolicyRevision, null,
+                null);
     }
 }

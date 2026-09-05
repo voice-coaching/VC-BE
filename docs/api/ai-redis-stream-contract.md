@@ -41,7 +41,7 @@ job messages.
 | `ANALYSIS_REDIS_PASSWORD` | Y | Secret-manager injected Redis ACL password. Never log or commit it. |
 | `ANALYSIS_REDIS_SSL_ENABLED` | Y | Must be `true`; Stream-enabled startup otherwise fails closed. |
 | `ANALYSIS_REDIS_CONNECT_TIMEOUT` | Y | TCP connect bound, default `PT5S`. |
-| `ANALYSIS_REDIS_COMMAND_TIMEOUT` | Y | Redis command bound, default `PT5S`; must exceed result `BLOCK`. |
+| `ANALYSIS_REDIS_COMMAND_TIMEOUT` | Y | Redis command bound, default `PT30S`; must exceed result `BLOCK`. The larger closed-beta result needs a materially longer bound than the old 64 KiB contract. |
 | `ANALYSIS_REDIS_SHUTDOWN_TIMEOUT` | Y | Lettuce shutdown bound, default `PT1S`. |
 | `ANALYSIS_REQUEST_STREAM` | Y | Default `analysis:request:v1`. |
 | `ANALYSIS_REQUEST_CONSUMER_GROUP` | Y | AI-owned group observed by VC-BE for aggregate PEL depth; default `analysis-workers`. |
@@ -56,7 +56,8 @@ job messages.
 | `ANALYSIS_RETENTION_AGE` | Y | Minimum terminal DB evidence age before outbox/marker cleanup, default `PT1H`. |
 | `ANALYSIS_RETENTION_POLL_INTERVAL` / `ANALYSIS_RETENTION_BATCH_SIZE` | Y | Cleanup schedule and bounded batch, defaults `PT5M` / `100`. |
 | `ANALYSIS_OBSERVATION_POLL_INTERVAL` | Y | Aggregate Stream and DB outbox observation interval, default `PT30S`. |
-| `ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES` | Y | UTF-8 request/result payload cap, default `65536`, range `1024..1048576`; configure the AI worker's result cap to the same value. |
+| `ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES` | Y | UTF-8 request cap, default `65536`, range `1024..1048576`. |
+| `ANALYSIS_STREAM_MAXIMUM_RESULT_PAYLOAD_BYTES` | Y | Closed-beta result cap, default/max `402653184`; configure the AI worker to the same value. |
 | `ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH` | Y | Approximate result DLQ cap, default `10000`. |
 | `ANALYSIS_PENDING_CLAIM_IDLE` | Y | Minimum pending idle time before reclaim; default `PT5M`. |
 | `ANALYSIS_STREAM_MAX_RETRIES` | Y | Dispatch/result retry cap; default `3`. |
@@ -138,11 +139,11 @@ entries without risking pending or unpersisted work.
 VC-BE also rejects an oversized request payload before writing its durable outbox row;
 the dispatcher repeats the check immediately before Redis I/O as defense in depth.
 
-## Request payload: `voice-coaching.analysis-request.v4`
+## Request payload: `voice-coaching.analysis-request.v5`
 
 ```json
 {
-  "schemaVersion": "voice-coaching.analysis-request.v4",
+  "schemaVersion": "voice-coaching.analysis-request.v5",
   "eventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
   "analysisId": 35,
   "contentId": 12,
@@ -155,6 +156,12 @@ the dispatcher repeats the check immediately before Redis I/O as defense in dept
   "fileSizeBytes": 1234,
   "durationMs": 1200,
   "learningFocus": "PRONUNCIATION",
+  "closedBetaContext": {
+    "schemaVersion": "voice-coaching.closed-beta-context.v1",
+    "userId": 9,
+    "sessionId": 7,
+    "recordingId": 50
+  },
   "visualInput": {
     "objectKey": "recordings/analysis-video/<opaque-uuid>.mp4",
     "sha256": "lower-case sha256 of the canonical MP4 bytes",
@@ -164,7 +171,7 @@ the dispatcher repeats the check immediately before Redis I/O as defense in dept
     "consentPolicyRevision": "voice-video-processing-consent-v1"
   },
   "authorizationGrant": {
-    "grantVersion": "voice-coaching.analysis-authorization.v3",
+    "grantVersion": "voice-coaching.analysis-authorization.v4",
     "keyId": "backend-2026-09",
     "requestEventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
     "analysisId": 35,
@@ -185,6 +192,7 @@ the dispatcher repeats the check immediately before Redis I/O as defense in dept
     "visualFileSizeBytes": 4567,
     "visualConsentReceiptSha256": "lower-case sha256 hex",
     "visualConsentPolicyRevision": "voice-video-processing-consent-v1",
+    "closedBetaContextSha256": "lower-case sha256 hex",
     "issuedAtUtc": "2026-09-02T00:00:00Z",
     "expiresAtUtc": "2026-09-02T00:05:00Z",
     "purpose": "pronunciation_coaching",
@@ -210,6 +218,7 @@ the dispatcher repeats the check immediately before Redis I/O as defense in dept
 | `mimeType` | N | Registered media MIME type. |
 | `fileSizeBytes` / `durationMs` | N | Non-negative registered metadata. |
 | `learningFocus` | Y | `PRONUNCIATION`, `INTONATION`, or `BOTH`. Unsupported worker focus fails closed. |
+| `closedBetaContext` | Y in v5 | Raw user/session/recording IDs intentionally transported during the closed beta; its canonical digest is HMAC-bound. |
 | `visualInput` | N | All-or-none canonical MP4 reference and face-processing consent. It is consumed only after Seungun selects a phone. |
 | `authorizationGrant` | Y | Signed, short-lived, same-request processing authority described below. |
 
@@ -244,13 +253,15 @@ workspace with a cleared environment and a `file,pipe` protocol allowlist. This 
 not a mount namespace: production still runs VC-BE as an unprivileged service in a
 read-only container or host filesystem with only the media workspace writable.
 
-The payload intentionally excludes `userId`, `sessionId`, `recordingId`, file paths,
-presigned URLs, and raw consent material. Both analyze and retry REST calls require
+The v5 payload intentionally includes `userId`, `sessionId`, and `recordingId` in
+`closedBetaContext`; the v4 result additionally includes object keys, restricted local
+paths, and base64 media in `closedBetaDebug`. It still excludes presigned URLs and raw
+consent material. Both analyze and retry REST calls require
 `{"accepted":true,"policyRevision":"..."}` from the authenticated owner. Before
 issuing a job, VC-BE durably records an opaque consent receipt bound to the owner,
 session, recording, request generation, policy revision, and normalized audio digest,
 then signs that receipt into a five-minute grant. Session cancellation and account
-withdrawal timestamp every still-active receipt as revoked. The v3 grant
+withdrawal timestamp every still-active receipt as revoked. The v4 grant
 binds request event, analysis/content/prompt, script digest, object-key digest,
 normalized audio digest, MIME, size, duration, learning focus, policy, purpose,
 data category, cleanup and egress policy. When visual input is present it additionally
@@ -272,7 +283,8 @@ The signature is HMAC-SHA256 over the fields above in listed order, excluding
 UTC JSON strings. The AI keyring selects the secret by `keyId` and compares the
 signature in constant time. Unknown keys, signature/binding differences, a future or
 expired window, a TTL over ten minutes, a policy mismatch, missing cleanup, or enabled
-remote egress fail before object storage access. Legacy request v1-v3 and grant v1-v2 are unsupported.
+remote egress fail before object storage access. Request v4/grant v3 are
+decode-only during the coordinated drain; older versions are unsupported.
 
 The AI worker uses a restricted object-storage adapter for the configured bucket and
 must inspect each object, condition the streaming GET on its ETag and optional VersionId,
@@ -283,11 +295,11 @@ request transaction rolls back instead of leaving a stranded pending analysis. A
 worker deployment without an approved authorization, storage, and Seungun composition
 must refuse startup before it consumes any Stream entry.
 
-## Result payload: `voice-coaching.analysis-result.v3`
+## Result payload: `voice-coaching.analysis-result.v4`
 
 ```json
 {
-  "schemaVersion": "voice-coaching.analysis-result.v3",
+  "schemaVersion": "voice-coaching.analysis-result.v4",
   "eventId": "e917fda8-3c4f-4b7e-9094-7a1706081f1b",
   "requestEventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
   "analysisId": 35,
@@ -328,7 +340,41 @@ must refuse startup before it consumes any Stream entry.
     "approvedClaimId": "lip.aperture.low",
     "rendererKey": "lip_aperture_hint",
     "upstreamPhoneAnchorRef": "lower-case sha256 hex",
-    "supplementSha256": "lower-case sha256 hex"
+    "supplementSha256": "lower-case sha256 hex",
+    "closedBetaLipObservation": {
+      "schemaVersion": "voice-coaching.closed-beta-lip-observation.v1",
+      "status": "OBSERVED",
+      "selectedExpectedIndex": 0,
+      "videoStartMs": 120,
+      "videoEndMs": 240,
+      "geometryArtifactSha256": "lower-case sha256 hex",
+      "measurements": {
+        "inner_aperture_ratio": {"value": 0.25, "unit": "ratio"}
+      },
+      "containsPronunciationTruth": false,
+      "containsActionTruth": false
+    }
+  },
+  "seungunProductionEvidence": {
+    "schema_version": "korean_phone_ctc.production_analysis.v2"
+  },
+  "closedBetaDebug": {
+    "schemaVersion": "voice-coaching.closed-beta-debug.v1",
+    "context": {
+      "schemaVersion": "voice-coaching.closed-beta-context.v1",
+      "userId": 9,
+      "sessionId": 7,
+      "recordingId": 50
+    },
+    "captureState": "COMPLETE",
+    "audioObjectKey": "recordings/analysis-audio/<opaque-uuid>.wav",
+    "visualObjectKey": "recordings/analysis-video/<opaque-uuid>.mp4",
+    "materializedAudioPath": "/restricted/attempt/source.wav",
+    "decodedAudioPath": "/restricted/attempt/decoded.wav",
+    "materializedVideoPath": "/restricted/attempt/source.mp4",
+    "audioMediaBase64": "base64 source WAV bytes",
+    "decodedAudioMediaBase64": "base64 decoded WAV bytes",
+    "videoMediaBase64": "base64 canonical MP4 bytes"
   }
 }
 ```
@@ -337,19 +383,29 @@ must refuse startup before it consumes any Stream entry.
 | --- | --- | --- |
 | `schemaVersion`, `eventId`, `requestEventId`, `analysisId`, `status` | Y | Version, UUID lineage, and positive analysis ID. `requestEventId` must equal the current active request generation. |
 | `status` | Y | `PROCESSING`, `COMPLETED`, or `FAILED`; `PENDING` is not a worker result. |
-| `outcome` | completed only | Result v3 accepts only `COACHING_READY` and `COMPLETED_NO_ISSUE`; other enum values remain reserved until their evidence mapping is reviewed. |
-| `visualSupplement` | N | Only an approved same-attempt action projection. Its selected index must equal Seungun's `pronunciationEvidence.selectedExpectedIndex`; it cannot create a diagnosis. |
+| `outcome` | completed only | Result v4 accepts only `COACHING_READY` and `COMPLETED_NO_ISSUE`; other enum values remain reserved until their evidence mapping is reviewed. |
+| `visualSupplement` | N | Approved same-attempt action plus optional aggregate closed-beta lip observation. Its selected index must equal Seungun's selected index. |
+| `seungunProductionEvidence` | completed v4 | Full `korean_phone_ctc.production_analysis.v2` envelope, including the immutable frozen evidence bundle, deterministic decision, digest, and pipeline revision. |
+| `closedBetaDebug` | all v4 terminal results | Intentionally serializes personal IDs, object keys, raw local paths, and available base64 media for attack-surface testing. `UNAVAILABLE` failures retain the context and keys with null media/path fields. |
 | `failureCode`, `failureReason` | failed only | Stable code plus learner-safe reason (max 500 chars). Never include infrastructure exception text. Failed/processing results contain no transcript, scores, feedback, digest, or segments; a failure may retain worker/pipeline revision receipts. |
 | `pronunciationEvidence` | coaching only | Required exactly when `outcome=COACHING_READY`. It preserves the same-attempt Seungun-selected phone, index, optional time range, threshold-passed ranking score and explicit non-confidence semantics. |
-| transcript, score, strength/weakness, segment fields | N | The v3 production mapping requires these to remain `null`/empty because no approved Seungun mapping currently supplies them. Placeholder or independently inferred values are rejected. |
-| revision/digest fields | completed | Worker/pipeline revision and lower-case audio SHA-256 are required provenance; object keys and digests are not exposed as public client API fields. |
+| transcript, score, strength/weakness, segment fields | N | The v4 production mapping requires these to remain `null`/empty because no approved Seungun mapping currently supplies them. |
+| revision/digest fields | completed | Worker/pipeline revision and lower-case audio SHA-256 are required provenance. |
 | `segments` | all states | Must currently be an empty array. A future segment mapping requires a new reviewed schema. |
 
-Legacy `voice-coaching.analysis-result.v1` and `v2` are rejected. Result-v3 deployment therefore
+VC-BE strictly decodes `closedBetaDebug` so the Backend-facing transport and JVM
+attack surface are exercised, but it does not persist or return that raw block through
+the public result DTO. The aggregate `closedBetaLipObservation` is stored in PostgreSQL
+by V15 and returned to the authenticated result owner. The configured 384 MiB result
+limit is a transport ceiling, not a demonstrated safe operating point; production-like
+Redis/JVM/Python peak-memory and latency testing remains a rollout gate.
+
+Legacy `voice-coaching.analysis-result.v1` and `v2` are rejected. Result v3 remains
+decode-only for draining the prior deployment; new workers publish only v4. Result-v4 deployment
 requires a quiesced rollout: stop new analysis admission and the AI worker, drain or
 deliberately resolve all pending request/result entries, deploy Backend and worker,
 then enable both together. Do not run an older result producer against the v3 consumer
-or the reverse. The Redis stream name remains `analysis:result:v1`; it identifies the
+or the reverse outside that drain window. The Redis stream name remains `analysis:result:v1`; it identifies the
 transport channel, not the JSON schema version.
 
 `PROCESSING` updates only the job state. It does not authorize the AI worker to ACK

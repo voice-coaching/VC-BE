@@ -1,6 +1,7 @@
 package org.example.voice.analysis.infrastructure.stream;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.voice.analysis.domain.model.AnalysisWorkerRequest;
@@ -11,7 +12,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class AnalysisStreamCodec {
 
-    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    private static final int CLOSED_BETA_MAXIMUM_JSON_STRING_LENGTH = 180_000_000;
+
+    private final ObjectMapper objectMapper;
+
+    public AnalysisStreamCodec() {
+        objectMapper = new ObjectMapper().findAndRegisterModules();
+        objectMapper.getFactory().setStreamReadConstraints(
+                StreamReadConstraints.builder()
+                        .maxStringLength(CLOSED_BETA_MAXIMUM_JSON_STRING_LENGTH)
+                        .build()
+        );
+    }
 
     public String encodeRequest(AnalysisWorkerRequest request) {
         try {

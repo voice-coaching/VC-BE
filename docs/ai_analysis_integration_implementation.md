@@ -1,11 +1,9 @@
 # intelligentAI 음성·영상 분석 연동 구현 현황
 
-- 측정일: 2026-09-03
+- 측정일: 2026-09-05
 - 구현 기준 브랜치: `AI-API`
-- 문서화 시점 HEAD: `2235d2015d1c764081105d3d3a7351ed0c088ade`
 
-아래 동의 원장 보강은 아직 커밋되지 않은 현재 작업 트리를 기준으로 한다. 운영 release는
-검토·커밋·전체 검증을 마친 깨끗한 SHA에서만 생성해야 한다.
+운영 release는 검토·커밋·전체 검증을 마친 깨끗한 SHA에서만 생성해야 한다.
 
 ## 문서 목적
 
@@ -17,9 +15,10 @@ media normalization, Redis Stream, 취소·삭제·관측 및 배포 경계를 �
 
 현재 교차 저장소 계약은 다음 버전으로 고정돼 있다.
 
-- request: `voice-coaching.analysis-request.v4`
-- authorization: `voice-coaching.analysis-authorization.v3`
-- result: `voice-coaching.analysis-result.v3`
+- request: `voice-coaching.analysis-request.v5`
+- authorization: `voice-coaching.analysis-authorization.v4`
+- result: `voice-coaching.analysis-result.v4`
+- Seungun envelope: `korean_phone_ctc.production_analysis.v2`
 - visual supplement: `voice-coaching.visual-supplement.v1`
 
 ## Backend 책임
@@ -32,15 +31,21 @@ VC-BE는 다음 실서비스 책임을 소유한다.
 - canonical object의 digest·크기·MIME·duration과 opaque consent receipt를 DB에 저장한다.
 - request generation마다 짧은 수명의 HMAC authorization을 발급하고 durable outbox를
   transaction 안에서 기록한다.
-- request를 Redis Stream에 전달하고 result-v3를 PostgreSQL에 반영한 뒤 ACK한다.
+- request-v5를 Redis Stream에 전달하고 result-v4를 PostgreSQL에 반영한 뒤 ACK한다.
 - session 취소, timeout, 기록 삭제, 동의 철회 시 영속 cancellation outbox와 tombstone을
   발행한다.
 - 원본·canonical media 삭제를 outbox로 재시도하고 queue/PEL/DLQ/삭제 지연을 관측한다.
 - 인증된 사용자에게 DB에 확정된 결과만 public API DTO로 반환한다.
 
 Backend는 발음 오류나 selected phone을 직접 판정하지 않는다. 이 판단은 Seungun이
-소유한다. Backend는 result-v3의 pronunciation evidence와 선택적 same-attempt visual
+소유한다. Backend는 result-v4의 pronunciation evidence와 선택적 same-attempt visual
 supplement를 검증·저장·표현할 뿐 새 진단을 만들지 않는다.
+
+closed beta 동안 result-v4의 `closedBetaDebug`는 식별자·object key·AI 임시 경로와
+base64 media를 의도적으로 포함하며 Backend consumer가 strict decode한다. 이 raw debug는
+PostgreSQL/public DTO에 복제하지 않고 Redis entry와 consumer JVM 메모리에서 보안 시험
+대상이 된다. 반면 `closedBetaLipObservation`의 7개 aggregate 측정은 V15 JSONB에 저장되어
+인증된 결과 DTO로 전달된다.
 
 ## 동의 발급의 실제 경계
 
@@ -121,7 +126,7 @@ authenticated upload
   -> canonical WAV + optional canonical MP4
   -> PostgreSQL recording/consent/request outbox transaction
   -> analysis:request:v1
-  -> intelligentAI request-v4 worker
+  -> intelligentAI request-v5 / Seungun-v2 worker
   -> analysis:result:v1
   -> active-generation validation and PostgreSQL commit
   -> result XACK + XDEL
@@ -163,6 +168,7 @@ non-root/read-only 환경으로 실행하고 media workspace만 쓰기 가능하
 | 6 | ffmpeg/ffprobe seccomp 격리, per-object 삭제 transaction, 운영 metric | `f10a221` |
 | 7 | H.264/HEVC/VP8/VP9 codec matrix와 비공개 표본 opt-in test | `77a22f1` |
 | 8 | loopback Actuator+public health gate와 이전 release 자동 rollback | `2235d20` |
+| 9 | request-v5/grant-v4/result-v4, closed-beta raw decode, P6 aggregate 저장·응답 | 이번 구현 |
 
 ## 주요 구현 위치
 
@@ -170,12 +176,13 @@ non-root/read-only 환경으로 실행하고 media workspace만 쓰기 가능하
 | --- | --- |
 | [`TrainingAnalysisRequestService.java`](../src/main/java/org/example/voice/training/application/TrainingAnalysisRequestService.java) | owner/consent/admission 검증과 durable request 생성 |
 | [`FfmpegS3RecordingMediaNormalizer.java`](../src/main/java/org/example/voice/training/infrastructure/storage/FfmpegS3RecordingMediaNormalizer.java) | 객체 identity 검증, codec parsing, WAV/MP4 canonicalization |
-| [`HmacAnalysisAuthorizationIssuer.java`](../src/main/java/org/example/voice/analysis/infrastructure/authorization/HmacAnalysisAuthorizationIssuer.java) | request-v4 처리 권한 canonical HMAC 발급 |
+| [`HmacAnalysisAuthorizationIssuer.java`](../src/main/java/org/example/voice/analysis/infrastructure/authorization/HmacAnalysisAuthorizationIssuer.java) | request-v5와 closed-beta context 처리 권한 canonical HMAC 발급 |
 | [`ProcessingConsent.java`](../src/main/java/org/example/voice/consent/domain/entity/ProcessingConsent.java) | scope별 동의 evidence와 binding 불변식 |
 | [`JpaProcessingConsentLedger.java`](../src/main/java/org/example/voice/consent/infrastructure/JpaProcessingConsentLedger.java) | opaque voice/face receipt 발급과 session/user 철회 |
 | [`V14__harden_processing_consent_invariants.sql`](../src/main/resources/db/migration/V14__harden_processing_consent_invariants.sql) | 기존 원장에 fail-closed DB constraint와 request-event unique index 추가 |
+| [`V15__store_closed_beta_lip_observation.sql`](../src/main/resources/db/migration/V15__store_closed_beta_lip_observation.sql) | closed-beta 40-point lip aggregate를 JSONB object로 저장 |
 | [`AnalysisRequestOutboxDispatcher.java`](../src/main/java/org/example/voice/analysis/infrastructure/stream/AnalysisRequestOutboxDispatcher.java) | DB outbox에서 request Stream으로 전달 |
-| [`RedisAnalysisResultConsumer.java`](../src/main/java/org/example/voice/analysis/infrastructure/stream/RedisAnalysisResultConsumer.java) | result-v3 bound/parse, DB handoff 뒤 ACK |
+| [`RedisAnalysisResultConsumer.java`](../src/main/java/org/example/voice/analysis/infrastructure/stream/RedisAnalysisResultConsumer.java) | result-v4 bound/parse, DB handoff 뒤 ACK |
 | [`AnalysisResultIngestionService.java`](../src/main/java/org/example/voice/analysis/application/AnalysisResultIngestionService.java) | active request generation의 상태·evidence·supplement 반영 |
 | [`AnalysisCancellationOutboxDispatcher.java`](../src/main/java/org/example/voice/analysis/infrastructure/stream/AnalysisCancellationOutboxDispatcher.java) | durable cancellation tombstone 전달 |
 | [`AnalysisStreamRetentionSweeper.java`](../src/main/java/org/example/voice/analysis/infrastructure/stream/AnalysisStreamRetentionSweeper.java) | terminal DB evidence 기반 안전한 retention |
@@ -184,8 +191,9 @@ non-root/read-only 환경으로 실행하고 media workspace만 쓰기 가능하
 | [`scripts/deploy.sh`](../scripts/deploy.sh) | commit JAR 활성화, 내부/외부 health, rollback |
 
 DB 변경은 `V10`부터 `V13` migration에 visual input/supplement, cancellation outbox,
-request Stream identity와 retention 근거를 추가했고, `V14`에 processing-consent invariant를
-보강했다. 기존 migration을 수정하지 않고 새 migration으로만 확장했다.
+request Stream identity와 retention 근거를 추가했고, `V14`에 processing-consent invariant,
+`V15`에 closed-beta lip aggregate JSONB를 추가했다. 기존 migration을 수정하지 않고 새
+migration으로만 확장했다.
 
 ## 전달·취소·삭제 불변식
 
@@ -201,7 +209,7 @@ request Stream identity와 retention 근거를 추가했고, `V14`에 processing
 
 ## 검증 결과
 
-다음은 2026-09-03 로컬 실행 근거다.
+다음은 2026-09-05 현재 working tree의 로컬 실행 근거다.
 
 | 검증 | 결과 | 범위 |
 | --- | --- | --- |
@@ -212,8 +220,8 @@ request Stream identity와 retention 근거를 추가했고, `V14`에 processing
 | workflow YAML parse와 `git diff --check` | exit 0 | deploy workflow와 변경 형식 |
 | staged 보호 데이터·secret scan | 통과 | media/model/env/credential 미포함 |
 | consent/issuer 관련 Java 21 tests | `BUILD SUCCESSFUL` | entity, JPA ledger, HMAC issuer, analyze/retry service, recording face consent |
-| PostgreSQL 16 migration/startup smoke | exit 0 | V0~V14 적용, Hibernate validate, consent check constraints와 unique index 확인 |
-| intelligentAI attested CUDA composition | exit 0 | 실제 local model artifact preload와 synthetic key/policy binding; Redis/S3 호출 없음 |
+| PostgreSQL 16 migration/startup smoke | exit 0 | V0~V15 적용, Hibernate validate, V15 JSONB/check constraint와 Actuator `UP` 확인 |
+| intelligentAI request-v5 worker smoke | exit 0 | 실제 local CUDA Seungun v2와 P6 visual로 result-v4 생성, 7개 aggregate와 raw media digest 일치 |
 
 codec matrix와 비공개 표본은 mock S3 경계에서 실제 host ffmpeg를 실행해 probe,
 canonical media 생성, digest와 cleanup을 검사했다. 비공개 표본 한 건의 통과는 전체
@@ -222,10 +230,10 @@ iOS/Android 기기·OS·촬영 설정 호환성을 의미하지 않는다.
 ## 배포 상태
 
 - `implemented`: API admission, media normalization, PostgreSQL 동의 발급·철회 원장,
-  HMAC grant, outbox, Redis 전달·취소·retention, result-v3 저장, 삭제와 관측 코드가 존재한다.
-- `verified`: 전체 Gradle build/test, 합성 codec matrix, 제한된 비공개 표본,
-  deployment script, 동의 관련 Java 테스트, PostgreSQL 16 V14 migration과 local AI CUDA
-  attestation 조합이 통과했다.
+  HMAC grant, outbox, Redis 전달·취소·retention, result-v4 저장, 삭제와 관측 코드가 존재한다.
+- `verified`: 전체 Gradle build/test/bootJar, 합성 codec matrix, 제한된 비공개 표본,
+  deployment script, PostgreSQL 16 V15 migration과 실제 local CUDA Seungun v2 + P6 visual
+  request-v5/result-v4 smoke가 통과했다.
 - `contract-only`: 동의 issuer 자체와 local GPU model/artifact 조합은 더 이상
   contract-only가 아니다. 실제 production S3/TLS Redis, secret manager와 배포 target을
   사용한 사용자 요청의 end-to-end 실행은 아직 확인하지 않았다.
@@ -243,8 +251,10 @@ production workflow는 빌드한 JAR와 같은 commit의 `scripts/deploy.sh`를 
 3. VC-BE active key ID/policy와 worker keyring/deployment attestation 일치 및 secret 주입
 4. intelligentAI의 전용 group read-only artifact/manifest와 GPU preload health
 5. 새 분석 admission 중지와 기존 request/result Stream·PEL drain 또는 명시적 종결
-6. Backend와 worker 배포 후 end-to-end request-v4/result-v3 DB 반영 및 media 삭제
-7. 실패 시 양쪽 이전 release 복구와 동일 health gate 재통과
+6. Backend와 worker 배포 후 end-to-end request-v5/result-v4 DB 반영 및 media 삭제
+7. 최대 result 크기에서 dedicated Redis, Python worker, Backend JVM, PostgreSQL의
+   peak-memory·latency 및 재전달/DLQ 부하 시험
+8. 실패 시 양쪽 이전 release 복구와 동일 health gate 재통과
 
 이 gate를 통과하기 전에는 synthetic/local 검증을 production readiness로 확대해석하지
 않는다. 설정이 불완전하면 `ANALYSIS_STREAM_ENABLED` 경계와 production configuration

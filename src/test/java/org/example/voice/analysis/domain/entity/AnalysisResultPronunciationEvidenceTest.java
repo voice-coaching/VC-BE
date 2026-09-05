@@ -2,6 +2,7 @@ package org.example.voice.analysis.domain.entity;
 
 import org.example.voice.analysis.domain.model.AnalysisWorkerPronunciationEvidence;
 import org.example.voice.analysis.domain.model.AnalysisWorkerResult;
+import org.example.voice.analysis.domain.model.AnalysisWorkerVisualSupplement;
 import org.example.voice.analysis.domain.type.AnalysisOutcome;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.training.domain.entity.VoiceRecording;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,6 +52,49 @@ class AnalysisResultPronunciationEvidenceTest {
         assertThat(entity.getSelectedPhone()).isNull();
         assertThat(entity.getSummaryFeedback()).isNull();
         assertThat(entity.complete(completed(requestEventId))).isFalse();
+    }
+
+    @Test
+    void storesAndClearsClosedBetaAggregateLipObservation() {
+        UUID requestEventId = UUID.randomUUID();
+        AnalysisResult entity = AnalysisResult.pending(mock(VoiceRecording.class), requestEventId);
+        AnalysisWorkerResult base = completed(requestEventId);
+        Map<String, Object> observation = Map.of(
+                "schemaVersion", "voice-coaching.closed-beta-lip-observation.v1",
+                "status", "OBSERVED",
+                "selectedExpectedIndex", 0,
+                "geometryArtifactSha256", "2".repeat(64),
+                "measurements", Map.of(
+                        "inner_aperture_ratio", Map.of("value", 0.25, "unit", "ratio")
+                ),
+                "containsPronunciationTruth", false,
+                "containsActionTruth", false
+        );
+        AnalysisWorkerResult result = new AnalysisWorkerResult(
+                base.schemaVersion(), base.eventId(), base.requestEventId(), base.analysisId(),
+                base.status(), base.outcome(), base.failureCode(), base.failureReason(),
+                base.transcript(), base.sttConfidence(), base.sttModelName(), base.overallScore(),
+                base.pronunciationScore(), base.intonationScore(), base.speedWpm(), base.speedStatus(),
+                base.stressScore(), base.pauseScore(), base.strengthsText(), base.weaknessesText(),
+                base.summaryFeedback(), base.pronunciationEvidence(), base.workerRevision(),
+                base.pipelineRevision(), base.audioSha256(), base.segments(),
+                new AnalysisWorkerVisualSupplement(
+                        AnalysisWorkerVisualSupplement.SCHEMA_VERSION,
+                        0,
+                        "supports_upstream",
+                        "lip.aperture.low",
+                        "lip_aperture_hint",
+                        "f".repeat(64),
+                        "1".repeat(64),
+                        observation
+                )
+        );
+
+        assertThat(entity.complete(result)).isTrue();
+        assertThat(entity.getVisualClosedBetaLipObservation()).isEqualTo(observation);
+
+        entity.retry(UUID.randomUUID());
+        assertThat(entity.getVisualClosedBetaLipObservation()).isNull();
     }
 
     private AnalysisWorkerResult completed(UUID requestEventId) {
