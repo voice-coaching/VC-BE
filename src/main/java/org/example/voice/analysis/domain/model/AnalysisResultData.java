@@ -1,5 +1,6 @@
 package org.example.voice.analysis.domain.model;
 
+import org.example.voice.analysis.domain.type.AnalysisOutcome;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.analysis.domain.type.SpeedStatus;
 
@@ -9,6 +10,7 @@ import java.time.OffsetDateTime;
 public record AnalysisResultData(
         Long id,
         AnalysisStatus status,
+        AnalysisOutcome outcome,
         String transcript,
         BigDecimal sttConfidence,
         BigDecimal overallScore,
@@ -21,8 +23,35 @@ public record AnalysisResultData(
         String strengthsText,
         String weaknessesText,
         String summaryFeedback,
+        PronunciationEvidenceData pronunciationEvidence,
+        VisualSupplementData visualSupplement,
         OffsetDateTime analyzedAt
 ) {
+
+    public AnalysisResultData(
+            Long id,
+            AnalysisStatus status,
+            AnalysisOutcome outcome,
+            String transcript,
+            BigDecimal sttConfidence,
+            BigDecimal overallScore,
+            BigDecimal pronunciationScore,
+            BigDecimal intonationScore,
+            BigDecimal speedWpm,
+            SpeedStatus speedStatus,
+            BigDecimal stressScore,
+            BigDecimal pauseScore,
+            String strengthsText,
+            String weaknessesText,
+            String summaryFeedback,
+            PronunciationEvidenceData pronunciationEvidence,
+            OffsetDateTime analyzedAt
+    ) {
+        this(id, status, outcome, transcript, sttConfidence, overallScore,
+                pronunciationScore, intonationScore, speedWpm, speedStatus,
+                stressScore, pauseScore, strengthsText, weaknessesText,
+                summaryFeedback, pronunciationEvidence, null, analyzedAt);
+    }
 
     public boolean isCompleted() {
         return status == AnalysisStatus.COMPLETED;

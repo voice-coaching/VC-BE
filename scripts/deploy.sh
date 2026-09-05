@@ -12,21 +12,42 @@ readonly APP_LINK="${APP_ROOT}/app.jar"
 readonly INCOMING_JAR="/tmp/alpha-${RELEASE_ID}.jar"
 readonly RELEASE_JAR="${RELEASES_DIR}/${RELEASE_ID}.jar"
 readonly SERVICE_NAME="alpha-backend"
-readonly HEALTH_URL="http://127.0.0.1:8080/v3/api-docs"
+readonly INTERNAL_HEALTH_URL="http://127.0.0.1:9091/internal/actuator/health"
+readonly PUBLIC_HEALTH_URL="https://api.voice-coaching.site/v3/api-docs"
 
 previous_release=""
 if [[ -L "${APP_LINK}" ]]; then
   previous_release="$(readlink -f "${APP_LINK}" || true)"
 fi
+if [[ -n "${previous_release}" && "${previous_release}" != "${RELEASES_DIR}/"*.jar ]]; then
+  previous_release=""
+fi
+
+healthy() {
+  systemctl is-active --quiet "${SERVICE_NAME}" \
+    && curl --fail --silent --show-error "${INTERNAL_HEALTH_URL}" > /dev/null \
+    && curl --fail --silent --show-error "${PUBLIC_HEALTH_URL}" > /dev/null
+}
 
 rollback() {
+  local original_status=$?
+  trap - ERR
   if [[ -n "${previous_release}" && -f "${previous_release}" ]]; then
     echo "Deployment failed. Rolling back to ${previous_release}."
     ln -sfn "${previous_release}" "${APP_LINK}"
     systemctl restart "${SERVICE_NAME}"
+    for attempt in {1..30}; do
+      if healthy; then
+        echo "Previous release is healthy after rollback."
+        return "${original_status}"
+      fi
+      sleep 2
+    done
+    echo "Previous release rollback did not become healthy." >&2
   else
     echo "Deployment failed and no previous release is available."
   fi
+  return "${original_status}"
 }
 
 trap rollback ERR
@@ -38,7 +59,7 @@ ln -sfn "${RELEASE_JAR}" "${APP_LINK}"
 systemctl restart "${SERVICE_NAME}"
 
 for attempt in {1..30}; do
-  if systemctl is-active --quiet "${SERVICE_NAME}" && curl --fail --silent "${HEALTH_URL}" > /dev/null; then
+  if healthy; then
     rm -f "${INCOMING_JAR}"
     trap - ERR
     echo "Release ${RELEASE_ID} deployed successfully."

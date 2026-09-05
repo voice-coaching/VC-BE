@@ -1,0 +1,327 @@
+package org.example.voice.training.application;
+
+import org.example.voice.analysis.domain.model.AnalysisWorkerRequest;
+import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
+import org.example.voice.analysis.domain.model.AnalysisAuthorizationIssue;
+import org.example.voice.analysis.domain.model.AnalysisWorkerVisualInput;
+import org.example.voice.analysis.domain.port.AnalysisAuthorizationIssuer;
+import org.example.voice.analysis.domain.type.AnalysisStatus;
+import org.example.voice.common.exception.BaseException;
+import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.consent.domain.model.ProcessingConsentReceipt;
+import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.practicecontent.domain.type.LearningFocus;
+import org.example.voice.training.domain.model.AnalysisRequestData;
+import org.example.voice.training.domain.model.AnalysisConsentData;
+import org.example.voice.training.domain.model.AnalysisProgressData;
+import org.example.voice.training.domain.model.AnalysisRetryData;
+import org.example.voice.training.domain.model.SelectedRecordingAnalysisData;
+import org.example.voice.training.domain.port.AnalysisJobPublisher;
+import org.example.voice.training.domain.port.AnalysisAdmissionGuard;
+import org.example.voice.training.domain.port.TrainingAnalysisReader;
+import org.example.voice.training.domain.port.TrainingAnalysisWriter;
+import org.example.voice.training.domain.port.TrainingSessionWriter;
+import org.example.voice.training.domain.port.VoiceRecordingReader;
+import org.example.voice.training.domain.type.RecordingQualityStatus;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.OffsetDateTime;
+import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
+
+@ExtendWith(MockitoExtension.class)
+class TrainingAnalysisRequestServiceTest {
+
+    @Mock private TrainingSessionService trainingSessionService;
+    @Mock private VoiceRecordingReader voiceRecordingReader;
+    @Mock private TrainingAnalysisReader trainingAnalysisReader;
+    @Mock private TrainingAnalysisWriter trainingAnalysisWriter;
+    @Mock private TrainingSessionWriter trainingSessionWriter;
+    @Mock private AnalysisJobPublisher analysisJobPublisher;
+    @Mock private AnalysisAuthorizationIssuer analysisAuthorizationIssuer;
+    @Mock private ProcessingConsentLedger processingConsentLedger;
+    @Mock private AnalysisAdmissionGuard analysisAdmissionGuard;
+
+    @Test
+    void createsTrustedWorkerRequestAndPersistsItsEventGeneration() {
+        SelectedRecordingAnalysisData source = new SelectedRecordingAnalysisData(
+                50L,
+                12L,
+                "2026-09-02T00:00:00Z",
+                "안녕하세요. 오늘 날씨가 좋습니다.",
+                "recordings/50.wav",
+                "audio/wav",
+                1234L,
+                1200,
+                "d".repeat(64),
+                LearningFocus.PRONUNCIATION,
+                RecordingQualityStatus.PASS
+        );
+        when(voiceRecordingReader.findSelectedForAnalysis(7L, 9L)).thenReturn(Optional.of(source));
+        when(trainingAnalysisWriter.createPending(eq(50L), any())).thenReturn(
+                new AnalysisRequestData(35L, AnalysisStatus.PENDING, OffsetDateTime.now())
+        );
+
+        allowAuthorization();
+        service().requestAnalysis(7L, 9L, consent());
+
+        ArgumentCaptor<AnalysisWorkerRequest> request = ArgumentCaptor.forClass(AnalysisWorkerRequest.class);
+        verify(analysisJobPublisher).publish(request.capture());
+        verify(trainingSessionWriter).startAnalysis(7L);
+        verify(trainingAnalysisWriter).createPending(eq(50L), eq(request.getValue().eventId()));
+        assertThat(request.getValue().analysisId()).isEqualTo(35L);
+        assertThat(request.getValue().contentId()).isEqualTo(12L);
+        assertThat(request.getValue().audioObjectKey()).isEqualTo("recordings/50.wav");
+        assertThat(request.getValue().scriptSha256()).hasSize(64);
+        assertThat(request.getValue().schemaVersion()).isEqualTo("voice-coaching.analysis-request.v5");
+        assertThat(request.getValue().closedBetaContext().userId()).isEqualTo(9L);
+        assertThat(request.getValue().closedBetaContext().sessionId()).isEqualTo(7L);
+        assertThat(request.getValue().closedBetaContext().recordingId()).isEqualTo(50L);
+        assertThat(request.getValue().audioSha256()).isEqualTo("d".repeat(64));
+        assertThat(request.getValue().authorizationGrant().requestEventId())
+                .isEqualTo(request.getValue().eventId());
+        assertThat(request.getValue().authorizationGrant().consentReceiptSha256()).isEqualTo("e".repeat(64));
+    }
+
+    @Test
+    void bindsCanonicalVisualAndPublishesSignedClosedBetaOwnerIdentifiers() {
+        SelectedRecordingAnalysisData source = new SelectedRecordingAnalysisData(
+                50L,
+                12L,
+                "revision-v1",
+                "가",
+                "recordings/analysis-audio/00000000-0000-0000-0000-000000000001.wav",
+                "audio/wav",
+                1234L,
+                1200,
+                "d".repeat(64),
+                "recordings/analysis-video/00000000-0000-0000-0000-000000000002.mp4",
+                "video/mp4",
+                4000L,
+                "f".repeat(64),
+                "9".repeat(64),
+                "voice-video-processing-consent-v1",
+                LearningFocus.PRONUNCIATION,
+                RecordingQualityStatus.PASS
+        );
+        when(voiceRecordingReader.findSelectedForAnalysis(7L, 9L)).thenReturn(Optional.of(source));
+        when(trainingAnalysisWriter.createPending(eq(50L), any())).thenReturn(
+                new AnalysisRequestData(35L, AnalysisStatus.PENDING, OffsetDateTime.now())
+        );
+        allowAuthorization();
+
+        service().requestAnalysis(7L, 9L, consent());
+
+        ArgumentCaptor<AnalysisWorkerRequest> request = ArgumentCaptor.forClass(AnalysisWorkerRequest.class);
+        verify(analysisJobPublisher).publish(request.capture());
+        assertThat(request.getValue().visualInput()).isEqualTo(new AnalysisWorkerVisualInput(
+                source.visualObjectKey(), source.visualSha256(), source.visualMimeType(),
+                source.visualFileSizeBytes(), source.visualConsentReceiptSha256(),
+                source.visualConsentPolicyRevision()
+        ));
+        assertThat(request.getValue().audioObjectKey()).doesNotContain("users/", "sessions/");
+        assertThat(request.getValue().visualInput().objectKey()).doesNotContain("users/", "sessions/");
+        assertThat(request.getValue().authorizationGrant().binds(request.getValue().visualInput())).isTrue();
+        assertThat(request.getValue().authorizationGrant().binds(
+                request.getValue().closedBetaContext()
+        )).isTrue();
+    }
+
+    @Test
+    void rejectsLegacyUrlRatherThanPublishingItToTheWorker() {
+        SelectedRecordingAnalysisData source = new SelectedRecordingAnalysisData(
+                50L,
+                12L,
+                "2026-09-02T00:00:00Z",
+                "안녕하세요. 오늘 날씨가 좋습니다.",
+                "https://storage.example.com/legacy.wav",
+                "audio/wav",
+                1234L,
+                1200,
+                "d".repeat(64),
+                LearningFocus.PRONUNCIATION,
+                RecordingQualityStatus.PASS
+        );
+        when(voiceRecordingReader.findSelectedForAnalysis(7L, 9L)).thenReturn(Optional.of(source));
+        when(trainingAnalysisWriter.createPending(eq(50L), any())).thenReturn(
+                new AnalysisRequestData(35L, AnalysisStatus.PENDING, OffsetDateTime.now())
+        );
+
+        allowAuthorization();
+        assertThatThrownBy(() -> service().requestAnalysis(7L, 9L, consent()))
+                .isInstanceOfSatisfying(BaseException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.ANALYSIS_SOURCE_NOT_READY));
+
+        verify(analysisJobPublisher, never()).publish(any());
+    }
+
+    @Test
+    void rejectsMissingExplicitConsentBeforeCreatingAnalysisState() {
+        assertThatThrownBy(() -> service().requestAnalysis(
+                7L, 9L, new AnalysisConsentData(false, "voice-analysis-consent-v1")
+        )).isInstanceOfSatisfying(BaseException.class,
+                exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.ANALYSIS_CONSENT_REQUIRED));
+
+        verify(trainingAnalysisWriter, never()).createPending(any(), any());
+        verify(analysisJobPublisher, never()).publish(any());
+    }
+
+    @Test
+    void rejectsAUserWhoseConcurrentAnalysisQuotaIsExhaustedBeforeConsent() {
+        doThrow(new BaseException(ErrorCode.ANALYSIS_CONCURRENT_LIMIT_EXCEEDED))
+                .when(analysisAdmissionGuard).acquireAndAssertAvailable(9L);
+
+        assertThatThrownBy(() -> service().requestAnalysis(7L, 9L, consent()))
+                .isInstanceOfSatisfying(BaseException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.ANALYSIS_CONCURRENT_LIMIT_EXCEEDED));
+
+        verify(processingConsentLedger, never()).grantVoiceAnalysis(any(), any(), any(), any(), any(), any());
+        verify(trainingAnalysisWriter, never()).createPending(any(), any());
+    }
+
+    @Test
+    void rejectsUnsupportedCombinedFocusBeforeConsentOrAnalysisState() {
+        SelectedRecordingAnalysisData source = new SelectedRecordingAnalysisData(
+                50L,
+                12L,
+                "2026-09-02T00:00:00Z",
+                "안녕하세요.",
+                "recordings/50.wav",
+                "audio/wav",
+                1234L,
+                1200,
+                "d".repeat(64),
+                LearningFocus.BOTH,
+                RecordingQualityStatus.PASS
+        );
+        when(voiceRecordingReader.findSelectedForAnalysis(7L, 9L)).thenReturn(Optional.of(source));
+
+        assertThatThrownBy(() -> service().requestAnalysis(7L, 9L, consent()))
+                .isInstanceOfSatisfying(BaseException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.ANALYSIS_FOCUS_NOT_SUPPORTED));
+
+        verify(processingConsentLedger, never()).grantVoiceAnalysis(any(), any(), any(), any(), any(), any());
+        verify(trainingAnalysisWriter, never()).createPending(any(), any());
+        verify(analysisJobPublisher, never()).publish(any());
+    }
+
+    @Test
+    void retriesTheLockedFailedGenerationUsingItsPersistedCount() {
+        SelectedRecordingAnalysisData source = new SelectedRecordingAnalysisData(
+                50L,
+                12L,
+                "2026-09-02T00:00:00Z",
+                "안녕하세요. 오늘 날씨가 좋습니다.",
+                "recordings/50.wav",
+                "audio/wav",
+                1234L,
+                1200,
+                "d".repeat(64),
+                LearningFocus.PRONUNCIATION,
+                RecordingQualityStatus.PASS
+        );
+        OffsetDateTime failedAt = OffsetDateTime.now();
+        when(voiceRecordingReader.findSelectedForAnalysis(7L, 9L)).thenReturn(Optional.of(source));
+        when(trainingAnalysisReader.findLatestFailedBySelectedRecording(7L, 9L)).thenReturn(Optional.of(
+                new AnalysisProgressData(35L, AnalysisStatus.FAILED, "FAILED", 0, "temporary", failedAt)
+        ));
+        when(trainingAnalysisWriter.retry(eq(35L), any())).thenReturn(
+                new AnalysisRetryData(35L, AnalysisStatus.PENDING, 2, failedAt)
+        );
+        allowAuthorization();
+
+        var result = service().retry(7L, 9L, consent());
+
+        assertThat(result.retryCount()).isEqualTo(2);
+        verify(trainingSessionWriter).assertAnalysisRetryAllowed(7L);
+        verify(trainingAnalysisWriter).retry(eq(35L), any());
+        verify(analysisJobPublisher).publish(any());
+    }
+
+    private TrainingAnalysisRequestService service() {
+        return new TrainingAnalysisRequestService(
+                trainingSessionService,
+                voiceRecordingReader,
+                trainingAnalysisReader,
+                trainingAnalysisWriter,
+                trainingSessionWriter,
+                analysisJobPublisher,
+                analysisAuthorizationIssuer,
+                processingConsentLedger,
+                analysisAdmissionGuard
+        );
+    }
+
+    private void allowAuthorization() {
+        when(processingConsentLedger.grantVoiceAnalysis(any(), any(), any(), any(), any(), any()))
+                .thenReturn(new ProcessingConsentReceipt("e".repeat(64), OffsetDateTime.now()));
+        when(analysisAuthorizationIssuer.issue(any())).thenAnswer(invocation -> {
+            AnalysisAuthorizationIssue issue = invocation.getArgument(0);
+            Instant issuedAt = Instant.parse("2026-09-02T00:00:00Z");
+            return new AnalysisAuthorizationGrant(
+                    AnalysisAuthorizationGrant.GRANT_VERSION,
+                    "test-key-v1",
+                    issue.requestEventId(),
+                    issue.analysisId(),
+                    issue.contentId(),
+                    issue.promptRevision(),
+                    issue.scriptSha256(),
+                    sha256(issue.audioObjectKey()),
+                    issue.audioSha256(),
+                    issue.mimeType(),
+                    issue.fileSizeBytes(),
+                    issue.durationMs(),
+                    issue.learningFocus(),
+                    issue.consentReceiptSha256(),
+                    issue.consentPolicyRevision(),
+                    issue.visualInput() == null ? null : sha256(issue.visualInput().objectKey()),
+                    issue.visualInput() == null ? null : issue.visualInput().sha256(),
+                    issue.visualInput() == null ? null : issue.visualInput().mimeType(),
+                    issue.visualInput() == null ? null : issue.visualInput().fileSizeBytes(),
+                    issue.visualInput() == null ? null : issue.visualInput().consentReceiptSha256(),
+                    issue.visualInput() == null ? null : issue.visualInput().consentPolicyRevision(),
+                    issue.closedBetaContext().bindingSha256(),
+                    issuedAt,
+                    issuedAt.plusSeconds(300),
+                    AnalysisAuthorizationGrant.PURPOSE,
+                    AnalysisAuthorizationGrant.DATA_CATEGORY,
+                    true,
+                    false,
+                    "c".repeat(64)
+            );
+        });
+    }
+
+    private static AnalysisConsentData consent() {
+        return new AnalysisConsentData(true, "voice-analysis-consent-v1");
+    }
+
+    private static String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))
+            );
+        } catch (NoSuchAlgorithmException error) {
+            throw new IllegalStateException(error);
+        }
+    }
+}

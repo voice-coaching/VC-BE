@@ -2,6 +2,8 @@ package org.example.voice.user.application;
 
 import org.example.voice.onboarding.domain.entity.OnboardingProfile;
 import org.example.voice.onboarding.domain.port.OnboardingProfileReader;
+import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.analysis.domain.port.AnalysisCancellation;
 import org.example.voice.user.domain.entity.User;
 import org.example.voice.user.domain.port.LoginProviderReader;
 import org.example.voice.user.domain.port.UserReader;
@@ -10,6 +12,9 @@ import org.example.voice.user.domain.port.UserWriter;
 import org.example.voice.user.domain.type.UserStatus;
 import org.example.voice.user.exception.NicknameAlreadyExistsException;
 import org.example.voice.user.exception.WithdrawalAlreadyProcessedException;
+import org.example.voice.training.domain.port.RecordingDeletionScheduler;
+import org.example.voice.training.domain.type.RecordingDeletionReason;
+import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -28,6 +33,10 @@ class UserServiceTest {
     private LoginProviderReader loginProviderReader;
     private UserSessionRevoker userSessionRevoker;
     private OnboardingProfileReader onboardingProfileReader;
+    private ProcessingConsentLedger processingConsentLedger;
+    private RecordingDeletionScheduler recordingDeletionScheduler;
+    private RecordingUploadIntentRegistry uploadIntentRegistry;
+    private AnalysisCancellation analysisCancellation;
     private UserService userService;
 
     @BeforeEach
@@ -37,7 +46,21 @@ class UserServiceTest {
         loginProviderReader = mock(LoginProviderReader.class);
         userSessionRevoker = mock(UserSessionRevoker.class);
         onboardingProfileReader = mock(OnboardingProfileReader.class);
-        userService = new UserService(userReader, userWriter, loginProviderReader, userSessionRevoker, onboardingProfileReader);
+        processingConsentLedger = mock(ProcessingConsentLedger.class);
+        recordingDeletionScheduler = mock(RecordingDeletionScheduler.class);
+        uploadIntentRegistry = mock(RecordingUploadIntentRegistry.class);
+        analysisCancellation = mock(AnalysisCancellation.class);
+        userService = new UserService(
+                userReader,
+                userWriter,
+                loginProviderReader,
+                userSessionRevoker,
+                onboardingProfileReader,
+                processingConsentLedger,
+                recordingDeletionScheduler,
+                uploadIntentRegistry,
+                analysisCancellation
+        );
     }
 
     @Test
@@ -98,6 +121,10 @@ class UserServiceTest {
         verify(user).withdraw(result.withdrawnAt());
         verify(userWriter).save(user);
         verify(userSessionRevoker).revokeAll(1L);
+        verify(analysisCancellation).cancelForUser(1L);
+        verify(processingConsentLedger).revokeForUser(1L);
+        verify(recordingDeletionScheduler).scheduleAllForUser(1L, RecordingDeletionReason.USER_WITHDRAWN);
+        verify(uploadIntentRegistry).expireForUser(1L);
     }
 
     @Test
@@ -108,6 +135,13 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> userService.withdraw(1L))
                 .isInstanceOf(WithdrawalAlreadyProcessedException.class);
-        verifyNoInteractions(userWriter, userSessionRevoker);
+        verifyNoInteractions(
+                userWriter,
+                userSessionRevoker,
+                processingConsentLedger,
+                recordingDeletionScheduler,
+                uploadIntentRegistry,
+                analysisCancellation
+        );
     }
 }

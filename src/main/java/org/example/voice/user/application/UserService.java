@@ -2,6 +2,8 @@ package org.example.voice.user.application;
 
 import lombok.RequiredArgsConstructor;
 import org.example.voice.onboarding.domain.port.OnboardingProfileReader;
+import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.analysis.domain.port.AnalysisCancellation;
 import org.example.voice.user.domain.entity.User;
 import org.example.voice.user.domain.model.UpdatedUserProfile;
 import org.example.voice.user.domain.model.UserProfile;
@@ -13,6 +15,9 @@ import org.example.voice.user.domain.port.UserWriter;
 import org.example.voice.user.exception.NicknameAlreadyExistsException;
 import org.example.voice.user.exception.UserNotFoundException;
 import org.example.voice.user.exception.WithdrawalAlreadyProcessedException;
+import org.example.voice.training.domain.port.RecordingDeletionScheduler;
+import org.example.voice.training.domain.type.RecordingDeletionReason;
+import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +35,10 @@ public class UserService {
     private final LoginProviderReader loginProviderReader;
     private final UserSessionRevoker userSessionRevoker;
     private final OnboardingProfileReader onboardingProfileReader;
+    private final ProcessingConsentLedger processingConsentLedger;
+    private final RecordingDeletionScheduler recordingDeletionScheduler;
+    private final RecordingUploadIntentRegistry uploadIntentRegistry;
+    private final AnalysisCancellation analysisCancellation;
 
     @Transactional(readOnly = true)
     public UserProfile getMyProfile(Long userId) {
@@ -76,6 +85,10 @@ public class UserService {
         user.withdraw(now);
         userWriter.save(user);
         userSessionRevoker.revokeAll(userId);
+        analysisCancellation.cancelForUser(userId);
+        processingConsentLedger.revokeForUser(userId);
+        recordingDeletionScheduler.scheduleAllForUser(userId, RecordingDeletionReason.USER_WITHDRAWN);
+        uploadIntentRegistry.expireForUser(userId);
         return new WithdrawalResult(now);
     }
 

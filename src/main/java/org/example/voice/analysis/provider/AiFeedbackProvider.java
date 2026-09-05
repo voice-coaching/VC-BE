@@ -5,6 +5,12 @@ import java.util.List;
 
 public interface AiFeedbackProvider {
     GeneratedFeedback regenerate(FeedbackSource source, FeedbackStyle style);
-    record FeedbackSource(String transcript, List<String> strengths, List<String> weaknesses) {}
+    record FeedbackSource(
+            String approvedSummaryFeedback,
+            String selectedPhone,
+            Integer selectedExpectedIndex,
+            String evidenceState,
+            String pipelineRevision
+    ) {}
     record GeneratedFeedback(List<String> strengths, List<String> weaknesses, String summaryFeedback) {}
 }

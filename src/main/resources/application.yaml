@@ -33,6 +33,11 @@ spring:
   flyway:
     baseline-on-migrate: true
     baseline-version: 0
+    # Existing deployments can already have V1+ history from before the V0
+    # fresh-install baseline was introduced. Ignore only migrations Flyway
+    # classifies as "ignored" (lower than the installed version); pending,
+    # missing, failed, and checksum-mismatched migrations still fail validation.
+    ignore-migration-patterns: "*:ignored"
 
 auth:
   jwt:
@@ -55,4 +60,79 @@ app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
+storage:
+  enabled: ${OBJECT_STORAGE_ENABLED:false}
+  bucket: ${OBJECT_STORAGE_BUCKET:}
+  region: ${OBJECT_STORAGE_REGION:}
+  endpoint: ${OBJECT_STORAGE_ENDPOINT:}
+  path-style-access: ${OBJECT_STORAGE_PATH_STYLE_ACCESS:false}
+  recordings-prefix: ${OBJECT_STORAGE_RECORDINGS_PREFIX:recordings/}
+  media-normalization:
+    enabled: ${MEDIA_NORMALIZATION_ENABLED:false}
+    workspace-root: ${MEDIA_NORMALIZATION_WORKSPACE_ROOT:/tmp/voice-coach-media-normalization}
+    sandbox-python-binary: ${MEDIA_NORMALIZATION_SANDBOX_PYTHON_BINARY:/usr/bin/python3.12}
+    sandbox-address-space-bytes: ${MEDIA_NORMALIZATION_SANDBOX_ADDRESS_SPACE_BYTES:2147483648}
+    ffmpeg-binary: ${MEDIA_NORMALIZATION_FFMPEG_BINARY:/usr/bin/ffmpeg}
+    ffprobe-binary: ${MEDIA_NORMALIZATION_FFPROBE_BINARY:/usr/bin/ffprobe}
+    process-timeout: ${MEDIA_NORMALIZATION_PROCESS_TIMEOUT:PT30S}
+    maximum-input-bytes: ${MEDIA_NORMALIZATION_MAXIMUM_INPUT_BYTES:104857600}
+    maximum-normalized-bytes: ${MEDIA_NORMALIZATION_MAXIMUM_OUTPUT_BYTES:20971520}
+    minimum-duration-ms: ${MEDIA_NORMALIZATION_MINIMUM_DURATION_MS:500}
+    maximum-duration-ms: ${MEDIA_NORMALIZATION_MAXIMUM_DURATION_MS:180000}
 
+analysis:
+  authorization:
+    key-id: ${ANALYSIS_AUTHORIZATION_KEY_ID:}
+    signing-secret-base64: ${ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64:}
+    consent-policy-revision: ${ANALYSIS_CONSENT_POLICY_REVISION:}
+    grant-ttl: ${ANALYSIS_AUTHORIZATION_GRANT_TTL:PT5M}
+  stream:
+    enabled: ${ANALYSIS_STREAM_ENABLED:false}
+    redis-host: ${ANALYSIS_REDIS_HOST:localhost}
+    redis-port: ${ANALYSIS_REDIS_PORT:6379}
+    redis-username: ${ANALYSIS_REDIS_USERNAME:}
+    redis-password: ${ANALYSIS_REDIS_PASSWORD:}
+    redis-ssl-enabled: ${ANALYSIS_REDIS_SSL_ENABLED:false}
+    redis-connect-timeout: ${ANALYSIS_REDIS_CONNECT_TIMEOUT:PT5S}
+    redis-command-timeout: ${ANALYSIS_REDIS_COMMAND_TIMEOUT:PT30S}
+    redis-shutdown-timeout: ${ANALYSIS_REDIS_SHUTDOWN_TIMEOUT:PT1S}
+    request-stream: ${ANALYSIS_REQUEST_STREAM:analysis:request:v1}
+    request-consumer-group: ${ANALYSIS_REQUEST_CONSUMER_GROUP:analysis-workers}
+    request-dead-letter-stream: ${ANALYSIS_REQUEST_DLQ_STREAM:analysis:request:dlq:v1}
+    result-stream: ${ANALYSIS_RESULT_STREAM:analysis:result:v1}
+    result-consumer-group: ${ANALYSIS_RESULT_CONSUMER_GROUP:backend-analysis-result-workers}
+    result-consumer-name: ${ANALYSIS_RESULT_CONSUMER_NAME:backend-analysis-result-1}
+    result-dead-letter-stream: ${ANALYSIS_RESULT_DLQ_STREAM:analysis:result:dlq:v1}
+    cancellation-key-prefix: ${ANALYSIS_CANCELLATION_KEY_PREFIX:analysis:canceled:v1:}
+    request-index-key-prefix: ${ANALYSIS_REQUEST_INDEX_KEY_PREFIX:analysis:request-index:v1:}
+    cancellation-outbox-poll-interval: ${ANALYSIS_CANCELLATION_OUTBOX_POLL_INTERVAL:PT1S}
+    retention-age: ${ANALYSIS_RETENTION_AGE:PT1H}
+    retention-poll-interval: ${ANALYSIS_RETENTION_POLL_INTERVAL:PT5M}
+    observation-poll-interval: ${ANALYSIS_OBSERVATION_POLL_INTERVAL:PT30S}
+    retention-batch-size: ${ANALYSIS_RETENTION_BATCH_SIZE:100}
+    outbox-poll-interval: ${ANALYSIS_OUTBOX_POLL_INTERVAL:PT1S}
+    result-poll-interval: ${ANALYSIS_RESULT_POLL_INTERVAL:PT1S}
+    result-block: ${ANALYSIS_RESULT_BLOCK:PT1S}
+    pending-claim-idle: ${ANALYSIS_PENDING_CLAIM_IDLE:PT5M}
+    batch-size: ${ANALYSIS_STREAM_BATCH_SIZE:25}
+    max-retries: ${ANALYSIS_STREAM_MAX_RETRIES:3}
+    maximum-payload-bytes: ${ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES:65536}
+    maximum-result-payload-bytes: ${ANALYSIS_STREAM_MAXIMUM_RESULT_PAYLOAD_BYTES:402653184}
+    dead-letter-maximum-length: ${ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH:10000}
+    max-concurrent-per-user: ${ANALYSIS_MAX_CONCURRENT_PER_USER:3}
+    execution-timeout: ${ANALYSIS_EXECUTION_TIMEOUT:PT15M}
+    timeout-sweep-interval: ${ANALYSIS_TIMEOUT_SWEEP_INTERVAL:PT1M}
+    timeout-sweep-batch-size: ${ANALYSIS_TIMEOUT_SWEEP_BATCH_SIZE:100}
+
+management:
+  server:
+    address: ${MANAGEMENT_SERVER_ADDRESS:127.0.0.1}
+    port: ${MANAGEMENT_SERVER_PORT:9091}
+  endpoints:
+    web:
+      base-path: /internal/actuator
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never

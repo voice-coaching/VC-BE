@@ -4,6 +4,8 @@ public record RecordingRegisterRequestDto(
         String objectKey,
         String mimeType,
         Long fileSizeBytes,
-        Integer durationMs
+        Integer durationMs,
+        Boolean videoProcessingConsentAccepted,
+        String videoProcessingConsentPolicyRevision
 ) {
 }

@@ -11,21 +11,25 @@ import org.example.voice.training.domain.port.TrainingAnalysisWriter;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Repository
 @RequiredArgsConstructor
 public class TrainingAnalysisWriterImpl implements TrainingAnalysisWriter {
+
+    private static final int MAX_RETRY_COUNT = 3;
 
     private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;
     private final AnalysisResultJpaRepository analysisResultJpaRepository;
 
     @Override
     @Transactional
-    public AnalysisRequestData createPending(Long recordingId) {
+    public AnalysisRequestData createPending(Long recordingId, UUID requestEventId) {
         // 분석 요청 row를 먼저 저장한 뒤 analysisId를 큐 payload로 사용한다.
         // native returning 대신 JPA save 결과에서 생성 id를 얻는다.
         VoiceRecording recording = voiceRecordingJpaRepository.findById(recordingId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
-        AnalysisResult analysisResult = analysisResultJpaRepository.save(AnalysisResult.pending(recording));
+        AnalysisResult analysisResult = analysisResultJpaRepository.save(AnalysisResult.pending(recording, requestEventId));
         return new AnalysisRequestData(
                 analysisResult.getId(),
                 analysisResult.getStatus(),
@@ -35,16 +39,21 @@ public class TrainingAnalysisWriterImpl implements TrainingAnalysisWriter {
 
     @Override
     @Transactional
-    public AnalysisRetryData retry(Long previousAnalysisId, Long recordingId, Integer retryCount) {
-        // 재시도는 기존 실패 row를 새 PENDING 작업처럼 다시 큐에 태우는 방식이다.
-        // retryCount 컬럼이 현재 스키마에 없어서 응답값은 Reader가 센 실패 횟수로 계산해 전달한다.
-        AnalysisResult analysisResult = analysisResultJpaRepository.findById(previousAnalysisId)
+    public AnalysisRetryData retry(Long previousAnalysisId, UUID requestEventId) {
+        // 같은 분석 row를 잠근 뒤 영속 retry_count를 증가시켜 동시 재시도와 process 재시작에도 상한을 보존한다.
+        AnalysisResult analysisResult = analysisResultJpaRepository.findForIngestion(previousAnalysisId)
                 .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FOUND));
-        analysisResult.retry();
+        if (analysisResult.getStatus() != org.example.voice.analysis.domain.type.AnalysisStatus.FAILED) {
+            throw new BaseException(ErrorCode.ANALYSIS_NOT_FAILED);
+        }
+        if (analysisResult.getRetryCount() >= MAX_RETRY_COUNT) {
+            throw new BaseException(ErrorCode.MAX_RETRY_EXCEEDED);
+        }
+        analysisResult.retry(requestEventId);
         return new AnalysisRetryData(
                 analysisResult.getId(),
                 analysisResult.getStatus(),
-                retryCount,
+                analysisResult.getRetryCount(),
                 analysisResult.updatedAt()
         );
     }

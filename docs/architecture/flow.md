@@ -262,16 +262,28 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   1. `TrainingSessionService`가 콘텐츠 존재 여부와 사용 가능 여부를 확인한다.
   2. 학습 세션을 생성하고 초기 상태를 저장한다.
   3. 사용자가 녹음 파일 업로드 URL을 요청한다.
-  4. `RecordingUploadService`가 파일명, MIME type, 크기를 검증하고 presigned URL을 발급한다.
+  4. `RecordingUploadService`가 파일명, 허용 MIME type, 크기를 검증하고 owner/session prefix의 presigned URL을 발급한다.
   5. 클라이언트가 storage에 파일을 업로드한다.
-  6. 업로드 완료 후 `VoiceRecordingService`가 objectKey, duration, file size를 등록한다.
-  7. 사용자는 녹음 목록을 조회하고 최종 녹음을 선택한다.
+  6. 업로드 완료 후 `VoiceRecordingService`가 objectKey의 사용자·세션 소유권을 검증한다.
+  7. 영상이면 얼굴 영상 처리 동의를 먼저 확인하고, backend normalizer가 실제
+     container/codec을 probe한 뒤 단일 audio stream을 16 kHz mono PCM WAV로 추출한다.
+     normalizer는 HEAD에서 확인한 ETag/VersionId를 GET과 원본 DELETE에 조건으로 걸어
+     검사·다운로드·삭제 사이에 교체된 객체를 처리하거나 지우지 않는다.
+  8. backend가 canonical WAV의 duration, SHA-256, 음량·speech/clipping 기반 기술 QC를
+     계산하고 backend-only key로 저장한 다음 client upload 원본을 삭제한다.
+  9. 측정된 metadata와 terminal quality status로 녹음을 등록한다. 메서드 내부 DB 오류뿐
+     아니라 트랜잭션 커밋 rollback에서도 등록되지 않은 canonical audio/video 객체를 모두
+     보상 삭제한다.
+  10. 사용자는 녹음 목록을 조회하고 `PASS` 녹음만 최종 선택한다.
 - Validation:
   - contentId 필수
   - learningFocus 필수
   - session owner 일치 여부
   - 파일 크기와 MIME type
   - 업로드된 object 존재 여부
+  - object key의 인증 사용자·세션 prefix
+  - 실제 container/codec과 선언 MIME 일치
+  - 영상 처리 동의와 canonical audio SHA-256
   - 선택 가능한 녹음 상태 여부
 - Empty state:
   - 녹음 목록이 없으면 빈 목록을 반환한다.
@@ -318,20 +330,22 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - 녹음 품질이 분석 가능한 상태여야 한다.
 - Steps:
   1. `TrainingAnalysisRequestService`가 세션과 최종 녹음 존재 여부를 확인한다.
-  2. 이미 진행 중인 분석이 있는지 확인한다.
-  3. 분석 요청 기록을 생성하고 상태를 PENDING 또는 PROCESSING으로 둔다.
-  4. `AnalysisJobPublisher`가 비동기 분석 작업을 발행한다.
-  5. 외부 STT/AI provider가 녹음 파일을 분석한다.
-  6. `analysis` 모듈이 분석 결과와 세그먼트 결과를 저장한다.
-  7. 사용자는 상태 API로 진행률을 조회한다.
-  8. 완료 후 종합 분석과 세그먼트 분석을 조회한다.
-  9. 완료된 분석 결과 조회는 Redis Cache에 저장될 수 있다.
-  10. 필요하면 피드백 재생성 API로 AI 요약 피드백만 다시 생성한다.
+  2. 사용자 row를 잠근 뒤 전체 세션의 동시 PENDING/PROCESSING 분석 수와 선택 녹음의 중복 요청을 확인한다.
+  3. 명시적 동의를 owner/session/recording/request generation/policy/audio digest와 결합한 opaque receipt로 영속화한다.
+  4. 분석 결과 row를 `PENDING`과 새 request event id로 만들고, 같은 DB transaction에 outbox event를 저장한다.
+  5. outbox dispatcher가 versioned request payload를 전용 Redis Stream에 at-least-once로 발행한다.
+  6. worker는 자기 객체 저장소 권한으로 object key를 해석해 녹음을 분석하고 versioned result event를 반환한다.
+  7. result consumer는 active request event id가 일치할 때만 `analysis_results`와 세그먼트를 저장하고 그 뒤 ACK한다.
+  8. 사용자는 상태 API로 진행률을 조회한다.
+  9. 완료 후 종합 분석과 세그먼트 분석을 조회한다.
+  10. 완료된 분석 결과 조회는 Redis Cache에 저장될 수 있다.
+  11. 필요하면 피드백 재생성 API로 AI 요약 피드백만 다시 생성한다.
 - Validation:
   - session owner 일치 여부
   - 선택된 녹음 존재 여부
   - 분석 가능한 녹음 품질
-  - 분석 중복 요청 여부
+  - 분석 중복 요청 여부와 active request event id 일치 여부
+  - 사용자별 동시 분석 상한
   - retry 가능 상태와 최대 재시도 횟수
 - Empty state:
   - 분석 결과가 아직 없으면 상태 API에서 진행 중 상태를 반환한다.
@@ -340,19 +354,23 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - 세션 없음은 404
   - 선택된 녹음 없음은 409
   - 품질 미달은 422
+  - 안전한 object key가 아닌 legacy URL 또는 유효하지 않은 분석 source는 422
   - 이미 분석 중이면 409
+  - 사용자별 동시 분석 상한을 넘으면 429
   - 분석 결과 없음은 404
   - 재시도 불가능 상태는 409
+  - 전용 분석 Stream이 비활성화되었거나 구성되지 않았으면 503
 - Permission behavior:
   - 본인 세션, 녹음, 분석 결과만 조회/요청할 수 있다.
 - Retry or recovery:
-  - FAILED 상태의 분석은 retry API로 재시도할 수 있다.
+  - FAILED 상태의 분석은 retry API로 재시도할 수 있다. 재시도마다 새 request event id를 사용하므로 이전 결과는 반영하지 않는다.
+  - 요청 발행 또는 결과 반영이 최대 횟수를 넘기면 원본 event를 DLQ에 남기고 현재 분석을 `FAILED`로 종료한다.
+  - PENDING/PROCESSING generation이 설정된 실행 제한 시간을 넘기면 sweeper가 `FAILED`로 종료하고 동의를 철회한다.
   - 피드백 재생성은 분석 데이터는 유지하고 AI summary만 다시 생성한다.
   - 캐시 값은 TTL 만료 후 다음 조회에서 DB 값으로 다시 채워진다.
 - Side effects:
-  - `analysis_results`, `analysis_segments`가 생성 또는 갱신된다.
-  - 분석 job이 발행된다.
-  - 외부 STT/AI provider가 호출된다.
+  - `processing_consents`, `analysis_results`, `analysis_segments`, `analysis_request_outbox`가 생성 또는 갱신된다.
+  - 분석 job은 전용 Redis Stream으로 발행되며, 유효한 결과가 DB transaction으로 저장된 뒤에만 ACK한다.
   - 완료된 분석 결과 상세, 학습 세션 기준 분석 결과, 세그먼트 목록 조회는 Redis cache entry를 생성할 수 있다.
   - 피드백 재생성은 분석 상세 캐시를 무효화한다.
 - Related API:
@@ -366,7 +384,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 - Related modules:
   - `training`, `analysis`, `common/storage`
 - Related DB tables:
-  - `training_sessions`, `voice_recordings`, `analysis_results`, `analysis_segments`
+  - `training_sessions`, `voice_recordings`, `processing_consents`, `analysis_results`, `analysis_segments`, `analysis_request_outbox`
 
 ## 학습 세션 완료 및 취소
 
@@ -384,8 +402,10 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   1. `TrainingSessionService`가 세션 존재와 소유권을 확인한다.
   2. 완료 요청은 선택 녹음의 분석 완료 여부를 확인한다.
   3. 완료 가능한 경우 세션 상태를 COMPLETED로 변경하고 완료 시간을 기록한다.
-  4. 취소 요청은 세션 상태를 CANCELED로 변경한다.
-  5. 삭제 요청은 정책에 따라 DB record와 storage file 삭제 대상 여부를 확인한다.
+  4. 취소 요청은 세션 상태를 CANCELED로 변경하고, 미발행 outbox를 중단하며, 분석 결과/세그먼트를 폐기한 뒤 활성 동의 receipt를 철회한다.
+  5. 삭제 요청은 DB 참조 순서를 지켜 request outbox, segment, analysis, recording, session을 제거한다.
+  6. 녹음 객체와 만료·미완료 upload intent는 같은 DB transaction에서 `recording_deletion_outbox`에 기록한다.
+  7. 삭제 dispatcher가 owner/session/key를 재검증하고 객체 저장소 삭제를 최대 10회 재시도한다.
 - Validation:
   - session owner 일치 여부
   - 분석 완료 여부
@@ -402,9 +422,12 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 - Retry or recovery:
   - 분석 미완료면 분석 완료 후 다시 완료 요청한다.
   - 취소 후 같은 세션은 되돌리지 않는다.
+  - 취소 transaction과 경합한 늦은 worker 결과는 취소된 분석을 다시 완료 상태로 만들 수 없다.
+  - 객체 삭제는 idempotent하며 실패 시 지수 backoff로 최대 10회 재시도하고, 소진된 row는 `FAILED`로 보존한다.
+  - 등록되지 않은 upload intent는 presigned URL 만료 뒤 sweeper가 자동으로 삭제 대상으로 전환한다.
 - Side effects:
   - 세션 상태와 완료/취소 시간이 갱신된다.
-  - 삭제 API는 DB record 또는 storage 삭제 대상을 만들 수 있다.
+  - 삭제 API는 DB record를 정리하고 storage 객체를 durable 삭제 대상으로 만든다.
 - Related API:
   - `POST /api/training-sessions/{sessionId}/complete`
   - `POST /api/training-sessions/{sessionId}/cancel`
@@ -413,7 +436,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 - Related modules:
   - `training`, `analysis`, `common/storage`
 - Related DB tables:
-  - `training_sessions`, `voice_recordings`, `analysis_results`, `analysis_segments`
+  - `training_sessions`, `voice_recordings`, `recording_upload_intents`, `recording_deletion_outbox`, `analysis_results`, `analysis_segments`, `analysis_request_outbox`
 
 ## 클래스 학습 흐름
 

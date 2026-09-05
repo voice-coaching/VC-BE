@@ -7,6 +7,8 @@ import java.util.Optional;
 public interface AnalysisResultReader {
     Optional<AnalysisResult> findOwned(Long analysisId, Long userId);
     Optional<AnalysisResult> findOwnedForUpdate(Long analysisId, Long userId);
+
+    Optional<AnalysisResult> findForIngestion(Long analysisId);
     Optional<AnalysisResult> findLatestBySession(Long sessionId, Long userId);
     Optional<AnalysisResultData> findOwnedData(Long analysisId, Long userId);
     Optional<AnalysisResultData> findLatestBySessionData(Long sessionId, Long userId);

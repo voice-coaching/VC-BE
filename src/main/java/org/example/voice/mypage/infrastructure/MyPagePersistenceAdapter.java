@@ -17,6 +17,8 @@ import org.example.voice.practicecontent.domain.type.ContentType;
 import org.example.voice.practicecontent.domain.type.PublishStatus;
 import org.example.voice.practicecontent.infrastructure.PracticeContentJpaRepository;
 import org.example.voice.training.domain.type.TrainingSessionStatus;
+import org.example.voice.training.domain.port.RecordingDeletionScheduler;
+import org.example.voice.training.domain.type.RecordingDeletionReason;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
@@ -44,13 +46,16 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     private final OnboardingProfileReader onboardingProfileReader;
     private final PracticeContentJpaRepository contentRepository;
     private final CourseJpaRepository courseRepository;
+    private final RecordingDeletionScheduler recordingDeletionScheduler;
 
     public MyPagePersistenceAdapter(OnboardingProfileReader onboardingProfileReader,
                                     PracticeContentJpaRepository contentRepository,
-                                    CourseJpaRepository courseRepository) {
+                                    CourseJpaRepository courseRepository,
+                                    RecordingDeletionScheduler recordingDeletionScheduler) {
         this.onboardingProfileReader = onboardingProfileReader;
         this.contentRepository = contentRepository;
         this.courseRepository = courseRepository;
+        this.recordingDeletionScheduler = recordingDeletionScheduler;
     }
 
     @Override
@@ -279,6 +284,27 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
             }, allEntries = true)
     })
     public void deleteHistory(Long sessionId) {
+        List<Object[]> recordings = entityManager.createQuery("""
+                select r.trainingSession.userId, r.audioUrl, r.visualObjectKey
+                  from VoiceRecording r
+                 where r.trainingSession.id = :id
+                """, Object[].class).setParameter("id", sessionId).getResultList();
+        recordings.forEach(recording -> recordingDeletionScheduler.schedule(
+                (Long) recording[0],
+                sessionId,
+                (String) recording[1],
+                RecordingDeletionReason.HISTORY_DELETED
+        ));
+        recordings.stream()
+                .filter(recording -> recording[2] != null)
+                .forEach(recording -> recordingDeletionScheduler.schedule(
+                        (Long) recording[0],
+                        sessionId,
+                        (String) recording[2],
+                        RecordingDeletionReason.HISTORY_DELETED
+                ));
+        entityManager.createQuery("delete from AnalysisRequestOutbox o where o.analysisResult.id in (select a.id from AnalysisResult a where a.recording.trainingSession.id=:id)")
+                .setParameter("id", sessionId).executeUpdate();
         entityManager.createQuery("delete from AnalysisSegment s where s.analysisResult.id in (select a.id from AnalysisResult a where a.recording.trainingSession.id=:id)")
                 .setParameter("id", sessionId).executeUpdate();
         entityManager.createQuery("delete from AnalysisResult a where a.recording.trainingSession.id=:id")

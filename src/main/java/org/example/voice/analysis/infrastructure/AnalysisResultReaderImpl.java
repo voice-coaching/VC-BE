@@ -3,6 +3,8 @@ package org.example.voice.analysis.infrastructure;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.model.AnalysisResultData;
+import org.example.voice.analysis.domain.model.PronunciationEvidenceData;
+import org.example.voice.analysis.domain.model.VisualSupplementData;
 import org.example.voice.analysis.domain.port.AnalysisResultReader;
 import org.example.voice.analysis.infrastructure.cache.AnalysisCacheNames;
 import org.example.voice.training.infrastructure.AnalysisResultJpaRepository;
@@ -23,6 +25,11 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
 
     public Optional<AnalysisResult> findOwnedForUpdate(Long analysisId, Long userId) {
         return repository.findOwnedForUpdate(analysisId, userId);
+    }
+
+    @Override
+    public Optional<AnalysisResult> findForIngestion(Long analysisId) {
+        return repository.findForIngestion(analysisId);
     }
 
     public Optional<AnalysisResult> findLatestBySession(Long sessionId, Long userId) {
@@ -63,6 +70,7 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
         return new AnalysisResultData(
                 result.getId(),
                 result.getStatus(),
+                result.getAnalysisOutcome(),
                 result.getTranscript(),
                 result.getSttConfidence(),
                 result.getOverallScore(),
@@ -75,7 +83,42 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
                 result.getStrengthsText(),
                 result.getWeaknessesText(),
                 result.getSummaryFeedback(),
+                pronunciationEvidence(result),
+                visualSupplement(result),
                 result.getAnalyzedAt()
+        );
+    }
+
+    private VisualSupplementData visualSupplement(AnalysisResult result) {
+        if (result.getVisualSupplementSchemaVersion() == null) {
+            return null;
+        }
+        return new VisualSupplementData(
+                result.getVisualSupplementSchemaVersion(),
+                result.getSelectedExpectedIndex(),
+                result.getVisualEvidenceRelation(),
+                result.getVisualApprovedClaimId(),
+                result.getVisualRendererKey(),
+                result.getVisualPhoneAnchorRef(),
+                result.getVisualSupplementSha256(),
+                result.getVisualClosedBetaLipObservation()
+        );
+    }
+
+    private PronunciationEvidenceData pronunciationEvidence(AnalysisResult result) {
+        if (result.getPronunciationEvidenceSchemaVersion() == null) {
+            return null;
+        }
+        return new PronunciationEvidenceData(
+                result.getPronunciationEvidenceSchemaVersion(),
+                result.getSelectedPhone(),
+                result.getSelectedExpectedIndex(),
+                result.getSelectedStartMs(),
+                result.getSelectedEndMs(),
+                result.getDetectorScore(),
+                result.getOperatingThreshold(),
+                result.getScoreSemantics(),
+                result.getEvidenceState()
         );
     }
 }

@@ -1,222 +1,310 @@
 # Backend-AI Redis Stream Contract
 
-이 문서는 백엔드와 AI Worker가 Redis Stream으로 음성 분석 요청과 분석 결과를 주고받는 내부 연동 계약을 정의한다.
+현재 Backend 구현·검증·운영 gate 요약은
+[intelligentAI 음성·영상 분석 연동 구현 현황](../ai_analysis_integration_implementation.md)을
+참조한다. 이 문서는 교차 저장소 payload와 전달 계약의 정본이다.
 
-HTTP callback API는 사용하지 않는다. AI Worker는 Redis Stream에서 분석 요청을 읽고, 분석 결과를 다시 Redis Stream에 발행한다.
+## Purpose and boundary
 
-## Overview
+VC-BE and the intelligentAI worker exchange asynchronous audio-analysis work through
+Redis Streams. There is no backend-to-AI HTTP callback and the worker does not expose
+a public API. Client authentication, session ownership, storage metadata, persistent
+job state and result retrieval remain owned by VC-BE.
 
 ```text
 Client
--> Backend API: POST /api/training-sessions/{sessionId}/analyze
--> Backend: analysis_results row를 PENDING으로 생성
--> Backend: analysis:request Stream에 분석 요청 메시지 발행
--> AI Worker: analysis:request 메시지 소비
--> AI Worker: 음성 분석 수행
--> AI Worker: analysis:result Stream에 분석 결과 메시지 발행
--> Backend Consumer: analysis:result 메시지 소비
--> Backend: analysis_results, analysis_segments 저장
--> Client
-   -> GET /api/training-sessions/{sessionId}/analysis/status
-   -> GET /api/analyses/{analysisId}
+  -> POST /api/training-sessions/{sessionId}/analyze
+  -> PostgreSQL: analysis_results=PENDING + analysis_request_outbox
+  -> Redis: analysis:request:v1
+  -> intelligentAI worker
+  -> Redis: analysis:result:v1
+  -> VC-BE result consumer -> PostgreSQL result + segments
+  -> GET status/result/segments
 ```
 
-## Redis Connection
+The request outbox is the durable boundary between the PostgreSQL request
+transaction and Redis `XADD`. Delivery is at-least-once; every consumer must be
+idempotent.
 
-Redis 접속 정보는 메시지 본문에 넣지 않는다. 백엔드와 AI Worker는 각자 환경 변수 또는 설정 파일로 Redis에 접속한다.
+## Redis topology and environment
 
-| Config | Example | Description |
+Stream traffic uses a dedicated Redis endpoint. It must not share the endpoint used
+for Spring Cache because cache maintenance may delete keys without preserving pending
+job messages.
+
+| Variable | Required | Description |
 | --- | --- | --- |
-| `REDIS_HOST` | `localhost` | Redis host |
-| `REDIS_PORT` | `6379` | Redis port |
-| `REDIS_PASSWORD` | `password` | Redis password |
-| `ANALYSIS_REQUEST_STREAM` | `analysis:request` | 백엔드가 분석 요청을 발행하는 Stream |
-| `ANALYSIS_RESULT_STREAM` | `analysis:result` | AI Worker가 분석 결과를 발행하는 Stream |
+| `ANALYSIS_STREAM_ENABLED` | Y in production | Enables VC-BE Stream dispatcher and result consumer. Default is `false`. |
+| `ANALYSIS_REDIS_HOST` | Y | Private Redis host for analysis messages. |
+| `ANALYSIS_REDIS_PORT` | Y | Redis port. |
+| `ANALYSIS_REDIS_USERNAME` | N | Redis ACL username. |
+| `ANALYSIS_REDIS_PASSWORD` | Y | Secret-manager injected Redis ACL password. Never log or commit it. |
+| `ANALYSIS_REDIS_SSL_ENABLED` | Y | Must be `true`; Stream-enabled startup otherwise fails closed. |
+| `ANALYSIS_REDIS_CONNECT_TIMEOUT` | Y | TCP connect bound, default `PT5S`. |
+| `ANALYSIS_REDIS_COMMAND_TIMEOUT` | Y | Redis command bound, default `PT30S`; must exceed result `BLOCK`. The larger closed-beta result needs a materially longer bound than the old 64 KiB contract. |
+| `ANALYSIS_REDIS_SHUTDOWN_TIMEOUT` | Y | Lettuce shutdown bound, default `PT1S`. |
+| `ANALYSIS_REQUEST_STREAM` | Y | Default `analysis:request:v1`. |
+| `ANALYSIS_REQUEST_CONSUMER_GROUP` | Y | AI-owned group observed by VC-BE for aggregate PEL depth; default `analysis-workers`. |
+| `ANALYSIS_REQUEST_DLQ_STREAM` | Y | AI-owned request DLQ observed by VC-BE; default `analysis:request:dlq:v1`. |
+| `ANALYSIS_RESULT_STREAM` | Y | Default `analysis:result:v1`. |
+| `ANALYSIS_RESULT_CONSUMER_GROUP` | Y | Default `backend-analysis-result-workers`. |
+| `ANALYSIS_RESULT_CONSUMER_NAME` | Y | Unique pod/host instance name. |
+| `ANALYSIS_RESULT_DLQ_STREAM` | Y | Default `analysis:result:dlq:v1`. |
+| `ANALYSIS_CANCELLATION_KEY_PREFIX` | Y | Default `analysis:canceled:v1:`; only an opaque request event UUID is appended. |
+| `ANALYSIS_REQUEST_INDEX_KEY_PREFIX` | Y | Default `analysis:request-index:v1:`; maps one request event to its idempotent Stream ID. |
+| `ANALYSIS_CANCELLATION_OUTBOX_POLL_INTERVAL` | Y | Durable cancellation dispatch interval, default `PT1S`. |
+| `ANALYSIS_RETENTION_AGE` | Y | Minimum terminal DB evidence age before outbox/marker cleanup, default `PT1H`. |
+| `ANALYSIS_RETENTION_POLL_INTERVAL` / `ANALYSIS_RETENTION_BATCH_SIZE` | Y | Cleanup schedule and bounded batch, defaults `PT5M` / `100`. |
+| `ANALYSIS_OBSERVATION_POLL_INTERVAL` | Y | Aggregate Stream and DB outbox observation interval, default `PT30S`. |
+| `ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES` | Y | UTF-8 request cap, default `65536`, range `1024..1048576`. |
+| `ANALYSIS_STREAM_MAXIMUM_RESULT_PAYLOAD_BYTES` | Y | Closed-beta result cap, default/max `402653184`; configure the AI worker to the same value. |
+| `ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH` | Y | Approximate result DLQ cap, default `10000`. |
+| `ANALYSIS_PENDING_CLAIM_IDLE` | Y | Minimum pending idle time before reclaim; default `PT5M`. |
+| `ANALYSIS_STREAM_MAX_RETRIES` | Y | Dispatch/result retry cap; default `3`. |
+| `ANALYSIS_MAX_CONCURRENT_PER_USER` | Y | DB-serialized per-user concurrent job cap; default `3`. |
+| `ANALYSIS_EXECUTION_TIMEOUT` | Y | Maximum time a generation may remain PENDING/PROCESSING; default `PT15M`. |
+| `ANALYSIS_TIMEOUT_SWEEP_INTERVAL` | Y | Stale-generation sweep interval; default `PT1M`. |
+| `ANALYSIS_TIMEOUT_SWEEP_BATCH_SIZE` | Y | Maximum rows locked by one timeout transaction; default `100`. |
+| `ANALYSIS_AUTHORIZATION_KEY_ID` | Y | Active HMAC key identifier; `[A-Za-z0-9._-]`, max 100. |
+| `ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64` | Y | Secret-manager value decoding to at least 32 bytes. Never log or commit it. |
+| `ANALYSIS_CONSENT_POLICY_REVISION` | Y | Exact active consent revision accepted from the client. |
+| `ANALYSIS_AUTHORIZATION_GRANT_TTL` | Y | Short-lived grant TTL, default `PT5M`, maximum `PT10M`. |
+| `OBJECT_STORAGE_ENABLED` | Y | Must be `true` whenever Stream analysis is enabled. |
+| `OBJECT_STORAGE_BUCKET` / `OBJECT_STORAGE_REGION` | Y | Private S3-compatible recording bucket and signing region. |
+| `OBJECT_STORAGE_ENDPOINT` | Provider-specific | HTTPS-only endpoint override for NCP/R2/MinIO-compatible deployments. |
+| `OBJECT_STORAGE_PATH_STYLE_ACCESS` | N | Enables path-style access only when the provider requires it. |
+| `OBJECT_STORAGE_RECORDINGS_PREFIX` | Y | Private relative key prefix; default `recordings/`. |
+| `MEDIA_NORMALIZATION_ENABLED` | Y | Must be `true` with Stream analysis; enables backend-owned probe, decode, technical QC and canonical WAV upload. |
+| `MEDIA_NORMALIZATION_WORKSPACE_ROOT` | Y | Absolute owner-only temporary workspace root. |
+| `MEDIA_NORMALIZATION_SANDBOX_PYTHON_BINARY` | Y | Absolute reviewed Python 3.12 executable used by the packaged seccomp launcher. |
+| `MEDIA_NORMALIZATION_SANDBOX_ADDRESS_SPACE_BYTES` | Y | Per-media-process address-space limit, default 2 GiB, range 256 MiB..16 GiB. |
+| `MEDIA_NORMALIZATION_FFMPEG_BINARY` / `MEDIA_NORMALIZATION_FFPROBE_BINARY` | Y | Absolute reviewed executable paths. |
+| `MEDIA_NORMALIZATION_PROCESS_TIMEOUT` | Y | Per-process timeout, default `PT30S`, maximum `PT2M`. |
 
-## Redis Streams
+The active non-secret deployment identity must be copied exactly into the AI worker
+configuration and its private deployment attestation:
 
-| Stream | Direction | Producer | Consumer | Consumer Group |
+| VC-BE | intelligentAI |
+| --- | --- |
+| deployed Backend/AI compatibility window | exact `AI_ANALYSIS_RELEASE_ID` for the reviewed AI commit |
+| `ANALYSIS_AUTHORIZATION_KEY_ID` | `AI_ANALYSIS_ACTIVE_AUTHORIZATION_KEY_ID` and a matching keyring entry |
+| `ANALYSIS_CONSENT_POLICY_REVISION` | `AI_ANALYSIS_CONSENT_POLICY_REVISION` |
+| secret-manager HMAC bytes | same bytes in `AI_ANALYSIS_AUTHORIZATION_KEYS_FILE`; never in the attestation |
+
+For key rotation, first add the new key to the AI keyring while retaining the old
+verification key, deploy a new content-bound AI attestation naming the new active key,
+then switch VC-BE issuance to that key. Drain every grant signed by the old key before
+removing it from the AI keyring. A key ID, policy, release, device or artifact digest
+mismatch makes the worker refuse startup before Redis/S3 use.
+
+The Redis port is private-network only. Do not open it to the internet, transmit a
+Redis URL/password in messages, or use the ordinary cache endpoint for Stream data.
+TLS peer verification remains enabled. A private Redis CA must be installed in the
+JVM trust store supplied to VC-BE; disabling certificate verification is unsupported.
+The Backend Redis ACL needs the existing request/result Stream commands plus
+`GET`, `SET`, `DEL`, `XRANGE`, `XLEN`, `XPENDING`, and `EVAL` for request indexing, cancellation, observation and
+retention. The AI ACL needs `EXISTS`, `DEL`, and `EVAL` in addition to its Stream
+commands. Fixed Lua scripts atomically publish/index a request, check cancellation
+before result `XADD`, or combine `XACK` with `XDEL`.
+
+## Stream ownership
+
+| Stream | Producer | Consumer group | Consumer | ACK owner |
 | --- | --- | --- | --- | --- |
-| `analysis:request` | Backend -> AI Worker | Backend | AI Worker | `analysis-workers` |
-| `analysis:result` | AI Worker -> Backend | AI Worker | Backend | `backend-analysis-result-workers` |
+| `analysis:request:v1` | VC-BE outbox dispatcher | `analysis-workers` | intelligentAI worker | AI worker after terminal result `XADD` |
+| `analysis:result:v1` | intelligentAI worker | `backend-analysis-result-workers` | VC-BE result consumer | VC-BE after DB transaction commits |
+| `analysis:request:dlq:v1` | intelligentAI worker | operator-only | restricted operator tooling | n/a |
+| `analysis:result:dlq:v1` | VC-BE result consumer | operator-only | operator tooling | n/a |
 
-## 1. Analysis Request Stream
+Cancellation is a shared Redis key rather than a consumer-group message because every
+worker must observe it. VC-BE first commits one idempotent row in
+`analysis_cancellation_outbox`, then retries `SET analysis:canceled:v1:<eventId> 1`
+until it succeeds. The tombstone has no TTL: expiring it while an old request remains
+in a Stream or PEL could re-authorize compute after revocation. It is deleted only by
+the DB-aware acknowledged-message retention workflow. The key contains no user,
+session, recording, object, or consent identifier.
 
-Stream: `analysis:request`  
-Direction: Backend -> AI Worker  
-Purpose: 백엔드가 AI Worker에게 선택된 녹음 파일 분석을 요청한다.
+Normal request/result Stream entries have exactly one string field, `payload`,
+containing UTF-8 JSON. Producer and consumer reject unknown fields and unsupported
+`schemaVersion` values. DLQ entries are restricted operator records: they contain
+`sourceStreamId`, `failureCode`, and, when an original payload existed, that raw
+`payload` for deliberate recovery.
+Payload size is measured as UTF-8 bytes before JSON decoding. An oversized result is
+never copied into the DLQ body; only its source Stream ID and stable failure code are
+retained. Result DLQ trimming is approximate and bounded. Request/result Streams do
+not use age- or length-based trimming. The AI worker atomically `XACK`+`XDEL`s a
+request only after its terminal result/DLQ write, and VC-BE atomically `XACK`+`XDEL`s
+a result only after its PostgreSQL transaction commits. This removes acknowledged
+entries without risking pending or unpersisted work.
+VC-BE also rejects an oversized request payload before writing its durable outbox row;
+the dispatcher repeats the check immediately before Redis I/O as defense in depth.
 
-### Message Body
+## Request payload: `voice-coaching.analysis-request.v5`
 
 ```json
 {
-  "analysisId": "Long",
-  "sessionId": "Long",
-  "recordingId": "Long",
-  "userId": "Long",
-  "audioUrl": "String",
-  "scriptText": "String",
-  "learningFocus": "String"
-}
-```
-
-### Message Fields
-
-| Field | Type | Required | Source | Description |
-| --- | --- | --- | --- | --- |
-| `analysisId` | Long | Y | `analysis_results.id` | 백엔드가 생성한 분석 결과 ID |
-| `sessionId` | Long | Y | `training_sessions.id` | 학습 세션 ID |
-| `recordingId` | Long | Y | `voice_recordings.id` | 선택된 녹음 ID |
-| `userId` | Long | Y | `training_sessions.user_id` | 분석 요청 사용자 ID |
-| `audioUrl` | String | Y | `voice_recordings.audio_url` | AI Worker가 접근 가능한 녹음 파일 URL 또는 object key |
-| `scriptText` | String | Y | `practice_contents.script_text` | 사용자가 읽은 기준 문장 |
-| `learningFocus` | String | Y | `training_sessions.learning_focus` | 분석 초점. `PRONUNCIATION`, `INTONATION`, `BOTH` |
-
-### Message Example
-
-```json
-{
+  "schemaVersion": "voice-coaching.analysis-request.v5",
+  "eventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
   "analysisId": 35,
-  "sessionId": 12,
-  "recordingId": 50,
-  "userId": 14,
-  "audioUrl": "https://storage.example.com/recordings/50.wav",
+  "contentId": 12,
+  "promptRevision": "2026-09-02T00:00:00Z",
   "scriptText": "안녕하세요. 오늘 날씨가 좋습니다.",
-  "learningFocus": "PRONUNCIATION"
+  "scriptSha256": "lower-case sha256 hex",
+  "audioObjectKey": "recordings/analysis-audio/<opaque-uuid>.wav",
+  "audioSha256": "lower-case sha256 of the normalized WAV bytes",
+  "mimeType": "audio/wav",
+  "fileSizeBytes": 1234,
+  "durationMs": 1200,
+  "learningFocus": "PRONUNCIATION",
+  "closedBetaContext": {
+    "schemaVersion": "voice-coaching.closed-beta-context.v1",
+    "userId": 9,
+    "sessionId": 7,
+    "recordingId": 50
+  },
+  "visualInput": {
+    "objectKey": "recordings/analysis-video/<opaque-uuid>.mp4",
+    "sha256": "lower-case sha256 of the canonical MP4 bytes",
+    "mimeType": "video/mp4",
+    "fileSizeBytes": 4567,
+    "consentReceiptSha256": "lower-case sha256 hex",
+    "consentPolicyRevision": "voice-video-processing-consent-v1"
+  },
+  "authorizationGrant": {
+    "grantVersion": "voice-coaching.analysis-authorization.v4",
+    "keyId": "backend-2026-09",
+    "requestEventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
+    "analysisId": 35,
+    "contentId": 12,
+    "promptRevision": "2026-09-02T00:00:00Z",
+    "scriptSha256": "lower-case sha256 hex",
+    "audioObjectKeySha256": "lower-case sha256 hex",
+    "audioSha256": "lower-case sha256 of the normalized WAV bytes",
+    "mimeType": "audio/wav",
+    "fileSizeBytes": 1234,
+    "durationMs": 1200,
+    "learningFocus": "PRONUNCIATION",
+    "consentReceiptSha256": "lower-case sha256 hex",
+    "consentPolicyRevision": "voice-analysis-consent-v1",
+    "visualObjectKeySha256": "lower-case sha256 hex",
+    "visualSha256": "lower-case sha256 hex",
+    "visualMimeType": "video/mp4",
+    "visualFileSizeBytes": 4567,
+    "visualConsentReceiptSha256": "lower-case sha256 hex",
+    "visualConsentPolicyRevision": "voice-video-processing-consent-v1",
+    "closedBetaContextSha256": "lower-case sha256 hex",
+    "issuedAtUtc": "2026-09-02T00:00:00Z",
+    "expiresAtUtc": "2026-09-02T00:05:00Z",
+    "purpose": "pronunciation_coaching",
+    "dataCategory": "learner_voice_recording",
+    "deleteOnCompletion": true,
+    "remoteEgressAllowed": false,
+    "signature": "lower-case HMAC-SHA256 hex"
+  }
 }
 ```
 
-## 2. Analysis Result Stream
+| Field | Required | Rule |
+| --- | --- | --- |
+| `schemaVersion` | Y | Exact value above. |
+| `eventId` | Y | UUID; identifies this request generation. A retry gets a new value. |
+| `analysisId` | Y | Existing `analysis_results.id`; positive integer. |
+| `contentId` | Y | Existing trusted `practice_contents.id`; positive integer. |
+| `promptRevision` | Y | VC-BE content revision snapshot. |
+| `scriptText` | Y | Trusted content text, maximum 10,000 characters. |
+| `scriptSha256` | Y | Lower-case SHA-256 of UTF-8 `scriptText`. |
+| `audioObjectKey` | Y | Storage object key, never a URL or path. |
+| `audioSha256` | Y | Backend-calculated SHA-256 of the canonical object. The worker must match it before inference. |
+| `mimeType` | N | Registered media MIME type. |
+| `fileSizeBytes` / `durationMs` | N | Non-negative registered metadata. |
+| `learningFocus` | Y | `PRONUNCIATION`, `INTONATION`, or `BOTH`. Unsupported worker focus fails closed. |
+| `closedBetaContext` | Y in v5 | Raw user/session/recording IDs intentionally transported during the closed beta; its canonical digest is HMAC-bound. |
+| `visualInput` | N | All-or-none canonical MP4 reference and face-processing consent. It is consumed only after Seungun selects a phone. |
+| `authorizationGrant` | Y | Signed, short-lived, same-request processing authority described below. |
 
-Stream: `analysis:result`  
-Direction: AI Worker -> Backend  
-Purpose: AI Worker가 분석 완료 또는 실패 결과를 백엔드에 전달한다.
+Before this payload exists, VC-BE verifies that the upload key belongs to the
+authenticated user and session, probes the real container and codecs, extracts exactly
+one audio stream, writes 16 kHz mono signed PCM WAV, performs technical audio QC,
+stores it under an opaque backend-only key, calculates `audioSha256`, and deletes
+the client-uploaded source. The normalizer binds its source GET and DELETE to the ETag
+and optional VersionId observed immediately before download, so a replaced upload fails
+closed and is not accidentally deleted. A database rollback after canonical upload
+triggers best-effort cleanup of every unregistered canonical audio/video object. For
+consented video, VC-BE also strips container metadata,
+canonicalizes the media to MP4 H.264/HEVC plus AAC, stores it under a second opaque
+key, and binds its digest, size, MIME and face-consent receipt into the request.
+MP4/QuickTime accepts H.264 or HEVC with AAC; WebM video accepts VP8 or VP9 with
+Opus or Vorbis and is transcoded to the canonical MP4 contract. Unsupported or
+ambiguous streams fail closed.
 
-AI 응답은 현재 DB의 `analysis_results`, `analysis_segments`에 저장 가능한 필드만 사용한다. 새 DB 컬럼을 전제로 하지 않는다.
+The executable compatibility matrix covers H.264/AAC MP4, HEVC/AAC QuickTime,
+VP8/Vorbis WebM and VP9/Opus WebM. Every accepted input is re-probed after
+canonicalization as a single H.264-or-HEVC video stream plus one AAC audio stream
+inside MP4. An opt-in test accepts `VC_BE_PRIVATE_MEDIA_SAMPLE` so an approved local
+device capture can traverse the same S3-stubbed normalizer without copying the media
+into this repository. The current local smoke passed with an HEVC/AAC portrait capture;
+this single sample does not establish broad device compatibility.
 
-### Message Body
+The bundled media launcher applies `no_new_privs`, denies network, `io_uring` and
+process-escape syscalls through libseccomp, permits only thread-style clone, and
+sets CPU, address-space, output-file, file-descriptor and core-dump limits before
+executing the reviewed ffmpeg/ffprobe binary. Each invocation runs in its owner-only
+workspace with a cleared environment and a `file,pipe` protocol allowlist. This is
+not a mount namespace: production still runs VC-BE as an unprivileged service in a
+read-only container or host filesystem with only the media workspace writable.
+
+The v5 payload intentionally includes `userId`, `sessionId`, and `recordingId` in
+`closedBetaContext`; the v4 result additionally includes object keys, restricted local
+paths, and base64 media in `closedBetaDebug`. It still excludes presigned URLs and raw
+consent material. Both analyze and retry REST calls require
+`{"accepted":true,"policyRevision":"..."}` from the authenticated owner. Before
+issuing a job, VC-BE durably records an opaque consent receipt bound to the owner,
+session, recording, request generation, policy revision, and normalized audio digest,
+then signs that receipt into a five-minute grant. Session cancellation and account
+withdrawal timestamp every still-active receipt as revoked. The v4 grant
+binds request event, analysis/content/prompt, script digest, object-key digest,
+normalized audio digest, MIME, size, duration, learning focus, policy, purpose,
+data category, cleanup and egress policy. When visual input is present it additionally
+binds every visual field and its separate face-processing consent. A retry receives
+and persists a new request event, receipt and signature.
+
+Consent issuance is an implemented VC-BE transaction boundary, not an external issuer
+stub. The `processing_consents` ledger stores only the owner/session/recording binding,
+scope, policy, subject digest, request event, opaque receipt digest and grant/revocation
+times. V14 adds validated database constraints for positive subject IDs, safe policy,
+scope-specific binding, request UUID and revocation ordering, plus a partial unique
+index for non-null request events. An existing database that violates these invariants
+must fail migration and be corrected through an audited data migration; constraints
+must not be disabled to start analysis.
+
+The signature is HMAC-SHA256 over the fields above in listed order, excluding
+`signature`. Each line is `name:utf8ByteLength:value\n`; a null value is
+`name:-1:\n`; booleans are lower-case. `issuedAtUtc` and `expiresAtUtc` use the exact
+UTC JSON strings. The AI keyring selects the secret by `keyId` and compares the
+signature in constant time. Unknown keys, signature/binding differences, a future or
+expired window, a TTL over ten minutes, a policy mismatch, missing cleanup, or enabled
+remote egress fail before object storage access. Request v4/grant v3 are
+decode-only during the coordinated drain; older versions are unsupported.
+
+The AI worker uses a restricted object-storage adapter for the configured bucket and
+must inspect each object, condition the streaming GET on its ETag and optional VersionId,
+verify the returned object identity, key, MIME type, registered size, locally calculated digest against
+`audioSha256`, and cleanup
+policy. VC-BE rejects a legacy URL or traversal-like key before publishing; the
+request transaction rolls back instead of leaving a stranded pending analysis. A
+worker deployment without an approved authorization, storage, and Seungun composition
+must refuse startup before it consumes any Stream entry.
+
+## Result payload: `voice-coaching.analysis-result.v4`
 
 ```json
 {
-  "analysisId": "Long",
-  "status": "String",
-  "transcript": "String",
-  "sttConfidence": "Number",
-  "sttModelName": "String",
-  "overallScore": "Number",
-  "pronunciationScore": "Number",
-  "intonationScore": "Number",
-  "speedWpm": "Number",
-  "speedStatus": "String",
-  "stressScore": "Number",
-  "pauseScore": "Number",
-  "strengthsText": "String",
-  "weaknessesText": "String",
-  "summaryFeedback": "String",
-  "failureReason": "String",
-  "segments": [
-    {
-      "sequenceNo": "Integer",
-      "expectedText": "String",
-      "recognizedText": "String",
-      "startMs": "Integer",
-      "endMs": "Integer",
-      "matchType": "String",
-      "resultStatus": "String",
-      "targetUnit": "String",
-      "errorType": "String",
-      "pronunciationScore": "Number",
-      "intonationScore": "Number",
-      "feedback": "String"
-    }
-  ]
-}
-```
-
-### Result Fields
-
-| Field | Type | Required | Target | Description |
-| --- | --- | --- | --- | --- |
-| `analysisId` | Long | Y | `analysis_results.id` | 분석 ID |
-| `status` | String | Y | `analysis_results.status` | 분석 상태. `PROCESSING`, `COMPLETED`, `FAILED` |
-| `transcript` | String | N | `analysis_results.transcript` | AI가 인식한 전체 음성 텍스트 |
-| `sttConfidence` | Number | N | `analysis_results.stt_confidence` | STT 신뢰도 |
-| `sttModelName` | String | N | `analysis_results.stt_model_name` | STT 모델명 |
-| `overallScore` | Number | N | `analysis_results.overall_score` | 종합 점수 |
-| `pronunciationScore` | Number | N | `analysis_results.pronunciation_score` | 발음 점수 |
-| `intonationScore` | Number | N | `analysis_results.intonation_score` | 억양 점수 |
-| `speedWpm` | Number | N | `analysis_results.speed_wpm` | 분당 발화 속도 |
-| `speedStatus` | String | N | `analysis_results.speed_status` | 발화 속도 상태. `TOO_SLOW`, `NORMAL`, `TOO_FAST` |
-| `stressScore` | Number | N | `analysis_results.stress_score` | 강세 점수 |
-| `pauseScore` | Number | N | `analysis_results.pause_score` | 쉼 점수 |
-| `strengthsText` | String | N | `analysis_results.strengths_text` | 전체 강점 요약 |
-| `weaknessesText` | String | N | `analysis_results.weaknesses_text` | 전체 약점 요약 |
-| `summaryFeedback` | String | N | `analysis_results.summary_feedback` | 종합 피드백 |
-| `failureReason` | String | N | `analysis_results.failure_reason` | 실패 사유. `FAILED` 상태에서 사용 |
-| `segments` | Array | N | `analysis_segments` | 음절, 단어, 발음 단위별 상세 분석 결과 |
-
-### Segment Fields
-
-| Field | Type | Required | Target | Description |
-| --- | --- | --- | --- | --- |
-| `sequenceNo` | Integer | Y | `analysis_segments.sequence_no` | 분석 구간 순서 |
-| `expectedText` | String | N | `analysis_segments.expected_text` | 기준 텍스트 |
-| `recognizedText` | String | N | `analysis_segments.recognized_text` | 인식된 텍스트 |
-| `startMs` | Integer | N | `analysis_segments.start_ms` | 구간 시작 시각(ms) |
-| `endMs` | Integer | N | `analysis_segments.end_ms` | 구간 종료 시각(ms) |
-| `matchType` | String | Y | `analysis_segments.match_type` | 매칭 유형. `MATCH`, `SUBSTITUTION`, `OMISSION`, `ADDITION` |
-| `resultStatus` | String | Y | `analysis_segments.result_status` | 구간 결과. `NORMAL`, `CAUTION`, `NEEDS_IMPROVEMENT` |
-| `targetUnit` | String | N | `analysis_segments.target_unit` | 발음 집계 대상 단위 |
-| `errorType` | String | N | `analysis_segments.error_type` | 오류 유형 |
-| `pronunciationScore` | Number | N | `analysis_segments.pronunciation_score` | 구간 발음 점수 |
-| `intonationScore` | Number | N | `analysis_segments.intonation_score` | 구간 억양 점수 |
-| `feedback` | String | N | `analysis_segments.feedback` | 구간 피드백 |
-
-### Success Message Example
-
-```json
-{
+  "schemaVersion": "voice-coaching.analysis-result.v4",
+  "eventId": "e917fda8-3c4f-4b7e-9094-7a1706081f1b",
+  "requestEventId": "4adfe173-0691-4e89-b94e-a5c5c5085826",
   "analysisId": 35,
   "status": "COMPLETED",
-  "transcript": "안녕하세요. 오늘 날씨가 좋습니다.",
-  "sttConfidence": 0.9342,
-  "sttModelName": "whisper-large-v3",
-  "overallScore": 82.5,
-  "pronunciationScore": 80.0,
-  "intonationScore": 85.0,
-  "speedWpm": 132.4,
-  "speedStatus": "NORMAL",
-  "stressScore": 79.5,
-  "pauseScore": 76.0,
-  "strengthsText": "발화 속도가 안정적입니다.",
-  "weaknessesText": "일부 받침 발음이 약하게 들립니다.",
-  "summaryFeedback": "전체적으로 안정적인 발화였지만 받침 발음 개선이 필요합니다.",
-  "failureReason": null,
-  "segments": [
-    {
-      "sequenceNo": 1,
-      "expectedText": "안녕",
-      "recognizedText": "안녕",
-      "startMs": 0,
-      "endMs": 700,
-      "matchType": "MATCH",
-      "resultStatus": "NORMAL",
-      "targetUnit": "FINAL_CONSONANT_NG",
-      "errorType": null,
-      "pronunciationScore": 91.2,
-      "intonationScore": 86.0,
-      "feedback": "받침 발음이 명확합니다."
-    }
-  ]
-}
-```
-
-### Failure Message Example
-
-```json
-{
-  "analysisId": 35,
-  "status": "FAILED",
+  "outcome": "COACHING_READY",
   "transcript": null,
   "sttConfidence": null,
   "sttModelName": null,
@@ -229,81 +317,209 @@ AI 응답은 현재 DB의 `analysis_results`, `analysis_segments`에 저장 가�
   "pauseScore": null,
   "strengthsText": null,
   "weaknessesText": null,
-  "summaryFeedback": null,
-  "failureReason": "음성 인식에 실패했습니다.",
-  "segments": []
+  "summaryFeedback": "목표 음소 ‘ㄱ’ 소리를 천천히 분리해 발음해 보세요.",
+  "pronunciationEvidence": {
+    "schemaVersion": "voice-coaching.pronunciation-evidence.v1",
+    "selectedPhone": "ㄱ",
+    "selectedExpectedIndex": 0,
+    "selectedStartMs": 120,
+    "selectedEndMs": 240,
+    "detectorScore": 0.91,
+    "operatingThreshold": 0.8,
+    "scoreSemantics": "detector_ranking_score_not_calibrated_correctness_confidence",
+    "evidenceState": "frozen_detector_threshold_passed"
+  },
+  "workerRevision": "worker-revision",
+  "pipelineRevision": "pipeline-revision",
+  "audioSha256": "lower-case sha256 hex",
+  "segments": [],
+  "visualSupplement": {
+    "schemaVersion": "voice-coaching.visual-supplement.v1",
+    "selectedExpectedIndex": 0,
+    "evidenceRelation": "supports_upstream",
+    "approvedClaimId": "lip.aperture.low",
+    "rendererKey": "lip_aperture_hint",
+    "upstreamPhoneAnchorRef": "lower-case sha256 hex",
+    "supplementSha256": "lower-case sha256 hex",
+    "closedBetaLipObservation": {
+      "schemaVersion": "voice-coaching.closed-beta-lip-observation.v1",
+      "status": "OBSERVED",
+      "selectedExpectedIndex": 0,
+      "videoStartMs": 120,
+      "videoEndMs": 240,
+      "geometryArtifactSha256": "lower-case sha256 hex",
+      "measurements": {
+        "inner_aperture_ratio": {"value": 0.25, "unit": "ratio"}
+      },
+      "containsPronunciationTruth": false,
+      "containsActionTruth": false
+    }
+  },
+  "seungunProductionEvidence": {
+    "schema_version": "korean_phone_ctc.production_analysis.v2"
+  },
+  "closedBetaDebug": {
+    "schemaVersion": "voice-coaching.closed-beta-debug.v1",
+    "context": {
+      "schemaVersion": "voice-coaching.closed-beta-context.v1",
+      "userId": 9,
+      "sessionId": 7,
+      "recordingId": 50
+    },
+    "captureState": "COMPLETE",
+    "audioObjectKey": "recordings/analysis-audio/<opaque-uuid>.wav",
+    "visualObjectKey": "recordings/analysis-video/<opaque-uuid>.mp4",
+    "materializedAudioPath": "/restricted/attempt/source.wav",
+    "decodedAudioPath": "/restricted/attempt/decoded.wav",
+    "materializedVideoPath": "/restricted/attempt/source.mp4",
+    "audioMediaBase64": "base64 source WAV bytes",
+    "decodedAudioMediaBase64": "base64 decoded WAV bytes",
+    "videoMediaBase64": "base64 canonical MP4 bytes"
+  }
 }
 ```
 
-## Processing Rule
-
-1. 백엔드는 `POST /api/training-sessions/{sessionId}/analyze` 요청을 받는다.
-2. 백엔드는 선택된 녹음과 사용자 소유권을 검증한다.
-3. 백엔드는 `analysis_results`에 `PENDING` 상태 row를 생성한다.
-4. 백엔드는 `analysis:request` Stream에 메시지를 발행한다.
-5. AI Worker는 `XREADGROUP`으로 `analysis:request` 메시지를 읽는다.
-6. AI Worker는 분석을 수행하고 `analysis:result` Stream에 결과 메시지를 발행한다.
-7. AI Worker는 결과 발행 성공 후 `analysis:request` 메시지를 `XACK` 처리한다.
-8. 백엔드 Consumer는 `analysis:result` 메시지를 읽는다.
-9. 백엔드는 `analysisId`로 기존 `analysis_results` row를 조회한다.
-10. `status`가 `COMPLETED`이면 `analysis_results`를 갱신하고 `segments`를 `analysis_segments`에 저장한다.
-11. `status`가 `FAILED`이면 `analysis_results.status`, `failure_reason`을 갱신한다.
-12. DB 저장 성공 후 백엔드는 `analysis:result` 메시지를 `XACK` 처리한다.
-
-## Status Transition
-
-| Event | Status |
-| --- | --- |
-| 백엔드가 분석 요청 row 생성 | `PENDING` |
-| AI Worker가 처리 시작 메시지 발행 | `PROCESSING` |
-| AI Worker가 성공 결과 발행 | `COMPLETED` |
-| AI Worker가 실패 결과 발행 | `FAILED` |
-
-## ACK Policy
-
-| Message | ACK Owner | ACK Timing |
+| Field | Required | Rule |
 | --- | --- | --- |
-| `analysis:request` message | AI Worker | `analysis:result` 메시지 발행 성공 후 |
-| `analysis:result` message | Backend Consumer | `analysis_results`, `analysis_segments` DB 저장 성공 후 |
+| `schemaVersion`, `eventId`, `requestEventId`, `analysisId`, `status` | Y | Version, UUID lineage, and positive analysis ID. `requestEventId` must equal the current active request generation. |
+| `status` | Y | `PROCESSING`, `COMPLETED`, or `FAILED`; `PENDING` is not a worker result. |
+| `outcome` | completed only | Result v4 accepts only `COACHING_READY` and `COMPLETED_NO_ISSUE`; other enum values remain reserved until their evidence mapping is reviewed. |
+| `visualSupplement` | N | Approved same-attempt action plus optional aggregate closed-beta lip observation. Its selected index must equal Seungun's selected index. |
+| `seungunProductionEvidence` | completed v4 | Full `korean_phone_ctc.production_analysis.v2` envelope, including the immutable frozen evidence bundle, deterministic decision, digest, and pipeline revision. |
+| `closedBetaDebug` | all v4 terminal results | Intentionally serializes personal IDs, object keys, raw local paths, and available base64 media for attack-surface testing. `UNAVAILABLE` failures retain the context and keys with null media/path fields. |
+| `failureCode`, `failureReason` | failed only | Stable code plus learner-safe reason (max 500 chars). Never include infrastructure exception text. Failed/processing results contain no transcript, scores, feedback, digest, or segments; a failure may retain worker/pipeline revision receipts. |
+| `pronunciationEvidence` | coaching only | Required exactly when `outcome=COACHING_READY`. It preserves the same-attempt Seungun-selected phone, index, optional time range, threshold-passed ranking score and explicit non-confidence semantics. |
+| transcript, score, strength/weakness, segment fields | N | The v4 production mapping requires these to remain `null`/empty because no approved Seungun mapping currently supplies them. |
+| revision/digest fields | completed | Worker/pipeline revision and lower-case audio SHA-256 are required provenance. |
+| `segments` | all states | Must currently be an empty array. A future segment mapping requires a new reviewed schema. |
 
-ACK 전에 처리 실패가 발생하면 메시지를 ACK하지 않는다. ACK되지 않은 메시지는 Redis Stream pending entry로 남으며 재처리 대상이 된다.
+VC-BE strictly decodes `closedBetaDebug` so the Backend-facing transport and JVM
+attack surface are exercised, but it does not persist or return that raw block through
+the public result DTO. The aggregate `closedBetaLipObservation` is stored in PostgreSQL
+by V15 and returned to the authenticated result owner. The configured 384 MiB result
+limit is a transport ceiling, not a demonstrated safe operating point; production-like
+Redis/JVM/Python peak-memory and latency testing remains a rollout gate.
 
-## Retry Policy
+Legacy `voice-coaching.analysis-result.v1` and `v2` are rejected. Result v3 remains
+decode-only for draining the prior deployment; new workers publish only v4. Result-v4 deployment
+requires a quiesced rollout: stop new analysis admission and the AI worker, drain or
+deliberately resolve all pending request/result entries, deploy Backend and worker,
+then enable both together. Do not run an older result producer against the v3 consumer
+or the reverse outside that drain window. The Redis stream name remains `analysis:result:v1`; it identifies the
+transport channel, not the JSON schema version.
 
-| Item | Policy |
-| --- | --- |
-| Pending timeout | 5분 이상 ACK되지 않은 메시지를 재처리 대상으로 본다 |
-| Max retry count | 3회 |
-| Request retry target | AI Worker가 `analysis:request` pending 메시지를 claim 후 재처리 |
-| Result retry target | Backend Consumer가 `analysis:result` pending 메시지를 claim 후 재처리 |
-| Retry exceeded | 기존 `analysis_results.status`를 `FAILED`로 갱신하고 `failure_reason`에 사유 기록 |
+`PROCESSING` updates only the job state. It does not authorize the AI worker to ACK
+the request; the request remains pending until the worker publishes a terminal
+`COMPLETED` or `FAILED` result.
 
-`analysis_results.recording_id`에는 UNIQUE 제약이 있으므로 retry 과정에서 같은 녹음에 대한 분석 row를 새로 생성하지 않는다.
+## Persistence and idempotency
 
-## Message Storage Rule
+- `analysis_results.active_request_event_id` identifies the active request generation.
+  VC-BE ignores a late result whose `requestEventId` differs, including a result from
+  a pre-retry attempt.
+- A duplicate terminal result for the active generation does not overwrite an already
+  terminal analysis or duplicate `analysis_segments`.
+- The first accepted completed result atomically replaces the segments for its
+  `analysisId`; a failed result stores stable failure code/reason.
+- `analysis_request_outbox` persists request payloads before Redis I/O. Its final
+  dispatch failure changes the matching analysis to `FAILED`.
+- Request publication atomically creates the Stream entry and an opaque event-to-ID
+  index. A retry after an uncertain DB commit returns the same indexed Stream ID
+  instead of publishing duplicate work.
+- Each outbox publish runs in its own bounded DB transaction. Redis failure therefore
+  holds at most one outbox row lock for at most the configured command timeout.
+- Recording-object deletion similarly locks and delivers one outbox item per independent
+  transaction. A failed storage call schedules bounded retry without rolling back other
+  candidates; terminal failures remain visible for operator action.
+- PostgreSQL is the permanent result store. Redis holds transport messages only; no
+  audio blob, token, URL, raw exception, or user identifier is placed in a stream.
+- Analysis admission takes a pessimistic lock on the owning user row before counting
+  PENDING/PROCESSING jobs. This makes the per-user concurrent cap effective across
+  backend instances rather than being an in-memory rate limit.
+- The retention sweeper considers only protocol-v1 request outboxes whose analysis
+  and outbox states are terminal and older than `ANALYSIS_RETENTION_AGE`. It verifies
+  that the exact indexed request Stream entry is absent, requires any cancellation
+  outbox to be published, then deletes the request payload row, cancellation row,
+  request index, and tombstone. Legacy rows with no retention protocol marker are
+  deliberately left for reviewed migration rather than guessed safe.
 
-- Redis Stream에는 음성 blob을 직접 저장하지 않는다.
-- Redis Stream에는 `audioUrl` 또는 object key처럼 AI Worker가 음성 파일을 가져올 수 있는 참조값만 저장한다.
-- 분석 결과의 영구 저장소는 PostgreSQL이다.
-- 요약 분석 결과는 `analysis_results`에 저장한다.
-- 구간별 상세 분석 결과는 `analysis_segments`에 저장한다.
-- `analysis_segments.target_unit`, `analysis_segments.error_type`은 강점/약점 집계 API에서 사용할 수 있으므로 AI Worker가 가능한 한 채워서 보낸다.
+## Retry, reclaim, and dead letter handling
 
-## Related Backend APIs
+1. VC-BE retries pending outbox records with bounded backoff, up to
+   `ANALYSIS_STREAM_MAX_RETRIES`.
+2. A VC-BE result consumer does not ACK until `AnalysisResultIngestionService` commits.
+3. Pending result messages idle for at least `ANALYSIS_PENDING_CLAIM_IDLE` are claimed
+   by the configured consumer. This supports process restart and consumer loss.
+4. A decodable result message whose delivery count reaches the retry cap first fails
+   the matching active analysis with `analysis_result_retry_exhausted`, then is copied
+   to the result DLQ with only `payload`, source stream ID, and stable failure code,
+   and finally ACKed. A malformed message, missing payload, deleted source record, or
+   unknown analysis is copied with a stable non-sensitive DLQ failure code and ACKed,
+   then retained only in the DLQ for restricted operator recovery.
+5. Operators inspect the DLQ using restricted tooling. Replaying a message requires a
+   new deliberate Stream entry; do not edit a message in place.
+6. The AI request consumer reclaims idle pending requests before reading new entries.
+   It measures the encoded UTF-8 result before publication and writes a terminal result
+   before ACKing a valid request. A non-serializable or oversized normal result is
+   replaced with a bounded `FAILED` result for the same request generation. A malformed or missing
+   request payload cannot produce a normal result; the worker copies it to
+   `analysis:request:dlq:v1` with only the source Stream ID, original payload, and a
+   stable failure code, then ACKs it. Request-DLQ access and replay are restricted
+   operator actions.
+7. A DB sweeper changes a generation that exceeds `ANALYSIS_EXECUTION_TIMEOUT` to
+   `FAILED`, prevents an unpublished outbox record from being dispatched, and revokes
+   active processing consent for that session. It also persists a cancellation
+   tombstone outbox row. A result that arrives after that point
+   is ACKed as a duplicate and cannot revive the failed generation.
+8. Session cancellation fails and clears every non-failed analysis result, deletes its
+   derived segments, and prevents pending outbox dispatch before consent and media are
+   revoked. History deletion and user withdrawal use the same cancellation path.
+   Cancellation schedules tombstones for every previously issued request generation
+   in the aggregate and deliberately wins even when a terminal result arrived just
+   before the session transaction acquired the analysis lock. The AI worker checks a
+   tombstone before work, polls it while the model runs, interrupts the isolated
+   Seungun process when observed, and atomically rechecks it with result publication.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| POST | `/api/training-sessions/{sessionId}/analyze` | 분석 요청 생성 및 `analysis:request` 메시지 발행 |
-| GET | `/api/training-sessions/{sessionId}/analysis/status` | 분석 진행 상태 조회 |
-| GET | `/api/analyses/{analysisId}` | 분석 결과 조회 |
+## Health and metrics
 
-## Related DB Tables
+VC-BE exposes management endpoints on `127.0.0.1:9091` by default:
 
-| Table | Purpose |
-| --- | --- |
-| `training_sessions` | 학습 세션과 분석 진행 상태 연결 |
-| `voice_recordings` | 선택된 녹음 파일 메타데이터와 `audioUrl` 저장 |
-| `analysis_results` | 분석 상태, STT 결과, 점수, 전체 피드백 저장 |
-| `analysis_segments` | 음절, 단어, 발음 단위별 상세 분석 결과 저장 |
-| `practice_contents` | 기준 문장 `scriptText` 조회 |
-| `users` | 분석 요청 사용자 조회 |
+- `/internal/actuator/health` includes the dedicated analysis Redis readiness check.
+- `/internal/actuator/prometheus` exports bounded-cardinality publish, ingestion,
+  delivery-failure, DLQ, execution-timeout, cancellation-delivery, and retention
+  cleanup/failure counters. It also exports request/result outstanding Stream entries,
+  request/result PEL and DLQ depths, pending request/cancellation outbox counts and
+  oldest ages, plus recording-deletion pending/failed counts and oldest age. `-1`
+  means the observation source was unavailable, and a paired observation-failure
+  counter is incremented.
+
+Because terminal handoff performs `XACK` plus `XDEL`, an outstanding Stream-entry
+gauge covers both unclaimed and pending transport work. It is intentionally not a
+consumer-offset lag estimate. Metrics have no user, session, recording, event,
+object, payload, failure-reason, or exception labels.
+
+No user, session, recording, event, object key, payload, or exception is used as a
+metric label or health detail. If the management address is changed from loopback,
+the deployment must restrict the port to the health checker and metrics collector.
+
+## Public API impact
+
+Client APIs remain VC-BE REST endpoints:
+
+- `POST /api/training-sessions/{sessionId}/analyze`
+- `GET /api/training-sessions/{sessionId}/analysis/status`
+- `POST /api/training-sessions/{sessionId}/analysis/retry`
+- `GET /api/analyses/{analysisId}`
+- `GET /api/analyses/{analysisId}/segments`
+
+Completed result views add nullable `outcome` and `pronunciationEvidence`; worker
+revisions, object keys, hashes, Stream IDs, and internal failure codes are not public
+API response fields. The current runtime accepts only `PRONUNCIATION`. `INTONATION`
+and `BOTH` requests return `422` before consent issuance or analysis state creation.
+
+Both POST endpoints above require this request body; the server rejects missing,
+false, blank, or stale consent before it creates/publishes analysis state:
+
+```json
+{"accepted": true, "policyRevision": "voice-analysis-consent-v1"}
+```

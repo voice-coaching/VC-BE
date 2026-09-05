@@ -1,30 +1,48 @@
 package org.example.voice.training.application;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.consent.domain.model.ProcessingConsentReceipt;
 import org.example.voice.training.controller.dto.RecordingRegisterRequestDto;
 import org.example.voice.training.domain.model.RecordingPlaybackUrlData;
+import org.example.voice.training.domain.model.NormalizedRecordingData;
 import org.example.voice.training.domain.model.RecordingSelectionData;
 import org.example.voice.training.domain.model.VoiceRecordingData;
 import org.example.voice.training.domain.model.VoiceRecordingRegisteredData;
+import org.example.voice.training.domain.model.VisualProcessingAuthorizationData;
 import org.example.voice.training.domain.port.VoiceRecordingReader;
 import org.example.voice.training.domain.port.VoiceRecordingWriter;
+import org.example.voice.training.domain.port.RecordingObjectStoragePort;
+import org.example.voice.training.domain.port.RecordingMediaNormalizationPort;
+import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class VoiceRecordingService {
+
+    private static final String VIDEO_PROCESSING_CONSENT_POLICY_REVISION =
+            "voice-video-processing-consent-v1";
 
     // 녹음 파일 메타데이터를 관리한다.
     // 실제 파일 업로드는 프론트가 Presigned URL로 직접 수행하고, 백엔드는 업로드 후 metadata만 등록한다.
     private final VoiceRecordingReader voiceRecordingReader;
     private final VoiceRecordingWriter voiceRecordingWriter;
     private final TrainingSessionService trainingSessionService;
+    private final RecordingObjectStoragePort objectStorage;
+    private final RecordingMediaNormalizationPort mediaNormalization;
+    private final ProcessingConsentLedger processingConsentLedger;
+    private final RecordingUploadIntentRegistry uploadIntentRegistry;
 
     @Transactional
     public VoiceRecordingRegisteredData register(Long sessionId, RecordingRegisterRequestDto request, Long userId) {
@@ -35,18 +53,71 @@ public class VoiceRecordingService {
         if (voiceRecordingReader.existsByObjectKey(request.objectKey())) {
             throw new BaseException(ErrorCode.RECORDING_ALREADY_REGISTERED);
         }
-
-        int attemptNo = voiceRecordingReader.countBySessionId(sessionId) + 1;
-        // 음질검사 AI가 아직 없으므로 등록 직후 qualityStatus는 PENDING이다.
-        // Swagger 테스트에서 선택까지 진행하려면 DB에서 PASS로 변경해야 한다.
-        return voiceRecordingWriter.register(
+        validateVideoConsent(request);
+        objectStorage.assertUploadedObject(
+                userId,
+                sessionId,
+                request.objectKey(),
+                request.mimeType(),
+                request.fileSizeBytes()
+        );
+        VisualProcessingAuthorizationData visualAuthorization = null;
+        if (request.mimeType().startsWith("video/")) {
+            ProcessingConsentReceipt faceConsent = processingConsentLedger.grantFaceVideoProcessing(
+                    userId,
+                    sessionId,
+                    request.videoProcessingConsentPolicyRevision(),
+                    request.objectKey()
+            );
+            visualAuthorization = new VisualProcessingAuthorizationData(
+                    faceConsent.receiptSha256(),
+                    request.videoProcessingConsentPolicyRevision()
+            );
+        }
+        NormalizedRecordingData normalized = mediaNormalization.normalize(
+                userId,
                 sessionId,
                 request.objectKey(),
                 request.mimeType(),
                 request.fileSizeBytes(),
-                request.durationMs(),
-                attemptNo
+                visualAuthorization
         );
+        CanonicalMediaRollbackCleanup rollbackCleanup = new CanonicalMediaRollbackCleanup(
+                userId, sessionId, normalized
+        );
+        registerRollbackCleanup(rollbackCleanup);
+
+        try {
+            uploadIntentRegistry.markConsumed(userId, sessionId, request.objectKey());
+            return voiceRecordingWriter.register(sessionId, normalized);
+        } catch (RuntimeException error) {
+            try {
+                rollbackCleanup.cleanup();
+            } catch (RuntimeException cleanupFailure) {
+                cleanupFailure.addSuppressed(error);
+                throw cleanupFailure;
+            }
+            throw error;
+        }
+    }
+
+    private static void registerRollbackCleanup(CanonicalMediaRollbackCleanup cleanup) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_COMMITTED) {
+                    return;
+                }
+                try {
+                    cleanup.cleanup();
+                } catch (RuntimeException ignored) {
+                    log.error("Canonical media rollback cleanup requires operator reconciliation");
+                }
+            }
+        });
     }
 
     public List<VoiceRecordingData> getRecordings(Long sessionId, Long userId) {
@@ -78,7 +149,7 @@ public class VoiceRecordingService {
         if (voiceRecordingReader.hasCompletedAnalysis(recordingId)) {
             throw new BaseException(ErrorCode.ANALYZED_RECORDING_CANNOT_DELETE);
         }
-        voiceRecordingWriter.delete(recordingId);
+        voiceRecordingWriter.delete(sessionId, recordingId);
     }
 
     public RecordingPlaybackUrlData getPlaybackUrl(Long recordingId, Long userId) {
@@ -87,8 +158,74 @@ public class VoiceRecordingService {
     }
 
     private void validateRegisterRequest(RecordingRegisterRequestDto request) {
-        if (request == null || request.objectKey() == null || request.mimeType() == null) {
+        if (request == null
+                || request.objectKey() == null
+                || request.mimeType() == null
+                || request.fileSizeBytes() == null
+                || request.fileSizeBytes() <= 0
+                || request.durationMs() == null
+                || request.durationMs() <= 0) {
             throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+    }
+
+    private static void validateVideoConsent(RecordingRegisterRequestDto request) {
+        if (!request.mimeType().startsWith("video/")) {
+            return;
+        }
+        if (!Boolean.TRUE.equals(request.videoProcessingConsentAccepted())
+                || !VIDEO_PROCESSING_CONSENT_POLICY_REVISION.equals(
+                        request.videoProcessingConsentPolicyRevision()
+                )) {
+            throw new BaseException(ErrorCode.VIDEO_PROCESSING_CONSENT_REQUIRED);
+        }
+    }
+
+    private final class CanonicalMediaRollbackCleanup {
+        private final Long userId;
+        private final Long sessionId;
+        private final NormalizedRecordingData normalized;
+        private boolean completed;
+
+        private CanonicalMediaRollbackCleanup(
+                Long userId,
+                Long sessionId,
+                NormalizedRecordingData normalized
+        ) {
+            this.userId = userId;
+            this.sessionId = sessionId;
+            this.normalized = normalized;
+        }
+
+        private synchronized void cleanup() {
+            if (completed) {
+                return;
+            }
+            RuntimeException failure = null;
+            try {
+                mediaNormalization.deleteNormalizedObject(
+                        userId, sessionId, normalized.objectKey()
+                );
+            } catch (RuntimeException error) {
+                failure = error;
+            }
+            if (normalized.visual() != null) {
+                try {
+                    mediaNormalization.deleteNormalizedObject(
+                            userId, sessionId, normalized.visual().objectKey()
+                    );
+                } catch (RuntimeException error) {
+                    if (failure == null) {
+                        failure = error;
+                    } else {
+                        failure.addSuppressed(error);
+                    }
+                }
+            }
+            if (failure != null) {
+                throw failure;
+            }
+            completed = true;
         }
     }
 }

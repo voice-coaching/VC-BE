@@ -14,6 +14,8 @@ import org.example.voice.training.domain.model.TrainingSessionCancellationData;
 import org.example.voice.training.domain.model.TrainingSessionCompletionData;
 import org.example.voice.training.domain.model.TrainingSessionCreatedData;
 import org.example.voice.training.domain.port.TrainingSessionWriter;
+import org.example.voice.training.domain.port.RecordingDeletionScheduler;
+import org.example.voice.training.domain.type.RecordingDeletionReason;
 import org.example.voice.training.domain.type.TrainingSessionStatus;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
@@ -27,6 +29,7 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     private final PracticeContentJpaRepository practiceContentJpaRepository;
     private final TrainingSessionJpaRepository trainingSessionJpaRepository;
     private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;
+    private final RecordingDeletionScheduler recordingDeletionScheduler;
 
     @Override
     @Transactional
@@ -50,10 +53,35 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     @Override
     @Transactional
     @CacheEvict(cacheNames = HomeCacheNames.RECENT_TRAINING, allEntries = true)
-    public void updateStatus(Long sessionId, TrainingSessionStatus status) {
-        TrainingSession session = trainingSessionJpaRepository.findById(sessionId)
+    public void beginUpload(Long sessionId) {
+        TrainingSession session = findForUpdate(sessionId);
+        if (!session.beginUpload()) {
+            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
+        }
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(cacheNames = HomeCacheNames.RECENT_TRAINING, allEntries = true)
+    public void startAnalysis(Long sessionId) {
+        TrainingSession session = findForUpdate(sessionId);
+        if (!session.startAnalysis()) {
+            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void assertAnalysisRetryAllowed(Long sessionId) {
+        TrainingSession session = findForUpdate(sessionId);
+        if (!session.allowsAnalysisRetry()) {
+            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
+        }
+    }
+
+    private TrainingSession findForUpdate(Long sessionId) {
+        return trainingSessionJpaRepository.findByIdForUpdate(sessionId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
-        session.updateStatus(status);
     }
 
     @Override
@@ -71,8 +99,10 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
             }, allEntries = true)
     })
     public TrainingSessionCompletionData complete(Long sessionId, Integer totalLearningSeconds) {
-        TrainingSession session = trainingSessionJpaRepository.findById(sessionId)
-                .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
+        TrainingSession session = findForUpdate(sessionId);
+        if (session.getStatus() != TrainingSessionStatus.ANALYZING) {
+            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
+        }
         session.complete(totalLearningSeconds);
         return new TrainingSessionCompletionData(session.getId(), session.getStatus(), session.getCompletedAt());
     }
@@ -92,8 +122,12 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
             }, allEntries = true)
     })
     public TrainingSessionCancellationData cancel(Long sessionId) {
-        TrainingSession session = trainingSessionJpaRepository.findById(sessionId)
-                .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
+        TrainingSession session = findForUpdate(sessionId);
+        if (session.getStatus() == TrainingSessionStatus.COMPLETED
+                || session.getStatus() == TrainingSessionStatus.CANCELED
+                || session.getStatus() == TrainingSessionStatus.FAILED) {
+            throw new BaseException(ErrorCode.SESSION_ALREADY_FINISHED);
+        }
         session.cancel();
         voiceRecordingJpaRepository
                 .findByTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNullOrderByAttemptNoAsc(
@@ -101,8 +135,23 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
                         session.getUserId()
                 )
                 .stream()
-                .filter(recording -> !recording.getSelected())
-                .forEach(VoiceRecording::delete);
+                .forEach(recording -> {
+                    recording.delete();
+                    recordingDeletionScheduler.schedule(
+                            session.getUserId(),
+                            sessionId,
+                            recording.getAudioUrl(),
+                            RecordingDeletionReason.SESSION_CANCELED
+                    );
+                    if (recording.getVisualObjectKey() != null) {
+                        recordingDeletionScheduler.schedule(
+                                session.getUserId(),
+                                sessionId,
+                                recording.getVisualObjectKey(),
+                                RecordingDeletionReason.SESSION_CANCELED
+                        );
+                    }
+                });
         return new TrainingSessionCancellationData(session.getId(), session.getStatus(), session.getCompletedAt());
     }
 }

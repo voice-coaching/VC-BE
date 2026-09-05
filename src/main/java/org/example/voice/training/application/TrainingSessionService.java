@@ -3,6 +3,9 @@ package org.example.voice.training.application;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.consent.domain.port.ProcessingConsentLedger;
+import org.example.voice.analysis.domain.port.AnalysisCancellation;
+import org.example.voice.training.domain.port.RecordingUploadIntentRegistry;
 import org.example.voice.training.controller.dto.TrainingSessionCreateRequestDto;
 import org.example.voice.training.domain.model.TrainingSessionCancellationData;
 import org.example.voice.training.domain.model.TrainingSessionCompletionData;
@@ -24,6 +27,9 @@ public class TrainingSessionService {
     private final TrainingSessionReader trainingSessionReader;
     private final TrainingSessionWriter trainingSessionWriter;
     private final TrainingAnalysisReader trainingAnalysisReader;
+    private final ProcessingConsentLedger processingConsentLedger;
+    private final RecordingUploadIntentRegistry uploadIntentRegistry;
+    private final AnalysisCancellation analysisCancellation;
 
     @Transactional
     public TrainingSessionCreatedData create(TrainingSessionCreateRequestDto request, Long userId) {
@@ -69,7 +75,11 @@ public class TrainingSessionService {
         if (status == TrainingSessionStatus.COMPLETED || status == TrainingSessionStatus.CANCELED) {
             throw new BaseException(ErrorCode.SESSION_ALREADY_FINISHED);
         }
-        return trainingSessionWriter.cancel(sessionId);
+        TrainingSessionCancellationData canceled = trainingSessionWriter.cancel(sessionId);
+        analysisCancellation.cancelForSession(sessionId);
+        processingConsentLedger.revokeForSession(userId, sessionId);
+        uploadIntentRegistry.expireForSession(userId, sessionId);
+        return canceled;
     }
 
     public void assertSessionExists(Long sessionId, Long userId) {

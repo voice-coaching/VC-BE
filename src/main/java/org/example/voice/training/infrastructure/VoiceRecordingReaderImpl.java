@@ -4,8 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.training.domain.entity.VoiceRecording;
 import org.example.voice.training.domain.model.RecordingPlaybackUrlData;
+import org.example.voice.training.domain.model.SelectedRecordingAnalysisData;
 import org.example.voice.training.domain.model.VoiceRecordingData;
 import org.example.voice.training.domain.port.VoiceRecordingReader;
+import org.example.voice.training.domain.port.RecordingObjectStoragePort;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +24,7 @@ public class VoiceRecordingReaderImpl implements VoiceRecordingReader {
 
     private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;
     private final AnalysisResultJpaRepository analysisResultJpaRepository;
-    private final PresignedUrlProvider presignedUrlProvider;
+    private final RecordingObjectStoragePort objectStorage;
 
     @Override
     public boolean existsByObjectKey(String objectKey) {
@@ -82,6 +84,34 @@ public class VoiceRecordingReaderImpl implements VoiceRecordingReader {
     }
 
     @Override
+    public Optional<SelectedRecordingAnalysisData> findSelectedForAnalysis(Long sessionId, Long userId) {
+        return voiceRecordingJpaRepository
+                .findFirstByTrainingSessionIdAndTrainingSessionUserIdAndSelectedTrueAndDeletedAtIsNullOrderByCreatedAtDesc(
+                        sessionId,
+                        userId
+                )
+                .map(recording -> new SelectedRecordingAnalysisData(
+                        recording.getId(),
+                        recording.getTrainingSession().getContent().getId(),
+                        recording.getTrainingSession().getContent().getUpdatedAt().toInstant().toString(),
+                        recording.getTrainingSession().getContent().getScriptText(),
+                        recording.getAudioUrl(),
+                        recording.getMimeType(),
+                        recording.getFileSizeBytes(),
+                        recording.getDurationMs(),
+                        recording.getAudioSha256(),
+                        recording.getVisualObjectKey(),
+                        recording.getVisualMimeType(),
+                        recording.getVisualFileSizeBytes(),
+                        recording.getVisualSha256(),
+                        recording.getVisualConsentReceiptSha256(),
+                        recording.getVisualConsentPolicyRevision(),
+                        recording.getTrainingSession().getLearningFocus(),
+                        recording.getQualityStatus()
+                ));
+    }
+
+    @Override
     public Optional<RecordingPlaybackUrlData> findPlaybackUrl(Long recordingId, Long userId) {
         return voiceRecordingJpaRepository.findById(recordingId)
                 .filter(recording -> recording.getDeletedAt() == null)
@@ -90,7 +120,7 @@ public class VoiceRecordingReaderImpl implements VoiceRecordingReader {
                     OffsetDateTime expiresAt = OffsetDateTime.now(ZoneId.of("Asia/Seoul")).plusMinutes(10);
                     return new RecordingPlaybackUrlData(
                             recording.getId(),
-                            presignedUrlProvider.createPlaybackUrl(recording.getAudioUrl(), expiresAt),
+                            objectStorage.createPlaybackUrl(recording.getAudioUrl(), expiresAt),
                             expiresAt
                     );
                 });

@@ -39,7 +39,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/email-availability", "/api/auth/signup", "/api/auth/login",
-                                "/api/auth/social-login", "/api/auth/token/refresh", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                                "/api/auth/social-login", "/api/auth/token/refresh", "/swagger-ui/**", "/v3/api-docs/**",
+                                "/internal/actuator/health/**", "/internal/actuator/prometheus").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) -> {

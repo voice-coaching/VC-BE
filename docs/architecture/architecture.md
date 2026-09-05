@@ -17,8 +17,8 @@ voice는 발음 및 억양 학습을 위한 Spring Boot 기반 백엔드 프로�
 - Migration: Flyway
 - Authentication: JWT Access Token / Refresh Token
 - API Documentation: Springdoc OpenAPI
-- External Integration: OAuth, storage presigned URL, STT/AI feedback provider
-- Cache: Redis Cache
+- External Integration: OAuth, storage presigned URL, dedicated Redis Stream AI analysis worker
+- Cache: Redis Cache (AI analysis Stream endpoint와 분리)
 
 ## 주요 기능
 
@@ -203,7 +203,7 @@ Domain Entity / Domain Model
 ## 외부 연동 경계
 
 - OAuth 연동과 JWT 발급/검증은 `auth/infrastructure`에 둔다.
-- STT, AI feedback, voice analysis provider는 `analysis`의 provider 또는 infrastructure 경계에 둔다.
+- 현재 발음 판정과 selected phone은 Seungun worker가 소유하고, VC-BE는 `analysis/infrastructure/stream`의 versioned Redis Stream adapter로 결과를 반영한다. 승인된 별도 STT 매핑 전까지 transcript와 관련 점수는 비워 둔다.
 - 녹음 파일 업로드와 재생 URL 발급은 `training/infrastructure` 또는 `common/storage` 책임을 명확히 구분한다.
 - 외부 provider DTO를 공개 API DTO로 그대로 사용하지 않는다.
 - timeout, retry, fallback, failure mapping이 필요한 경우 application 흐름과 infrastructure 구현을 분리한다.

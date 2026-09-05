@@ -77,8 +77,28 @@ public class TrainingSession {
         return new TrainingSession(userId, content, courseStepId, learningFocus);
     }
 
-    public void updateStatus(TrainingSessionStatus status) {
-        this.status = status;
+    public boolean beginUpload() {
+        if (status == TrainingSessionStatus.RECORDING) {
+            status = TrainingSessionStatus.UPLOADING;
+            return true;
+        }
+        return status == TrainingSessionStatus.UPLOADING;
+    }
+
+    public boolean allowsRecordingChanges() {
+        return status == TrainingSessionStatus.RECORDING || status == TrainingSessionStatus.UPLOADING;
+    }
+
+    public boolean startAnalysis() {
+        if (!allowsRecordingChanges()) {
+            return false;
+        }
+        status = TrainingSessionStatus.ANALYZING;
+        return true;
+    }
+
+    public boolean allowsAnalysisRetry() {
+        return status == TrainingSessionStatus.ANALYZING;
     }
 
     public void complete(Integer totalLearningSeconds) {

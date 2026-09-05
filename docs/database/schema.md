@@ -1,8 +1,9 @@
 # DB Schema - voice
 
 - 데이터베이스: PostgreSQL
-- 기준 SQL: `voicebackup(08.08.15.15).sql`
-- 덤프 생성 시각: 2026-08-07 15:16:51
+- 현재 schema source of truth: `src/main/resources/db/migration/V0..V9`
+- `voicebackup(08.08.15.15).sql`은 2026-08-07 당시의 historical 참고자료이며 신규 배포 입력이 아니다.
+- 빈 PostgreSQL은 `V0__create_core_application_schema.sql`로 core table을 만든 뒤 V1~V9를 순서대로 적용한다.
 
 ## 테이블 목록
 
@@ -190,6 +191,7 @@
 | mime_type | varchar(100) | N | - | - | - | MIME 타입 |
 | file_size_bytes | bigint | N | - | - | - | 파일 크기(byte) |
 | duration_ms | integer | N | - | - | - | 재생 길이(ms) |
+| audio_sha256 | varchar(64) | N | - | CHECK | - | backend-normalized WAV 바이트의 SHA-256. 과거 row는 null 가능 |
 | quality_status | varchar(30) | Y | - | CHECK | - | 품질 검사 상태 |
 | volume_score | numeric(5,2) | N | - | - | - | 볼륨 점수 |
 | noise_score | numeric(5,2) | N | - | - | - | 노이즈 점수 |
@@ -227,6 +229,54 @@
 
 | feedback_regeneration_count | integer | Y | 0 | - | - | 종합 피드백 재생성 횟수 |
 | feedback_regenerated_at | timestamptz | N | - | - | - | 마지막 종합 피드백 재생성 시각 |
+| active_request_event_id | varchar(36) | N | - | Index | - | 현재 분석 요청 generation UUID. 이전 재시도 결과를 거부한다. |
+| retry_count | integer | Y | 0 | CHECK | - | 동일 분석 행의 누적 사용자 재시도 횟수(0~3). 상태 변경이나 서버 재시작으로 초기화되지 않는다. |
+| analysis_outcome | varchar(40) | N | - | - | - | 완료된 분석의 근거 제한 outcome |
+| failure_code | varchar(100) | N | - | - | - | 내부 안정 실패 코드. public API에는 노출하지 않는다. |
+| worker_revision | varchar(100) | N | - | - | - | worker revision receipt |
+| pipeline_revision | varchar(100) | N | - | - | - | pipeline revision receipt |
+| audio_sha256 | varchar(64) | N | - | - | - | 처리한 audio digest receipt |
+
+### analysis_request_outbox
+- 목적: DB 분석 요청과 Redis Stream `XADD` 사이의 at-least-once dispatch를 보장한다.
+- 해당 모듈: analysis/training AI integration
+- Soft delete: 없음
+- Migration: `V3__add_analysis_stream_integration.sql`
+
+| Column | Type | Required | Default | Index | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- |
+| id | bigint | Y | identity | PK | Y | outbox ID |
+| event_id | varchar(36) | Y | - | - | Y | request generation UUID |
+| analysis_id | bigint | Y | - | FK | - | 대상 `analysis_results.id` |
+| payload | text | Y | - | - | - | versioned request JSON |
+| status | varchar(20) | Y | - | Index | - | `PENDING`, `PUBLISHED`, `FAILED` |
+| attempt_count | integer | Y | 0 | - | - | dispatch attempt count |
+| next_attempt_at | timestamptz | Y | now() | Index | - | next retry time |
+| last_error_code | varchar(100) | N | - | - | - | stable dispatch failure code |
+| created_at | timestamptz | Y | now() | - | - | enqueue time |
+| published_at | timestamptz | N | - | - | - | successful XADD time |
+
+### processing_consents
+- 목적: 음성 분석과 얼굴 영상 처리에 대한 명시적 동의 receipt 및 철회 시각을 감사 가능하게 보존한다.
+- 해당 모듈: consent/training/analysis
+- Migration: `V6__create_processing_consent_ledger.sql`
+
+| Column | Type | Required | Default | Index | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- |
+| id | bigint | Y | identity | PK | Y | 동의 기록 ID |
+| user_id | bigint | Y | - | Index | - | 동의를 제출한 사용자 ID의 감사용 snapshot |
+| training_session_id | bigint | Y | - | Index | - | 동의가 적용된 학습 세션 ID의 감사용 snapshot |
+| recording_id | bigint | N | - | - | - | 음성 분석 동의의 정규화 녹음 ID |
+| scope | varchar(40) | Y | - | CHECK | - | `VOICE_ANALYSIS` 또는 `FACE_VIDEO_PROCESSING` |
+| policy_revision | varchar(100) | Y | - | - | - | 사용자가 수락한 정확한 정책 revision |
+| subject_sha256 | varchar(64) | Y | - | CHECK | - | audio digest 또는 원본 object key digest |
+| request_event_id | varchar(36) | N | - | Index | - | 음성 분석 요청 generation UUID |
+| receipt_sha256 | varchar(64) | Y | - | - | Y | worker grant에도 포함되는 opaque receipt digest |
+| granted_at | timestamptz | Y | - | - | - | 동의 수락 시각(UTC) |
+| revoked_at | timestamptz | N | - | Index | - | 세션 취소 또는 회원 탈퇴에 따른 철회 시각 |
+
+감사 기록은 계정/세션 row가 정리된 뒤에도 철회 증거를 보존해야 하므로 물리 FK 대신
+식별자 snapshot을 저장한다. 사용자 입력 원문, object key, 영상·음성 바이트는 저장하지 않는다.
 
 ### analysis_segments
 - 목적: 분석 결과의 문장/구간별 매칭 및 세부 피드백을 저장한다.
@@ -251,6 +301,46 @@
 | intonation_score | numeric(5,2) | N | - | - | - | 억양 점수 |
 | feedback | varchar(1000) | N | - | - | - | 세부 피드백 |
 
+### recording_upload_intents
+- 목적: presigned URL 발급 후 등록되지 않은 원본 업로드도 만료 시 회수할 수 있게 한다.
+- 해당 모듈: training/storage
+- Migration: `V8__create_recording_upload_intents.sql`
+
+| Column | Type | Required | Default | Index | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- |
+| id | bigint | Y | identity | PK | Y | 업로드 intent ID |
+| user_id | bigint | Y | - | Index | - | 발급 사용자 ID snapshot |
+| training_session_id | bigint | Y | - | Index | - | 발급 세션 ID snapshot |
+| object_key | varchar(1000) | Y | - | - | Y | 발급된 private source object key |
+| mime_type | varchar(100) | Y | - | - | - | 요청 MIME |
+| file_size_bytes | bigint | Y | - | CHECK | - | 요청 바이트 크기 |
+| expires_at | timestamptz | Y | - | Index | - | presigned URL 만료 시각 |
+| status | varchar(20) | Y | - | Index | - | `ISSUED`, `CONSUMED`, `EXPIRED` |
+| created_at | timestamptz | Y | now() | - | - | 발급 시각 |
+| resolved_at | timestamptz | N | - | - | - | 소비 또는 만료 처리 시각 |
+
+### recording_deletion_outbox
+- 목적: DB 변경과 객체 저장소 삭제 사이의 간극을 idempotent 재시도로 해소한다.
+- 해당 모듈: training/storage
+- Migration: `V7__create_recording_deletion_outbox.sql`
+
+| Column | Type | Required | Default | Index | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- |
+| id | bigint | Y | identity | PK | Y | 삭제 작업 ID |
+| user_id | bigint | Y | - | Index | - | key 소유자 ID snapshot |
+| training_session_id | bigint | Y | - | - | - | key 소유 세션 ID snapshot |
+| object_key | varchar(1000) | Y | - | - | Y | 삭제할 private object key |
+| reason | varchar(40) | Y | - | CHECK | - | 삭제 발생 원인 |
+| status | varchar(20) | Y | - | Index | - | `PENDING`, `DELETED`, `FAILED` |
+| attempt_count | integer | Y | 0 | CHECK | - | 객체 삭제 시도 횟수(최대 10) |
+| next_attempt_at | timestamptz | Y | now() | Index | - | 다음 재시도 시각 |
+| last_error_code | varchar(100) | N | - | - | - | 비민감 안정 오류 코드 |
+| created_at | timestamptz | Y | now() | - | - | 삭제 요청 시각 |
+| deleted_at | timestamptz | N | - | - | - | 객체 삭제 완료 시각 |
+
+완료된 upload intent와 삭제 outbox는 30일 뒤 제거한다. 삭제 재시도 소진 row는 운영자
+복구 근거로 보존하며 자동 삭제하지 않는다.
+
 ## 관계
 
 | From | To | Cardinality | Delete Behavior | Notes |
@@ -269,6 +359,7 @@
 | voice_recordings.training_session_id | training_sessions.id | N:1 | 기본 FK 동작 | 세션별 녹음 시도 |
 | analysis_results.recording_id | voice_recordings.id | 1:1 | 기본 FK 동작 | 녹음 1개당 분석 결과 1개 |
 | analysis_segments.analysis_result_id | analysis_results.id | N:1 | 기본 FK 동작 | 분석 결과별 세그먼트 |
+| analysis_request_outbox.analysis_id | analysis_results.id | N:1 | 기본 FK 동작 | 분석 요청 Stream dispatch 기록 |
 
 ## Enum 값
 
@@ -334,6 +425,14 @@
 | analysis_results | status | PROCESSING | 분석 중 |
 | analysis_results | status | COMPLETED | 분석 완료 |
 | analysis_results | status | FAILED | 분석 실패 |
+| analysis_results | analysis_outcome | COACHING_READY | 코칭 가능한 근거가 확인됨 |
+| analysis_results | analysis_outcome | COMPLETED_NO_ISSUE | 관찰된 개선 이슈 없음 |
+| analysis_results | analysis_outcome | RERECORD_REQUIRED | 내용/품질 사유로 재녹음 필요 |
+| analysis_results | analysis_outcome | UNCERTAIN | 근거 부족으로 안전한 결론 불가 |
+| analysis_results | analysis_outcome | FAILED_CLOSED | 안전 gate가 fail-closed 됨 |
+| analysis_request_outbox | status | PENDING | Stream 발행 대기 |
+| analysis_request_outbox | status | PUBLISHED | Stream 발행 완료 |
+| analysis_request_outbox | status | FAILED | dispatch 재시도 소진 |
 | analysis_segments | match_type | MATCH | 일치 |
 | analysis_segments | match_type | SUBSTITUTION | 대체 |
 | analysis_segments | match_type | OMISSION | 누락 |

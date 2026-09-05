@@ -31,7 +31,7 @@
 | `onboarding` | 온보딩 프로필과 설문 응답 저장/조회 | `OnboardingService` | `OnboardingProfileReader`, `OnboardingProfileWriter` |
 | `practicecontent` | 학습 콘텐츠, 기준 음성, 콘텐츠 추천 | `PracticeContentService`, `PracticeContentRecommendationService`, `ReferenceAudioService` | `PracticeContentReader`, `ReferenceAudioReader` |
 | `training` | 학습 세션, 녹음 업로드/선택, 분석 요청 | `TrainingSessionService`, `VoiceRecordingService`, `RecordingUploadService`, `TrainingAnalysisRequestService` | `TrainingSessionReader`, `TrainingSessionWriter`, `VoiceRecordingReader`, `VoiceRecordingWriter`, `TrainingAnalysisReader`, `TrainingAnalysisWriter`, `AnalysisJobPublisher` |
-| `analysis` | 분석 결과, 세그먼트 분석, 피드백 재생성 | `AnalysisService`, `AnalysisSegmentService`, `FeedbackRegenerationService` | `AnalysisResultReader`, `AnalysisResultWriter`, `AnalysisSegmentReader`, `AnalysisSegmentWriter` |
+| `analysis` | 분석 결과, 세그먼트 분석, worker 결과 반영, 피드백 재생성 | `AnalysisService`, `AnalysisSegmentService`, `AnalysisResultIngestionService`, `FeedbackRegenerationService` | `AnalysisResultReader`, `AnalysisResultWriter`, `AnalysisSegmentReader`, `AnalysisSegmentWriter` |
 | `course` | 클래스, 클래스 단계, 사용자 클래스 진도 | `CourseService`, `CourseStepService`, `CourseProgressService` | `CourseReader`, `CourseStepReader`, `CourseProgressReader`, `CourseProgressWriter` |
 | `home` | 홈 대시보드, 최근 학습, 추천 조회 | `HomeService`, `RecentLearningService`, `RecommendationService` | `HomeReader` |
 | `common` | 공통 설정, 응답, 예외, 보안, 저장소, 유틸리티 | N/A | N/A |
@@ -133,12 +133,12 @@
 - `TrainingSessionReader` / `TrainingSessionWriter`: 학습 세션 조회와 상태 변경 계약
 - `VoiceRecordingReader` / `VoiceRecordingWriter`: 녹음 파일 메타데이터 조회와 저장 계약
 - `TrainingAnalysisReader` / `TrainingAnalysisWriter`: 분석 요청/결과 흐름 조회와 저장 계약
-- `AnalysisJobPublisher`: 비동기 분석 작업 발행 계약
+- `AnalysisJobPublisher`: DB outbox에 versioned 비동기 분석 작업을 기록하는 계약
 
 ### 소유 경계
 
 - 학습 세션 생명주기와 녹음 선택 규칙은 `training` 모듈이 소유한다.
-- 실제 분석 결과의 상세 데이터는 `analysis` 모듈이 소유한다.
+- 실제 분석 결과의 상세 데이터와 결과 Stream 반영은 `analysis` 모듈이 소유한다.
 - 파일 저장소 presigned URL 발급 구현은 `training/infrastructure` 또는 `common/storage` 경계에 둔다.
 
 ## Analysis 컴포넌트
@@ -160,7 +160,7 @@
 
 - 분석 결과 상태, 점수, STT transcript, 세그먼트 결과는 `analysis` 모듈이 소유한다.
 - 분석 요청 트리거와 학습 세션 상태 변경은 `training` 모듈과 협력한다.
-- 외부 STT/AI provider 응답은 내부 model로 변환한 뒤 사용한다.
+- worker 결과는 전용 Redis Stream에서 versioned internal model로 변환한 뒤 사용한다.
 - 완료된 분석 결과 상세, 세션 기준 분석 결과, 세그먼트 목록 캐시는 `analysis` infrastructure가 소유한다.
 - 진행 중이거나 실패한 분석 결과는 캐시하지 않는다.
 - 피드백 재생성은 분석 상세 캐시를 무효화한다.

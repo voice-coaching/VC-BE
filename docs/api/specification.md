@@ -293,7 +293,7 @@ Content-Type: application/json
 - Error cases: See common error codes
 
 ### DELETE /api/training-sessions/{sessionId}/recordings/{recordingId}
-- Description: 녹음 시도 삭제 - 재녹음으로 버린 파일을 DB와 스토리지에서 삭제. 분석 완료 녹음은 정책에 따라 제한
+- Description: 녹음 시도 삭제 - DB soft delete와 durable storage deletion outbox를 같은 transaction에 기록. 분석 완료 녹음은 정책에 따라 제한
 - Auth: Bearer accessToken
 - Path params: `sessionId`, `recordingId`
 - Query params: None
@@ -353,13 +353,16 @@ Content-Type: application/json
 - Error cases: See common error codes
 
 ### POST /api/training-sessions/{sessionId}/analyze
-- Description: 음성 분석 요청 - 선택된 녹음의 음질을 확인하고 STT·발음·억양 분석 작업을 비동기로 요청
+- Description: 음성 분석 요청 - 명시적 동의와 선택된 녹음의 음질을 확인하고 Seungun 발음 분석 작업을 비동기로 요청
 - Auth: Bearer accessToken
 - Path params: `sessionId`
 - Query params: None
 - Request body:
 ```json
-// Body 없음
+{
+  "accepted": true,
+  "policyRevision": "String"
+}
 ```
 - Response body:
 ```json
@@ -478,13 +481,16 @@ Content-Type: application/json
 - Error cases: See common error codes
 
 ### POST /api/training-sessions/{sessionId}/analysis/retry
-- Description: 분석 재시도 - 일시적 오류로 실패한 분석 작업을 같은 최종 녹음으로 다시 요청
+- Description: 분석 재시도 - 새 명시적 동의와 단기 권한 grant로 실패한 분석 작업을 같은 최종 녹음으로 다시 요청
 - Auth: Bearer accessToken
 - Path params: `sessionId`
 - Query params: None
 - Request body:
 ```json
-// Body 없음
+{
+  "accepted": true,
+  "policyRevision": "String"
+}
 ```
 - Response body:
 ```json
@@ -731,22 +737,34 @@ Content-Type: application/json
   "data": {
     "id": "Long",
     "status": "String", // AnalysisStatus; analysis_results.status; 값: PENDING, PROCESSING, COMPLETED, FAILED
-    "transcript": "String",
-    "sttConfidence": "Number",
-    "overallScore": "Number",
-    "pronunciationScore": "Number",
-    "intonationScore": "Number",
-    "speedWpm": "Number",
-    "speedStatus": "String", // SpeedStatus; analysis_results.speed_status; 값: TOO_SLOW, NORMAL, TOO_FAST
-    "stressScore": "Number",
-    "pauseScore": "Number",
+    "outcome": "String | null", // result.v2 완료 값: COACHING_READY, COMPLETED_NO_ISSUE
+    "transcript": "String | null", // result.v2 현재 미측정
+    "sttConfidence": "Number | null", // result.v2 현재 미측정
+    "overallScore": "Number | null", // result.v2 현재 미측정
+    "pronunciationScore": "Number | null", // result.v2 현재 미측정
+    "intonationScore": "Number | null", // result.v2 현재 미측정
+    "speedWpm": "Number | null", // result.v2 현재 미측정
+    "speedStatus": "String | null", // result.v2 현재 미측정
+    "stressScore": "Number | null", // result.v2 현재 미측정
+    "pauseScore": "Number | null", // result.v2 현재 미측정
     "strengths": [
       "String"
     ],
     "weaknesses": [
       "String"
     ],
-    "summaryFeedback": "String",
+    "summaryFeedback": "String | null",
+    "pronunciationEvidence": { // COACHING_READY일 때만 존재, 그 외 null
+      "schemaVersion": "voice-coaching.pronunciation-evidence.v1",
+      "selectedPhone": "String",
+      "selectedExpectedIndex": "Integer",
+      "selectedStartMs": "Integer | null",
+      "selectedEndMs": "Integer | null",
+      "detectorScore": "Number",
+      "operatingThreshold": "Number",
+      "scoreSemantics": "detector_ranking_score_not_calibrated_correctness_confidence",
+      "evidenceState": "frozen_detector_threshold_passed"
+    },
     "analyzedAt": "String (ISO-8601)"
   }
 }
@@ -877,6 +895,7 @@ Content-Type: application/json
     "sessionId": "Long",
     "analysisId": "Long",
     "status": "String", // AnalysisStatus; analysis_results.status; 값: PENDING, PROCESSING, COMPLETED, FAILED
+    "outcome": "String | null", // AnalysisOutcome; COMPLETED일 때만 설정
     "overallScore": "Number",
     "pronunciationScore": "Number",
     "intonationScore": "Number"
@@ -1543,7 +1562,7 @@ Content-Type: application/json
 - Error cases: See common error codes
 
 ### POST /api/training-sessions/{sessionId}/recordings/upload-url
-- Description: 녹음 업로드 URL 발급 - 파일명·MIME 타입을 받아 S3 또는 오브젝트 스토리지 Presigned URL 발급
+- Description: 음성 또는 영상 녹음 업로드 URL 발급 - 파일명·MIME 타입을 받아 private object storage Presigned URL 발급
 - Auth: Bearer accessToken
 - Path params: `sessionId`
 - Query params: None
@@ -1565,16 +1584,19 @@ Content-Type: application/json
     "uploadUrl": "String (URL)",
     "expiresAt": "String (ISO-8601)",
     "requiredHeaders": {
-      "Content-Type": "String"
+      "Content-Type": "String",
+      "Content-Length": "String"
     }
   }
 }
 ```
-- Status codes: 200 OK
+- 허용 형식: `audio/webm`, `audio/mpeg`, `audio/wav`는 최대 20 MiB;
+  `video/mp4`, `video/quicktime`, `video/webm`은 최대 100 MiB이다.
+- Status codes: 200 OK, 400 unsupported format, 413 size limit
 - Error cases: See common error codes
 
 ### POST /api/training-sessions/{sessionId}/recordings
-- Description: 녹음 업로드 완료 등록 - 업로드된 객체 키·재생 시간·파일 크기를 등록하고 녹음 시도 번호 생성
+- Description: 업로드 객체를 소유권·실제 container/codec 기준으로 검사하고 backend에서 16 kHz mono PCM WAV로 정규화한 뒤 녹음 시도를 등록
 - Auth: Bearer accessToken
 - Path params: `sessionId`
 - Query params: None
@@ -1584,9 +1606,17 @@ Content-Type: application/json
   "objectKey": "String",
   "mimeType": "String",
   "fileSizeBytes": "Integer",
-  "durationMs": "Integer"
+  "durationMs": "Integer",
+  "videoProcessingConsentAccepted": "Boolean | null",
+  "videoProcessingConsentPolicyRevision": "String | null"
 }
 ```
+- `durationMs`는 클라이언트 표시용 주장이고 영속 값은 정규화 WAV에서 다시 측정한다.
+- 영상 MIME이면 두 consent 필드가 각각 `true`,
+  `voice-video-processing-consent-v1`이어야 하며, 동의 검증 전에 영상을 decode하지 않는다.
+- object key는 인증 사용자와 path의 `sessionId`에 발급된 prefix와 정확히 일치해야 한다.
+- 원본 업로드 객체는 성공·실패와 무관하게 처리 후 삭제한다. DB에는 backend-only
+  정규화 WAV key, 실제 크기·duration, SHA-256, 기술 품질 상태만 저장한다.
 - Response body:
 ```json
 {
@@ -1601,7 +1631,8 @@ Content-Type: application/json
   }
 }
 ```
-- Status codes: 200 OK
+- Status codes: 200 OK, 400 missing video consent, 403 object owner mismatch,
+  422 invalid container/codec or technical quality result, 503 unavailable normalizer/storage
 - Error cases: See common error codes
 
 ### GET /api/training-sessions/{sessionId}/recordings
@@ -1660,5 +1691,8 @@ Content-Type: application/json
 
 ## Internal API Mapping
 
-- No upstream API contract is fixed in the exported source documents.
-- STT, AI feedback generation, and Presigned URL issuance should link provider-specific contracts when implementation details are finalized.
+- VC-BE와 AI worker 간 분석 요청/결과 계약은
+  [versioned Redis Stream contract](ai-redis-stream-contract.md)를 따른다.
+- 이 공개 REST API는 분석 요청과 상태·결과 조회만 제공한다. worker는 직접 HTTP callback이나
+  사용자별 Presigned URL을 사용하지 않으며, 전용 Redis Stream과 worker 권한의 객체 저장소로 연동한다.
+- STT와 AI 피드백 구현 세부사항은 worker 내부 계약이며 공개 API DTO에 직접 노출하지 않는다.
