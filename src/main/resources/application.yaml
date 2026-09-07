@@ -55,6 +55,9 @@ auth:
     kakao:
       client-id: ${KAKAO_OAUTH_CLIENT_ID:}
       client-secret: ${KAKAO_OAUTH_CLIENT_SECRET:}
+    naver:
+      client-id: ${NAVER_OAUTH_CLIENT_ID:}
+      client-secret: ${NAVER_OAUTH_CLIENT_SECRET:}
 
 app:
   cors:

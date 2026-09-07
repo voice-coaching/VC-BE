@@ -23,7 +23,7 @@ public class GoogleOAuthClient implements SocialOAuthProvider {
     @Override public OAuthProvider provider() { return OAuthProvider.GOOGLE; }
 
     @Override
-    public SocialUserInfo authenticate(String authorizationCode, String redirectUri) {
+    public SocialUserInfo authenticate(String authorizationCode, String redirectUri, String state) {
         try {
             var form = new LinkedMultiValueMap<String, String>();
             form.add("code", authorizationCode); form.add("client_id", clientId); form.add("client_secret", clientSecret);

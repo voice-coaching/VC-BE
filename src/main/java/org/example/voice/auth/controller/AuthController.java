@@ -63,7 +63,12 @@ public class AuthController {
     @PostMapping("/social-login")
     @SecurityRequirements
     public ResponseEntity<ApiResponse<SocialLoginResponseDto>> socialLogin(@Valid @RequestBody SocialLoginRequestDto request) {
-        AuthSession session = socialLoginService.login(request.provider(), request.authorizationCode(), request.redirectUri());
+        AuthSession session = socialLoginService.login(
+                request.provider(),
+                request.authorizationCode(),
+                request.redirectUri(),
+                request.state()
+        );
         return withCookie(ApiResponse.success("SNS 로그인이 완료되었습니다.", SocialLoginResponseDto.from(session)), session.refreshToken());
     }
 

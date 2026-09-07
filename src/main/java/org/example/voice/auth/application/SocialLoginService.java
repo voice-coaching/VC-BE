@@ -23,18 +23,22 @@ public class SocialLoginService {
         this.socialAccountService = socialAccountService;
     }
 
-    public AuthSession login(String providerName, String authorizationCode, String redirectUri) {
+    public AuthSession login(String providerName, String authorizationCode, String redirectUri, String state) {
         OAuthProvider provider = parseProvider(providerName);
         SocialOAuthProvider client = providers.get(provider);
         if (client == null) throw new UnsupportedSocialProviderException();
-        SocialUserInfo profile = client.authenticate(authorizationCode, redirectUri);
+        SocialUserInfo profile = client.authenticate(authorizationCode, redirectUri, state);
         return socialAccountService.completeLogin(provider, profile);
     }
 
     private OAuthProvider parseProvider(String value) {
         try {
             OAuthProvider provider = OAuthProvider.valueOf(value.toUpperCase(Locale.ROOT));
-            if (provider != OAuthProvider.GOOGLE && provider != OAuthProvider.KAKAO) throw new UnsupportedSocialProviderException();
+            if (provider != OAuthProvider.GOOGLE
+                    && provider != OAuthProvider.KAKAO
+                    && provider != OAuthProvider.NAVER) {
+                throw new UnsupportedSocialProviderException();
+            }
             return provider;
         } catch (IllegalArgumentException | NullPointerException exception) {
             throw new UnsupportedSocialProviderException();

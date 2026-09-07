@@ -145,7 +145,8 @@ Content-Type: application/json
 {
   "provider": "String", // OAuthProvider; social_accounts.provider; 값: GOOGLE, KAKAO, NAVER, APPLE
   "authorizationCode": "String",
-  "redirectUri": "String"
+  "redirectUri": "String",
+  "state": "String" // NAVER에서 필수, Google/Kakao에서는 선택
 }
 ```
 - Response body:

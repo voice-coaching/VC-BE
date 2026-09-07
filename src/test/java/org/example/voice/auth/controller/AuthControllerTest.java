@@ -20,14 +20,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class AuthControllerTest {
     private AuthService authService;
+    private SocialLoginService socialLoginService;
     private TokenService tokenService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         authService = mock(AuthService.class);
+        socialLoginService = mock(SocialLoginService.class);
         tokenService = mock(TokenService.class);
-        AuthController controller = new AuthController(authService, mock(SocialLoginService.class), tokenService);
+        AuthController controller = new AuthController(authService, socialLoginService, tokenService);
         ReflectionTestUtils.setField(controller, "refreshTokenSeconds", 1200L);
         ReflectionTestUtils.setField(controller, "secureCookie", true);
         ReflectionTestUtils.setField(controller, "sameSite", "None");
@@ -69,5 +71,37 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.result").value(false))
                 .andExpect(jsonPath("$.message").value("유효하지 않은 Refresh Token입니다."));
+    }
+
+    @Test
+    void naverSocialLoginPassesStateAndReturnsTokens() throws Exception {
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(1L);
+        when(user.getEmail()).thenReturn("user@naver.com");
+        when(user.getNickname()).thenReturn("naver-user");
+        when(socialLoginService.login("NAVER", "code", "https://app.example.com/callback", "state-value"))
+                .thenReturn(new AuthSession(user, "access", "refresh", 600, true, false));
+
+        mockMvc.perform(post("/api/auth/social-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "provider":"NAVER",
+                                  "authorizationCode":"code",
+                                  "redirectUri":"https://app.example.com/callback",
+                                  "state":"state-value"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("refreshToken=refresh")))
+                .andExpect(jsonPath("$.data.accessToken").value("access"))
+                .andExpect(jsonPath("$.data.isNewUser").value(true));
+
+        verify(socialLoginService).login(
+                "NAVER",
+                "code",
+                "https://app.example.com/callback",
+                "state-value"
+        );
     }
 }

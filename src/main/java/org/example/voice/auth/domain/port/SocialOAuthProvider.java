@@ -5,5 +5,5 @@ import org.example.voice.auth.domain.type.OAuthProvider;
 
 public interface SocialOAuthProvider {
     OAuthProvider provider();
-    SocialUserInfo authenticate(String authorizationCode, String redirectUri);
+    SocialUserInfo authenticate(String authorizationCode, String redirectUri, String state);
 }

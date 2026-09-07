@@ -128,7 +128,7 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/auth/email-availability", "인증", "이메일 사용 가능 여부 확인", "회원가입 전에 이메일 형식과 중복 여부를 확인합니다. 중복 이메일은 오류가 아니라 available=false로 반환합니다.", true);
         add(map, PathItem.HttpMethod.POST, "/api/auth/signup", "인증", "일반 회원가입", "이메일, 비밀번호, 닉네임과 필수 약관 동의를 검증해 계정을 만들고 Access Token과 Refresh Token 쿠키를 발급합니다.", true);
         add(map, PathItem.HttpMethod.POST, "/api/auth/login", "인증", "이메일 로그인", "이메일과 비밀번호를 검증하고 기존 로그인 세션을 만료시킨 뒤 새 토큰을 발급합니다.", true);
-        add(map, PathItem.HttpMethod.POST, "/api/auth/social-login", "인증", "SNS 로그인", "Google 또는 Kakao 인가 코드를 공급자 토큰으로 교환해 로그인하며, 최초 로그인이라면 회원 계정을 자동 생성합니다.", true);
+        add(map, PathItem.HttpMethod.POST, "/api/auth/social-login", "인증", "SNS 로그인", "Google, Kakao 또는 Naver 인가 코드를 공급자 토큰으로 교환해 로그인하며, 최초 로그인이라면 회원 계정을 자동 생성합니다. Naver 로그인은 콜백에서 받은 state가 필수입니다.", true);
         add(map, PathItem.HttpMethod.POST, "/api/auth/token/refresh", "인증", "Access Token 갱신", "HttpOnly Refresh Token 쿠키를 검증하고 토큰을 회전해 새로운 Access Token과 Refresh Token 쿠키를 발급합니다.", true);
         add(map, PathItem.HttpMethod.POST, "/api/auth/logout", "인증", "로그아웃", "현재 사용자의 Refresh Token 세션을 폐기하고 브라우저의 Refresh Token 쿠키를 만료시킵니다.", false);
 
