@@ -7,7 +7,7 @@ This document summarizes the API list exported from the local API spec directory
 | GET | `/api/auth/email-availability` | public | 이메일 중복 확인 - Query: email. 사용 가능한 이메일이면 available=true 반환 |
 | POST | `/api/auth/signup` | public | 일반 회원가입 - 이메일·비밀번호·닉네임·약관 동의 시각을 받아 회원 생성 후 온보딩 필요 여부 반환 |
 | POST | `/api/auth/login` | public | 일반 로그인 - 이메일·비밀번호 검증 후 Access Token과 Refresh Token 발급 |
-| POST | `/api/auth/social-login` | public | SNS 로그인 - provider와 authorizationCode를 받아 기존 회원 로그인 또는 신규 회원 생성. 신규 회원 여부 반환 |
+| POST | `/api/auth/social-login` | public | Google, Kakao, Naver SNS 로그인. NAVER는 authorizationCode와 state를 함께 전달 |
 | POST | `/api/auth/token/refresh` | public | 토큰 갱신 - Refresh Token 쿠키 또는 요청값을 검증하여 Access Token 재발급 |
 | POST | `/api/auth/logout` | Bearer accessToken | 로그아웃 - 현재 세션 종료 및 Refresh Token 무효화 |
 | GET | `/api/users/me` | Bearer accessToken | 내 정보 조회 - 로그인한 사용자의 이메일·닉네임·가입 방식·온보딩 완료 여부 조회 |

@@ -20,7 +20,7 @@ class SocialLoginServiceTest {
         SocialAccountService accounts = mock(SocialAccountService.class);
         SocialLoginService service = new SocialLoginService(List.of(google), accounts);
 
-        assertThatThrownBy(() -> service.login("NAVER", "code", "redirect"))
+        assertThatThrownBy(() -> service.login("APPLE", "code", "redirect", null))
                 .isInstanceOf(UnsupportedSocialProviderException.class);
         verifyNoInteractions(accounts);
     }
@@ -31,13 +31,30 @@ class SocialLoginServiceTest {
         SocialAccountService accounts = mock(SocialAccountService.class);
         SocialUserInfo profile = new SocialUserInfo("provider-id", "user@example.com", "nick");
         when(google.provider()).thenReturn(OAuthProvider.GOOGLE);
-        when(google.authenticate("code", "redirect")).thenReturn(profile);
+        when(google.authenticate("code", "redirect", null)).thenReturn(profile);
         when(accounts.completeLogin(OAuthProvider.GOOGLE, profile)).thenReturn(mock(AuthSession.class));
 
-        new SocialLoginService(List.of(google), accounts).login("GOOGLE", "code", "redirect");
+        new SocialLoginService(List.of(google), accounts).login("GOOGLE", "code", "redirect", null);
 
         var order = inOrder(google, accounts);
-        order.verify(google).authenticate("code", "redirect");
+        order.verify(google).authenticate("code", "redirect", null);
         order.verify(accounts).completeLogin(OAuthProvider.GOOGLE, profile);
+    }
+
+    @Test
+    void passesNaverStateToExternalProvider() {
+        SocialOAuthProvider naver = mock(SocialOAuthProvider.class);
+        SocialAccountService accounts = mock(SocialAccountService.class);
+        SocialUserInfo profile = new SocialUserInfo("naver-id", "user@naver.com", "nick");
+        when(naver.provider()).thenReturn(OAuthProvider.NAVER);
+        when(naver.authenticate("code", "redirect", "state-value")).thenReturn(profile);
+        when(accounts.completeLogin(OAuthProvider.NAVER, profile)).thenReturn(mock(AuthSession.class));
+
+        new SocialLoginService(List.of(naver), accounts)
+                .login("naver", "code", "redirect", "state-value");
+
+        var order = inOrder(naver, accounts);
+        order.verify(naver).authenticate("code", "redirect", "state-value");
+        order.verify(accounts).completeLogin(OAuthProvider.NAVER, profile);
     }
 }

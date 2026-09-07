@@ -23,7 +23,7 @@ public class KakaoOAuthClient implements SocialOAuthProvider {
     @Override public OAuthProvider provider() { return OAuthProvider.KAKAO; }
 
     @Override
-    public SocialUserInfo authenticate(String authorizationCode, String redirectUri) {
+    public SocialUserInfo authenticate(String authorizationCode, String redirectUri, String state) {
         try {
             var form = new LinkedMultiValueMap<String, String>();
             form.add("grant_type", "authorization_code"); form.add("client_id", clientId);

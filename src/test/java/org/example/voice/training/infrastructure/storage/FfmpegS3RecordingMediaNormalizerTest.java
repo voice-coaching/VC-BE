@@ -9,6 +9,8 @@ import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -45,6 +47,7 @@ class FfmpegS3RecordingMediaNormalizerTest {
     @Mock private S3Client s3Client;
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void sandboxLauncherDeniesNetworkSocketCreation() throws Exception {
         Process process = new ProcessBuilder(
                 mediaProperties().getSandboxPythonBinary(),
@@ -162,6 +165,7 @@ class FfmpegS3RecordingMediaNormalizerTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void rejectsObjectOutsideAuthenticatedOwnerPrefixBeforeStorageAccess() throws Exception {
         assertThatThrownBy(() -> normalizer(ownerPrefixGuardMediaProperties()).normalize(
                 9L,
