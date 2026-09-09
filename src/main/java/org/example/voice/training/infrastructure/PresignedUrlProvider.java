@@ -14,8 +14,7 @@ import java.util.UUID;
 @ConditionalOnProperty(prefix = "storage", name = "enabled", havingValue = "false", matchIfMissing = true)
 public class PresignedUrlProvider implements RecordingObjectStoragePort {
 
-    // 실제 스토리지 연동 전까지 objectKey 규칙만 먼저 고정한다.
-    // S3/Cloudflare R2/NCP Object Storage를 붙여도 이 key를 그대로 파일 경로로 사용할 수 있다.
+    @Override
     public String createObjectKey(Long userId, Long sessionId, String fileName) {
         String extension = "";
         if (fileName != null && fileName.contains(".")) {
@@ -25,30 +24,22 @@ public class PresignedUrlProvider implements RecordingObjectStoragePort {
         return "recordings/users/%d/sessions/%d/%s%s".formatted(userId, sessionId, UUID.randomUUID(), extension);
     }
 
-    // 개발용 upload URL이다.
-    // 실제 Presigned URL 발급은 이 메서드 내부를 SDK 호출로 바꾸거나 별도 구현체로 분리하면 된다.
+    @Override
     public String createUploadUrl(
             String objectKey,
             String mimeType,
             long fileSizeBytes,
             OffsetDateTime expiresAt
     ) {
-        return "https://storage.example.com/%s?signature=dev-upload&expiresAt=%s"
-                .formatted(objectKey, expiresAt);
+        throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
     }
 
-    // 개발용 playback URL이다.
-    // DB에 이미 http URL이 저장된 테스트 데이터는 그대로 반환하고, objectKey만 있으면 임시 CDN URL로 감싼다.
+    @Override
     public String createPlaybackUrl(String objectKey, OffsetDateTime expiresAt) {
-        if (objectKey != null && objectKey.startsWith("http")) {
-            return objectKey;
-        }
-        return "https://storage.example.com/%s?signature=dev-playback&expiresAt=%s"
-                .formatted(objectKey, expiresAt);
+        throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
     }
 
-    // Presigned PUT 요청에서 프론트가 함께 보내야 하는 헤더다.
-    // 실제 스토리지 정책에 따라 Content-MD5, x-amz-* 같은 헤더가 추가될 수 있다.
+    @Override
     public Map<String, String> requiredHeaders(String mimeType, long fileSizeBytes) {
         return Map.of(
                 "Content-Type", mimeType,
@@ -64,7 +55,6 @@ public class PresignedUrlProvider implements RecordingObjectStoragePort {
             String mimeType,
             long fileSizeBytes
     ) {
-        // Development mode has no object store. Stream analysis is guarded from using this adapter.
         String ownerPrefix = "recordings/users/%d/sessions/%d/".formatted(userId, sessionId);
         if (objectKey == null
                 || !objectKey.startsWith(ownerPrefix)
@@ -72,6 +62,7 @@ public class PresignedUrlProvider implements RecordingObjectStoragePort {
                 || objectKey.substring(ownerPrefix.length()).contains("/")) {
             throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
         }
+        throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
     }
 
     @Override
@@ -86,6 +77,7 @@ public class PresignedUrlProvider implements RecordingObjectStoragePort {
                 && !relativeKey.matches("normalized/[0-9a-fA-F-]{36}\\.wav"))) {
             throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
         }
-        // Development adapter owns no real object store. Validation still prevents cross-owner deletion.
+        // A disabled provider must leave the durable deletion request retryable.
+        throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
     }
 }

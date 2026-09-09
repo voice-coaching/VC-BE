@@ -113,6 +113,10 @@ src/main/resources/application-secret.yaml
 
 ## 문서
 
+- RunPod 파이프라인 API 연결·현재 구현 범위: [docs/runpod_pipeline_api_20260910.md](docs/runpod_pipeline_api_20260910.md)
+- 녹음 파일 저장소와 AWS PostgreSQL 메타데이터: [docs/recording_storage_api_20260909.md](docs/recording_storage_api_20260909.md)
+- 연결 설정·업로드 한도 조회: `GET /api/analysis-capabilities` (인증 필요)
+
 - API 명세서: https://app.notion.com/p/697fd927f58c820f99850163cde5d6a2
 - ERD: https://app.notion.com/p/ERD-3b5fd927f58c80a48f6bd83fc7e1629c
 - EC2 Redis/Redis Insight 접근: [docs/architecture/deployment.md](docs/architecture/deployment.md)

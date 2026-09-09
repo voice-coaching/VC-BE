@@ -3,8 +3,10 @@ package org.example.voice.analysis.infrastructure.authorization;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationIssue;
 import org.example.voice.analysis.domain.port.AnalysisAuthorizationIssuer;
+import org.example.voice.analysis.infrastructure.stream.AnalysisStreamProperties;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -27,24 +29,47 @@ public class HmacAnalysisAuthorizationIssuer implements AnalysisAuthorizationIss
     private final AnalysisAuthorizationProperties properties;
     private final byte[] signingSecret;
     private final Clock clock;
+    private final boolean closedBetaEnabled;
 
     public HmacAnalysisAuthorizationIssuer(AnalysisAuthorizationProperties properties) {
-        this(properties, Clock.systemUTC());
+        this(properties, new AnalysisStreamProperties(), Clock.systemUTC());
+    }
+
+    @Autowired
+    public HmacAnalysisAuthorizationIssuer(
+            AnalysisAuthorizationProperties properties,
+            AnalysisStreamProperties streamProperties
+    ) {
+        this(properties, streamProperties, Clock.systemUTC());
     }
 
     HmacAnalysisAuthorizationIssuer(
             AnalysisAuthorizationProperties properties,
             Clock clock
     ) {
+        this(properties, new AnalysisStreamProperties(), clock);
+    }
+
+    HmacAnalysisAuthorizationIssuer(
+            AnalysisAuthorizationProperties properties,
+            AnalysisStreamProperties streamProperties,
+            Clock clock
+    ) {
         this.properties = properties;
         this.clock = clock;
+        this.closedBetaEnabled = streamProperties.isClosedBetaEnabled();
         this.signingSecret = validateAndDecode(properties);
+    }
+
+    @Override
+    public boolean requiresClosedBetaContext() {
+        return closedBetaEnabled;
     }
 
     @Override
     public AnalysisAuthorizationGrant issue(AnalysisAuthorizationIssue issue) {
         if (issue == null
-                || issue.closedBetaContext() == null
+                || closedBetaEnabled != (issue.closedBetaContext() != null)
                 || !properties.getConsentPolicyRevision().equals(issue.consentPolicyRevision())) {
             throw new BaseException(ErrorCode.ANALYSIS_CONSENT_POLICY_MISMATCH);
         }
@@ -65,7 +90,9 @@ public class HmacAnalysisAuthorizationIssuer implements AnalysisAuthorizationIss
             String signature
     ) {
         return new AnalysisAuthorizationGrant(
-                AnalysisAuthorizationGrant.GRANT_VERSION,
+                closedBetaEnabled
+                        ? AnalysisAuthorizationGrant.GRANT_VERSION
+                        : AnalysisAuthorizationGrant.LEGACY_GRANT_VERSION,
                 properties.getKeyId(),
                 issue.requestEventId(),
                 issue.analysisId(),

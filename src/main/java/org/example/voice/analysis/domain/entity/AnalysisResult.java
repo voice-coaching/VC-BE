@@ -27,6 +27,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.UUID;
 import java.util.Map;
+import java.util.Objects;
 
 @Entity
 @Getter
@@ -212,6 +213,13 @@ public class AnalysisResult {
     public boolean complete(AnalysisWorkerResult result) {
         if (status == AnalysisStatus.COMPLETED || status == AnalysisStatus.FAILED) {
             return false;
+        }
+        if (recording == null || !Objects.equals(recording.getAudioSha256(), result.audioSha256())) {
+            throw new IllegalArgumentException("analysis result does not bind the registered audio");
+        }
+        if (result.visualSupplement() != null
+                && (recording.getVisualObjectKey() == null || recording.getVisualSha256() == null)) {
+            throw new IllegalArgumentException("visual result requires the registered same-attempt video");
         }
         this.status = AnalysisStatus.COMPLETED;
         this.analysisOutcome = result.outcome();

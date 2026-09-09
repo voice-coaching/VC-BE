@@ -1,9 +1,10 @@
 # DB Schema - voice
 
 - 데이터베이스: PostgreSQL
-- 현재 schema source of truth: `src/main/resources/db/migration/V0..V9`
+- 현재 schema source of truth: `src/main/resources/db/migration/V0..V15`
 - `voicebackup(08.08.15.15).sql`은 2026-08-07 당시의 historical 참고자료이며 신규 배포 입력이 아니다.
-- 빈 PostgreSQL은 `V0__create_core_application_schema.sql`로 core table을 만든 뒤 V1~V9를 순서대로 적용한다.
+- 빈 PostgreSQL은 `V0__create_core_application_schema.sql`로 core table을 만든 뒤 V1~V15를 순서대로 적용한다.
+- 사용자 녹음은 기존 `voice_recordings`, `recording_upload_intents`, `processing_consents`, 삭제 outbox로 관리한다. AWS의 PostgreSQL에도 같은 migration을 적용하며 파일 자체는 private 객체 저장소에 둔다. 이번 API 보완은 새 DB나 중복 테이블을 추가하지 않는다. [저장소·DB 연결 안내](../recording_storage_api_20260909.md)
 
 ## 테이블 목록
 

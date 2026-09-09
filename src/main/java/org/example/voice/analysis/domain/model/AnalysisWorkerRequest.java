@@ -1,6 +1,7 @@
 package org.example.voice.analysis.domain.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.example.voice.practicecontent.domain.type.LearningFocus;
 
 import java.util.Objects;
@@ -11,8 +12,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /**
- * Versioned Backend-to-AI request payload. The v5 closed-beta contract carries
- * personal identifiers explicitly so the beta security surface can be tested.
+ * Versioned Backend-to-AI request payload. Production uses v4 without personal
+ * context. The explicitly enabled v5 closed-beta contract carries that context.
  */
 @JsonIgnoreProperties(ignoreUnknown = false)
 public record AnalysisWorkerRequest(
@@ -29,7 +30,7 @@ public record AnalysisWorkerRequest(
         Long fileSizeBytes,
         Integer durationMs,
         LearningFocus learningFocus,
-        AnalysisClosedBetaContext closedBetaContext,
+        @JsonInclude(JsonInclude.Include.NON_NULL) AnalysisClosedBetaContext closedBetaContext,
         AnalysisWorkerVisualInput visualInput,
         AnalysisAuthorizationGrant authorizationGrant
 ) {

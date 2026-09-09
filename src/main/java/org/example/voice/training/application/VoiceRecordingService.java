@@ -8,6 +8,7 @@ import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.consent.domain.model.ProcessingConsentReceipt;
 import org.example.voice.training.controller.dto.RecordingRegisterRequestDto;
 import org.example.voice.training.domain.model.RecordingPlaybackUrlData;
+import org.example.voice.training.domain.model.RecordingMediaPolicy;
 import org.example.voice.training.domain.model.NormalizedRecordingData;
 import org.example.voice.training.domain.model.RecordingSelectionData;
 import org.example.voice.training.domain.model.VoiceRecordingData;
@@ -31,9 +32,6 @@ import java.util.List;
 @Slf4j
 public class VoiceRecordingService {
 
-    private static final String VIDEO_PROCESSING_CONSENT_POLICY_REVISION =
-            "voice-video-processing-consent-v1";
-
     // 녹음 파일 메타데이터를 관리한다.
     // 실제 파일 업로드는 프론트가 Presigned URL로 직접 수행하고, 백엔드는 업로드 후 metadata만 등록한다.
     private final VoiceRecordingReader voiceRecordingReader;
@@ -54,6 +52,13 @@ public class VoiceRecordingService {
             throw new BaseException(ErrorCode.RECORDING_ALREADY_REGISTERED);
         }
         validateVideoConsent(request);
+        uploadIntentRegistry.reserveForRegistration(
+                userId,
+                sessionId,
+                request.objectKey(),
+                request.mimeType(),
+                request.fileSizeBytes()
+        );
         objectStorage.assertUploadedObject(
                 userId,
                 sessionId,
@@ -160,7 +165,9 @@ public class VoiceRecordingService {
     private void validateRegisterRequest(RecordingRegisterRequestDto request) {
         if (request == null
                 || request.objectKey() == null
+                || request.objectKey().isBlank()
                 || request.mimeType() == null
+                || request.mimeType().isBlank()
                 || request.fileSizeBytes() == null
                 || request.fileSizeBytes() <= 0
                 || request.durationMs() == null
@@ -174,7 +181,7 @@ public class VoiceRecordingService {
             return;
         }
         if (!Boolean.TRUE.equals(request.videoProcessingConsentAccepted())
-                || !VIDEO_PROCESSING_CONSENT_POLICY_REVISION.equals(
+                || !RecordingMediaPolicy.VIDEO_CONSENT_POLICY_REVISION.equals(
                         request.videoProcessingConsentPolicyRevision()
                 )) {
             throw new BaseException(ErrorCode.VIDEO_PROCESSING_CONSENT_REQUIRED);

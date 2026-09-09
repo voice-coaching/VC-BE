@@ -189,7 +189,9 @@ public class RedisAnalysisResultConsumer {
                 failureCode = UNKNOWN_ANALYSIS_DLQ_FAILURE_CODE;
             }
         }
-        moveToDeadLetter(recordId, payload, failureCode);
+        // Rejected schemas may contain raw media or private fields. Keep only
+        // the source record ID and failure code when the payload is untrusted.
+        moveToDeadLetter(recordId, decoded == null ? "" : payload, failureCode);
         acknowledge(recordId);
     }
 

@@ -4,6 +4,7 @@ This document summarizes the API list exported from the local API spec directory
 
 | Method | URL | Auth | Description |
 | --- | --- | --- | --- |
+| GET | `/api/analysis-capabilities` | Bearer accessToken | 녹음·분석 연결 설정 여부, 지원 MIME·크기·길이와 동의 정책 revision 조회. 실시간 health 조회 아님 |
 | GET | `/api/auth/email-availability` | public | 이메일 중복 확인 - Query: email. 사용 가능한 이메일이면 available=true 반환 |
 | POST | `/api/auth/signup` | public | 일반 회원가입 - 이메일·비밀번호·닉네임·약관 동의 시각을 받아 회원 생성 후 온보딩 필요 여부 반환 |
 | POST | `/api/auth/login` | public | 일반 로그인 - 이메일·비밀번호 검증 후 Access Token과 Refresh Token 발급 |
@@ -27,13 +28,13 @@ This document summarizes the API list exported from the local API spec directory
 | GET | `/api/users/me/training-sessions/recent` | Bearer accessToken | 최근 학습 이어하기 조회 - 가장 최근의 미완료 학습 또는 완료 직전 학습 정보를 반환 |
 | GET | `/api/recordings/{recordingId}/playback-url` | Bearer accessToken | 사용자 녹음 재생 URL 조회 - 본인 녹음인지 확인한 뒤 과거 녹음을 재생할 수 있는 제한시간 URL 반환 |
 | GET | `/api/practice-contents` | Bearer accessToken | 학습 콘텐츠 목록 조회 - Query: type, category, difficulty, focus, page, size. NEWS·SENTENCE·ANNOUNCER·CLASS_PRACTICE 공통 목록 |
-| GET | `/api/analyses/{analysisId}` | Bearer accessToken | 종합 분석 결과 조회 - STT 문장·전체 점수·발음·억양·속도·강세·휴지·강점·약점·종합 피드백 반환 |
+| GET | `/api/analyses/{analysisId}` | Bearer accessToken | 같은 시도의 발음 근거·선택적 입술 보완·상세 summaryFeedback 조회. 현재 지원하지 않는 STT·점수는 null |
 | GET | `/api/practice-contents/{contentId}` | Bearer accessToken | 학습 콘텐츠 상세 조회 - 제목·스크립트·난이도·학습 초점·뉴스 출처·목표 발음 항목을 반환 |
 | GET | `/api/analyses/{analysisId}/segments` | Bearer accessToken | 음절별 분석 결과 조회 - Query: page, size. 원문·인식문·재생 시간·일치 유형·점수·상세 피드백 반환 |
 | GET | `/api/practice-contents/{contentId}/reference-audios` | Bearer accessToken | 기준 음성 목록 조회 - 콘텐츠에 연결된 아나운서·코치·TTS 기준 음성 목록 반환 |
 | GET | `/api/training-sessions/{sessionId}/analysis` | Bearer accessToken | 학습 세션 분석 결과 조회 - 세션 ID로 최종 분석 결과와 analysisId를 조회하여 결과 화면 진입에 사용 |
 | GET | `/api/reference-audios/{audioId}/playback-url` | Bearer accessToken | 기준 음성 재생 URL 조회 - 권한 검증 후 제한시간이 있는 재생 URL 또는 CDN URL 반환 |
-| POST | `/api/analyses/{analysisId}/feedback/regenerate` | Bearer accessToken | 분석 결과 요약 재생성 - 음절별 분석 데이터는 유지하고 AI 종합 피드백만 재생성. 운영 정책에 따라 횟수 제한 가능 |
+| POST | `/api/analyses/{analysisId}/feedback/regenerate` | Bearer accessToken | 저장된 승인 피드백 재반환. 현재 provider는 Clova를 새로 호출하지 않으며 최대 3회 |
 | GET | `/api/practice-contents/next` | Bearer accessToken | 다음 학습 콘텐츠 조회 - Query: type, category, difficulty, excludeId. 현재 콘텐츠 다음에 연습할 항목 반환 |
 | GET | `/api/users/me/training-sessions` | Bearer accessToken | 학습 기록 목록 조회 - Query: type, status, from, to, page, size. 완료된 학습 기록을 최신순으로 조회 |
 | GET | `/api/practice-contents/{contentId}/recommendations` | Bearer accessToken | 콘텐츠 기반 추천 조회 - 현재 콘텐츠의 난이도·발음 유형과 유사한 다음 콘텐츠 목록 반환 |
@@ -54,7 +55,7 @@ This document summarizes the API list exported from the local API spec directory
 | POST | `/api/training-sessions` | Bearer accessToken | 학습 세션 생성 - contentId·courseStepId(선택)·learningFocus를 받아 학습 세션 생성 |
 | GET | `/api/training-sessions/{sessionId}` | Bearer accessToken | 학습 세션 조회 - 세션 상태·콘텐츠·녹음 시도·분석 가능 여부를 조회 |
 | POST | `/api/training-sessions/{sessionId}/recordings/upload-url` | Bearer accessToken | 음성·영상 녹음 업로드 URL 발급 - 허용 MIME/크기를 검사해 private object storage Presigned URL 발급 |
-| POST | `/api/training-sessions/{sessionId}/recordings` | Bearer accessToken | 업로드 소유권·영상 동의·실제 codec을 검사하고 canonical WAV와 기술 품질 결과를 등록 |
+| POST | `/api/training-sessions/{sessionId}/recordings` | Bearer accessToken | 발급 intent 소유권·TTL·MIME·크기를 잠금 검증하고 영상 동의·실제 codec 확인 후 canonical WAV와 기술 품질 결과 등록 |
 | GET | `/api/training-sessions/{sessionId}/recordings` | Bearer accessToken | 녹음 시도 목록 조회 - 해당 학습 세션의 녹음 시도와 품질 검사 상태 조회 |
 | PATCH | `/api/training-sessions/{sessionId}/recordings/{recordingId}/select` | Bearer accessToken | 최종 녹음 선택 - 분석에 사용할 최종 녹음을 선택하고 다른 시도는 선택 해제 |
 

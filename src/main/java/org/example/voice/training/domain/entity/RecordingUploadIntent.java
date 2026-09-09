@@ -97,6 +97,14 @@ public class RecordingUploadIntent {
         }
     }
 
+    public boolean canRegisterAt(OffsetDateTime now) {
+        return status == RecordingUploadIntentStatus.ISSUED && expiresAt.isAfter(now);
+    }
+
+    public boolean matchesDeclaredMedia(String declaredMimeType, Long declaredFileSizeBytes) {
+        return mimeType.equals(declaredMimeType) && fileSizeBytes.equals(declaredFileSizeBytes);
+    }
+
     public boolean expire() {
         if (status != RecordingUploadIntentStatus.ISSUED) {
             return false;
