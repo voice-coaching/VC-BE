@@ -211,6 +211,9 @@ the dispatcher repeats the check immediately before Redis I/O as defense in dept
 VC-BE always sends one canonical audio input to the AI worker. Optional video is
 represented only by the presence of `visualInput`; there is no separate request
 type for audio-only analysis and audio+video analysis.
+The public upload/register API still accepts one media input. If that media is audio,
+VC-BE produces only the canonical WAV. If that media is video, VC-BE derives both the
+canonical WAV and the optional canonical MP4 from the same uploaded object.
 
 ```text
 audio upload

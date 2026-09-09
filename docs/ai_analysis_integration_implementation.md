@@ -146,10 +146,11 @@ authenticated upload
 [`FfmpegS3RecordingMediaNormalizer`](../src/main/java/org/example/voice/training/infrastructure/storage/FfmpegS3RecordingMediaNormalizer.java)에
 있으며 route/controller에는 ffmpeg 로직이 없다.
 
-## 음성 필수 + 영상 선택 입력 작업 방침
+## 단일 media 입력 기반 AI 분석 작업 방침
 
 AI 요청은 두 종류의 API로 나누지 않고 하나의 Redis Stream request schema를 사용한다.
-실무 구현 기준은 `audio는 항상 필수`, `video는 선택`이다.
+Public upload/register API는 하나의 media input을 받는다. 기본 입력은 음성이며, media가
+영상이면 Backend가 같은 파일에서 AI용 음성과 선택적 영상 입력을 함께 만든다.
 
 ```text
 음성 업로드
