@@ -5,4 +5,8 @@ import org.example.voice.analysis.domain.model.AnalysisAuthorizationIssue;
 
 public interface AnalysisAuthorizationIssuer {
     AnalysisAuthorizationGrant issue(AnalysisAuthorizationIssue issue);
+
+    default boolean requiresClosedBetaContext() {
+        return false;
+    }
 }

@@ -48,7 +48,9 @@ public class AnalysisProductionConfigurationGuard {
                 || stream.getMaximumPayloadBytes() < 1_024
                 || stream.getMaximumPayloadBytes() > 1_048_576
                 || stream.getMaximumResultPayloadBytes() < 1_024
-                || stream.getMaximumResultPayloadBytes() > 402_653_184
+                || stream.getMaximumResultPayloadBytes() > (stream.isClosedBetaEnabled()
+                        ? AnalysisStreamProperties.CLOSED_BETA_MAXIMUM_RESULT_PAYLOAD_BYTES
+                        : AnalysisStreamProperties.PRODUCTION_MAXIMUM_RESULT_PAYLOAD_BYTES)
                 || stream.getDeadLetterMaximumLength() <= 0
                 || stream.getDeadLetterMaximumLength() > 1_000_000
                 || invalidDuration(stream.getCancellationOutboxPollInterval())

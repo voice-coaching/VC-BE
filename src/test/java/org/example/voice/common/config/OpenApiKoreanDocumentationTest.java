@@ -15,7 +15,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OpenApiKoreanDocumentationTest {
     @Test
     void documentsEveryCurrentEndpointInKorean() {
-        assertThat(OpenApiKoreanDocumentation.documentation()).hasSize(53);
+        assertThat(OpenApiKoreanDocumentation.documentation()).hasSize(54)
+                .containsKey(new OpenApiKoreanDocumentation.ApiKey(
+                        PathItem.HttpMethod.GET, "/api/analysis-capabilities"
+                ));
         assertThat(OpenApiKoreanDocumentation.documentation().values())
                 .allSatisfy(doc -> {
                     assertThat(doc.tag()).isNotBlank();

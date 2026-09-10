@@ -42,9 +42,56 @@ Content-Type: application/json
 
 - 2xx: `200 OK`, `201 Created`, `204 No Content`
 - 4xx: `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `409 Conflict`, `429 Too Many Requests`
-- 5xx: `500 Internal Server Error`, `502 Bad Gateway`, `504 Gateway Timeout`
+- 5xx: `500 Internal Server Error`, `502 Bad Gateway`, `503 Service Unavailable`, `504 Gateway Timeout`
 
 ## Endpoint Details
+
+### GET /api/analysis-capabilities
+
+- Description: 업로드·분석 UI가 사용할 형식, 크기·길이 제한, 동의 정책과 **연결 설정 여부** 조회.
+- Auth: Bearer accessToken.
+- Path params / Query params / Request body: 없음.
+- Status: `200 OK`; 인증이 없거나 유효하지 않으면 `401`, 접근 거부 시 `403`.
+- Response body (아직 저장소·분석 Redis를 연결하지 않은 기본 설정 예):
+
+```json
+{
+  "result": true,
+  "message": "녹음 및 분석 지원 조건을 조회했습니다.",
+  "data": {
+    "recordingUpload": "NOT_CONFIGURED",
+    "analysisRequests": "NOT_CONFIGURED",
+    "supportedLearningFocuses": ["PRONUNCIATION"],
+    "acceptedAudioMimeTypes": ["audio/webm", "audio/mpeg", "audio/wav"],
+    "acceptedVideoMimeTypes": ["video/mp4", "video/quicktime", "video/webm"],
+    "maximumAudioUploadBytes": 20971520,
+    "maximumVideoUploadBytes": 104857600,
+    "minimumDurationMs": 500,
+    "maximumDurationMs": 180000,
+    "videoRequiresAudioTrack": true,
+    "voiceProcessingConsentRequired": true,
+    "videoProcessingConsentRequired": true,
+    "consentPolicyRevision": null,
+    "videoProcessingConsentPolicyRevision": "voice-video-processing-consent-v1"
+  }
+}
+```
+
+`recordingUpload`은 저장소와 미디어 정규화가 켜져 있으면 `CONFIGURED`, 아니면 `NOT_CONFIGURED`다. `analysisRequests`는 여기에 분석 Stream이 켜져 있어야 `CONFIGURED`다. 이 API는 S3·Redis·RunPod를 호출하지 않으며, `CONFIGURED`가 연결 성공이나 추론 준비를 보증하지 않는다. 실제 업로드·분석 요청의 오류 처리도 유지한다.
+
+크기는 바이트, 길이는 밀리초다. 표시된 파일 한도는 음성 20MiB·영상 100MiB의 업로드 URL 발급 상한과 배포된 정규화 입력 한도 중 작은 값이다. 프론트는 등록까지 처리 가능한 이 보수적인 한도를 사용한다. URL 발급 자체의 상한보다 정규화 한도가 작으면, 더 큰 파일로 URL을 얻더라도 등록 단계에서 거부된다. 영상에는 오디오 트랙이 있어야 하며 해당 영상에서 canonical WAV를 추출한다.
+
+`consentPolicyRevision`은 음성 분석용이다. null이면 동의 정책이 미설정이므로 분석을 진행하지 않는다. 영상 등록에는 별도 `videoProcessingConsentPolicyRevision`을 사용한다. 각 revision은 정책 본문이나 실제 사용자 동의 증명 자체가 아니다.
+
+### 녹음 등록·분석 연결 공통 보완 (2026-09-10)
+
+1. `upload-url` 발급 → 응답의 `requiredHeaders`로 객체 업로드 → `recordings` 등록 → 녹음 선택 → 동의와 함께 `analyze` → 상태·결과 조회 순서를 사용한다.
+2. 저장소 미설정 상태의 업로드·재생·실제 객체 확인은 `503`이다. 가짜 URL이나 성공한 삭제로 응답하지 않는다. 분석 Stream이 비활성화되어 있으면 분석 요청도 `503`이며 분석 job과 동의 변경 transaction은 롤백된다.
+3. 등록 시 사용자→세션→발급 intent 순서로 잠근다. 발급 내역 부재는 `409 UPLOAD_INTENT_NOT_FOUND`, 만료·이미 소비된 상태는 `409 UPLOAD_INTENT_NOT_ACTIVE`, 발급 MIME·크기 불일치는 `422 ANALYSIS_SOURCE_NOT_READY`다. 실제 등록 완료 여부에 따른 `RECORDING_ALREADY_REGISTERED` 오류도 유지한다. 공통 HTTP 오류 body는 기존 `result/message/data` 형식을 따르며 enum 이름은 별도 응답 필드로 추가하지 않았다.
+4. 상세 결과의 `summaryFeedback`은 워커가 보낸 승인 문장을 그대로 저장·반환한다. 결과의 음성 SHA-256은 등록된 canonical WAV와 일치해야 하며 영상이 등록되지 않은 시도의 시각 결과는 거부한다. `pronunciationEvidence`와 `visualSupplement`의 같은 음소 관계도 유지한다. 현재 STT·발음 총점·억양·속도 점수는 공급되지 않아 null이며 임의 점수로 채우지 않는다.
+5. `/feedback/regenerate`의 현재 구현은 저장된 승인 문장을 다시 제공한다. Clova의 새 추론이나 새 교정 행동 생성으로 해석하지 않는다.
+
+기본 분석 전송 계약은 원본 미디어를 제외한 request v4 / authorization v3 / result v3다. 개인정보·원본을 포함하는 기존 베타 계약은 `ANALYSIS_CLOSED_BETA_ENABLED=true`에서만 사용한다. [전송 계약](ai-redis-stream-contract.md), [이번 API 연결 안내](../runpod_pipeline_api_20260910.md)를 참고한다.
 
 ### GET /api/auth/email-availability
 - Description: 이메일 중복 확인 - Query: email. 사용 가능한 이메일이면 available=true 반환

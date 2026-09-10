@@ -14,7 +14,11 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "analysis.stream")
 public class AnalysisStreamProperties {
 
+    public static final int PRODUCTION_MAXIMUM_RESULT_PAYLOAD_BYTES = 1024 * 1024;
+    public static final int CLOSED_BETA_MAXIMUM_RESULT_PAYLOAD_BYTES = 384 * 1024 * 1024;
+
     private boolean enabled;
+    private boolean closedBetaEnabled;
     private String redisHost = "localhost";
     private int redisPort = 6379;
     private String redisUsername;
@@ -44,7 +48,7 @@ public class AnalysisStreamProperties {
     private int batchSize = 25;
     private int maxRetries = 3;
     private int maximumPayloadBytes = 65_536;
-    private int maximumResultPayloadBytes = 384 * 1024 * 1024;
+    private int maximumResultPayloadBytes = PRODUCTION_MAXIMUM_RESULT_PAYLOAD_BYTES;
     private long deadLetterMaximumLength = 10_000;
     private int maxConcurrentPerUser = 3;
     private Duration executionTimeout = Duration.ofMinutes(15);

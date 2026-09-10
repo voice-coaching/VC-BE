@@ -1,6 +1,8 @@
 package org.example.voice.analysis.domain.model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.example.voice.practicecontent.domain.type.LearningFocus;
 
 import java.nio.charset.StandardCharsets;
@@ -32,9 +34,9 @@ public record AnalysisAuthorizationGrant(
         Long visualFileSizeBytes,
         String visualConsentReceiptSha256,
         String visualConsentPolicyRevision,
-        String closedBetaContextSha256,
-        Instant issuedAtUtc,
-        Instant expiresAtUtc,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String closedBetaContextSha256,
+        @JsonFormat(shape = JsonFormat.Shape.STRING) Instant issuedAtUtc,
+        @JsonFormat(shape = JsonFormat.Shape.STRING) Instant expiresAtUtc,
         String purpose,
         String dataCategory,
         boolean deleteOnCompletion,

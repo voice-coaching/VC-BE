@@ -148,13 +148,14 @@ public class TrainingAnalysisRequestService {
                             source.visualConsentReceiptSha256(),
                             source.visualConsentPolicyRevision()
                     );
-            AnalysisClosedBetaContext closedBetaContext =
-                    new AnalysisClosedBetaContext(
+            AnalysisClosedBetaContext closedBetaContext = analysisAuthorizationIssuer.requiresClosedBetaContext()
+                    ? new AnalysisClosedBetaContext(
                             AnalysisClosedBetaContext.SCHEMA_VERSION,
                             userId,
                             sessionId,
                             source.recordingId()
-                    );
+                    )
+                    : null;
             AnalysisAuthorizationGrant grant = analysisAuthorizationIssuer.issue(
                     new AnalysisAuthorizationIssue(
                             requestEventId,
@@ -175,7 +176,9 @@ public class TrainingAnalysisRequestService {
                     )
             );
             return new AnalysisWorkerRequest(
-                    AnalysisWorkerRequest.SCHEMA_VERSION,
+                    closedBetaContext == null
+                            ? AnalysisWorkerRequest.LEGACY_SCHEMA_VERSION
+                            : AnalysisWorkerRequest.SCHEMA_VERSION,
                     requestEventId,
                     analysisId,
                     source.contentId(),

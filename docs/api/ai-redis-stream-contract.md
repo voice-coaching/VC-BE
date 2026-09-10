@@ -4,6 +4,70 @@
 [intelligentAI 음성·영상 분석 연동 구현 현황](../ai_analysis_integration_implementation.md)을
 참조한다. 이 문서는 교차 저장소 payload와 전달 계약의 정본이다.
 
+## Production default and explicit closed beta (2026-09-10)
+
+The default is now the existing raw-media-free contract: request
+`voice-coaching.analysis-request.v4`, authorization
+`voice-coaching.analysis-authorization.v3`, result
+`voice-coaching.analysis-result.v3`. The intelligentAI parser and service already
+support this combination. This change does not introduce a new worker schema.
+
+`ANALYSIS_CLOSED_BETA_ENABLED=false` omits `closedBetaContext` from the request and
+`closedBetaContextSha256` from its grant entirely, including their null keys.
+`visualInput` and all six nullable visual grant fields must still be present.
+Both authorization timestamps are UTC ISO-8601 strings, matching the signed
+`Instant.toString()` representation. Whole-document null suppression is invalid.
+
+The v4 request has these 15 keys, in addition to the grant's own exact field set:
+`schemaVersion,eventId,analysisId,contentId,promptRevision,scriptText,scriptSha256,`
+`audioObjectKey,audioSha256,mimeType,fileSizeBytes,durationMs,learningFocus,visualInput,authorizationGrant`.
+Use the beta examples below by changing the request/grant versions and removing
+only the two beta fields described above. The HMAC field order for grant v3
+does not include `closedBetaContextSha256`; visual binding and consent remain
+mandatory when video is present.
+
+For production result v3, omit or set null `closedBetaDebug` and
+`seungunProductionEvidence`; all existing summary/evidence/visual fields remain.
+The Backend rejects result v4 and non-null beta blocks in production mode.
+The result default and maximum are **1,048,576 UTF-8 bytes**; JSON strings are
+limited to 65,536 characters. Unknown fields, duplicate JSON keys and trailing
+JSON content are rejected. Request size remains 65,536 UTF-8 bytes.
+Invalid or disabled result schemas are not copied into the dead-letter payload;
+the DLQ retains the source Stream ID and failure code instead.
+
+The existing request v5/grant v4/result v4 examples below describe **explicit beta
+mode**, enabled only with `ANALYSIS_CLOSED_BETA_ENABLED=true`. To retain its former
+large payload limit, also set
+`ANALYSIS_STREAM_MAXIMUM_RESULT_PAYLOAD_BYTES=402653184`. Enabling beta does not
+silently increase the configured limit. Align worker result limits and drain
+pending messages before switching modes; a production consumer must not receive
+remaining beta results. The transport Stream names do not change.
+
+Completed results must match the registered canonical audio SHA-256. A visual
+supplement requires a registered video for that same recording as well as the
+matching Seungun selected index. Stale request generations and already terminal
+results retain their existing idempotent handling. Approved detailed
+`summaryFeedback` text is stored and returned without shortening.
+
+The optional lip observation remains a small aggregate, not raw beta media. Its
+exact keys are `schemaVersion,status,selectedExpectedIndex,videoStartMs,videoEndMs,`
+`geometryArtifactSha256,measurements,containsPronunciationTruth,containsActionTruth`.
+Times are non-negative integers with end greater than start, the selected index
+matches the supplement, and both truth flags are false. Measurements allow only
+the seven existing cues, each with exactly `value` and `unit`. Values are finite
+and non-negative; units match the current producer: `mouth_width_fraction` uses
+`image_fraction`, `shape_change_rate_per_second` uses `normalized_per_second`, and
+the five aperture/area/asymmetry cues use `ratio`. Unknown nested fields, arrays,
+media, paths or arbitrary metadata are rejected before persistence/public output.
+This binds units to the current producer more tightly than Python's general
+non-empty-unit validation; a new cue or unit requires a coordinated contract change.
+
+This PR supplies the Backend API and its contract only. Redis and worker activation
+are deferred. The currently deployed RunPod Clova server is separate from the Redis
+worker composition: its adapter still needs to be connected in intelligentAI before
+claiming full Seungun + lips + Clova processing. See
+[API handoff](../runpod_pipeline_api_20260910.md).
+
 ## Purpose and boundary
 
 VC-BE and the intelligentAI worker exchange asynchronous audio-analysis work through
@@ -35,6 +99,7 @@ job messages.
 | Variable | Required | Description |
 | --- | --- | --- |
 | `ANALYSIS_STREAM_ENABLED` | Y in production | Enables VC-BE Stream dispatcher and result consumer. Default is `false`. |
+| `ANALYSIS_CLOSED_BETA_ENABLED` | N | Default `false`: raw-free request v4/grant v3/result v3. `true` explicitly enables the beta examples below. |
 | `ANALYSIS_REDIS_HOST` | Y | Private Redis host for analysis messages. |
 | `ANALYSIS_REDIS_PORT` | Y | Redis port. |
 | `ANALYSIS_REDIS_USERNAME` | N | Redis ACL username. |
@@ -57,7 +122,7 @@ job messages.
 | `ANALYSIS_RETENTION_POLL_INTERVAL` / `ANALYSIS_RETENTION_BATCH_SIZE` | Y | Cleanup schedule and bounded batch, defaults `PT5M` / `100`. |
 | `ANALYSIS_OBSERVATION_POLL_INTERVAL` | Y | Aggregate Stream and DB outbox observation interval, default `PT30S`. |
 | `ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES` | Y | UTF-8 request cap, default `65536`, range `1024..1048576`. |
-| `ANALYSIS_STREAM_MAXIMUM_RESULT_PAYLOAD_BYTES` | Y | Closed-beta result cap, default/max `402653184`; configure the AI worker to the same value. |
+| `ANALYSIS_STREAM_MAXIMUM_RESULT_PAYLOAD_BYTES` | Y | Production default/max `1048576`; explicit beta can set up to `402653184`. Configure the AI worker to the same limit. |
 | `ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH` | Y | Approximate result DLQ cap, default `10000`. |
 | `ANALYSIS_PENDING_CLAIM_IDLE` | Y | Minimum pending idle time before reclaim; default `PT5M`. |
 | `ANALYSIS_STREAM_MAX_RETRIES` | Y | Dispatch/result retry cap; default `3`. |
@@ -139,7 +204,7 @@ entries without risking pending or unpersisted work.
 VC-BE also rejects an oversized request payload before writing its durable outbox row;
 the dispatcher repeats the check immediately before Redis I/O as defense in depth.
 
-## Request payload: `voice-coaching.analysis-request.v5`
+## Explicit beta request payload: `voice-coaching.analysis-request.v5`
 
 ```json
 {
@@ -283,8 +348,9 @@ The signature is HMAC-SHA256 over the fields above in listed order, excluding
 UTC JSON strings. The AI keyring selects the secret by `keyId` and compares the
 signature in constant time. Unknown keys, signature/binding differences, a future or
 expired window, a TTL over ten minutes, a policy mismatch, missing cleanup, or enabled
-remote egress fail before object storage access. Request v4/grant v3 are
-decode-only during the coordinated drain; older versions are unsupported.
+remote egress fail before object storage access. Request v4/grant v3 are the
+production default; request v5/grant v4 require explicit beta mode. Older
+versions are unsupported.
 
 The AI worker uses a restricted object-storage adapter for the configured bucket and
 must inspect each object, condition the streaming GET on its ETag and optional VersionId,
@@ -295,7 +361,7 @@ request transaction rolls back instead of leaving a stranded pending analysis. A
 worker deployment without an approved authorization, storage, and Seungun composition
 must refuse startup before it consumes any Stream entry.
 
-## Result payload: `voice-coaching.analysis-result.v4`
+## Explicit beta result payload: `voice-coaching.analysis-result.v4`
 
 ```json
 {
@@ -400,8 +466,8 @@ by V15 and returned to the authenticated result owner. The configured 384 MiB re
 limit is a transport ceiling, not a demonstrated safe operating point; production-like
 Redis/JVM/Python peak-memory and latency testing remains a rollout gate.
 
-Legacy `voice-coaching.analysis-result.v1` and `v2` are rejected. Result v3 remains
-decode-only for draining the prior deployment; new workers publish only v4. Result-v4 deployment
+Legacy `voice-coaching.analysis-result.v1` and `v2` are rejected. Result v3 is the
+production default. The worker selects v3 without beta context and v4 with it. Result-v4 deployment
 requires a quiesced rollout: stop new analysis admission and the AI worker, drain or
 deliberately resolve all pending request/result entries, deploy Backend and worker,
 then enable both together. Do not run an older result producer against the v3 consumer
