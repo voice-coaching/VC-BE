@@ -146,6 +146,49 @@ authenticated upload
 [`FfmpegS3RecordingMediaNormalizer`](../src/main/java/org/example/voice/training/infrastructure/storage/FfmpegS3RecordingMediaNormalizer.java)에
 있으며 route/controller에는 ffmpeg 로직이 없다.
 
+## 단일 media 입력 기반 AI 분석 작업 방침
+
+AI 요청은 두 종류의 API로 나누지 않고 하나의 Redis Stream request schema를 사용한다.
+Public upload/register API는 하나의 media input을 받는다. 기본 입력은 음성이며, media가
+영상이면 Backend가 같은 파일에서 AI용 음성과 선택적 영상 입력을 함께 만든다.
+
+```text
+음성 업로드
+  -> Backend가 MP3/WebM/WAV 등 원본을 canonical WAV로 정규화
+  -> Redis request에는 audioObjectKey, audioSha256, mimeType=audio/wav,
+     fileSizeBytes, durationMs를 넣는다
+  -> visualInput은 보내지 않는다
+
+영상 업로드
+  -> Backend가 영상에서 음성 track을 추출해 canonical WAV로 만든다
+  -> 영상 분석이 필요한 경우 Backend가 canonical MP4도 만든다
+  -> Redis request에는 동일한 audio 필드와 visualInput을 함께 넣는다
+```
+
+AI worker는 `visualInput` 존재 여부만 보고 분석 경로를 선택한다.
+
+```text
+visualInput 없음
+  -> 음성만 사용해 분석
+
+visualInput 있음
+  -> canonical WAV와 canonical MP4를 함께 사용해 분석
+```
+
+이 방식은 AI worker가 client upload format을 직접 처리하지 않게 만든다. 즉 AI worker는
+MP3, WebM, MOV 같은 원본 포맷을 해석하지 않고, Backend가 검증·정규화한 `audio/wav`
+파일을 항상 기준 입력으로 삼는다. 영상은 음성을 대체하지 않고 같은 시도의 보조 입력으로만
+사용한다.
+
+작업 시 책임 경계는 다음과 같이 유지한다.
+
+- `training`은 upload URL 발급, 업로드 등록, 선택 녹음, 분석 요청 흐름을 소유한다.
+- media probing, codec 검사, WAV/MP4 정규화는 `training/infrastructure/storage` adapter가 수행한다.
+- AI request/result DTO는 public API DTO로 재사용하지 않고 `analysis` 내부 계약으로만 다룬다.
+- Redis Stream publish/consume은 `analysis/infrastructure/stream` 경계에서 수행한다.
+- DB에는 원본 blob을 저장하지 않고 object key, MIME, size, duration, digest, 분석 상태만 저장한다.
+- public API 응답에는 Redis Stream ID, object key, storage secret, worker 내부 debug 값을 노출하지 않는다.
+
 | 업로드 container | 허용 video | 허용 audio | AI 전달 형식 |
 | --- | --- | --- | --- |
 | MP4/QuickTime | H.264 또는 HEVC | AAC | 단일 H.264/HEVC + AAC MP4 |

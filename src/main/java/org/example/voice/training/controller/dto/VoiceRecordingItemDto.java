@@ -6,6 +6,7 @@ public record VoiceRecordingItemDto(
         Long id,
         Integer attemptNo,
         Integer durationMs,
+        String analysisMediaType,
         String qualityStatus,
         Boolean selected
 ) {
@@ -15,6 +16,7 @@ public record VoiceRecordingItemDto(
                 data.id(),
                 data.attemptNo(),
                 data.durationMs(),
+                data.analysisMediaType(),
                 data.qualityStatus().name(),
                 data.selected()
         );

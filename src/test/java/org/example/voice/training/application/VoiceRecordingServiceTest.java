@@ -55,6 +55,7 @@ class VoiceRecordingServiceTest {
                 new VoiceRecordingRegisteredData(
                         50L,
                         1,
+                        "AUDIO_ONLY",
                         RecordingQualityStatus.PASS,
                         false,
                         OffsetDateTime.now()
@@ -121,6 +122,7 @@ class VoiceRecordingServiceTest {
                 new VoiceRecordingRegisteredData(
                         50L,
                         1,
+                        "AUDIO_ONLY",
                         RecordingQualityStatus.PASS,
                         false,
                         OffsetDateTime.now()
@@ -167,6 +169,7 @@ class VoiceRecordingServiceTest {
                 new VoiceRecordingRegisteredData(
                         50L,
                         1,
+                        "AUDIO_VISUAL",
                         RecordingQualityStatus.PASS,
                         false,
                         OffsetDateTime.now()

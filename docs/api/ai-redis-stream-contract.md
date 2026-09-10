@@ -206,6 +206,41 @@ the dispatcher repeats the check immediately before Redis I/O as defense in dept
 
 ## Explicit beta request payload: `voice-coaching.analysis-request.v5`
 
+### Media input contract
+
+VC-BE always sends one canonical audio input to the AI worker. Optional video is
+represented only by the presence of `visualInput`; there is no separate request
+type for audio-only analysis and audio+video analysis.
+The public upload/register API still accepts one media input. If that media is audio,
+VC-BE produces only the canonical WAV. If that media is video, VC-BE derives both the
+canonical WAV and the optional canonical MP4 from the same uploaded object.
+
+```text
+audio upload
+  -> VC-BE normalizes the source into 16 kHz mono PCM WAV
+  -> request contains audioObjectKey/audioSha256/mimeType=fileSizeBytes/durationMs
+  -> visualInput is null/absent
+
+video upload
+  -> VC-BE extracts the audio track into 16 kHz mono PCM WAV
+  -> VC-BE also creates a canonical MP4 visual object when visual analysis is needed
+  -> request contains the required audio fields plus visualInput
+```
+
+The AI worker rule is intentionally small:
+
+```text
+if visualInput is absent:
+    run audio-only analysis using the canonical WAV
+else:
+    run audio+video analysis using both the canonical WAV and canonical MP4
+```
+
+This keeps AI inference code independent from client upload formats. The worker never
+handles client-uploaded MP3/WebM/MOV directly and must treat `audioObjectKey` as the
+primary source for speech analysis in every request. `visualInput` is an additive
+same-attempt signal, not a replacement for the audio input.
+
 ```json
 {
   "schemaVersion": "voice-coaching.analysis-request.v5",

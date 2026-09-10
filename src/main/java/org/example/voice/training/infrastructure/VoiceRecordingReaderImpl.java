@@ -139,8 +139,13 @@ public class VoiceRecordingReaderImpl implements VoiceRecordingReader {
                 recording.getId(),
                 recording.getAttemptNo(),
                 recording.getDurationMs(),
+                analysisMediaType(recording.getVisualObjectKey()),
                 recording.getQualityStatus(),
                 recording.getSelected()
         );
+    }
+
+    private static String analysisMediaType(String visualObjectKey) {
+        return visualObjectKey == null ? "AUDIO_ONLY" : "AUDIO_VISUAL";
     }
 }

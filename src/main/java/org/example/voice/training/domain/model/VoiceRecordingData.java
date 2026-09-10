@@ -6,6 +6,7 @@ public record VoiceRecordingData(
         Long id,
         Integer attemptNo,
         Integer durationMs,
+        String analysisMediaType,
         RecordingQualityStatus qualityStatus,
         Boolean selected
 ) {
