@@ -88,8 +88,10 @@ S3와 정규화가 준비되기 전에는 `OBJECT_STORAGE_ENABLED=false`, `MEDIA
 
 ## 검증과 인계
 
-Codex는 Java 컴파일과 실행 JAR 생성을 수행하고, 정적 소스·전송 계약을 대조한다. 브라우저·자동 회귀·실제 AWS/Redis/RunPod 추론 QA는 사용자의 지시에 따라 실행하지 않는다. 명령은 `gradlew.bat compileJava bootJar -x test --no-daemon`이다.
+Codex는 Java 및 테스트 소스 컴파일과 실행 JAR 생성을 수행하고, 정적 소스·전송 계약을 대조한다. 로컬 자동 테스트·브라우저·실제 AWS/Redis/RunPod 추론 QA는 사용자의 지시에 따라 실행하지 않는다. CI 수정 확인 명령은 `gradlew.bat compileJava compileTestJava bootJar -x test --no-daemon`이다. 기존 GitHub CI workflow는 변경하지 않으며 PR 푸시에 따라 자동 실행되는 결과를 확인한다.
 
-기존 테스트 일부는 기본 모드가 항상 베타이며 v4 HMAC vector와 개인 context가 있다는 이전 전제를 가진다. 담당자 QA에서는 베타 vector 검증을 명시적 베타 설정으로 분리하고 운영 기본 모드 기대값을 확인해야 한다. 이 PR에서 테스트 실행·테스트 설정·회귀 산출물은 생성하지 않았다. 기존 CI workflow는 변경하지 않는다.
+초기 PR의 CI에서는 139개 테스트 중 12개가 실패했다. 운영 기본 모드로 바꾼 뒤에도 베타 context·v4 HMAC·대용량 원본 결과를 전제한 테스트가 남아 있었고, 결과 저장 테스트의 등록 음성 SHA·영상 metadata·관찰 시각도 새 계약에 맞지 않았다. 해당 fixture를 갱신하고 베타 HMAC vector·대용량 결과 검증은 명시적 베타 설정으로 유지했다. 운영 기본 모드의 개인 context 제외, 같은 녹음과 등록 영상의 결과 검증도 함께 확인하도록 테스트 코드를 보완했다.
+
+새 `GET /api/analysis-capabilities`는 중앙 OpenAPI 문서 목록에서 누락돼 영문 기본 태그를 노출했다. 한국어 문서와 인증 설정을 등록하고, 기존 API 문서 테스트의 정확한 엔드포인트 수를 53개에서 54개로 갱신했다. 기존 한국어 문서·운영 입력 검증은 유지한다. CI 통과는 실제 Redis·저장소·RunPod 연결 검증을 대체하지 않는다.
 
 검토·배포 대상은 `develop`이다. PR 생성은 배포 완료가 아니며 AWS 저장소 생성, DB migration 적용 결과, Redis 연결 및 전체 pipeline QA는 각각 별도 상태로 확인한다.

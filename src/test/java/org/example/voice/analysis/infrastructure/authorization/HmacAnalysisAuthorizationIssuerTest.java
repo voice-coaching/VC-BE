@@ -4,6 +4,7 @@ import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationIssue;
 import org.example.voice.analysis.domain.model.AnalysisClosedBetaContext;
 import org.example.voice.analysis.domain.model.AnalysisWorkerVisualInput;
+import org.example.voice.analysis.infrastructure.stream.AnalysisStreamProperties;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.practicecontent.domain.type.LearningFocus;
@@ -89,6 +90,50 @@ class HmacAnalysisAuthorizationIssuerTest {
     }
 
     @Test
+    void issuesV3WithoutPersonalContextByDefault() {
+        HmacAnalysisAuthorizationIssuer issuer = new HmacAnalysisAuthorizationIssuer(
+                properties("voice-analysis-consent-v1"),
+                Clock.fixed(NOW, ZoneOffset.UTC)
+        );
+
+        AnalysisAuthorizationGrant grant = issuer.issue(issue("voice-analysis-consent-v1", false));
+
+        assertThat(issuer.requiresClosedBetaContext()).isFalse();
+        assertThat(grant.grantVersion()).isEqualTo("voice-coaching.analysis-authorization.v3");
+        assertThat(grant.closedBetaContextSha256()).isNull();
+        assertThat(grant.issuedAtUtc()).isEqualTo(NOW);
+        assertThat(grant.expiresAtUtc()).isEqualTo(NOW.plusSeconds(300));
+        assertThat(grant.signature()).hasSize(64).isNotEqualTo("0".repeat(64));
+        assertThat(new String(grant.canonicalSigningInput(), java.nio.charset.StandardCharsets.UTF_8))
+                .doesNotContain("closedBetaContextSha256:")
+                .contains("visualObjectKeySha256:-1:\n");
+    }
+
+    @Test
+    void rejectsPersonalContextUnlessClosedBetaIsExplicitlyEnabled() {
+        HmacAnalysisAuthorizationIssuer issuer = new HmacAnalysisAuthorizationIssuer(
+                properties("voice-analysis-consent-v1"),
+                Clock.fixed(NOW, ZoneOffset.UTC)
+        );
+
+        assertThatThrownBy(() -> issuer.issue(issue("voice-analysis-consent-v1")))
+                .isInstanceOfSatisfying(BaseException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(ErrorCode.ANALYSIS_CONSENT_POLICY_MISMATCH));
+    }
+
+    @Test
+    void requiresPersonalContextInExplicitClosedBetaMode() {
+        HmacAnalysisAuthorizationIssuer issuer = issuer("voice-analysis-consent-v1");
+
+        assertThat(issuer.requiresClosedBetaContext()).isTrue();
+        assertThatThrownBy(() -> issuer.issue(issue("voice-analysis-consent-v1", false)))
+                .isInstanceOfSatisfying(BaseException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(ErrorCode.ANALYSIS_CONSENT_POLICY_MISMATCH));
+    }
+
+    @Test
     void rejectsWeakSigningSecretAtCompositionTime() {
         AnalysisAuthorizationProperties properties = properties("voice-analysis-consent-v1");
         properties.setSigningSecretBase64(Base64.getEncoder().encodeToString(new byte[16]));
@@ -110,8 +155,11 @@ class HmacAnalysisAuthorizationIssuerTest {
     }
 
     private static HmacAnalysisAuthorizationIssuer issuer(String policyRevision) {
+        AnalysisStreamProperties streamProperties = new AnalysisStreamProperties();
+        streamProperties.setClosedBetaEnabled(true);
         return new HmacAnalysisAuthorizationIssuer(
                 properties(policyRevision),
+                streamProperties,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }
@@ -126,13 +174,19 @@ class HmacAnalysisAuthorizationIssuerTest {
     }
 
     private static AnalysisAuthorizationIssue issue(String policyRevision) {
+        return issue(policyRevision, true);
+    }
+
+    private static AnalysisAuthorizationIssue issue(String policyRevision, boolean closedBeta) {
         return new AnalysisAuthorizationIssue(
                 UUID.fromString("4adfe173-0691-4e89-b94e-a5c5c5085826"),
                 35L,
                 12L,
                 "2026-09-02T00:00:00Z",
                 "a".repeat(64),
-                "recordings/users/9/sessions/7/attempt.wav",
+                closedBeta
+                        ? "recordings/users/9/sessions/7/attempt.wav"
+                        : "recordings/analysis-audio/00000000-0000-0000-0000-000000000001.wav",
                 "d".repeat(64),
                 "audio/wav",
                 1234L,
@@ -140,12 +194,12 @@ class HmacAnalysisAuthorizationIssuerTest {
                 LearningFocus.PRONUNCIATION,
                 "4bb06f8e4e3a7715d201d573d0aa423762e55dabd61a2c02278fa56cc6d294e0",
                 policyRevision,
-                new AnalysisClosedBetaContext(
+                closedBeta ? new AnalysisClosedBetaContext(
                         AnalysisClosedBetaContext.SCHEMA_VERSION,
                         9L,
                         7L,
                         50L
-                ),
+                ) : null,
                 null
         );
     }

@@ -90,10 +90,11 @@ class TrainingAnalysisRequestServiceTest {
         assertThat(request.getValue().contentId()).isEqualTo(12L);
         assertThat(request.getValue().audioObjectKey()).isEqualTo("recordings/50.wav");
         assertThat(request.getValue().scriptSha256()).hasSize(64);
-        assertThat(request.getValue().schemaVersion()).isEqualTo("voice-coaching.analysis-request.v5");
-        assertThat(request.getValue().closedBetaContext().userId()).isEqualTo(9L);
-        assertThat(request.getValue().closedBetaContext().sessionId()).isEqualTo(7L);
-        assertThat(request.getValue().closedBetaContext().recordingId()).isEqualTo(50L);
+        assertThat(request.getValue().schemaVersion()).isEqualTo("voice-coaching.analysis-request.v4");
+        assertThat(request.getValue().closedBetaContext()).isNull();
+        assertThat(request.getValue().authorizationGrant().grantVersion())
+                .isEqualTo("voice-coaching.analysis-authorization.v3");
+        assertThat(request.getValue().authorizationGrant().closedBetaContextSha256()).isNull();
         assertThat(request.getValue().audioSha256()).isEqualTo("d".repeat(64));
         assertThat(request.getValue().authorizationGrant().requestEventId())
                 .isEqualTo(request.getValue().eventId());
@@ -102,6 +103,15 @@ class TrainingAnalysisRequestServiceTest {
 
     @Test
     void bindsCanonicalVisualAndPublishesSignedClosedBetaOwnerIdentifiers() {
+        assertCanonicalVisualRequest(true);
+    }
+
+    @Test
+    void bindsCanonicalVisualWithoutOwnerIdentifiersInProductionMode() {
+        assertCanonicalVisualRequest(false);
+    }
+
+    private void assertCanonicalVisualRequest(boolean closedBetaEnabled) {
         SelectedRecordingAnalysisData source = new SelectedRecordingAnalysisData(
                 50L,
                 12L,
@@ -125,6 +135,7 @@ class TrainingAnalysisRequestServiceTest {
         when(trainingAnalysisWriter.createPending(eq(50L), any())).thenReturn(
                 new AnalysisRequestData(35L, AnalysisStatus.PENDING, OffsetDateTime.now())
         );
+        when(analysisAuthorizationIssuer.requiresClosedBetaContext()).thenReturn(closedBetaEnabled);
         allowAuthorization();
 
         service().requestAnalysis(7L, 9L, consent());
@@ -142,6 +153,20 @@ class TrainingAnalysisRequestServiceTest {
         assertThat(request.getValue().authorizationGrant().binds(
                 request.getValue().closedBetaContext()
         )).isTrue();
+        if (closedBetaEnabled) {
+            assertThat(request.getValue().schemaVersion()).isEqualTo("voice-coaching.analysis-request.v5");
+            assertThat(request.getValue().authorizationGrant().grantVersion())
+                    .isEqualTo("voice-coaching.analysis-authorization.v4");
+            assertThat(request.getValue().closedBetaContext().userId()).isEqualTo(9L);
+            assertThat(request.getValue().closedBetaContext().sessionId()).isEqualTo(7L);
+            assertThat(request.getValue().closedBetaContext().recordingId()).isEqualTo(50L);
+        } else {
+            assertThat(request.getValue().schemaVersion()).isEqualTo("voice-coaching.analysis-request.v4");
+            assertThat(request.getValue().closedBetaContext()).isNull();
+            assertThat(request.getValue().authorizationGrant().grantVersion())
+                    .isEqualTo("voice-coaching.analysis-authorization.v3");
+            assertThat(request.getValue().authorizationGrant().closedBetaContextSha256()).isNull();
+        }
     }
 
     @Test
@@ -278,7 +303,9 @@ class TrainingAnalysisRequestServiceTest {
             AnalysisAuthorizationIssue issue = invocation.getArgument(0);
             Instant issuedAt = Instant.parse("2026-09-02T00:00:00Z");
             return new AnalysisAuthorizationGrant(
-                    AnalysisAuthorizationGrant.GRANT_VERSION,
+                    issue.closedBetaContext() == null
+                            ? AnalysisAuthorizationGrant.LEGACY_GRANT_VERSION
+                            : AnalysisAuthorizationGrant.GRANT_VERSION,
                     "test-key-v1",
                     issue.requestEventId(),
                     issue.analysisId(),
@@ -299,7 +326,7 @@ class TrainingAnalysisRequestServiceTest {
                     issue.visualInput() == null ? null : issue.visualInput().fileSizeBytes(),
                     issue.visualInput() == null ? null : issue.visualInput().consentReceiptSha256(),
                     issue.visualInput() == null ? null : issue.visualInput().consentPolicyRevision(),
-                    issue.closedBetaContext().bindingSha256(),
+                    issue.closedBetaContext() == null ? null : issue.closedBetaContext().bindingSha256(),
                     issuedAt,
                     issuedAt.plusSeconds(300),
                     AnalysisAuthorizationGrant.PURPOSE,
