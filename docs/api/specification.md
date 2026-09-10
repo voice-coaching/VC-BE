@@ -401,7 +401,7 @@ Content-Type: application/json
 - Error cases: See common error codes
 
 ### POST /api/training-sessions/{sessionId}/analyze
-- Description: 음성 분석 요청 - 명시적 동의와 선택된 녹음의 음질을 확인하고 Seungun 발음 분석 작업을 비동기로 요청
+- Description: AI 분석 요청 - 명시적 동의와 선택된 녹음의 음질을 확인하고 Seungun 발음 분석 작업을 비동기로 요청
 - Auth: Bearer accessToken
 - Path params: `sessionId`
 - Query params: None
@@ -412,6 +412,10 @@ Content-Type: application/json
   "policyRevision": "String"
 }
 ```
+- 이 API는 파일을 직접 받지 않는다.
+- 선택된 recording이 audio media에서 등록된 경우 Backend는 audio-only Redis Stream request를 발행한다.
+- 선택된 recording이 video media에서 등록된 경우 Backend는 영상에서 파생한 canonical WAV와 canonical MP4를 함께 담은 Redis Stream request를 발행한다.
+- 클라이언트는 analyze 요청에서 audio/video 구분을 다시 보내지 않는다.
 - Response body:
 ```json
 {
@@ -1610,7 +1614,7 @@ Content-Type: application/json
 - Error cases: See common error codes
 
 ### POST /api/training-sessions/{sessionId}/recordings/upload-url
-- Description: 음성 또는 영상 녹음 업로드 URL 발급 - 파일명·MIME 타입을 받아 private object storage Presigned URL 발급
+- Description: 단일 media 업로드 URL 발급 - 파일명·MIME 타입·크기를 받아 음성 또는 영상 원본을 private object storage에 업로드할 Presigned URL 발급
 - Auth: Bearer accessToken
 - Path params: `sessionId`
 - Query params: None
@@ -1638,13 +1642,17 @@ Content-Type: application/json
   }
 }
 ```
+- 이 API는 하나의 업로드 media URL만 발급한다.
+- audio MIME이면 음성-only 분석 후보가 된다.
+- video MIME이면 등록 단계에서 Backend가 같은 source object에서 canonical WAV와 canonical MP4를 파생할 수 있다.
+- 영상 파일을 업로드하더라도 AI speech analysis의 기준 입력은 영상에서 추출한 canonical WAV다.
 - 허용 형식: `audio/webm`, `audio/mpeg`, `audio/wav`는 최대 20 MiB;
   `video/mp4`, `video/quicktime`, `video/webm`은 최대 100 MiB이다.
 - Status codes: 200 OK, 400 unsupported format, 413 size limit
 - Error cases: See common error codes
 
 ### POST /api/training-sessions/{sessionId}/recordings
-- Description: 업로드 객체를 소유권·실제 container/codec 기준으로 검사하고 backend에서 16 kHz mono PCM WAV로 정규화한 뒤 녹음 시도를 등록
+- Description: 단일 media 업로드 완료 등록 - 업로드 객체를 소유권·실제 container/codec 기준으로 검사하고 Backend에서 AI 입력용 canonical media를 만든 뒤 녹음 시도를 등록
 - Auth: Bearer accessToken
 - Path params: `sessionId`
 - Query params: None
@@ -1659,12 +1667,15 @@ Content-Type: application/json
   "videoProcessingConsentPolicyRevision": "String | null"
 }
 ```
+- `objectKey`, `mimeType`, `fileSizeBytes`, `durationMs`는 업로드된 단일 source media의 정보다.
 - `durationMs`는 클라이언트 표시용 주장이고 영속 값은 정규화 WAV에서 다시 측정한다.
+- audio MIME이면 Backend는 source media를 16 kHz mono PCM WAV로 정규화하고, 이후 AI에는 audio-only request를 발행한다.
+- video MIME이면 Backend는 같은 source media에서 음성 track을 추출해 16 kHz mono PCM WAV를 만들고, 영상 분석 입력이 필요할 때 canonical MP4도 생성한다.
 - 영상 MIME이면 두 consent 필드가 각각 `true`,
   `voice-video-processing-consent-v1`이어야 하며, 동의 검증 전에 영상을 decode하지 않는다.
 - object key는 인증 사용자와 path의 `sessionId`에 발급된 prefix와 정확히 일치해야 한다.
 - 원본 업로드 객체는 성공·실패와 무관하게 처리 후 삭제한다. DB에는 backend-only
-  정규화 WAV key, 실제 크기·duration, SHA-256, 기술 품질 상태만 저장한다.
+  정규화 WAV key, 실제 크기·duration, SHA-256, 기술 품질 상태를 저장하고, 영상 입력이 있으면 canonical MP4 key와 digest도 함께 저장한다.
 - Response body:
 ```json
 {

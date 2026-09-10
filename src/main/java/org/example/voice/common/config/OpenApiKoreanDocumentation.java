@@ -89,9 +89,9 @@ public class OpenApiKoreanDocumentation {
                 Map.entry("improvementAreas", "개선하고 싶은 영역 목록"), Map.entry("pronunciationConcerns", "발음 고민 목록"),
                 Map.entry("learningSituations", "주로 학습하려는 상황 목록"), Map.entry("contentId", "학습 콘텐츠 ID"),
                 Map.entry("courseStepId", "클래스 단계 ID. 자유 학습이면 생략할 수 있습니다."), Map.entry("learningFocus", "이번 학습에서 집중할 영역"),
-                Map.entry("totalLearningSeconds", "실제 학습한 총 시간(초)"), Map.entry("fileName", "업로드할 원본 음성 파일명"),
-                Map.entry("mimeType", "음성 파일 MIME 타입"), Map.entry("fileSizeBytes", "음성 파일 크기(byte)"),
-                Map.entry("objectKey", "업로드 URL 발급 시 받은 스토리지 객체 키"), Map.entry("durationMs", "녹음 재생 시간(ms)"),
+                Map.entry("totalLearningSeconds", "실제 학습한 총 시간(초)"), Map.entry("fileName", "업로드할 원본 media 파일명"),
+                Map.entry("mimeType", "업로드할 원본 media MIME 타입"), Map.entry("fileSizeBytes", "업로드할 원본 media 크기(byte)"),
+                Map.entry("objectKey", "업로드 URL 발급 시 받은 스토리지 객체 키"), Map.entry("durationMs", "원본 media 재생 시간(ms)"),
                 Map.entry("accepted", "현재 정책에 따른 음성 분석 처리 명시적 동의 여부"), Map.entry("policyRevision", "화면에 표시한 음성 분석 동의 정책 revision"),
                 Map.entry("feedbackStyle", "재생성할 피드백 스타일"), Map.entry("lastStepId", "마지막으로 완료한 클래스 단계 ID"),
                 Map.entry("progressPercent", "클래스 전체 진행률(0~100)"), Map.entry("type", "조회할 콘텐츠 또는 클래스 유형"),
@@ -156,13 +156,13 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/training-sessions/{sessionId}", "학습 세션", "학습 세션 상세 조회", "학습 세션의 콘텐츠, 진행 상태, 시간과 선택된 녹음 정보를 조회합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/complete", "학습 세션", "학습 세션 완료", "분석이 끝난 학습 세션을 완료 처리하고 실제 학습 시간을 저장합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/cancel", "학습 세션", "학습 세션 취소", "진행 중인 학습 세션을 취소 상태로 변경합니다.", false);
-        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/recordings/upload-url", "학습 세션", "녹음 업로드 URL 발급", "음성 파일을 스토리지에 직접 업로드할 수 있도록 업로드 URL과 저장 키를 발급합니다.", false);
-        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/recordings", "학습 세션", "업로드한 녹음 등록", "업로드가 끝난 음성 파일의 메타데이터를 학습 세션의 녹음 시도로 등록합니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/recordings/upload-url", "학습 세션", "단일 media 업로드 URL 발급", "음성 또는 영상 원본을 스토리지에 직접 업로드할 수 있도록 업로드 URL과 저장 키를 발급합니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/recordings", "학습 세션", "단일 media 업로드 완료 등록", "업로드가 끝난 원본 media를 검사하고 audio는 canonical WAV로, video는 canonical WAV와 canonical MP4로 파생해 녹음 시도로 등록합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/training-sessions/{sessionId}/recordings", "학습 세션", "학습 세션 녹음 목록 조회", "세션에 등록된 녹음 시도와 선택 여부를 생성 순서대로 조회합니다.", false);
         add(map, PathItem.HttpMethod.PATCH, "/api/training-sessions/{sessionId}/recordings/{recordingId}/select", "학습 세션", "분석 대상 녹음 선택", "분석에 사용할 녹음 하나를 선택하고 기존 선택 녹음은 해제합니다.", false);
         add(map, PathItem.HttpMethod.DELETE, "/api/training-sessions/{sessionId}/recordings/{recordingId}", "학습 세션", "녹음 삭제", "내 학습 세션의 녹음을 삭제 처리하며 선택된 녹음이라면 선택 상태도 해제합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/recordings/{recordingId}/playback-url", "학습 세션", "내 녹음 재생 URL 발급", "등록된 내 녹음을 제한된 시간 동안 재생할 수 있는 URL을 발급합니다.", false);
-        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/analyze", "학습 세션", "음성 분석 요청", "명시적 동의를 확인하고 선택된 녹음에 대해 Seungun 발음 분석 작업을 요청합니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/analyze", "학습 세션", "AI 분석 요청", "명시적 동의를 확인하고 선택된 녹음에 대해 Seungun 발음 분석 작업을 요청합니다. 영상 기반 녹음이면 음성과 영상 입력을 함께 사용합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/training-sessions/{sessionId}/analysis/status", "학습 세션", "음성 분석 진행 상태 조회", "학습 세션의 최신 분석 작업이 대기, 처리, 완료 또는 실패 중 어느 상태인지 조회합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/analysis/retry", "학습 세션", "실패한 음성 분석 재시도", "새 명시적 동의를 확인하고 실패한 최신 분석 작업을 새 request generation으로 재요청합니다.", false);
 
