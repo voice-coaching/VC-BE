@@ -1,5 +1,10 @@
 # RunPod 음성·입술·Clova 파이프라인 API 연결 안내
 
+> 현재 결정(2026-09-10): RunPod 연동은 Backend -> RunPod HTTP 요청과
+> RunPod -> Backend HTTP callback 방식을 사용한다. Redis는 기존 애플리케이션 cache
+> 용도로 유지하지만, 이번 단계의 Backend-AI MQ 전송에는 Redis Stream을 사용하지 않는다.
+> [Backend-AI RunPod HTTP Callback 계약](api/ai-runpod-http-callback-contract.md)을 참고한다.
+
 2026-09-10. 이번 범위는 **백엔드 API 구현과 `develop` 대상 PR**이다. 사용자의 후속 지시에 따라 Redis 연결은 다음 단계로 남긴다. 원격에는 `dev` 브랜치가 없고 기존 PR과 배포 workflow가 `develop`을 사용한다. 이 PR은 직접 merge하거나 운영 서버에 배포하지 않는다.
 
 ## 구현과 실제 연결의 구분
@@ -11,8 +16,8 @@
 | 분석 요청·상태·결과·retry API | 기존 구조 유지. 운영 전송 기본값, ISO 시각 직렬화, 결과 크기와 같은 녹음 검증 보완 |
 | AWS PostgreSQL 녹음 메타데이터 | 기존 Flyway V0~V15에 구현됨. 동일 테이블을 새로 생성하지 않음 |
 | 사용자 녹음용 객체 저장소 | 아직 생성·연결하지 않음. 현재 SDK 구현은 private S3/S3-compatible 저장소용 |
-| 분석 Redis | 사용자가 후속 연결로 지정. `ANALYSIS_STREAM_ENABLED=false` 유지 |
-| RunPod worker + Clova 연결 | 이번 API PR에서 실행·배포하지 않음. 아래 후속 연결 항목 참고 |
+| 분석 전송 | RunPod HTTP request + Backend callback으로 전환. `ANALYSIS_STREAM_ENABLED=false` 유지 |
+| RunPod worker + Clova 연결 | HTTP endpoint와 callback 인증을 후속 연결 항목으로 준비 |
 
 ## 프론트에서 호출하는 순서
 
@@ -21,7 +26,7 @@
 3. `POST /api/training-sessions/{sessionId}/recordings/upload-url`에 `fileName`, `mimeType`, `fileSizeBytes`를 보낸다. 반환된 URL에 파일을 직접 PUT한다. `requiredHeaders`와 파일 바이트 수를 일치시킨다. 브라우저에서 `Content-Length`는 브라우저가 실제 body 길이로 설정한다.
 4. `POST /api/training-sessions/{sessionId}/recordings`에 발급된 `objectKey`, MIME, 실제 크기, `durationMs`를 보낸다. 영상은 `videoProcessingConsentAccepted=true`와 capability의 **영상용** `videoProcessingConsentPolicyRevision`을 함께 보낸다. 음성 분석용 policy revision과 혼용하지 않는다.
 5. 등록된 녹음을 `PATCH /api/training-sessions/{sessionId}/recordings/{recordingId}/select`로 선택한다. 영상 요청은 해당 영상에서 추출한 canonical WAV와 함께 같은 시도로 저장된다. 별도 촬영의 음성과 입술 영상을 임의 결합하지 않는다.
-6. Redis·worker 연결이 완료된 뒤 `POST /api/training-sessions/{sessionId}/analyze`에 `{"accepted":true,"policyRevision":"<capability의 음성 분석용 revision>"}`을 보낸다. 현재처럼 연결이 꺼져 있으면 `503`이며 가짜 분석을 생성하지 않는다.
+6. RunPod HTTP endpoint와 Backend callback 인증이 완료된 뒤 `POST /api/training-sessions/{sessionId}/analyze`에 `{"accepted":true,"policyRevision":"<capability의 음성 분석용 revision>"}`을 보낸다. 현재처럼 연결이 꺼져 있으면 `503`이며 가짜 분석을 생성하지 않는다.
 7. `GET /api/training-sessions/{sessionId}/analysis/status`로 상태를 확인한다. 완료되면 `GET /api/analyses/{analysisId}` 또는 세션 결과 API를 읽는다. 실패 재시도에는 새 명시적 동의가 필요하며 `/analysis/retry`를 사용한다.
 
 모든 위 API는 인증된 사용자와 소유 세션·녹음 기준이다. 음성·영상의 형식·크기·길이는 capability와 실제 등록 검증을 함께 따른다. 영상에는 오디오 트랙이 있어야 한다. 현재 지원 초점은 발음이며 억양 분석을 성공한 것처럼 표시하지 않는다.
@@ -70,11 +75,23 @@ backend는 presigned PUT/GET과 업로드 HEAD, 정규화 객체 쓰기·읽기�
 
 S3와 정규화가 준비되기 전에는 `OBJECT_STORAGE_ENABLED=false`, `MEDIA_NORMALIZATION_ENABLED=false`를 유지한다. 음성 업로드와 영상 등록용 API는 구현되어 있지만, 저장소 없는 상태에서 실제 녹음이 저장됐다고 응답하지 않는다.
 
-## 환경변수와 후속 Redis 연결
+## 환경변수와 후속 RunPod 연결
 
 `.env.example`은 비밀 값 없는 입력 목록이다. 파일을 `.env`로 복사하는 것만으로 Spring Boot에 적용되지 않는다. 담당자의 기존 systemd `EnvironmentFile`, 컨테이너 `env_file` 또는 secret manager에서 **backend 프로세스 환경변수로 주입**한다. intelligentAI의 B2 `.env`를 backend에 통째로 복사하지 않는다.
 
-`REDIS_*`는 기존 애플리케이션 cache이고 `ANALYSIS_REDIS_*`는 별도 분석 Stream이다. 이번에 미연결로 남기는 대상은 분석 Redis다. `ANALYSIS_STREAM_ENABLED=false`가 기존 cache의 Redis 의존성까지 제거하지는 않는다.
+`REDIS_*`는 기존 애플리케이션 cache이다. 이번 RunPod 단계에서는 `ANALYSIS_STREAM_ENABLED=false`를 유지하고, 분석 전송에는 `RUNPOD_ENDPOINT_URL`, `RUNPOD_API_KEY`, `AI_CALLBACK_TOKEN`, `PUBLIC_BACKEND_BASE_URL`을 사용한다. `ANALYSIS_STREAM_ENABLED=false`가 기존 cache의 Redis 의존성까지 제거하지는 않는다.
+
+현재 RunPod HTTP callback 전환에서 준비할 값은 다음이다.
+
+1. RunPod HTTP endpoint URL과 API key.
+2. Backend callback URL을 만들 public Backend base URL과 callback bearer token.
+3. RunPod worker의 S3 읽기 권한, 고정 Seungun/visual 자산, release SHA와 artifact attestation.
+4. intelligentAI `backend_analysis/production.py`와 `service.py`에 기존 로컬 Clova 생성 adapter 연결.
+5. 연결 후 실제 요청, 결과 callback, 취소, 재시도, 음성, 입술, Clova 결과를 담당자가 검증한 뒤 분석 admission을 활성화한다.
+
+아래 Redis Stream 준비 목록은 과거 MQ 전송안의 참고 기록이며, 이번 RunPod HTTP callback 단계에서는 적용하지 않는다.
+
+## 과거 Redis Stream 준비 목록
 
 후속 연결 담당자는 다음을 준비한다.
 

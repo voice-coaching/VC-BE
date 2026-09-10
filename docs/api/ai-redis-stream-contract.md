@@ -1,5 +1,11 @@
 # Backend-AI Redis Stream Contract
 
+> 현재 결정(2026-09-10): RunPod 연동에서는 이 Redis Stream 전송 방식을 사용하지 않는다.
+> VC-BE는 Redis를 애플리케이션 cache 용도로 유지하지만, Backend-AI 분석 전송은
+> RunPod HTTP 요청 + Backend callback 방식으로 전환한다. 이 문서는 향후 내부 worker
+> 또는 managed Redis 전환을 위한 보류 계약으로만 보관한다. 현재 RunPod 계약은
+> [Backend-AI RunPod HTTP Callback 계약](ai-runpod-http-callback-contract.md)을 따른다.
+
 현재 Backend 구현·검증·운영 gate 요약은
 [intelligentAI 음성·영상 분석 연동 구현 현황](../ai_analysis_integration_implementation.md)을
 참조한다. 이 문서는 교차 저장소 payload와 전달 계약의 정본이다.
@@ -69,6 +75,10 @@ claiming full Seungun + lips + Clova processing. See
 [API handoff](../runpod_pipeline_api_20260910.md).
 
 ## Purpose and boundary
+
+> 보류 문서 주의: 아래 내용은 Redis Stream MQ 전송안의 세부 계약이다.
+> 현재 RunPod HTTP callback 연동에는 적용하지 않는다. 현재 적용 계약은
+> [Backend-AI RunPod HTTP Callback 계약](ai-runpod-http-callback-contract.md)을 따른다.
 
 VC-BE and the intelligentAI worker exchange asynchronous audio-analysis work through
 Redis Streams. There is no backend-to-AI HTTP callback and the worker does not expose

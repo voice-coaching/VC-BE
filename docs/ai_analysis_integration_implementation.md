@@ -1,5 +1,10 @@
 # intelligentAI 음성·영상 분석 연동 구현 현황
 
+> 현재 결정(2026-09-10): RunPod 배포는 Redis Stream MQ 대신 HTTP 요청 +
+> Backend callback 방식을 사용한다. 공개 분석 API는 유지한다. Backend-AI DTO는
+> 연동 계층 내부에 두고 public API DTO로 재사용하지 않는다. 현재 계약은
+> [Backend-AI RunPod HTTP Callback 계약](api/ai-runpod-http-callback-contract.md)을 따른다.
+
 > 아래 내용은 2026-09-05 베타 구현·검증의 이력이다. 2026-09-10 API 보완에서는
 > 원본을 제외한 request v4 / authorization v3 / result v3가 운영 기본값이며,
 > 기존 v5 요청·v4 결과는 명시적 베타 옵션으로 남긴다. 현재 범위와 연결 전 조건은
@@ -9,7 +14,37 @@
 - 측정일: 2026-09-05
 - 구현 기준 브랜치: `AI-API`
 
+## 현재 RunPod 전송 방향
+
+현재 RunPod 배포 방향은 Redis Stream MQ가 아니라 HTTP callback이다.
+
+```text
+Client -> VC-BE public analyze API
+VC-BE -> RunPod HTTP endpoint
+RunPod -> VC-BE internal callback API
+VC-BE -> PostgreSQL analysis result tables
+Client -> VC-BE public status/result APIs
+```
+
+Redis는 기존 애플리케이션 cache 용도로 유지한다. Redis Stream 구현과 계약은 향후 내부
+worker 또는 managed Redis 배포를 위한 보류 인프라 문서로 남긴다.
+
+후속 구현 작업:
+
+1. `analysis` infrastructure 경계 아래에 RunPod HTTP client/adapter를 추가한다.
+2. RunPod request/response DTO는 public API DTO와 분리한다.
+3. [Backend-AI RunPod HTTP Callback 계약](api/ai-runpod-http-callback-contract.md)에 적힌 Backend internal callback endpoint를 추가한다.
+4. callback 결과는 기존 analysis application service/model 경계를 통해 저장한다.
+5. HTTP callback 전송을 사용하는 동안 `ANALYSIS_STREAM_ENABLED=false`를 유지한다.
+
 운영 release는 검토·커밋·전체 검증을 마친 깨끗한 SHA에서만 생성해야 한다.
+
+## 과거 Redis Stream 구현 기록
+
+아래 섹션들은 2026-09-05 기준 Redis Stream MQ 구현 이력과 검증 기록이다.
+현재 RunPod HTTP callback 전환 작업의 정본 계약은
+[Backend-AI RunPod HTTP Callback 계약](api/ai-runpod-http-callback-contract.md)이다.
+아래의 Redis Stream, request-v5, result-v4, ACK, PEL, DLQ 설명은 이번 RunPod HTTP callback 단계의 현재 적용 방식으로 해석하지 않는다.
 
 ## 문서 목적
 
