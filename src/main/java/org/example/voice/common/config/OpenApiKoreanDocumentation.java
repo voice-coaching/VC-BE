@@ -92,6 +92,7 @@ public class OpenApiKoreanDocumentation {
                 Map.entry("totalLearningSeconds", "실제 학습한 총 시간(초)"), Map.entry("fileName", "업로드할 원본 media 파일명"),
                 Map.entry("mimeType", "업로드할 원본 media MIME 타입"), Map.entry("fileSizeBytes", "업로드할 원본 media 크기(byte)"),
                 Map.entry("objectKey", "업로드 URL 발급 시 받은 스토리지 객체 키"), Map.entry("durationMs", "원본 media 재생 시간(ms)"),
+                Map.entry("analysisMediaType", "AI 분석 입력 유형. AUDIO_ONLY 또는 AUDIO_VISUAL"),
                 Map.entry("accepted", "현재 정책에 따른 음성 분석 처리 명시적 동의 여부"), Map.entry("policyRevision", "화면에 표시한 음성 분석 동의 정책 revision"),
                 Map.entry("feedbackStyle", "재생성할 피드백 스타일"), Map.entry("lastStepId", "마지막으로 완료한 클래스 단계 ID"),
                 Map.entry("progressPercent", "클래스 전체 진행률(0~100)"), Map.entry("type", "조회할 콘텐츠 또는 클래스 유형"),
@@ -105,6 +106,7 @@ public class OpenApiKoreanDocumentation {
                 Map.entry("contentId", 1), Map.entry("courseStepId", 3), Map.entry("totalLearningSeconds", 180),
                 Map.entry("fileName", "recording.webm"), Map.entry("mimeType", "audio/webm"), Map.entry("fileSizeBytes", 245760),
                 Map.entry("objectKey", "recordings/1/sample.webm"), Map.entry("durationMs", 15000), Map.entry("feedbackStyle", "COACHING"),
+                Map.entry("analysisMediaType", "AUDIO_ONLY"),
                 Map.entry("accepted", true), Map.entry("policyRevision", "voice-analysis-consent-v1"),
                 Map.entry("progressPercent", 50.0), Map.entry("page", 0), Map.entry("size", 20), Map.entry("limit", 5)
         );

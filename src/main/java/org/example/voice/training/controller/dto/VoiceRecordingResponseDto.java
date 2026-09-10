@@ -7,6 +7,7 @@ import java.time.OffsetDateTime;
 public record VoiceRecordingResponseDto(
         Long recordingId,
         Integer attemptNo,
+        String analysisMediaType,
         String qualityStatus,
         Boolean selected,
         OffsetDateTime createdAt
@@ -16,6 +17,7 @@ public record VoiceRecordingResponseDto(
         return new VoiceRecordingResponseDto(
                 data.recordingId(),
                 data.attemptNo(),
+                data.analysisMediaType(),
                 data.qualityStatus().name(),
                 data.selected(),
                 data.createdAt()

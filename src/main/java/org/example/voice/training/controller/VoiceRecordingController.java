@@ -36,7 +36,7 @@ public class VoiceRecordingController {
             @RequestBody RecordingUploadUrlRequestDto request
     ) {
         return ApiResponse.success(
-                "녹음 업로드 URL을 발급했습니다.",
+                "미디어 업로드 URL을 발급했습니다.",
                 RecordingUploadUrlResponseDto.from(recordingUploadService.createUploadUrl(sessionId, request, user.id()))
         );
     }
@@ -48,7 +48,7 @@ public class VoiceRecordingController {
             @RequestBody RecordingRegisterRequestDto request
     ) {
         return ApiResponse.success(
-                "녹음 파일이 등록되었습니다.",
+                "미디어 파일이 등록되었습니다.",
                 VoiceRecordingResponseDto.from(voiceRecordingService.register(sessionId, request, user.id()))
         );
     }

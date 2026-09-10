@@ -120,8 +120,8 @@ visualInput: optional
 
 ### `OpenApiKoreanDocumentation.java`
 
-Swagger/OpenAPI 표시 문구만 수정했다. Controller path, request DTO, response DTO, service
-흐름은 변경하지 않았다.
+Swagger/OpenAPI 표시 문구를 수정했다. Controller path, request DTO, service 흐름은
+유지하되, recording 등록/목록 응답 DTO에는 media 구분 필드를 추가했다.
 
 변경 내용:
 
@@ -130,6 +130,33 @@ Swagger/OpenAPI 표시 문구만 수정했다. Controller path, request DTO, res
 - 업로드 URL 발급 operation 이름을 "단일 media 업로드 URL 발급"으로 바꿨다.
 - 업로드 완료 등록 operation 이름을 "단일 media 업로드 완료 등록"으로 바꿨다.
 - 분석 요청 operation 이름을 "AI 분석 요청"으로 바꿨다.
+
+### Recording response DTO
+
+등록 응답과 목록 응답에 다음 필드를 추가했다.
+
+```json
+{
+  "analysisMediaType": "AUDIO_ONLY"
+}
+```
+
+필드 의미:
+
+- `analysisMediaType`: AI 분석 입력 유형이다. `AUDIO_ONLY` 또는 `AUDIO_VISUAL`을
+  반환한다.
+
+계산 기준:
+
+```text
+visualObjectKey == null
+  -> analysisMediaType = AUDIO_ONLY
+
+visualObjectKey != null
+  -> analysisMediaType = AUDIO_VISUAL
+```
+
+DB 컬럼은 추가하지 않았다. 기존 `voice_recordings.visual_object_key` 존재 여부로 계산한다.
 
 ## 새로 만들지 않은 API
 
@@ -149,7 +176,8 @@ POST /api/analyses/ai-test
 
 ## 남은 구현 확인 사항
 
-- 실제 Controller DTO는 이미 단일 media 구조라 이번 작업에서 변경하지 않았다.
+- request DTO는 이미 단일 media 구조라 이번 작업에서 변경하지 않았다.
+- response DTO는 AI 분석 입력 구분을 위해 `analysisMediaType`을 추가했다.
 - 영상 MIME일 때 동의 필드는 현재 정책대로 유지했다.
 - Redis Stream schema version은 변경하지 않았다.
 - 추후 음성과 영상을 별도 파일로 동시에 업로드하는 요구사항이 생기면 request body를

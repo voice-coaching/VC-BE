@@ -1684,6 +1684,7 @@ Content-Type: application/json
   "data": {
     "recordingId": "Long",
     "attemptNo": "Integer",
+    "analysisMediaType": "String", // AUDIO_ONLY 또는 AUDIO_VISUAL
     "qualityStatus": "String", // RecordingQualityStatus; voice_recordings.quality_status; 값: PENDING, PASS, LOW_VOLUME, TOO_NOISY, TOO_SHORT, NO_SPEECH, FAILED
     "selected": "Boolean",
     "createdAt": "String (ISO-8601)"
@@ -1714,6 +1715,7 @@ Content-Type: application/json
         "id": "Long",
         "attemptNo": "Integer",
         "durationMs": "Integer",
+        "analysisMediaType": "String", // AUDIO_ONLY 또는 AUDIO_VISUAL
         "qualityStatus": "String", // RecordingQualityStatus; voice_recordings.quality_status; 값: PENDING, PASS, LOW_VOLUME, TOO_NOISY, TOO_SHORT, NO_SPEECH, FAILED
         "selected": "Boolean"
       }

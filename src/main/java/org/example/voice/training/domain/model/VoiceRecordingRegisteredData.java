@@ -7,6 +7,7 @@ import java.time.OffsetDateTime;
 public record VoiceRecordingRegisteredData(
         Long recordingId,
         Integer attemptNo,
+        String analysisMediaType,
         RecordingQualityStatus qualityStatus,
         Boolean selected,
         OffsetDateTime createdAt

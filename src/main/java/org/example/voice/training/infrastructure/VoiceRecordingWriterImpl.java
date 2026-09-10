@@ -56,10 +56,15 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
         return new VoiceRecordingRegisteredData(
                 recording.getId(),
                 recording.getAttemptNo(),
+                analysisMediaType(recording.getVisualObjectKey()),
                 recording.getQualityStatus(),
                 recording.getSelected(),
                 recording.getCreatedAt()
         );
+    }
+
+    private static String analysisMediaType(String visualObjectKey) {
+        return visualObjectKey == null ? "AUDIO_ONLY" : "AUDIO_VISUAL";
     }
 
     @Override
