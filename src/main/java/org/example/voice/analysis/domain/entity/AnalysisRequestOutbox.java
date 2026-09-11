@@ -21,7 +21,7 @@ import java.util.UUID;
 
 /**
  * Durable dispatch boundary between the PostgreSQL transaction that accepts an
- * analysis request and the non-transactional Redis XADD side effect.
+ * analysis request and the non-transactional external delivery side effect.
  */
 @Entity
 @Getter
@@ -67,6 +67,15 @@ public class AnalysisRequestOutbox {
     @Column(name = "request_stream_id", length = 64)
     private String requestStreamId;
 
+    @Column(name = "transport", nullable = false, length = 20)
+    private String transport;
+
+    @Column(name = "execution_id", length = 36)
+    private String executionId;
+
+    @Column(name = "delivery_reference", length = 128)
+    private String deliveryReference;
+
     @Column(name = "retention_protocol_version")
     private Integer retentionProtocolVersion;
 
@@ -80,10 +89,18 @@ public class AnalysisRequestOutbox {
         this.nextAttemptAt = now;
         this.createdAt = now;
         this.retentionProtocolVersion = RETENTION_PROTOCOL_VERSION;
+        this.transport = "REDIS_STREAM";
     }
 
     public static AnalysisRequestOutbox pending(UUID eventId, AnalysisResult analysisResult, String payload) {
         return new AnalysisRequestOutbox(eventId, analysisResult, payload);
+    }
+
+    public static AnalysisRequestOutbox pendingHttp(UUID eventId, UUID executionId, AnalysisResult analysisResult, String payload) {
+        AnalysisRequestOutbox outbox = new AnalysisRequestOutbox(eventId, analysisResult, payload);
+        outbox.transport = "RUNPOD_HTTP";
+        outbox.executionId = executionId.toString();
+        return outbox;
     }
 
     public void markPublished(String streamId) {
@@ -92,6 +109,13 @@ public class AnalysisRequestOutbox {
         }
         this.status = AnalysisRequestOutboxStatus.PUBLISHED;
         this.requestStreamId = streamId;
+        this.publishedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        this.lastErrorCode = null;
+    }
+
+    public void markDelivered(String reference) {
+        this.status = AnalysisRequestOutboxStatus.PUBLISHED;
+        this.deliveryReference = reference == null || reference.isBlank() ? eventId : reference;
         this.publishedAt = OffsetDateTime.now(ZoneOffset.UTC);
         this.lastErrorCode = null;
     }

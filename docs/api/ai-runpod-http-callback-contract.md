@@ -115,7 +115,7 @@ Content-Type: application/json
     "mimeType": "video/mp4",
     "sha256": "String",
     "fileSizeBytes": "Long",
-    "durationMs": "Integer"
+    "durationMs": "Integer | null"
   },
   "deadlineAt": "2026-09-10T12:00:00Z"
 }
@@ -136,7 +136,7 @@ Content-Type: application/json
 | `scriptText` | Y | 선택된 세션/콘텐츠의 기준 script |
 | `scriptSha256` | Y | `scriptText` digest. RunPod 접수 전 대본 변조 검증에 사용 |
 | `audio` | Y | Backend가 생성한 canonical WAV 입력. `objectKey`, `mimeType`, `sha256`, `fileSizeBytes`, `durationMs` 포함 |
-| `video` | N | source media가 video일 때 Backend가 생성한 canonical MP4 입력. audio-only 분석이면 생략하거나 `null` |
+| `video` | N | source media가 video일 때 Backend가 생성한 canonical MP4 입력. audio-only 분석이면 생략하거나 `null`. 현재 Backend 모델에는 video 전용 duration 필드가 없어 `video.durationMs`는 생략될 수 있다. |
 | `deadlineAt` | Y | UTC 작업 만료 시각. 오래된 작업을 실행하지 않기 위한 작업 수명 정보 |
 
 RunPod은 `video`가 있다고 해서 별도 사용자 업로드로 해석하면 안 된다.
@@ -205,27 +205,19 @@ Content-Type: application/json
   "recordingId": "Long",
   "status": "COMPLETED",
   "outcome": "COACHING_READY",
-  "transcript": "String",
-  "overallScore": 82.5,
-  "pronunciationScore": 80.0,
-  "intonationScore": 85.0,
-  "speedWpm": 120.0,
-  "speedStatus": "NORMAL",
-  "stressScore": 78.0,
-  "pauseScore": 81.0,
-  "strengthsText": "String",
-  "weaknessesText": "String",
-  "summaryFeedback": "String",
-  "segments": [
-    {
-      "sequence": 1,
-      "targetUnit": "String",
-      "label": "String",
-      "score": 80.0,
-      "errorType": "String",
-      "feedback": "String"
-    }
-  ],
+  "summaryFeedback": "선택 음소의 발음 피드백",
+  "pronunciationEvidence": {
+    "schemaVersion": "voice-coaching.pronunciation-evidence.v1",
+    "selectedPhone": "String",
+    "selectedExpectedIndex": 0,
+    "selectedStartMs": 120,
+    "selectedEndMs": 260,
+    "detectorScore": 0.82,
+    "operatingThreshold": 0.7,
+    "scoreSemantics": "detector_ranking_score_not_calibrated_correctness_confidence",
+    "evidenceState": "frozen_detector_threshold_passed"
+  },
+  "visualSupplement": null,
   "audioSha256": "String",
   "workerRevision": "String",
   "pipelineRevision": "String",
@@ -246,13 +238,10 @@ Content-Type: application/json
 | `recordingId` | Y | 해당 분석의 선택된 recording과 일치해야 한다. |
 | `status` | Y | `COMPLETED` 또는 `FAILED` |
 | `outcome` | N | 완료 시 `COACHING_READY` 또는 `COMPLETED_NO_ISSUE` |
-| `transcript` | N | AI가 제공하는 경우 저장할 음성 인식 텍스트 |
-| score fields | N | AI metric 숫자 값. Backend는 현재 DB/model에서 지원하는 필드만 저장한다. |
-| `speedStatus` | N | 저장 전에 Backend가 지원하는 enum 값이어야 한다. |
-| `strengthsText` | N | 강점 요약 |
-| `weaknessesText` | N | 약점 요약 |
-| `summaryFeedback` | N | 사용자에게 보여줄 주요 피드백 |
-| `segments` | N | 선택적인 세그먼트 단위 피드백. 없으면 생략하거나 빈 배열 |
+| `summaryFeedback` | Y when `outcome=COACHING_READY` | 사용자에게 보여줄 주요 피드백 |
+| `pronunciationEvidence` | Y when `outcome=COACHING_READY` | 선택 음소, 위치, detector score, threshold 등 검증된 발음 근거 |
+| `visualSupplement` | N | 같은 source video에서 파생한 시각 보완 근거. 없으면 `null` 또는 생략 |
+| transcript/score/segments fields | N | 현재 RunPod HTTP 운영 경로에서는 저장하지 않는다. 제공하려면 DB/model 매핑을 먼저 확정한다. |
 | `audioSha256` | Y when completed | 등록된 canonical audio SHA-256과 비교 |
 | `workerRevision` | Y when completed | 실제 실행 worker revision |
 | `pipelineRevision` | Y when completed | 실제 실행 pipeline/model revision |

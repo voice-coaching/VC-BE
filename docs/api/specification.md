@@ -1764,7 +1764,7 @@ Content-Type: application/json
   Backend PostgreSQL job/outbox가 최종 작업 원장이며 RunPod 메모리 상태를 최종 상태로 보지 않는다.
 
 ### POST /api/internal/ai/analyses/{analysisId}/claim
-- 구현 상태: 예정
+- 구현 상태: 구현
 - Description: RunPod 분석 실행 점유 - RunPod이 특정 `requestId`/`executionId` 작업 실행을 맡았음을 Backend에 기록한다.
 - Auth: `Authorization: Bearer {AI_ANALYSIS_CALLBACK_TOKEN}`
 - Path params: `analysisId`
@@ -1797,7 +1797,7 @@ Content-Type: application/json
 - Error cases: callback token 누락 또는 불일치, analysis id 불일치, stale request id, stale execution id, 이미 terminal 상태인 analysis, 점유 저장 실패
 
 ### POST /api/internal/ai/analyses/{analysisId}/heartbeat
-- 구현 상태: 예정
+- 구현 상태: 구현
 - Description: RunPod 분석 실행 heartbeat - 처리 중인 실행 세대의 점유 만료 시각을 갱신하고 취소 여부를 확인한다.
 - Auth: `Authorization: Bearer {AI_ANALYSIS_CALLBACK_TOKEN}`
 - Path params: `analysisId`
@@ -1830,7 +1830,7 @@ Content-Type: application/json
 - Error cases: callback token 누락 또는 불일치, analysis id 불일치, stale request id, stale execution id, 이미 terminal 상태인 analysis, heartbeat 저장 실패
 
 ### POST /api/internal/ai/analyses/{analysisId}/result
-- 구현 상태: 예정
+- 구현 상태: 구현
 - Description: RunPod AI 분석 결과 callback - Backend가 요청한 비동기 분석 결과를 내부 API로 수신한다.
 - Auth: `Authorization: Bearer {AI_ANALYSIS_CALLBACK_TOKEN}`
 - Path params: `analysisId`

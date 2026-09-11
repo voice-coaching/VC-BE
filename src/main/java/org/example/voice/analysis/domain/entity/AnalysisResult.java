@@ -25,6 +25,7 @@ import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.Map;
 import java.util.Objects;
@@ -104,6 +105,24 @@ public class AnalysisResult {
 
     @Column(name = "active_request_event_id", length = 36)
     private String activeRequestEventId;
+
+    @Column(name = "active_execution_id", length = 36)
+    private String activeExecutionId;
+
+    @Column(name = "worker_instance_id", length = 100)
+    private String workerInstanceId;
+
+    @Column(name = "claim_expires_at")
+    private OffsetDateTime claimExpiresAt;
+
+    @Column(name = "last_heartbeat_at")
+    private OffsetDateTime lastHeartbeatAt;
+
+    @Column(name = "last_result_event_id", length = 36)
+    private String lastResultEventId;
+
+    @Column(name = "last_result_payload_sha256", length = 64)
+    private String lastResultPayloadSha256;
 
     @Column(name = "worker_revision", length = 100)
     private String workerRevision;
@@ -192,6 +211,7 @@ public class AnalysisResult {
     public void retry(UUID requestEventId) {
         this.status = AnalysisStatus.PENDING;
         this.activeRequestEventId = requestEventId.toString();
+        this.activeExecutionId = null;
         this.retryCount += 1;
         clearWorkerResult();
         this.analyzedAt = OffsetDateTime.now(SEOUL_ZONE_ID);
@@ -199,6 +219,63 @@ public class AnalysisResult {
 
     public boolean isForActiveRequest(UUID requestEventId) {
         return requestEventId != null && requestEventId.toString().equals(activeRequestEventId);
+    }
+
+    public void assignExecution(UUID executionId) {
+        Objects.requireNonNull(executionId, "executionId");
+        this.activeExecutionId = executionId.toString();
+        this.workerInstanceId = null;
+        this.claimExpiresAt = null;
+        this.lastHeartbeatAt = null;
+        this.lastResultEventId = null;
+        this.lastResultPayloadSha256 = null;
+    }
+
+    public boolean isForActiveExecution(UUID executionId) {
+        return executionId != null && executionId.toString().equals(activeExecutionId);
+    }
+
+    public boolean claim(UUID requestEventId, UUID executionId, String workerInstanceId, OffsetDateTime claimedUntil) {
+        if (!isForActiveRequest(requestEventId) || !isForActiveExecution(executionId) || isCompletedOrFailed()) {
+            return false;
+        }
+        this.workerInstanceId = requireWorker(workerInstanceId);
+        this.claimExpiresAt = Objects.requireNonNull(claimedUntil, "claimedUntil");
+        this.lastHeartbeatAt = OffsetDateTime.now(ZoneOffset.UTC);
+        markProcessing();
+        return true;
+    }
+
+    public boolean heartbeat(UUID requestEventId, UUID executionId, String workerInstanceId, OffsetDateTime heartbeatAt,
+                             OffsetDateTime claimExpiresAt) {
+        if (!isForActiveRequest(requestEventId) || !isForActiveExecution(executionId) || isCompletedOrFailed()) {
+            return false;
+        }
+        if (this.workerInstanceId != null && !this.workerInstanceId.equals(workerInstanceId)) {
+            return false;
+        }
+        this.workerInstanceId = requireWorker(workerInstanceId);
+        this.lastHeartbeatAt = Objects.requireNonNull(heartbeatAt, "heartbeatAt");
+        this.claimExpiresAt = Objects.requireNonNull(claimExpiresAt, "claimExpiresAt");
+        markProcessing();
+        return true;
+    }
+
+    public boolean isDuplicateResultEvent(UUID eventId, String payloadSha256) {
+        return eventId != null
+                && eventId.toString().equals(lastResultEventId)
+                && Objects.equals(payloadSha256, lastResultPayloadSha256);
+    }
+
+    public boolean isConflictingResultEvent(UUID eventId, String payloadSha256) {
+        return eventId != null
+                && eventId.toString().equals(lastResultEventId)
+                && !Objects.equals(payloadSha256, lastResultPayloadSha256);
+    }
+
+    public void rememberResultEvent(UUID eventId, String payloadSha256) {
+        this.lastResultEventId = Objects.requireNonNull(eventId, "eventId").toString();
+        this.lastResultPayloadSha256 = Objects.requireNonNull(payloadSha256, "payloadSha256");
     }
 
     public boolean markProcessing() {
@@ -357,5 +434,16 @@ public class AnalysisResult {
         this.visualPhoneAnchorRef = null;
         this.visualSupplementSha256 = null;
         this.visualClosedBetaLipObservation = null;
+    }
+
+    private boolean isCompletedOrFailed() {
+        return status == AnalysisStatus.COMPLETED || status == AnalysisStatus.FAILED;
+    }
+
+    private static String requireWorker(String workerInstanceId) {
+        if (workerInstanceId == null || workerInstanceId.isBlank() || workerInstanceId.length() > 100) {
+            throw new IllegalArgumentException("workerInstanceId is invalid");
+        }
+        return workerInstanceId;
     }
 }
