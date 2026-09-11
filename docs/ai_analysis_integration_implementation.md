@@ -20,7 +20,9 @@
 
 ```text
 Client -> VC-BE public analyze API
+VC-BE -> PostgreSQL analysis job + delivery outbox
 VC-BE -> RunPod HTTP endpoint
+RunPod -> VC-BE internal claim/heartbeat API
 RunPod -> VC-BE internal callback API
 VC-BE -> PostgreSQL analysis result tables
 Client -> VC-BE public status/result APIs
@@ -33,9 +35,13 @@ worker 또는 managed Redis 배포를 위한 보류 인프라 문서로 남긴�
 
 1. `analysis` infrastructure 경계 아래에 RunPod HTTP client/adapter를 추가한다.
 2. RunPod request/response DTO는 public API DTO와 분리한다.
-3. [Backend-AI RunPod HTTP Callback 계약](api/ai-runpod-http-callback-contract.md)에 적힌 Backend internal callback endpoint를 추가한다.
-4. callback 결과는 기존 analysis application service/model 경계를 통해 저장한다.
-5. HTTP callback 전송을 사용하는 동안 `ANALYSIS_STREAM_ENABLED=false`를 유지한다.
+3. 분석 요청과 RunPod 전달 outbox를 같은 DB transaction에 저장한다.
+4. Backend dispatcher가 outbox를 읽어 RunPod `POST /v1/analysis-jobs`로 전달하고 일시 실패를 재시도한다.
+5. [Backend-AI RunPod HTTP Callback 계약](api/ai-runpod-http-callback-contract.md)에 적힌 Backend internal claim, heartbeat, result endpoint를 추가한다.
+6. `requestId`, `executionId`, `eventId`로 중복 전달과 stale callback을 차단한다.
+7. callback 결과는 기존 analysis application service/model 경계를 통해 저장한다.
+8. 취소·삭제·timeout은 RunPod cancel과 stale execution 차단으로 연결한다.
+9. HTTP callback 전송을 사용하는 동안 `ANALYSIS_STREAM_ENABLED=false`를 유지한다.
 
 운영 release는 검토·커밋·전체 검증을 마친 깨끗한 SHA에서만 생성해야 한다.
 

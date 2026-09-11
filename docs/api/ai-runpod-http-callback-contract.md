@@ -7,6 +7,7 @@
 - 전송 방식: Backend -> RunPod HTTP 요청, RunPod -> Backend HTTP callback
 - Redis 사용: 기존 애플리케이션 cache 용도로 유지한다. 이번 단계의 Backend-AI 분석 전송에는 Redis Stream MQ를 사용하지 않는다.
 - 공개 API 호환성: 클라이언트가 호출하는 기존 분석 API는 유지한다.
+- 운영 기준: Backend PostgreSQL job/outbox를 작업 원장으로 두고, RunPod 실행은 claim/heartbeat/executionId로 관리한다.
 
 ## 배경
 
@@ -27,6 +28,7 @@ EC2 내부 Docker Redis를 RunPod에서 접근하게 만들려면 Redis public �
 ```text
 Client -> Backend public API
 Backend -> RunPod HTTP endpoint
+RunPod -> Backend internal claim/heartbeat API
 RunPod -> Backend internal callback API
 Client -> Backend status/result API
 ```
@@ -58,13 +60,32 @@ GET /api/analyses/{analysisId}/segments
 `POST /api/training-sessions/{sessionId}/analyze`는 Backend의 분석 상태를 생성하거나 갱신한 뒤
 RunPod에 분석 작업을 보낸다. 클라이언트는 RunPod을 직접 호출하지 않는다.
 
+## 운영형 작업 수명 원칙
+
+실제 사용자 요청을 안정적으로 처리하기 위해 Backend DB를 최종 작업 원장으로 사용한다.
+RunPod의 메모리, 로컬 파일, 임시 큐만으로 작업 상태를 판단하지 않는다.
+
+| 장치 | 의미 | 목적 |
+| --- | --- | --- |
+| Backend outbox | Backend DB에 RunPod으로 보내야 할 분석 요청을 먼저 저장 | Backend가 요청 전송 전후에 종료되어도 재전송 가능 |
+| `requestId` | 사용자의 논리적 분석 요청 ID | 같은 분석 요청의 전달 재시도와 사용자 재요청을 구분 |
+| `executionId` | 실제 RunPod 실행 세대 ID | Pod 재시작, 재배정, 늦은 결과를 구분 |
+| claim | RunPod이 해당 `executionId` 실행을 점유했다고 Backend에 기록 | 같은 작업의 중복 실행 방지 |
+| heartbeat | RunPod이 처리 중임을 주기적으로 Backend에 알림 | Pod 종료나 멈춤 감지 |
+| cancel | 사용자가 삭제/취소한 작업을 RunPod 실행에 전달 | 늦은 결과가 다시 저장되는 문제 방지 |
+| retry | 일시적인 네트워크/5xx/429 실패 재시도 | 단기 장애로 사용자 작업이 유실되는 문제 방지 |
+| stale execution 차단 | 현재 `executionId`와 다른 결과를 거절 | 예전 Pod의 늦은 callback 저장 방지 |
+
+초기 운영 기본값은 실행 슬롯 1개, Backend outbox 기반 재전송, RunPod callback 재전송을 권장한다.
+처리량 측정 후 실행 슬롯, heartbeat 주기, timeout, retry 횟수를 조정한다.
+
 ## Backend -> RunPod 요청
 
 ### Request
 
 ```http
-POST {RUNPOD_ENDPOINT_URL}
-Authorization: Bearer {RUNPOD_API_KEY}
+POST {RUNPOD_ENDPOINT_URL}/v1/analysis-jobs
+Authorization: Bearer {AI_ANALYSIS_API_TOKEN}
 Content-Type: application/json
 ```
 
@@ -74,26 +95,29 @@ Content-Type: application/json
 {
   "schemaVersion": "voice-coaching.runpod-analysis-request.v1",
   "requestId": "String",
+  "executionId": "String",
   "analysisId": "Long",
   "recordingId": "Long",
   "contentId": "Long",
   "learningFocus": "PRONUNCIATION",
+  "promptRevision": "String",
   "scriptText": "String",
+  "scriptSha256": "String",
   "audio": {
     "objectKey": "recordings/analysis-audio/{uuid}.wav",
     "mimeType": "audio/wav",
     "sha256": "String",
+    "fileSizeBytes": "Long",
     "durationMs": "Integer"
   },
   "video": {
     "objectKey": "recordings/analysis-video/{uuid}.mp4",
     "mimeType": "video/mp4",
-    "sha256": "String"
+    "sha256": "String",
+    "fileSizeBytes": "Long",
+    "durationMs": "Integer"
   },
-  "callback": {
-    "url": "https://{backend-host}/api/internal/ai/analyses/{analysisId}/result",
-    "authorizationScheme": "Bearer"
-  }
+  "deadlineAt": "2026-09-10T12:00:00Z"
 }
 ```
 
@@ -102,19 +126,62 @@ Content-Type: application/json
 | Field | Required | Description |
 | --- | --- | --- |
 | `schemaVersion` | Y | 고정값: `voice-coaching.runpod-analysis-request.v1` |
-| `requestId` | Y | Backend가 생성한 요청 멱등성 key |
+| `requestId` | Y | Backend가 생성한 논리적 분석 요청 UUID. 같은 전달 재시도에서는 유지 |
+| `executionId` | Y | Backend가 생성한 실행 세대 UUID. Pod 장애로 새 실행을 배정하면 교체 |
 | `analysisId` | Y | Backend 분석 ID |
 | `recordingId` | Y | 선택된 녹음 ID |
 | `contentId` | Y | 학습 콘텐츠 ID |
 | `learningFocus` | Y | 현재는 `PRONUNCIATION` |
+| `promptRevision` | Y | 분석 prompt/콘텐츠 규칙 revision |
 | `scriptText` | Y | 선택된 세션/콘텐츠의 기준 script |
-| `audio` | Y | Backend가 생성한 canonical WAV 입력 |
+| `scriptSha256` | Y | `scriptText` digest. RunPod 접수 전 대본 변조 검증에 사용 |
+| `audio` | Y | Backend가 생성한 canonical WAV 입력. `objectKey`, `mimeType`, `sha256`, `fileSizeBytes`, `durationMs` 포함 |
 | `video` | N | source media가 video일 때 Backend가 생성한 canonical MP4 입력. audio-only 분석이면 생략하거나 `null` |
-| `callback.url` | Y | 결과를 받을 Backend callback endpoint |
-| `callback.authorizationScheme` | Y | 현재는 `Bearer` |
+| `deadlineAt` | Y | UTC 작업 만료 시각. 오래된 작업을 실행하지 않기 위한 작업 수명 정보 |
 
 RunPod은 `video`가 있다고 해서 별도 사용자 업로드로 해석하면 안 된다.
 `video`는 같은 source media에서 Backend가 파생한 canonical 입력이다.
+RunPod은 요청 JSON의 임의 callback URL을 신뢰하지 않는다. Backend callback base URL은 RunPod 환경변수로 고정하고,
+`analysisId`를 사용해 정해진 callback 경로를 조합한다.
+
+### 접수 응답
+
+RunPod은 인증, schema, media metadata, 처리 여력, Backend claim이 성공한 뒤 `202 Accepted`를 반환한다.
+모델 준비 전이면 claim하지 않고 `503 Service Unavailable`을 반환한다.
+실행 슬롯이 꽉 찼으면 `429 Too Many Requests`와 `Retry-After`를 반환한다.
+
+```json
+{
+  "requestId": "String",
+  "executionId": "String",
+  "status": "ACCEPTED"
+}
+```
+
+### Backend -> RunPod 제어 API
+
+Backend는 같은 `AI_ANALYSIS_API_TOKEN`으로 RunPod의 분석 접수, 상태 확인, 취소 API를 호출한다.
+RunPod API는 public client API가 아니며 Backend 외부 호출을 허용하지 않는다.
+
+| API | 역할 |
+| --- | --- |
+| `POST {RUNPOD_ENDPOINT_URL}/v1/analysis-jobs` | 분석 작업 접수 |
+| `GET {RUNPOD_ENDPOINT_URL}/v1/analysis-jobs/{requestId}` | 현재 Pod가 알고 있는 실행 상태 확인. Backend DB가 최종 상태 |
+| `POST {RUNPOD_ENDPOINT_URL}/v1/analysis-jobs/{requestId}/cancel` | 특정 `executionId` 실행 취소 요청 |
+
+## Backend 내부 작업 제어 API
+
+이 API들은 public client API가 아니다. RunPod과 Backend 사이의 서버 간 내부 계약이다.
+
+| API | 역할 |
+| --- | --- |
+| `POST /api/internal/ai/analyses/{analysisId}/claim` | `requestId`/`executionId`를 현재 분석 작업과 비교하고 단일 RunPod 실행 점유를 기록 |
+| `POST /api/internal/ai/analyses/{analysisId}/heartbeat` | 같은 실행의 점유 만료 시각을 갱신하고 취소 여부를 반환 |
+| `POST /api/internal/ai/analyses/{analysisId}/result` | terminal 분석 결과 callback 수신 |
+
+claim과 heartbeat 요청은 `Authorization: Bearer {AI_ANALYSIS_CALLBACK_TOKEN}`으로 인증한다.
+Backend는 claim과 결과 적용을 DB 조건부 갱신 또는 row lock으로 처리한다.
+HTTP 호출 중에는 DB transaction이나 row lock을 길게 유지하지 않는다.
 
 ## RunPod -> Backend Callback 요청
 
@@ -122,7 +189,7 @@ RunPod은 `video`가 있다고 해서 별도 사용자 업로드로 해석하면
 
 ```http
 POST /api/internal/ai/analyses/{analysisId}/result
-Authorization: Bearer {AI_CALLBACK_TOKEN}
+Authorization: Bearer {AI_ANALYSIS_CALLBACK_TOKEN}
 Content-Type: application/json
 ```
 
@@ -131,10 +198,13 @@ Content-Type: application/json
 ```json
 {
   "schemaVersion": "voice-coaching.runpod-analysis-result.v1",
+  "eventId": "String",
   "requestId": "String",
+  "executionId": "String",
   "analysisId": "Long",
   "recordingId": "Long",
   "status": "COMPLETED",
+  "outcome": "COACHING_READY",
   "transcript": "String",
   "overallScore": 82.5,
   "pronunciationScore": 80.0,
@@ -156,6 +226,10 @@ Content-Type: application/json
       "feedback": "String"
     }
   ],
+  "audioSha256": "String",
+  "workerRevision": "String",
+  "pipelineRevision": "String",
+  "failureCode": null,
   "failureReason": null
 }
 ```
@@ -165,10 +239,13 @@ Content-Type: application/json
 | Field | Required | Description |
 | --- | --- | --- |
 | `schemaVersion` | Y | 고정값: `voice-coaching.runpod-analysis-result.v1` |
+| `eventId` | Y | 동일 callback 전달 재시도에서 고정하는 결과 이벤트 UUID |
 | `requestId` | Y | Backend 요청의 `requestId`와 일치해야 한다. 멱등성 검증에 사용한다. |
+| `executionId` | Y | 현재 Backend가 유효하다고 보는 실행 세대와 일치해야 한다. |
 | `analysisId` | Y | path variable의 `analysisId`와 일치해야 한다. |
 | `recordingId` | Y | 해당 분석의 선택된 recording과 일치해야 한다. |
 | `status` | Y | `COMPLETED` 또는 `FAILED` |
+| `outcome` | N | 완료 시 `COACHING_READY` 또는 `COMPLETED_NO_ISSUE` |
 | `transcript` | N | AI가 제공하는 경우 저장할 음성 인식 텍스트 |
 | score fields | N | AI metric 숫자 값. Backend는 현재 DB/model에서 지원하는 필드만 저장한다. |
 | `speedStatus` | N | 저장 전에 Backend가 지원하는 enum 값이어야 한다. |
@@ -176,7 +253,11 @@ Content-Type: application/json
 | `weaknessesText` | N | 약점 요약 |
 | `summaryFeedback` | N | 사용자에게 보여줄 주요 피드백 |
 | `segments` | N | 선택적인 세그먼트 단위 피드백. 없으면 생략하거나 빈 배열 |
-| `failureReason` | N | `status=FAILED`이면 필요하고, `COMPLETED`이면 `null` |
+| `audioSha256` | Y when completed | 등록된 canonical audio SHA-256과 비교 |
+| `workerRevision` | Y when completed | 실제 실행 worker revision |
+| `pipelineRevision` | Y when completed | 실제 실행 pipeline/model revision |
+| `failureCode` | Y when failed | 실패 시 고정 실패 코드 |
+| `failureReason` | Y when failed | 실패 시 사용자 표시 가능한 설명. `COMPLETED`이면 `null` |
 
 ## Callback 응답
 
@@ -203,31 +284,45 @@ Content-Type: application/json
 | --- | --- |
 | `400 Bad Request` | schema version 오류, 잘못된 body, `analysisId` 불일치, 지원하지 않는 enum 값 |
 | `401 Unauthorized` | callback token 누락 또는 불일치 |
+| `403 Forbidden` | 서버 간 호출 권한 없음 |
 | `404 Not Found` | 분석 결과 대상이 존재하지 않음 |
-| `409 Conflict` | 이미 terminal 상태이거나 stale `requestId` |
+| `409 Conflict` | 이미 terminal 상태, stale `requestId`, stale `executionId`, 동일 `eventId`의 다른 결과 |
+| `429 Too Many Requests` | 일시적인 처리 제한 |
 | `422 Unprocessable Entity` | 현재 DB/model 제약에 결과를 매핑할 수 없음 |
 | `503 Service Unavailable` | 일시적인 의존성 문제로 callback 결과 저장 실패 |
 
-## 멱등성과 Retry
+## 멱등성, Retry, 복구
 
-- Backend는 RunPod 요청에 `requestId`를 포함한다.
-- RunPod은 callback에 같은 `requestId`를 포함해야 한다.
+- Backend는 분석 요청과 RunPod 전달 outbox를 같은 DB transaction에 저장한다.
+- Backend dispatcher는 outbox를 읽어 RunPod에 전달하고, 일시 실패 시 같은 `requestId`/`executionId`로 재시도한다.
+- RunPod은 callback에 같은 `requestId`, `executionId`, `eventId`를 포함해야 한다.
 - Backend는 같은 terminal 결과 callback이 중복으로 와도 DB row를 중복 생성하지 않아야 한다.
-- RunPod이 2xx가 아닌 응답을 받으면 같은 `requestId`로 재시도할 수 있다.
-- HTTP 전송 단계의 retry timing은 RunPod이 소유한다.
+- Backend는 현재 실행 세대와 다른 `executionId` 결과를 stale callback으로 보고 저장하지 않는다.
+- RunPod이 callback에서 `429`, 일시적 `5xx`, 네트워크 오류를 받으면 같은 `eventId`로 재전송한다.
+- `400`, `401`, `403`, `404`, `409`, `422`는 자동 재전송을 종료하고 운영 오류로 기록한다.
+- heartbeat가 끊기면 Backend는 점유 만료 후 기존 `executionId`를 무효화하고 새 `executionId`로 재배정할 수 있다.
+- 사용자 취소 또는 녹음 삭제가 발생하면 Backend는 먼저 작업을 terminal/canceled 상태로 만들고 RunPod cancel을 전송한다. 늦은 결과는 저장하지 않는다.
+- 위 상태 관리를 위해 DB migration이 필요하다. 실행 세대, worker instance, heartbeat/claim 만료 시각,
+  전달 재시도 횟수, 마지막 callback `eventId` 또는 결과 digest를 저장할 수 있어야 한다.
 
 ## 환경변수
 
 ```env
+AI_ANALYSIS_TRANSPORT=runpod_http
 ANALYSIS_STREAM_ENABLED=false
 
 RUNPOD_ENDPOINT_URL=
-RUNPOD_API_KEY=
-AI_CALLBACK_TOKEN=
-PUBLIC_BACKEND_BASE_URL=
+AI_ANALYSIS_API_TOKEN=
+AI_ANALYSIS_CALLBACK_TOKEN=
+AI_ANALYSIS_CALLBACK_BASE_URL=
+AI_ANALYSIS_EXECUTION_TIMEOUT=PT15M
+AI_ANALYSIS_HEARTBEAT_INTERVAL=PT15S
+AI_ANALYSIS_CLAIM_TTL=PT90S
+AI_ANALYSIS_DISPATCH_RETRY_MAX_ATTEMPTS=5
+AI_ANALYSIS_CALLBACK_RETRY_MAX_ATTEMPTS=5
 ```
 
-`RUNPOD_API_KEY`와 `AI_CALLBACK_TOKEN`은 secret이다.
+`AI_ANALYSIS_API_TOKEN`과 `AI_ANALYSIS_CALLBACK_TOKEN`은 secret이다.
 Git, 로그, API 응답에 노출하지 않는다.
 
 ## Redis Stream 상태

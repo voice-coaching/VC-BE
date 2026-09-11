@@ -65,7 +65,9 @@ This document summarizes the API list exported from the local API spec directory
 
 | Method | URL | Auth | Description |
 | --- | --- | --- | --- |
-| POST | `/api/internal/ai/analyses/{analysisId}/result` | Bearer `AI_CALLBACK_TOKEN` | 예정된 RunPod 분석 결과 callback. [RunPod HTTP callback 계약](ai-runpod-http-callback-contract.md)을 따른다. |
+| POST | `/api/internal/ai/analyses/{analysisId}/claim` | Bearer `AI_ANALYSIS_CALLBACK_TOKEN` | 예정된 RunPod 분석 실행 점유 API. [RunPod HTTP callback 계약](ai-runpod-http-callback-contract.md)을 따른다. |
+| POST | `/api/internal/ai/analyses/{analysisId}/heartbeat` | Bearer `AI_ANALYSIS_CALLBACK_TOKEN` | 예정된 RunPod 분석 실행 heartbeat API. [RunPod HTTP callback 계약](ai-runpod-http-callback-contract.md)을 따른다. |
+| POST | `/api/internal/ai/analyses/{analysisId}/result` | Bearer `AI_ANALYSIS_CALLBACK_TOKEN` | 예정된 RunPod 분석 결과 callback. [RunPod HTTP callback 계약](ai-runpod-http-callback-contract.md)을 따른다. |
 
 ## By Category
 
