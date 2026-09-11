@@ -59,6 +59,16 @@ This document summarizes the API list exported from the local API spec directory
 | GET | `/api/training-sessions/{sessionId}/recordings` | Bearer accessToken | 녹음 시도 목록 조회 - 해당 학습 세션의 녹음 시도와 품질 검사 상태 조회 |
 | PATCH | `/api/training-sessions/{sessionId}/recordings/{recordingId}/select` | Bearer accessToken | 최종 녹음 선택 - 분석에 사용할 최종 녹음을 선택하고 다른 시도는 선택 해제 |
 
+## 내부 API
+
+이 endpoint는 Backend-AI 내부 계약이며 public client API가 아니다.
+
+| Method | URL | Auth | Description |
+| --- | --- | --- | --- |
+| POST | `/api/internal/ai/analyses/{analysisId}/claim` | Bearer `AI_ANALYSIS_CALLBACK_TOKEN` | RunPod 분석 실행 점유 API. [RunPod HTTP callback 계약](ai-runpod-http-callback-contract.md)을 따른다. |
+| POST | `/api/internal/ai/analyses/{analysisId}/heartbeat` | Bearer `AI_ANALYSIS_CALLBACK_TOKEN` | RunPod 분석 실행 heartbeat API. [RunPod HTTP callback 계약](ai-runpod-http-callback-contract.md)을 따른다. |
+| POST | `/api/internal/ai/analyses/{analysisId}/result` | Bearer `AI_ANALYSIS_CALLBACK_TOKEN` | RunPod 분석 결과 callback. [RunPod HTTP callback 계약](ai-runpod-http-callback-contract.md)을 따른다. |
+
 ## By Category
 
 ### 인증

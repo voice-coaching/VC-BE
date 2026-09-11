@@ -27,6 +27,9 @@ public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResul
     Optional<AnalysisResult> findForIngestion(@Param("analysisId") Long analysisId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<AnalysisResult> findFirstByActiveRequestEventId(String activeRequestEventId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select a from AnalysisResult a
             where a.recording.trainingSession.id = :sessionId

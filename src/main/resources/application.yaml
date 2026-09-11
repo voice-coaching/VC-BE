@@ -84,6 +84,18 @@ storage:
     maximum-duration-ms: ${MEDIA_NORMALIZATION_MAXIMUM_DURATION_MS:180000}
 
 analysis:
+  transport: ${AI_ANALYSIS_TRANSPORT:disabled}
+  runpod:
+    endpoint-url: ${RUNPOD_ENDPOINT_URL:}
+    api-token: ${AI_ANALYSIS_API_TOKEN:}
+    callback-token: ${AI_ANALYSIS_CALLBACK_TOKEN:}
+    callback-base-url: ${AI_ANALYSIS_CALLBACK_BASE_URL:}
+    execution-timeout: ${AI_ANALYSIS_EXECUTION_TIMEOUT:PT15M}
+    claim-ttl: ${AI_ANALYSIS_CLAIM_TTL:PT90S}
+    outbox-poll-interval: ${AI_ANALYSIS_OUTBOX_POLL_INTERVAL:PT1S}
+    batch-size: ${AI_ANALYSIS_BATCH_SIZE:25}
+    dispatch-max-attempts: ${AI_ANALYSIS_DISPATCH_RETRY_MAX_ATTEMPTS:5}
+    maximum-payload-bytes: ${AI_ANALYSIS_MAXIMUM_PAYLOAD_BYTES:65536}
   authorization:
     key-id: ${ANALYSIS_AUTHORIZATION_KEY_ID:}
     signing-secret-base64: ${ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64:}

@@ -40,6 +40,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/email-availability", "/api/auth/signup", "/api/auth/login",
                                 "/api/auth/social-login", "/api/auth/token/refresh", "/swagger-ui/**", "/v3/api-docs/**",
+                                "/api/internal/ai/**",
                                 "/internal/actuator/health/**", "/internal/actuator/prometheus").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors
