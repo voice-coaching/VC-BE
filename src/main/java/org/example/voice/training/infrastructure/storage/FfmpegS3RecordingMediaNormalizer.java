@@ -2,7 +2,8 @@ package org.example.voice.training.infrastructure.storage;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.training.domain.model.NormalizedRecordingData;
@@ -352,7 +353,7 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
         byte[] output = run(command, true, source.getParent());
         try {
             return objectMapper.readValue(output, ProbeDocument.class);
-        } catch (IOException error) {
+        } catch (JacksonException error) {
             throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
         }
     }

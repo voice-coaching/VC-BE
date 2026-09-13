@@ -1,6 +1,6 @@
 package org.example.voice.training.infrastructure.storage;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.training.domain.model.NormalizedRecordingData;
