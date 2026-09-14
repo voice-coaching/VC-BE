@@ -7,7 +7,7 @@ import org.example.voice.analysis.infrastructure.stream.AnalysisStreamProperties
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
@@ -22,7 +22,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 
 @Component
-@ConditionalOnProperty(prefix = "analysis.stream", name = "enabled", havingValue = "true")
+@ConditionalOnExpression("'${analysis.transport:redis_stream}' == 'redis_stream' and '${analysis.stream.enabled:false}' == 'true'")
 public class HmacAnalysisAuthorizationIssuer implements AnalysisAuthorizationIssuer {
     private static final Duration MAXIMUM_TTL = Duration.ofMinutes(10);
 

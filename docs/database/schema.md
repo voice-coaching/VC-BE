@@ -231,6 +231,12 @@
 | feedback_regeneration_count | integer | Y | 0 | - | - | 종합 피드백 재생성 횟수 |
 | feedback_regenerated_at | timestamptz | N | - | - | - | 마지막 종합 피드백 재생성 시각 |
 | active_request_event_id | varchar(36) | N | - | Index | - | 현재 분석 요청 generation UUID. 이전 재시도 결과를 거부한다. |
+| active_execution_id | varchar(36) | N | - | Index, Check | - | 현재 RunPod HTTP 실행 세대 UUID. 이전 Pod의 늦은 결과를 거부한다. |
+| worker_instance_id | varchar(100) | N | - | - | - | 현재 실행을 점유한 RunPod worker instance ID |
+| claim_expires_at | timestamptz | N | - | Index | - | RunPod 실행 점유 만료 시각 |
+| last_heartbeat_at | timestamptz | N | - | - | - | 마지막 RunPod heartbeat 수신 시각 |
+| last_result_event_id | varchar(36) | N | - | Check | - | 마지막으로 반영한 RunPod 결과 callback event UUID |
+| last_result_payload_sha256 | varchar(64) | N | - | Check | - | 마지막으로 반영한 RunPod 결과 callback payload digest |
 | retry_count | integer | Y | 0 | CHECK | - | 동일 분석 행의 누적 사용자 재시도 횟수(0~3). 상태 변경이나 서버 재시작으로 초기화되지 않는다. |
 | analysis_outcome | varchar(40) | N | - | - | - | 완료된 분석의 근거 제한 outcome |
 | failure_code | varchar(100) | N | - | - | - | 내부 안정 실패 코드. public API에는 노출하지 않는다. |
@@ -239,7 +245,7 @@
 | audio_sha256 | varchar(64) | N | - | - | - | 처리한 audio digest receipt |
 
 ### analysis_request_outbox
-- 목적: DB 분석 요청과 Redis Stream `XADD` 사이의 at-least-once dispatch를 보장한다.
+- 목적: DB 분석 요청과 외부 AI 전송(Redis Stream 또는 RunPod HTTP) 사이의 at-least-once dispatch를 보장한다.
 - 해당 모듈: analysis/training AI integration
 - Soft delete: 없음
 - Migration: `V3__add_analysis_stream_integration.sql`
@@ -256,6 +262,11 @@
 | last_error_code | varchar(100) | N | - | - | - | stable dispatch failure code |
 | created_at | timestamptz | Y | now() | - | - | enqueue time |
 | published_at | timestamptz | N | - | - | - | successful XADD time |
+| request_stream_id | varchar(64) | N | - | - | - | Redis Stream 전송 시 XADD stream id |
+| retention_protocol_version | integer | N | - | Index | - | Redis Stream retention 처리 protocol version |
+| transport | varchar(20) | Y | `REDIS_STREAM` | Index, Check | - | 전송 방식. `REDIS_STREAM`, `RUNPOD_HTTP` |
+| execution_id | varchar(36) | N | - | Check | - | RunPod HTTP 전송 시 실행 세대 UUID |
+| delivery_reference | varchar(128) | N | - | - | - | RunPod HTTP 접수 성공 참조값 |
 
 ### processing_consents
 - 목적: 음성 분석과 얼굴 영상 처리에 대한 명시적 동의 receipt 및 철회 시각을 감사 가능하게 보존한다.
@@ -360,7 +371,7 @@
 | voice_recordings.training_session_id | training_sessions.id | N:1 | 기본 FK 동작 | 세션별 녹음 시도 |
 | analysis_results.recording_id | voice_recordings.id | 1:1 | 기본 FK 동작 | 녹음 1개당 분석 결과 1개 |
 | analysis_segments.analysis_result_id | analysis_results.id | N:1 | 기본 FK 동작 | 분석 결과별 세그먼트 |
-| analysis_request_outbox.analysis_id | analysis_results.id | N:1 | 기본 FK 동작 | 분석 요청 Stream dispatch 기록 |
+| analysis_request_outbox.analysis_id | analysis_results.id | N:1 | 기본 FK 동작 | 분석 요청 external dispatch 기록 |
 
 ## Enum 값
 
@@ -431,9 +442,11 @@
 | analysis_results | analysis_outcome | RERECORD_REQUIRED | 내용/품질 사유로 재녹음 필요 |
 | analysis_results | analysis_outcome | UNCERTAIN | 근거 부족으로 안전한 결론 불가 |
 | analysis_results | analysis_outcome | FAILED_CLOSED | 안전 gate가 fail-closed 됨 |
-| analysis_request_outbox | status | PENDING | Stream 발행 대기 |
-| analysis_request_outbox | status | PUBLISHED | Stream 발행 완료 |
+| analysis_request_outbox | status | PENDING | 외부 AI 전송 대기 |
+| analysis_request_outbox | status | PUBLISHED | 외부 AI 전송 완료 |
 | analysis_request_outbox | status | FAILED | dispatch 재시도 소진 |
+| analysis_request_outbox | transport | REDIS_STREAM | Redis Stream 전송 |
+| analysis_request_outbox | transport | RUNPOD_HTTP | RunPod HTTP 전송 |
 | analysis_segments | match_type | MATCH | 일치 |
 | analysis_segments | match_type | SUBSTITUTION | 대체 |
 | analysis_segments | match_type | OMISSION | 누락 |

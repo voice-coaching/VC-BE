@@ -20,7 +20,7 @@ video media
   -> AI request: audio fields + visualInput
 ```
 
-Backend-AI Redis Stream request에서는 `audioObjectKey`가 항상 필수다. `visualInput`은
+Backend-AI RunPod HTTP request에서는 `audioObjectKey`가 항상 필수다. `visualInput`은
 업로드 media가 영상이고 영상 분석 입력이 만들어졌을 때만 포함한다.
 
 ## 수정 대상 API 명세
@@ -106,11 +106,11 @@ video/webm
 - 선택된 recording에 canonical video가 있으면 audio+video AI request를 발행한다.
 - 클라이언트가 analyze 요청에서 audio/video 구분을 다시 보내지 않는다.
 
-## Redis Stream 계약 확인
+## RunPod HTTP 계약 확인
 
 수정 위치:
 
-- `docs/api/ai-redis-stream-contract.md`
+- `docs/api/ai-runpod-http-callback-contract.md`
 
 현재 방향:
 
@@ -151,7 +151,7 @@ Backend-AI request model:
 
 ## 이번 문서화에서 변경하지 않는 것
 
-- Redis Stream JSON schema version은 변경하지 않는다.
+- RunPod HTTP request/result schema version은 변경하지 않는다.
 - 영상 처리 동의 필드는 유지한다.
 - DB 컬럼 삭제나 migration 추가는 하지 않는다.
 - public API endpoint path는 새로 만들지 않는다.
@@ -160,6 +160,6 @@ Backend-AI request model:
 
 - `docs/api/specification.md`에서 upload-url, recordings, analyze 설명이 위 결정 사항과 일치한다.
 - `docs/api/endpoints.md`의 요약 문구가 "단일 media 입력"과 "영상이면 음성+영상 파생"을 반영한다.
-- `docs/api/ai-redis-stream-contract.md`가 Backend-AI 내부 payload 기준으로 audio 필수,
+- `docs/api/ai-runpod-http-callback-contract.md`가 Backend-AI 내부 payload 기준으로 audio 필수,
   visualInput 선택을 명확히 설명한다.
-- 구현 시 Controller DTO와 AI Stream DTO를 재사용하지 않는다.
+- 구현 시 Controller DTO와 RunPod HTTP 내부 DTO를 재사용하지 않는다.

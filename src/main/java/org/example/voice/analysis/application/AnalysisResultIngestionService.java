@@ -15,6 +15,8 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 /** Applies an AI result only when it belongs to the currently active retry generation. */
 @Service
 @RequiredArgsConstructor
@@ -35,10 +37,33 @@ public class AnalysisResultIngestionService {
             @CacheEvict(cacheNames = AnalysisCacheNames.SEGMENTS, allEntries = true)
     })
     public AnalysisResultIngestionDisposition ingest(AnalysisWorkerResult message) {
+        return ingest(message, null, null);
+    }
+
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = AnalysisCacheNames.DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = AnalysisCacheNames.SESSION_RESULT, allEntries = true),
+            @CacheEvict(cacheNames = AnalysisCacheNames.SEGMENTS, allEntries = true)
+    })
+    public AnalysisResultIngestionDisposition ingest(
+            AnalysisWorkerResult message,
+            UUID executionId,
+            String payloadSha256
+    ) {
         AnalysisResult analysisResult = analysisResultReader.findForIngestion(message.analysisId())
                 .orElseThrow(() -> new IllegalArgumentException("analysis result does not exist"));
         if (!analysisResult.isForActiveRequest(message.requestEventId())) {
             return AnalysisResultIngestionDisposition.IGNORED_STALE;
+        }
+        if (executionId != null && !analysisResult.isForActiveExecution(executionId)) {
+            return AnalysisResultIngestionDisposition.IGNORED_STALE;
+        }
+        if (analysisResult.isDuplicateResultEvent(message.eventId(), payloadSha256)) {
+            return AnalysisResultIngestionDisposition.IGNORED_DUPLICATE;
+        }
+        if (analysisResult.isConflictingResultEvent(message.eventId(), payloadSha256)) {
+            throw new IllegalArgumentException("analysis result event conflicts with previous payload");
         }
 
         return switch (message.status()) {
@@ -53,6 +78,9 @@ public class AnalysisResultIngestionService {
                 if (!analysisResult.complete(message)) {
                     yield AnalysisResultIngestionDisposition.IGNORED_DUPLICATE;
                 }
+                if (payloadSha256 != null) {
+                    analysisResult.rememberResultEvent(message.eventId(), payloadSha256);
+                }
                 analysisResultWriter.save(analysisResult);
                 analysisSegmentWriter.replaceForAnalysis(analysisResult, message.segments());
                 scheduleVisualDeletion(analysisResult);
@@ -65,6 +93,9 @@ public class AnalysisResultIngestionService {
                         message.workerRevision(),
                         message.pipelineRevision()
                 );
+                if (failed && payloadSha256 != null) {
+                    analysisResult.rememberResultEvent(message.eventId(), payloadSha256);
+                }
                 analysisResultWriter.save(analysisResult);
                 yield failed
                         ? AnalysisResultIngestionDisposition.APPLIED

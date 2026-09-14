@@ -52,7 +52,7 @@ Content-Type: application/json
 - Auth: Bearer accessToken.
 - Path params / Query params / Request body: 없음.
 - Status: `200 OK`; 인증이 없거나 유효하지 않으면 `401`, 접근 거부 시 `403`.
-- Response body (아직 저장소·분석 Redis를 연결하지 않은 기본 설정 예):
+- Response body (아직 저장소·RunPod 분석 callback을 연결하지 않은 기본 설정 예):
 
 ```json
 {
@@ -77,7 +77,7 @@ Content-Type: application/json
 }
 ```
 
-`recordingUpload`은 저장소와 미디어 정규화가 켜져 있으면 `CONFIGURED`, 아니면 `NOT_CONFIGURED`다. `analysisRequests`는 여기에 분석 Stream이 켜져 있어야 `CONFIGURED`다. 이 API는 S3·Redis·RunPod를 호출하지 않으며, `CONFIGURED`가 연결 성공이나 추론 준비를 보증하지 않는다. 실제 업로드·분석 요청의 오류 처리도 유지한다.
+`recordingUpload`은 저장소와 미디어 정규화가 켜져 있으면 `CONFIGURED`, 아니면 `NOT_CONFIGURED`다. `analysisRequests`는 RunPod HTTP dispatch와 callback 설정이 켜져 있어야 `CONFIGURED`다. 이 API는 S3·RunPod를 호출하지 않으며, `CONFIGURED`가 연결 성공이나 추론 준비를 보증하지 않는다. 실제 업로드·분석 요청의 오류 처리도 유지한다.
 
 크기는 바이트, 길이는 밀리초다. 표시된 파일 한도는 음성 20MiB·영상 100MiB의 업로드 URL 발급 상한과 배포된 정규화 입력 한도 중 작은 값이다. 프론트는 등록까지 처리 가능한 이 보수적인 한도를 사용한다. URL 발급 자체의 상한보다 정규화 한도가 작으면, 더 큰 파일로 URL을 얻더라도 등록 단계에서 거부된다. 영상에는 오디오 트랙이 있어야 하며 해당 영상에서 canonical WAV를 추출한다.
 
@@ -91,7 +91,7 @@ Content-Type: application/json
 4. 상세 결과의 `summaryFeedback`은 워커가 보낸 승인 문장을 그대로 저장·반환한다. 결과의 음성 SHA-256은 등록된 canonical WAV와 일치해야 하며 영상이 등록되지 않은 시도의 시각 결과는 거부한다. `pronunciationEvidence`와 `visualSupplement`의 같은 음소 관계도 유지한다. 현재 STT·발음 총점·억양·속도 점수는 공급되지 않아 null이며 임의 점수로 채우지 않는다.
 5. `/feedback/regenerate`의 현재 구현은 저장된 승인 문장을 다시 제공한다. Clova의 새 추론이나 새 교정 행동 생성으로 해석하지 않는다.
 
-기본 분석 전송 계약은 원본 미디어를 제외한 request v4 / authorization v3 / result v3다. 개인정보·원본을 포함하는 기존 베타 계약은 `ANALYSIS_CLOSED_BETA_ENABLED=true`에서만 사용한다. [전송 계약](ai-redis-stream-contract.md), [이번 API 연결 안내](../runpod_pipeline_api_20260910.md)를 참고한다.
+기본 분석 전송 계약은 RunPod HTTP request + Backend callback이다. 기존 Redis Stream 계약은 이번 RunPod 단계에서는 사용하지 않고 향후 내부 worker 또는 managed Redis 전환 시 참고 문서로 보관한다. [RunPod HTTP callback 계약](ai-runpod-http-callback-contract.md), [이번 API 연결 안내](../runpod_pipeline_api_20260910.md)를 참고한다.
 
 ### GET /api/auth/email-availability
 - Description: 이메일 중복 확인 - Query: email. 사용 가능한 이메일이면 available=true 반환
@@ -413,8 +413,9 @@ Content-Type: application/json
 }
 ```
 - 이 API는 파일을 직접 받지 않는다.
-- 선택된 recording이 audio media에서 등록된 경우 Backend는 audio-only Redis Stream request를 발행한다.
-- 선택된 recording이 video media에서 등록된 경우 Backend는 영상에서 파생한 canonical WAV와 canonical MP4를 함께 담은 Redis Stream request를 발행한다.
+- 선택된 recording이 audio media에서 등록된 경우 Backend는 RunPod에 audio-only HTTP 분석 요청을 보낸다.
+- 선택된 recording이 video media에서 등록된 경우 Backend는 영상에서 파생한 canonical WAV와 canonical MP4를 함께 담아 RunPod에 HTTP 분석 요청을 보낸다.
+- 분석 결과는 RunPod이 Backend internal callback API로 전달한다.
 - 클라이언트는 analyze 요청에서 audio/video 구분을 다시 보내지 않는다.
 - Response body:
 ```json
@@ -1750,10 +1751,101 @@ Content-Type: application/json
 - Status codes: 200 OK
 - Error cases: See common error codes
 
-## Internal API Mapping
+## 내부 API 매핑
 
-- VC-BE와 AI worker 간 분석 요청/결과 계약은
-  [versioned Redis Stream contract](ai-redis-stream-contract.md)를 따른다.
-- 이 공개 REST API는 분석 요청과 상태·결과 조회만 제공한다. worker는 직접 HTTP callback이나
-  사용자별 Presigned URL을 사용하지 않으며, 전용 Redis Stream과 worker 권한의 객체 저장소로 연동한다.
-- STT와 AI 피드백 구현 세부사항은 worker 내부 계약이며 공개 API DTO에 직접 노출하지 않는다.
+- 현재 RunPod 기반 Backend-AI 분석 연동은
+  [RunPod HTTP callback 계약](ai-runpod-http-callback-contract.md)을 따른다.
+- 기존 [Redis Stream contract](ai-redis-stream-contract.md)는 이번 RunPod 단계에서는 사용하지 않고,
+  향후 내부 worker 또는 managed Redis 전환 시 참고 문서로 보관한다.
+- 이 공개 REST API는 분석 요청과 상태·결과 조회만 제공한다. RunPod은 Backend internal callback API로
+  결과를 전달하며, 클라이언트는 RunPod API나 내부 callback API를 직접 호출하지 않는다.
+- STT와 AI 피드백 구현 세부사항은 RunPod/AI 내부 계약이며 공개 API DTO에 직접 노출하지 않는다.
+- 운영형 RunPod 전송은 Backend outbox, claim, heartbeat, retry, stale execution 차단을 포함한다.
+  Backend PostgreSQL job/outbox가 최종 작업 원장이며 RunPod 메모리 상태를 최종 상태로 보지 않는다.
+
+### POST /api/internal/ai/analyses/{analysisId}/claim
+- 구현 상태: 구현
+- Description: RunPod 분석 실행 점유 - RunPod이 특정 `requestId`/`executionId` 작업 실행을 맡았음을 Backend에 기록한다.
+- Auth: `Authorization: Bearer {AI_ANALYSIS_CALLBACK_TOKEN}`
+- Path params: `analysisId`
+- Query params: None
+- Request body:
+```json
+{
+  "schemaVersion": "voice-coaching.runpod-analysis-claim.v1",
+  "requestId": "String",
+  "executionId": "String",
+  "workerInstanceId": "String",
+  "claimedUntil": "ISO-8601 datetime"
+}
+```
+- Response body:
+```json
+{
+  "result": "Boolean",
+  "message": "String",
+  "data": {
+    "analysisId": "Long",
+    "requestId": "String",
+    "executionId": "String",
+    "accepted": "Boolean",
+    "canceled": "Boolean"
+  }
+}
+```
+- Status codes: 200 OK, 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 503 Service Unavailable
+- Error cases: callback token 누락 또는 불일치, analysis id 불일치, stale request id, stale execution id, 이미 terminal 상태인 analysis, 점유 저장 실패
+
+### POST /api/internal/ai/analyses/{analysisId}/heartbeat
+- 구현 상태: 구현
+- Description: RunPod 분석 실행 heartbeat - 처리 중인 실행 세대의 점유 만료 시각을 갱신하고 취소 여부를 확인한다.
+- Auth: `Authorization: Bearer {AI_ANALYSIS_CALLBACK_TOKEN}`
+- Path params: `analysisId`
+- Query params: None
+- Request body:
+```json
+{
+  "schemaVersion": "voice-coaching.runpod-analysis-heartbeat.v1",
+  "requestId": "String",
+  "executionId": "String",
+  "workerInstanceId": "String",
+  "heartbeatAt": "ISO-8601 datetime"
+}
+```
+- Response body:
+```json
+{
+  "result": "Boolean",
+  "message": "String",
+  "data": {
+    "analysisId": "Long",
+    "requestId": "String",
+    "executionId": "String",
+    "continueProcessing": "Boolean",
+    "canceled": "Boolean"
+  }
+}
+```
+- Status codes: 200 OK, 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 503 Service Unavailable
+- Error cases: callback token 누락 또는 불일치, analysis id 불일치, stale request id, stale execution id, 이미 terminal 상태인 analysis, heartbeat 저장 실패
+
+### POST /api/internal/ai/analyses/{analysisId}/result
+- 구현 상태: 구현
+- Description: RunPod AI 분석 결과 callback - Backend가 요청한 비동기 분석 결과를 내부 API로 수신한다.
+- Auth: `Authorization: Bearer {AI_ANALYSIS_CALLBACK_TOKEN}`
+- Path params: `analysisId`
+- Query params: None
+- Request body: [RunPod HTTP callback 계약](ai-runpod-http-callback-contract.md)을 따른다.
+- Response body:
+```json
+{
+  "result": "Boolean",
+  "message": "String",
+  "data": {
+    "analysisId": "Long",
+    "status": "String"
+  }
+}
+```
+- Status codes: 200 OK, 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable Entity, 503 Service Unavailable
+- Error cases: callback token 누락 또는 불일치, analysis id 불일치, stale request id, stale execution id, 이미 terminal 상태인 analysis, 지원하지 않는 result schema, 결과 저장 실패

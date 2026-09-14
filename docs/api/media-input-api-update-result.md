@@ -19,7 +19,7 @@ video source media
   -> AI request는 audio + visualInput
 ```
 
-Backend-AI Redis Stream payload는 기존 방향을 유지한다.
+Backend-AI RunPod HTTP request payload는 기존 방향을 유지한다.
 
 ```text
 audioObjectKey: required
@@ -101,10 +101,10 @@ visualInput: optional
 
 - "음성 분석 요청"을 "AI 분석 요청"으로 정리했다.
 - 이 API는 파일을 직접 받지 않는다고 명시했다.
-- 선택된 recording이 audio media 기반이면 audio-only Redis Stream request를 발행한다고
+- 선택된 recording이 audio media 기반이면 audio-only RunPod HTTP request를 발행한다고
   명시했다.
 - 선택된 recording이 video media 기반이면 canonical WAV와 canonical MP4를 함께 담은
-  Redis Stream request를 발행한다고 명시했다.
+  RunPod HTTP request를 발행한다고 명시했다.
 - 클라이언트는 analyze 요청에서 audio/video 구분을 다시 보내지 않는다고 명시했다.
 
 현재 request body:
@@ -172,13 +172,13 @@ POST /api/analyses/ai-test
 
 - 현재 요구사항은 하나의 source media를 업로드하는 흐름이다.
 - 기존 `recordings/upload-url`과 `recordings`가 이미 이 유스케이스의 리소스 경계다.
-- Backend-AI Redis Stream 계약은 public API가 아니라 내부 infrastructure 계약이다.
+- Backend-AI RunPod HTTP callback 계약은 public API가 아니라 내부 infrastructure 계약이다.
 
 ## 남은 구현 확인 사항
 
 - request DTO는 이미 단일 media 구조라 이번 작업에서 변경하지 않았다.
 - response DTO는 AI 분석 입력 구분을 위해 `analysisMediaType`을 추가했다.
 - 영상 MIME일 때 동의 필드는 현재 정책대로 유지했다.
-- Redis Stream schema version은 변경하지 않았다.
+- RunPod HTTP request/result schema version은 변경하지 않았다.
 - 추후 음성과 영상을 별도 파일로 동시에 업로드하는 요구사항이 생기면 request body를
   `audio` 필수 + `video` 선택 nested 구조로 재설계해야 한다.

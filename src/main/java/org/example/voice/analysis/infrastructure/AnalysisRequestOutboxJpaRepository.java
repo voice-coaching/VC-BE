@@ -25,6 +25,13 @@ public interface AnalysisRequestOutboxJpaRepository extends JpaRepository<Analys
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<AnalysisRequestOutbox> findFirstByTransportAndStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(
+            String transport,
+            AnalysisRequestOutboxStatus status,
+            OffsetDateTime now
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<AnalysisRequestOutbox> findByAnalysisResultIdAndStatus(
             Long analysisId,
             AnalysisRequestOutboxStatus status
