@@ -12,7 +12,6 @@ import org.example.voice.user.domain.port.LoginProviderReader;
 import org.example.voice.user.domain.port.UserReader;
 import org.example.voice.user.domain.port.UserSessionRevoker;
 import org.example.voice.user.domain.port.UserWriter;
-import org.example.voice.user.exception.NicknameAlreadyExistsException;
 import org.example.voice.user.exception.UserNotFoundException;
 import org.example.voice.user.exception.WithdrawalAlreadyProcessedException;
 import org.example.voice.training.domain.port.RecordingDeletionScheduler;
@@ -68,9 +67,6 @@ public class UserService {
     public UpdatedUserProfile updateMyProfile(Long userId, String nickname) {
         User user = userReader.findByIdForUpdate(userId).orElseThrow(UserNotFoundException::new);
         String normalizedNickname = nickname.trim();
-        if (userReader.existsByNicknameExcludingUserId(normalizedNickname, userId)) {
-            throw new NicknameAlreadyExistsException();
-        }
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         user.updateNickname(normalizedNickname, now);

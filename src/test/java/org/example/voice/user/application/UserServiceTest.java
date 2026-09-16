@@ -10,7 +10,6 @@ import org.example.voice.user.domain.port.UserReader;
 import org.example.voice.user.domain.port.UserSessionRevoker;
 import org.example.voice.user.domain.port.UserWriter;
 import org.example.voice.user.domain.type.UserStatus;
-import org.example.voice.user.exception.NicknameAlreadyExistsException;
 import org.example.voice.user.exception.WithdrawalAlreadyProcessedException;
 import org.example.voice.training.domain.port.RecordingDeletionScheduler;
 import org.example.voice.training.domain.type.RecordingDeletionReason;
@@ -97,21 +96,9 @@ class UserServiceTest {
 
         var result = userService.updateMyProfile(1L, "  새닉네임  ");
 
-        verify(userReader).existsByNicknameExcludingUserId("새닉네임", 1L);
         verify(user).updateNickname(eq("새닉네임"), any(OffsetDateTime.class));
         verify(userWriter).save(user);
         assertThat(result.nickname()).isEqualTo("새닉네임");
-    }
-
-    @Test
-    void updateMyProfileRejectsDuplicateNickname() {
-        User user = mock(User.class);
-        when(userReader.findByIdForUpdate(1L)).thenReturn(Optional.of(user));
-        when(userReader.existsByNicknameExcludingUserId("중복", 1L)).thenReturn(true);
-
-        assertThatThrownBy(() -> userService.updateMyProfile(1L, "중복"))
-                .isInstanceOf(NicknameAlreadyExistsException.class);
-        verifyNoInteractions(userWriter);
     }
 
     @Test

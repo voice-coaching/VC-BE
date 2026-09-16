@@ -294,6 +294,7 @@ Content-Type: application/json
 
 ### PATCH /api/users/me
 - Description: 프로필 수정 - 닉네임 등 수정 가능한 사용자 기본 정보 변경
+- Note: `nickname`은 표시 이름이며 다른 사용자와 중복될 수 있다.
 - Auth: Bearer accessToken
 - Path params: None
 - Query params: None
