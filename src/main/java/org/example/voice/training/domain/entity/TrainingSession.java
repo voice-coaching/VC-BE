@@ -48,6 +48,15 @@ public class TrainingSession {
     @Column(name = "course_education_revision_id")
     private Long courseEducationRevisionId;
 
+    @Column(name = "practice_example_id", length = 100) private String practiceExampleId;
+    @Column(name = "practice_example_set_id") private Long practiceExampleSetId;
+    @Column(name = "practice_example_revision") private Integer practiceExampleRevision;
+
+    public void pinPracticeExample(String id, Long setId, Integer revision) {
+        if (practiceExampleId != null || id == null || setId == null || revision == null) throw new IllegalStateException("Invalid example pin");
+        practiceExampleId = id; practiceExampleSetId = setId; practiceExampleRevision = revision;
+    }
+
     public void pinCourseEducation(Long revisionId) {
         if (courseEducationRevisionId != null) throw new IllegalStateException("Education revision is already pinned");
         courseEducationRevisionId = revisionId;

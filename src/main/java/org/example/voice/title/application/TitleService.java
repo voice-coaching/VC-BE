@@ -24,6 +24,7 @@ public class TitleService implements TitleExamSessionLink {
     private final UserReader users;
     private final TrainingSessionWriter sessions;
     private final Clock clock;
+    private final org.example.voice.practiceexample.domain.port.PracticeExampleReader examples;
     public record Next(String code, String label, long requiredTrainingCount, long remainingTrainingCount, int passingScore, boolean eligible) {}
     public record Progress(String code, String label, long completedTrainingCount, long minimumTrainingCount, Next next, OffsetDateTime updatedAt) {}
     public record Exam(Long id, String currentTitle, String targetTitle, Long practiceContentId,
@@ -62,7 +63,10 @@ public class TitleService implements TitleExamSessionLink {
             var rule = policy(target);
             if (titles.completedCount(userId) < rule.getRequiredTrainingCount()) throw new TitleException(409, "TITLE_EXAM_NOT_ELIGIBLE");
             if (!titles.availableContent(rule.getPracticeContentId())) throw new TitleException(503, "TITLE_EXAM_CONTENT_UNAVAILABLE");
-            exam = titles.save(TitleExam.create(userId, title.getRank(), rule, now()));
+            exam = TitleExam.create(userId, title.getRank(), rule, now());
+            var example = examples.forSession(rule.getPracticeContentId(), null);
+            if (example != null) exam.pinPracticeExample(example.setId(), example.revision());
+            exam = titles.save(exam);
         }
         if (digest != null) titles.remember(new TitleExamRequest(userId, digest, exam.getId()));
         return view(exam, true);

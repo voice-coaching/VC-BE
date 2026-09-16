@@ -173,3 +173,8 @@ notification:
   reminders:
     enabled: ${PRACTICE_REMINDERS_ENABLED:false}
     poll-interval: PT1M
+
+practice-examples:
+  tts:
+    enabled: ${CHIRP_TTS_ENABLED:false}
+    quota-project: ${GOOGLE_CLOUD_QUOTA_PROJECT:}

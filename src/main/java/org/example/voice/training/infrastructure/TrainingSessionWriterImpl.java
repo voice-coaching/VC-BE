@@ -31,6 +31,7 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;
     private final RecordingDeletionScheduler recordingDeletionScheduler;
     private final org.example.voice.course.domain.port.CourseEducationReader courseEducation;
+    private final org.example.voice.practiceexample.domain.port.PracticeExampleReader examples;
 
     @Override
     @Transactional
@@ -38,9 +39,11 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     public TrainingSessionCreatedData create(Long userId, Long contentId, Long courseStepId, LearningFocus learningFocus) {
         PracticeContent content = practiceContentJpaRepository.findById(contentId)
                 .orElseThrow(() -> new BaseException(ErrorCode.CONTENT_NOT_FOUND));
-        Long revisionId = courseEducation.revisionForSession(courseStepId, contentId);
+        var example = examples.forSession(contentId, courseStepId);
+        Long revisionId = example != null && courseStepId != null ? example.educationRevisionId() : courseEducation.revisionForSession(courseStepId, contentId);
         TrainingSession session = TrainingSession.create(userId, content, courseStepId, learningFocus);
         session.pinCourseEducation(revisionId);
+        if (example != null) session.pinPracticeExample(example.id(), example.setId(), example.revision());
         session = trainingSessionJpaRepository.save(session);
         return new TrainingSessionCreatedData(
                 session.getId(),

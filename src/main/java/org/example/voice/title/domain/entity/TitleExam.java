@@ -17,6 +17,12 @@ public class TitleExam {
     @Enumerated(EnumType.STRING) @Column(name = "previous_rank", nullable = false, length = 30) private TitleRank previousRank;
     @Enumerated(EnumType.STRING) @Column(name = "target_rank", nullable = false, length = 30) private TitleRank targetRank;
     @Column(name = "practice_content_id", nullable = false) private Long practiceContentId;
+    private Long practiceExampleSetId;
+    private Integer practiceExampleRevision;
+    public void pinPracticeExample(Long setId, Integer revision) {
+        if (practiceExampleSetId != null || setId == null || revision == null) throw new IllegalStateException("Invalid example pin");
+        practiceExampleSetId = setId; practiceExampleRevision = revision;
+    }
     @Column(name = "required_training_count", nullable = false) private long requiredTrainingCount;
     @Column(name = "passing_score", nullable = false) private int passingScore;
     @Column(name = "training_session_id", unique = true) private Long trainingSessionId;
