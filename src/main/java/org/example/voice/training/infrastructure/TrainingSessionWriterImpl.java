@@ -100,9 +100,6 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     })
     public TrainingSessionCompletionData complete(Long sessionId, Integer totalLearningSeconds) {
         TrainingSession session = findForUpdate(sessionId);
-        if (session.getStatus() != TrainingSessionStatus.ANALYZING) {
-            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
-        }
         session.complete(totalLearningSeconds);
         return new TrainingSessionCompletionData(session.getId(), session.getStatus(), session.getCompletedAt());
     }

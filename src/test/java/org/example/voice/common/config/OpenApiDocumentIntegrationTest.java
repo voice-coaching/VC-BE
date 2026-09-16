@@ -23,6 +23,24 @@ class OpenApiDocumentIntegrationTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    void documentsSupportValidationIdempotencyAndErrorCodes() throws Exception {
+        String body = mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        JsonNode document = objectMapper.readTree(body);
+        JsonNode operation = document.path("paths").path("/api/inquiries").path("post");
+        assertThat(operation.path("responses").has("201")).isTrue();
+        assertThat(operation.path("responses").path("409").path("description").asText()).contains("CONFLICT");
+        assertThat(operation.path("parameters").toString()).contains("Idempotency-Key");
+        String schemaRef = operation.path("requestBody").path("content").path("application/json")
+                .path("schema").path("$ref").asText();
+        JsonNode request = document.path("components").path("schemas")
+                .path(schemaRef.substring(schemaRef.lastIndexOf('/') + 1));
+        assertThat(request.path("properties").path("subject").path("maxLength").asInt()).isEqualTo(100);
+        assertThat(request.path("properties").path("body").path("maxLength").asInt()).isEqualTo(2000);
+        assertThat(request.path("required").toString()).contains("category", "subject", "body");
+    }
+
+    @Test
     void generatedOpenApiContainsKoreanDocumentationForEveryEndpoint() throws Exception {
         String body = mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
@@ -40,7 +58,7 @@ class OpenApiDocumentIntegrationTest {
                 assertThat(field.getValue().path("tags").get(0).asText()).containsPattern("[가-힣]");
             }
         }
-        assertThat(operationCount).isEqualTo(54);
+        assertThat(operationCount).isEqualTo(59);
         assertThat(paths.path("/api/analysis-capabilities").path("get").path("summary").asText())
                 .isEqualTo("녹음·분석 지원 조건 조회");
     }

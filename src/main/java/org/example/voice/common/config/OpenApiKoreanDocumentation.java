@@ -28,7 +28,8 @@ public class OpenApiKoreanDocumentation {
                     tag("학습 세션", "학습 세션, 녹음 파일과 분석 요청 과정을 관리합니다."),
                     tag("분석 결과", "완료된 음성 분석 점수, 구간별 피드백과 종합 피드백을 제공합니다."),
                     tag("클래스", "클래스 목록, 단계와 사용자별 학습 진도를 관리합니다."),
-                    tag("마이페이지", "내 학습 기록, 통계, 강점·약점과 맞춤 추천을 제공합니다.")
+                    tag("마이페이지", "내 학습 기록, 통계, 강점·약점과 맞춤 추천을 제공합니다."),
+                    tag("고객 지원", "게시된 공지와 본인의 문의를 조회하고 접수합니다.")
             ));
             DOCS.forEach((key, doc) -> {
                 PathItem pathItem = openApi.getPaths().get(key.path());
@@ -188,6 +189,11 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/users/me/strengths-weaknesses", "마이페이지", "강점 및 약점 조회", "음절 분석을 발음 항목별로 집계해 반복 시도한 강점과 약점을 점수순으로 제공합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/users/me/score-trends", "마이페이지", "점수 변화 추이 조회", "선택한 종합·발음·억양 점수의 날짜별 평균과 학습 횟수를 그래프 데이터로 제공합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/users/me/weakness-recommendations", "마이페이지", "약점 기반 추천 조회", "최근 반복된 발음 약점과 연결되는 공개 학습 콘텐츠와 클래스를 추천합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/notices", "고객 지원", "공지 목록 조회", "게시 시간이 지난 공개 공지만 고정 여부, 게시 시간, ID 내림차순으로 조회합니다. 페이지 크기는 1~100입니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/notices/{noticeId}", "고객 지원", "공지 상세 조회", "게시된 공지의 구조화된 텍스트 섹션을 조회합니다. 숨김 또는 게시 전 공지는 404입니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/inquiries", "고객 지원", "문의 접수", "본인 학습 세션에 대한 문의를 접수합니다. 선택 Idempotency-Key는 1~128자 ASCII이며 같은 사용자·키·본문은 같은 201 접수 결과를 반환하고 다른 본문은 409입니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/inquiries", "고객 지원", "내 문의 목록 조회", "인증된 사용자의 문의를 생성 시간과 ID 내림차순으로 조회합니다. hasNext를 항상 반환합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/inquiries/{inquiryId}", "고객 지원", "내 문의 상세 조회", "본인 문의와 답변을 조회합니다. 존재하지 않거나 다른 사용자의 문의는 동일한 404 응답입니다.", false);
         return Map.copyOf(map);
     }
 
