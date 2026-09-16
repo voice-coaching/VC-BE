@@ -34,7 +34,8 @@ public class AnalysisCapabilitiesReaderImpl implements AnalysisCapabilitiesReade
         String policyRevision = authorization.getConsentPolicyRevision();
         return new AnalysisCapabilitiesData(
                 status(uploadConfigured),
-                status(uploadConfigured && (stream.isEnabled() || isRunPodHttpConfigured())),
+                status(uploadConfigured && policyRevision != null && !policyRevision.isBlank()
+                        && (stream.isEnabled() || isRunPodHttpConfigured())),
                 List.of(LearningFocus.PRONUNCIATION),
                 RecordingMediaPolicy.AUDIO_MIME_TYPES,
                 RecordingMediaPolicy.VIDEO_MIME_TYPES,

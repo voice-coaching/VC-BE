@@ -43,7 +43,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(ConstraintViolationException exception) {
         log.warn("Constraint violation: {}", exception.getMessage());
         return ResponseEntity.badRequest()
-                .body(ApiResponse.error(ErrorCode.INVALID_EMAIL_FORMAT.getMessage()));
+                .body(ApiResponse.error(exception.getConstraintViolations().stream()
+                        .allMatch(violation -> violation.getConstraintDescriptor().getAnnotation()
+                                .annotationType().equals(jakarta.validation.constraints.Email.class))
+                        && !exception.getConstraintViolations().isEmpty()
+                        ? ErrorCode.INVALID_EMAIL_FORMAT.getMessage()
+                        : ErrorCode.INVALID_INPUT_VALUE.getMessage()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
