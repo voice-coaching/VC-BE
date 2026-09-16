@@ -17,6 +17,8 @@ import lombok.NoArgsConstructor;
 import org.example.voice.practicecontent.domain.entity.PracticeContent;
 import org.example.voice.practicecontent.domain.type.LearningFocus;
 import org.example.voice.training.domain.type.TrainingSessionStatus;
+import org.example.voice.common.exception.BaseException;
+import org.example.voice.common.exception.ErrorCode;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -102,9 +104,20 @@ public class TrainingSession {
     }
 
     public void complete(Integer totalLearningSeconds) {
+        if (status == TrainingSessionStatus.COMPLETED) {
+            return;
+        }
+        if (status != TrainingSessionStatus.ANALYZING) {
+            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
+        }
+        if (totalLearningSeconds != null && totalLearningSeconds < 0) {
+            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+        }
         this.status = TrainingSessionStatus.COMPLETED;
         this.completedAt = OffsetDateTime.now(SEOUL_ZONE_ID);
-        this.totalLearningSeconds = totalLearningSeconds == null ? 0 : totalLearningSeconds;
+        if (totalLearningSeconds != null) {
+            this.totalLearningSeconds = totalLearningSeconds;
+        }
     }
 
     public void cancel() {
