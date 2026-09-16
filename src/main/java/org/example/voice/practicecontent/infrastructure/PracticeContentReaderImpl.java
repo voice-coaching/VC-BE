@@ -33,23 +33,12 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
 
     private final PracticeContentJpaRepository practiceContentJpaRepository;
     private final ReferenceAudioJpaRepository referenceAudioJpaRepository;
+    private final org.example.voice.practicecontent.domain.port.ContentCatalogReader catalog;
 
     @Override
-    @Cacheable(
-            cacheNames = PracticeContentCacheNames.LIST,
-            key = "T(org.example.voice.practicecontent.infrastructure.cache.PracticeContentCacheKeys).list(#p0)"
-    )
     public PracticeContentPageData<PracticeContentSummaryData> findPracticeContents(PracticeContentQueryConditionDto condition) {
-        PageRequest pageRequest = PageRequest.of(
-                condition.page(),
-                condition.size(),
-                Sort.by(Sort.Order.desc("publishedAt").nullsLast(), Sort.Order.desc("createdAt"))
-        );
-        Page<PracticeContent> page = practiceContentJpaRepository.findAll(searchSpec(condition), pageRequest);
-        List<PracticeContentSummaryData> items = page.getContent().stream()
-                .map(this::toSummaryData)
-                .toList();
-        return PracticeContentPageData.of(items, page.getNumber(), page.getSize(), page.getTotalElements());
+        return catalog.list(new org.example.voice.practicecontent.domain.model.ContentCatalogData.Filter(
+                condition.type(),condition.category(),condition.difficulty(),condition.focus()),condition.page(),condition.size());
     }
 
     @Override
@@ -115,25 +104,6 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
                         .toList()
                 )
                 .map(PracticeContentRecommendationListData::new);
-    }
-
-    private Specification<PracticeContent> searchSpec(PracticeContentQueryConditionDto condition) {
-        return (root, query, criteriaBuilder) -> {
-            var predicate = criteriaBuilder.equal(root.get("status"), PublishStatus.PUBLISHED);
-            if (condition.type() != null) {
-                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("contentType"), condition.type()));
-            }
-            if (condition.category() != null && !condition.category().isBlank()) {
-                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("category"), condition.category()));
-            }
-            if (condition.difficulty() != null) {
-                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("difficulty"), condition.difficulty()));
-            }
-            if (condition.focus() != null) {
-                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("learningFocus"), condition.focus()));
-            }
-            return predicate;
-        };
     }
 
     private Specification<PracticeContent> nextSpec(PracticeContentNextConditionDto condition) {
