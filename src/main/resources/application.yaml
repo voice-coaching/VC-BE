@@ -1,5 +1,10 @@
 spring:
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
   jackson:
     time-zone: Asia/Seoul
 
@@ -62,6 +67,12 @@ auth:
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+profile-image:
+  enabled: ${PROFILE_IMAGE_ENABLED:false}
+  bucket: ${PROFILE_IMAGE_BUCKET:}
+  region: ${PROFILE_IMAGE_REGION:}
+  cdn-base-url: ${PROFILE_IMAGE_CDN_BASE_URL:}
 
 storage:
   enabled: ${OBJECT_STORAGE_ENABLED:false}

@@ -61,6 +61,11 @@ public class User {
     @Column(name = "role", nullable = false)
     private UserRole role;
 
+    @Column(name = "profile_image_url", length = 2048)
+    private String profileImageUrl;
+
+    public void updateProfileImageUrl(String imageUrl) { this.profileImageUrl = imageUrl; }
+
     private User(String email, String password, String nickname, OffsetDateTime now) {
         this.email = email;
         this.password = password;
