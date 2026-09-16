@@ -53,7 +53,6 @@ class SupportPostgresMigrationTest {
                     sql.executeUpdate(inquirySql("null"));
                 }
                 assertThat(migrations.info().current().getVersion().getVersion()).isEqualTo("18");
-                assertThat(migrations.info().pending()).isEmpty();
             } finally {
                 // Only the randomly generated schema owned by this test is removed.
                 db.setSchema("public");

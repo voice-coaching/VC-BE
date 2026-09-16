@@ -16,6 +16,11 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMultipartSize(Exception ignored) {
+        return ResponseEntity.status(413).body(ApiResponse.error("업로드 용량 제한을 초과했습니다.", "PAYLOAD_TOO_LARGE"));
+    }
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException exception) {
         log.warn("Business exception: {}", exception.getMessage());

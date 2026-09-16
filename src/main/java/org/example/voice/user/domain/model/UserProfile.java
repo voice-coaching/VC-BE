@@ -12,6 +12,7 @@ public record UserProfile(
         UserStatus status,
         List<String> loginProviders,
         boolean onboardingCompleted,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        String profileImageUrl
 ) {
 }

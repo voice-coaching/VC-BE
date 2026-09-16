@@ -194,6 +194,10 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.POST, "/api/inquiries", "고객 지원", "문의 접수", "본인 학습 세션에 대한 문의를 접수합니다. 선택 Idempotency-Key는 1~128자 ASCII이며 같은 사용자·키·본문은 같은 201 접수 결과를 반환하고 다른 본문은 409입니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/users/me/inquiries", "고객 지원", "내 문의 목록 조회", "인증된 사용자의 문의를 생성 시간과 ID 내림차순으로 조회합니다. hasNext를 항상 반환합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/users/me/inquiries/{inquiryId}", "고객 지원", "내 문의 상세 조회", "본인 문의와 답변을 조회합니다. 존재하지 않거나 다른 사용자의 문의는 동일한 404 응답입니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/profile-image", "사용자", "프로필 사진 조회", "본인 사진을 조회하며 미등록 상태는 data:null입니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/users/me/profile-image", "사용자", "프로필 사진 등록", "JPEG/PNG/WebP 최대 5MB, 치수 128~4096px 파일을 정사각 PNG로 변환합니다. 기존 사진은 409이며 Idempotency-Key 재요청은 최초 응답을 반환합니다.", false);
+        add(map, PathItem.HttpMethod.PUT, "/api/users/me/profile-image", "사용자", "프로필 사진 교체", "기존 사진을 새 파일로 교체하고 이전 파일은 비동기 삭제합니다. 미등록 상태는 404입니다.", false);
+        add(map, PathItem.HttpMethod.DELETE, "/api/users/me/profile-image", "사용자", "프로필 사진 삭제", "사진을 제거하고 파일 삭제를 예약합니다. 이미 없어도 204입니다.", false);
         return Map.copyOf(map);
     }
 

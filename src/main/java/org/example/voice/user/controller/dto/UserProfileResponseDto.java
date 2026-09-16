@@ -11,11 +11,12 @@ public record UserProfileResponseDto(
         String status,
         List<String> loginProviders,
         boolean onboardingCompleted,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        String profileImageUrl
 ) {
     public static UserProfileResponseDto from(UserProfile profile) {
         return new UserProfileResponseDto(
                 profile.id(), profile.email(), profile.nickname(), profile.status().name(),
-                profile.loginProviders(), profile.onboardingCompleted(), profile.createdAt());
+                profile.loginProviders(), profile.onboardingCompleted(), profile.createdAt(), profile.profileImageUrl());
     }
 }

@@ -34,12 +34,13 @@ class UserControllerTest {
         OffsetDateTime now = OffsetDateTime.parse("2026-08-14T00:00:00Z");
         when(userService.getMyProfile(1L)).thenReturn(
                 new UserProfile(1L, "user@example.com", "또박이", UserStatus.ACTIVE,
-                        List.of("GOOGLE"), true, now));
+                        List.of("GOOGLE"), true, now, "https://cdn.example.invalid/profiles/image.png"));
 
         var response = controller.getMyProfile(loginUser);
 
         assertThat(response.isResult()).isTrue();
         assertThat(response.getData().id()).isEqualTo(1L);
+        assertThat(response.getData().profileImageUrl()).isEqualTo("https://cdn.example.invalid/profiles/image.png");
         assertThat(response.getMessage()).isEqualTo("내 정보를 조회했습니다.");
     }
 

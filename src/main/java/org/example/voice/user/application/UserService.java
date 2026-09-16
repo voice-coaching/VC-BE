@@ -39,6 +39,7 @@ public class UserService {
     private final RecordingDeletionScheduler recordingDeletionScheduler;
     private final RecordingUploadIntentRegistry uploadIntentRegistry;
     private final AnalysisCancellation analysisCancellation;
+    private final org.example.voice.profileimage.domain.port.ProfileImageLifecycle profileImages;
 
     @Transactional(readOnly = true)
     public UserProfile getMyProfile(Long userId) {
@@ -56,7 +57,8 @@ public class UserService {
                 user.getStatus(),
                 List.copyOf(loginProviders),
                 onboardingProfileReader.findByUserId(userId).isPresent(),
-                user.getCreatedAt()
+                user.getCreatedAt(),
+                user.getProfileImageUrl()
         );
     }
 
@@ -89,6 +91,7 @@ public class UserService {
         processingConsentLedger.revokeForUser(userId);
         recordingDeletionScheduler.scheduleAllForUser(userId, RecordingDeletionReason.USER_WITHDRAWN);
         uploadIntentRegistry.expireForUser(userId);
+        profileImages.removeForUser(userId);
         return new WithdrawalResult(now);
     }
 

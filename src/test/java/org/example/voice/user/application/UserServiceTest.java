@@ -59,7 +59,8 @@ class UserServiceTest {
                 processingConsentLedger,
                 recordingDeletionScheduler,
                 uploadIntentRegistry,
-                analysisCancellation
+                analysisCancellation,
+                mock(org.example.voice.profileimage.domain.port.ProfileImageLifecycle.class)
         );
     }
 
