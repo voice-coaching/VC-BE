@@ -76,7 +76,7 @@ public enum ErrorCode {
     ANALYSIS_INTERNAL_CONTRACT_INVALID(HttpStatus.BAD_REQUEST, "AI 내부 연동 요청 형식이 올바르지 않습니다."),
     ANALYSIS_INTERNAL_STALE_EXECUTION(HttpStatus.CONFLICT, "현재 분석 실행 세대와 일치하지 않는 요청입니다."),
     ANALYSIS_INTERNAL_RESULT_CONFLICT(HttpStatus.CONFLICT, "동일한 결과 이벤트와 다른 분석 결과가 충돌했습니다."),
-    ANALYSIS_NOT_COMPLETED(HttpStatus.CONFLICT, "분석이 완료된 후 학습을 종료할 수 있습니다."),
+    ANALYSIS_NOT_COMPLETED(HttpStatus.CONFLICT, "아직 분석이 완료되지 않았습니다."),
     INVALID_SESSION_STATE(HttpStatus.CONFLICT, "현재 학습 세션 상태에서는 요청한 작업을 수행할 수 없습니다."),
     SESSION_ALREADY_FINISHED(HttpStatus.CONFLICT, "이미 종료된 학습 세션입니다."),
     RECORDING_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 녹음에 접근할 권한이 없습니다."),
