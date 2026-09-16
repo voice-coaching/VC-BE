@@ -206,6 +206,13 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.POST, "/api/users/me/title-exams", "마이페이지", "승급 시험 생성", "게시된 정책 콘텐츠와 합격점을 고정해 다음 칭호 시험을 만듭니다. 기존 진행 시험과 Idempotency-Key 요청은 중복 생성하지 않습니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/users/me/title-exams/{examId}", "마이페이지", "승급 시험 조회", "본인의 시험 상태와 고정된 시험 정책을 조회합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/users/me/title-exams/{examId}/submit", "마이페이지", "승급 시험 채점", "해당 시험 세션의 실제 분석 점수로 채점하고 합격 시 한 단계만 승급합니다. 같은 분석 재요청은 같은 결과를 반환합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/notification-preferences", "알림", "알림 설정 조회", "연습 시간·요일·시간대와 마케팅 비활성 상태를 반환합니다.", false);
+        add(map, PathItem.HttpMethod.PATCH, "/api/users/me/notification-preferences", "알림", "알림 설정 변경", "전달된 연습 설정만 변경합니다. HH:mm, IANA 시간대와 요일을 검증하며 마케팅 활성화는 409입니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/users/me/push-subscriptions", "알림", "Push 등록", "브라우저 endpoint와 P-256 키를 암호화 저장합니다. 동일 endpoint 및 선택 Idempotency-Key를 지원하며 다른 사용자의 endpoint는 409, 저장 키 미설정은 503입니다. 등록은 실제 발송 완료를 뜻하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.DELETE, "/api/users/me/push-subscriptions/{subscriptionId}", "알림", "Push 등록 해제", "본인의 등록을 삭제합니다. 미존재와 다른 사용자의 등록은 404입니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/notifications", "알림", "알림함 조회", "본인 알림을 최신순으로 조회합니다. hasNext와 전체 미읽음 unreadCount를 반환하며 unreadOnly 필터를 지원합니다.", false);
+        add(map, PathItem.HttpMethod.PATCH, "/api/notifications/{notificationId}/read", "알림", "알림 읽음 처리", "본인 알림의 최초 읽음 시각을 보존하며 반복 요청을 안전하게 처리합니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/notifications/read-all", "알림", "모든 알림 읽음 처리", "본인의 미읽음 알림만 갱신하고 갱신 건수를 반환합니다.", false);
         return Map.copyOf(map);
     }
 
