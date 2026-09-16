@@ -45,8 +45,12 @@ public class CourseStepReaderImpl implements CourseStepReader {
 
     private Integer findCompletedStepOrder(Long userId, Long courseId, List<CourseStep> steps) {
         return userCourseProgressJpaRepository.findByUserIdAndCourseId(userId, courseId)
-                .map(UserCourseProgress::getLastStepId)
-                .flatMap(lastStepId -> findStepOrder(steps, lastStepId))
+                .map(progress -> {
+                    if (progress.getStatus() == org.example.voice.course.domain.type.CourseProgressStatus.COMPLETED)
+                        return steps.stream().mapToInt(CourseStep::getStepOrder).max().orElse(0);
+                    if (progress.getProgressPercent().signum() == 0 || progress.getLastStepId() == null) return 0;
+                    return findStepOrder(steps, progress.getLastStepId()).orElse(0);
+                })
                 .orElse(0);
     }
 

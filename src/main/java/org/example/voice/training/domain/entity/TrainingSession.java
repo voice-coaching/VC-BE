@@ -45,6 +45,14 @@ public class TrainingSession {
     @Column(name = "course_step_id")
     private Long courseStepId;
 
+    @Column(name = "course_education_revision_id")
+    private Long courseEducationRevisionId;
+
+    public void pinCourseEducation(Long revisionId) {
+        if (courseEducationRevisionId != null) throw new IllegalStateException("Education revision is already pinned");
+        courseEducationRevisionId = revisionId;
+    }
+
     @Enumerated(EnumType.STRING)
     @Column(name = "learning_focus", nullable = false)
     private LearningFocus learningFocus;

@@ -30,6 +30,7 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     private final TrainingSessionJpaRepository trainingSessionJpaRepository;
     private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;
     private final RecordingDeletionScheduler recordingDeletionScheduler;
+    private final org.example.voice.course.domain.port.CourseEducationReader courseEducation;
 
     @Override
     @Transactional
@@ -37,9 +38,10 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     public TrainingSessionCreatedData create(Long userId, Long contentId, Long courseStepId, LearningFocus learningFocus) {
         PracticeContent content = practiceContentJpaRepository.findById(contentId)
                 .orElseThrow(() -> new BaseException(ErrorCode.CONTENT_NOT_FOUND));
-        TrainingSession session = trainingSessionJpaRepository.save(
-                TrainingSession.create(userId, content, courseStepId, learningFocus)
-        );
+        Long revisionId = courseEducation.revisionForSession(courseStepId, contentId);
+        TrainingSession session = TrainingSession.create(userId, content, courseStepId, learningFocus);
+        session.pinCourseEducation(revisionId);
+        session = trainingSessionJpaRepository.save(session);
         return new TrainingSessionCreatedData(
                 session.getId(),
                 session.getContent().getId(),
