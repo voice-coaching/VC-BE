@@ -31,6 +31,7 @@ public class MyPageService {
     private final ProcessingConsentLedger processingConsentLedger;
     private final RecordingUploadIntentRegistry uploadIntentRegistry;
     private final AnalysisCancellation analysisCancellation;
+    private final org.example.voice.practicecontent.domain.port.CustomContentLifecycle customContents;
 
     @Transactional(readOnly = true)
     public MyPageData.HistoryPage getHistory(Long userId, String type, String status, LocalDate from,
@@ -48,11 +49,13 @@ public class MyPageService {
 
     @Transactional
     public void deleteHistory(Long userId, Long sessionId) {
+        Long contentId = customContents.prepareHistoryDeletion(sessionId,userId);
         if (!reader.sessionOwned(userId, sessionId)) throw sessionError(sessionId);
         analysisCancellation.cancelForSession(sessionId);
         processingConsentLedger.revokeForSession(userId, sessionId);
         uploadIntentRegistry.expireForSession(userId, sessionId);
         writer.deleteHistory(sessionId);
+        customContents.afterHistoryDeletion(contentId,userId);
     }
 
     @Transactional(readOnly = true)

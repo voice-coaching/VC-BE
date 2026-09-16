@@ -88,11 +88,6 @@ public class HomeReaderImpl implements HomeReader {
     }
 
     @Override
-    @Cacheable(
-            cacheNames = HomeCacheNames.RECENT_TRAINING,
-            key = "T(org.example.voice.home.infrastructure.cache.HomeCacheKeys).user(#p0)",
-            unless = "#result == null"
-    )
     public Optional<RecentTrainingData> findRecentTraining(Long userId) {
         return trainingSessionJpaRepository.findLatestByUserId(userId, PageRequest.of(0, 1))
                 .stream()

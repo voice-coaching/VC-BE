@@ -40,7 +40,8 @@ class MyPageServiceTest {
         uploadIntentRegistry = mock(RecordingUploadIntentRegistry.class);
         analysisCancellation = mock(AnalysisCancellation.class);
         service = new MyPageService(
-                reader, writer, processingConsentLedger, uploadIntentRegistry, analysisCancellation
+                reader, writer, processingConsentLedger, uploadIntentRegistry, analysisCancellation,
+                mock(org.example.voice.practicecontent.domain.port.CustomContentLifecycle.class)
         );
     }
 

@@ -40,6 +40,7 @@ public class UserService {
     private final RecordingUploadIntentRegistry uploadIntentRegistry;
     private final AnalysisCancellation analysisCancellation;
     private final org.example.voice.profileimage.domain.port.ProfileImageLifecycle profileImages;
+    private final org.example.voice.practicecontent.domain.port.CustomContentLifecycle customContents;
 
     @Transactional(readOnly = true)
     public UserProfile getMyProfile(Long userId) {
@@ -92,6 +93,7 @@ public class UserService {
         recordingDeletionScheduler.scheduleAllForUser(userId, RecordingDeletionReason.USER_WITHDRAWN);
         uploadIntentRegistry.expireForUser(userId);
         profileImages.removeForUser(userId);
+        customContents.eraseForUser(userId);
         return new WithdrawalResult(now);
     }
 

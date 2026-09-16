@@ -45,6 +45,11 @@ public class AnalysisRequestOutbox {
     @Column(name = "payload", nullable = false, columnDefinition = "text")
     private String payload;
 
+    @Column(name = "private_payload_ciphertext", columnDefinition = "text")
+    private org.example.voice.practicecontent.domain.model.PrivateText privatePayload;
+
+    public String getPayload() { return privatePayload == null ? payload : privatePayload.value(); }
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private AnalysisRequestOutboxStatus status;
@@ -83,7 +88,14 @@ public class AnalysisRequestOutbox {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         this.eventId = eventId.toString();
         this.analysisResult = analysisResult;
-        this.payload = payload;
+        if (analysisResult.getRecording() != null && analysisResult.getRecording().getTrainingSession() != null
+                && analysisResult.getRecording().getTrainingSession().getContent() != null
+                && analysisResult.getRecording().getTrainingSession().getContent().getOwnerId() != null) {
+            this.payload = "{}";
+            this.privatePayload = new org.example.voice.practicecontent.domain.model.PrivateText(payload);
+        } else {
+            this.payload = payload;
+        }
         this.status = AnalysisRequestOutboxStatus.PENDING;
         this.attemptCount = 0;
         this.nextAttemptAt = now;

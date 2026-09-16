@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PracticeContentService {
 
     private final PracticeContentReader practiceContentReader;
+    private final CustomContentService customContents;
 
     @Transactional(readOnly = true)
     public PracticeContentListResponseDto getPracticeContents(PracticeContentQueryConditionDto condition) {
@@ -31,6 +32,12 @@ public class PracticeContentService {
         return practiceContentReader.findPracticeContent(contentId)
                 .map(PracticeContentDetailResponseDto::from)
                 .orElseThrow(ContentNotFoundException::new);
+    }
+
+    @Transactional(readOnly = true)
+    public PracticeContentDetailResponseDto getPracticeContent(Long contentId, Long userId) {
+        return customContents.find(contentId,userId).map(PracticeContentDetailResponseDto::fromCustom)
+                .orElseGet(() -> getPracticeContent(contentId));
     }
 
     @Transactional(readOnly = true)

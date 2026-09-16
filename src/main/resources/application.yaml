@@ -151,6 +151,9 @@ analysis:
     timeout-sweep-interval: ${ANALYSIS_TIMEOUT_SWEEP_INTERVAL:PT1M}
     timeout-sweep-batch-size: ${ANALYSIS_TIMEOUT_SWEEP_BATCH_SIZE:100}
 
+custom-content:
+  encryption-key: ${CUSTOM_CONTENT_ENCRYPTION_KEY:}
+
 management:
   server:
     address: ${MANAGEMENT_SERVER_ADDRESS:127.0.0.1}

@@ -31,12 +31,16 @@ public class TrainingSessionService {
     private final RecordingUploadIntentRegistry uploadIntentRegistry;
     private final AnalysisCancellation analysisCancellation;
     private final org.example.voice.title.domain.port.TitleExamSessionLink titleExams;
+    private final org.example.voice.practicecontent.domain.port.CustomContentLifecycle customContents;
 
     @Transactional
     public TrainingSessionCreatedData create(TrainingSessionCreateRequestDto request, Long userId) {
         // 콘텐츠가 없으면 404, 존재하지만 게시 상태가 아니면 409로 분리한다.
         // 프론트가 "없는 콘텐츠"와 "현재 학습 불가 콘텐츠"를 다르게 처리할 수 있게 하기 위함이다.
         validateCreateRequest(request);
+        if (customContents.validateSession(request.contentId(),userId,request.courseStepId(),request.titleExamId())) {
+            return trainingSessionWriter.create(userId,request.contentId(),null,request.learningFocus());
+        }
         if (!trainingSessionReader.existsContent(request.contentId())) {
             throw new BaseException(ErrorCode.CONTENT_NOT_FOUND);
         }
