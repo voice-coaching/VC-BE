@@ -8,8 +8,9 @@ public record RunPodAnalysisControlResponseDto(
         Long analysisId,
         UUID requestId,
         UUID executionId,
-        Boolean accepted,
-        Boolean canceled,
+        String workerInstanceId,
+        String serverTime,
+        String leaseExpiresAt,
         Boolean continueProcessing
 ) {
     public static RunPodAnalysisControlResponseDto from(AnalysisRunPodControlData data) {
@@ -17,8 +18,9 @@ public record RunPodAnalysisControlResponseDto(
                 data.analysisId(),
                 data.requestId(),
                 data.executionId(),
-                data.accepted(),
-                data.canceled(),
+                data.workerInstanceId(),
+                data.serverTime(),
+                data.leaseExpiresAt(),
                 data.continueProcessing()
         );
     }

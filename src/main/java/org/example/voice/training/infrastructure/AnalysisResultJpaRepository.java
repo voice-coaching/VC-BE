@@ -16,6 +16,12 @@ import org.springframework.data.domain.Pageable;
 
 public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResult, Long> {
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from AnalysisResult a where a.status in :statuses and a.activeExecutionId is not null "
+            + "and (a.executionDeadlineAt <= :now or a.claimExpiresAt <= :now) order by a.id")
+    List<AnalysisResult> findExpiredHttpForUpdate(@Param("statuses") Collection<AnalysisStatus> statuses,
+            @Param("now") OffsetDateTime now, Pageable pageable);
+
     Optional<AnalysisResult> findByIdAndRecordingTrainingSessionUserId(Long id, Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

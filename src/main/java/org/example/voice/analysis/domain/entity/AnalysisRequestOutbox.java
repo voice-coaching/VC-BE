@@ -120,6 +120,11 @@ public class AnalysisRequestOutbox {
         this.lastErrorCode = null;
     }
 
+    /** Short database reservation; no lock or transaction is held across the worker HTTP call. */
+    public void reserveDeliveryUntil(OffsetDateTime until) {
+        this.nextAttemptAt = until;
+    }
+
     public boolean cancelPending(String errorCode) {
         if (status != AnalysisRequestOutboxStatus.PENDING) {
             return false;

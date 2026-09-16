@@ -1,5 +1,7 @@
 # RunPod 음성·입술·Clova 파이프라인 API 연결 안내
 
+> 2026-09-16: 내부 HTTP 계약은 [v1.1](api/ai-runpod-http-callback-contract.md)로 통일했다. 공개 API 호출 순서는 유지하며 내부 필드·lease·재전달 규칙은 최신 계약을 우선한다.
+
 > 현재 결정(2026-09-10): RunPod 연동은 Backend -> RunPod HTTP 요청과
 > RunPod -> Backend HTTP callback 방식을 사용한다. Redis는 기존 애플리케이션 cache
 > 용도로 유지하지만, 이번 단계의 Backend-AI MQ 전송에는 Redis Stream을 사용하지 않는다.
