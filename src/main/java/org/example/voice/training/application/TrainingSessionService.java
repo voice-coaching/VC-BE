@@ -30,6 +30,7 @@ public class TrainingSessionService {
     private final ProcessingConsentLedger processingConsentLedger;
     private final RecordingUploadIntentRegistry uploadIntentRegistry;
     private final AnalysisCancellation analysisCancellation;
+    private final org.example.voice.title.domain.port.TitleExamSessionLink titleExams;
 
     @Transactional
     public TrainingSessionCreatedData create(TrainingSessionCreateRequestDto request, Long userId) {
@@ -41,6 +42,9 @@ public class TrainingSessionService {
         }
         if (!trainingSessionReader.existsAvailableContent(request.contentId())) {
             throw new BaseException(ErrorCode.CONTENT_NOT_AVAILABLE);
+        }
+        if (request.titleExamId() != null) {
+            return titleExams.createSession(userId,request.titleExamId(),request.contentId(),request.courseStepId(),request.learningFocus());
         }
         return trainingSessionWriter.create(
                 userId,

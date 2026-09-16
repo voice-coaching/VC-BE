@@ -58,7 +58,7 @@ class OpenApiDocumentIntegrationTest {
                 assertThat(field.getValue().path("tags").get(0).asText()).containsPattern("[가-힣]");
             }
         }
-        assertThat(operationCount).isEqualTo(63);
+        assertThat(operationCount).isEqualTo(67);
         assertThat(paths.path("/api/analysis-capabilities").path("get").path("summary").asText())
                 .isEqualTo("녹음·분석 지원 조건 조회");
     }
