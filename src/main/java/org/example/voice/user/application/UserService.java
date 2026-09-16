@@ -41,6 +41,7 @@ public class UserService {
     private final AnalysisCancellation analysisCancellation;
     private final org.example.voice.profileimage.domain.port.ProfileImageLifecycle profileImages;
     private final org.example.voice.practicecontent.domain.port.CustomContentLifecycle customContents;
+    private final org.example.voice.notification.domain.port.NotificationLifecycle notifications;
 
     @Transactional(readOnly = true)
     public UserProfile getMyProfile(Long userId) {
@@ -94,6 +95,7 @@ public class UserService {
         uploadIntentRegistry.expireForUser(userId);
         profileImages.removeForUser(userId);
         customContents.eraseForUser(userId);
+        notifications.eraseForUser(userId);
         return new WithdrawalResult(now);
     }
 

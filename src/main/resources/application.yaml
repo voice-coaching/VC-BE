@@ -166,3 +166,10 @@ management:
   endpoint:
     health:
       show-details: never
+
+notification:
+  push:
+    encryption-key: ${PUSH_SUBSCRIPTION_ENCRYPTION_KEY:}
+  reminders:
+    enabled: ${PRACTICE_REMINDERS_ENABLED:false}
+    poll-interval: PT1M

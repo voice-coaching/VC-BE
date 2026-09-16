@@ -61,7 +61,8 @@ class UserServiceTest {
                 uploadIntentRegistry,
                 analysisCancellation,
                 mock(org.example.voice.profileimage.domain.port.ProfileImageLifecycle.class),
-                mock(org.example.voice.practicecontent.domain.port.CustomContentLifecycle.class)
+                mock(org.example.voice.practicecontent.domain.port.CustomContentLifecycle.class),
+                mock(org.example.voice.notification.domain.port.NotificationLifecycle.class)
         );
     }
 
