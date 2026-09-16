@@ -213,6 +213,8 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/notifications", "알림", "알림함 조회", "본인 알림을 최신순으로 조회합니다. hasNext와 전체 미읽음 unreadCount를 반환하며 unreadOnly 필터를 지원합니다.", false);
         add(map, PathItem.HttpMethod.PATCH, "/api/notifications/{notificationId}/read", "알림", "알림 읽음 처리", "본인 알림의 최초 읽음 시각을 보존하며 반복 요청을 안전하게 처리합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/notifications/read-all", "알림", "모든 알림 읽음 처리", "본인의 미읽음 알림만 갱신하고 갱신 건수를 반환합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/courses/{courseId}/steps/{stepId}/practice-examples", "클래스", "단계별 예문 조회", "게시된 개정의 예문 5개와 숫자 practiceContentId를 순서대로 제공합니다. 본인 sessionId로 고정된 과거 개정을 조회하며 미준비는 503입니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/practice-examples/{exampleId}/audio", "클래스", "Chirp 예문 음성 조회", "게시된 불변 예문만 Aoede 화자/속도 0.92로 합성합니다. 성공은 audio/mpeg와 private cache/ETag, 합성 실패는 JSON 503, 제한 초과는 429입니다. 임의 text query는 허용하지 않습니다.", false);
         return Map.copyOf(map);
     }
 

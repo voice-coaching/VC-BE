@@ -17,7 +17,10 @@ public record TrainingSessionDetailData(
     public record ContentData(
             Long id,
             String title,
-            String scriptText
+            String scriptText,
+            String practiceExampleId,
+            Integer practiceExampleRevision
     ) {
+        public ContentData(Long id, String title, String scriptText) { this(id, title, scriptText, null, null); }
     }
 }
