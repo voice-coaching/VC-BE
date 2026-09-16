@@ -198,6 +198,10 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.POST, "/api/users/me/profile-image", "사용자", "프로필 사진 등록", "JPEG/PNG/WebP 최대 5MB, 치수 128~4096px 파일을 정사각 PNG로 변환합니다. 기존 사진은 409이며 Idempotency-Key 재요청은 최초 응답을 반환합니다.", false);
         add(map, PathItem.HttpMethod.PUT, "/api/users/me/profile-image", "사용자", "프로필 사진 교체", "기존 사진을 새 파일로 교체하고 이전 파일은 비동기 삭제합니다. 미등록 상태는 404입니다.", false);
         add(map, PathItem.HttpMethod.DELETE, "/api/users/me/profile-image", "사용자", "프로필 사진 삭제", "사진을 제거하고 파일 삭제를 예약합니다. 이미 없어도 204입니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/title", "마이페이지", "내 칭호와 시험 자격 조회", "완료 학습 수와 다음 칭호 응시 자격을 조회합니다. 횟수만으로 자동 승급하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/users/me/title-exams", "마이페이지", "승급 시험 생성", "게시된 정책 콘텐츠와 합격점을 고정해 다음 칭호 시험을 만듭니다. 기존 진행 시험과 Idempotency-Key 요청은 중복 생성하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/title-exams/{examId}", "마이페이지", "승급 시험 조회", "본인의 시험 상태와 고정된 시험 정책을 조회합니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/users/me/title-exams/{examId}/submit", "마이페이지", "승급 시험 채점", "해당 시험 세션의 실제 분석 점수로 채점하고 합격 시 한 단계만 승급합니다. 같은 분석 재요청은 같은 결과를 반환합니다.", false);
         return Map.copyOf(map);
     }
 
