@@ -17,6 +17,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface AnalysisRequestOutboxJpaRepository extends JpaRepository<AnalysisRequestOutbox, Long> {
+    Optional<AnalysisRequestOutbox> findByEventIdAndExecutionIdAndTransport(String eventId, String executionId, String transport);
+    Optional<AnalysisRequestOutbox> findByEventIdAndTransport(String eventId, String transport);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from AnalysisRequestOutbox o where o.id = :id")
+    Optional<AnalysisRequestOutbox> findForDeliveryUpdate(@Param("id") Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<AnalysisRequestOutbox> findFirstByStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(

@@ -1,73 +1,76 @@
 package org.example.voice.analysis.controller;
 
 import io.swagger.v3.oas.annotations.Hidden;
-import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.application.AnalysisRunPodCallbackService;
-import org.example.voice.analysis.controller.dto.RunPodAnalysisClaimRequestDto;
-import org.example.voice.analysis.controller.dto.RunPodAnalysisControlResponseDto;
-import org.example.voice.analysis.controller.dto.RunPodAnalysisHeartbeatRequestDto;
-import org.example.voice.analysis.controller.dto.RunPodAnalysisResultCallbackRequestDto;
-import org.example.voice.analysis.controller.dto.RunPodAnalysisResultCallbackResponseDto;
+import org.example.voice.analysis.controller.dto.*;
 import org.example.voice.analysis.domain.type.AnalysisResultIngestionDisposition;
-import org.example.voice.analysis.infrastructure.runpod.RunPodInternalAuthentication;
-import org.example.voice.common.response.ApiResponse;
+import org.example.voice.analysis.infrastructure.runpod.*;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import java.io.IOException;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import com.fasterxml.jackson.databind.JsonNode;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/internal/ai/analyses")
+@RequestMapping("/api/internal/ai")
 @Hidden
 public class InternalRunPodAnalysisController {
-
     private final RunPodInternalAuthentication authentication;
     private final AnalysisRunPodCallbackService callbackService;
+    private final RunPodContract contract;
+    private final RunPodBackendReadiness readiness;
 
-    @PostMapping("/{analysisId}/claim")
-    public ResponseEntity<ApiResponse<RunPodAnalysisControlResponseDto>> claim(
-            @PathVariable Long analysisId,
-            @RequestHeader(value = "Authorization", required = false) String authorization,
-            @Valid @RequestBody RunPodAnalysisClaimRequestDto request
-    ) {
-        authentication.verify(authorization);
-        return ResponseEntity.ok(ApiResponse.success(
-                "AI 분석 실행 점유를 확인했습니다.",
-                RunPodAnalysisControlResponseDto.from(callbackService.claim(analysisId, request.toCommand()))
-        ));
+    @GetMapping("/worker-readiness")
+    public ResponseEntity<Readiness> readiness(HttpServletRequest request) {
+        authenticate(request);
+        boolean ready = readiness.isReady();
+        return ResponseEntity.status(ready ? 200 : 503)
+                .body(new Readiness(ready ? "ready" : "not_ready", RunPodContract.VERSION, now()));
     }
 
-    @PostMapping("/{analysisId}/heartbeat")
-    public ResponseEntity<ApiResponse<RunPodAnalysisControlResponseDto>> heartbeat(
-            @PathVariable Long analysisId,
-            @RequestHeader(value = "Authorization", required = false) String authorization,
-            @Valid @RequestBody RunPodAnalysisHeartbeatRequestDto request
-    ) {
-        authentication.verify(authorization);
-        return ResponseEntity.ok(ApiResponse.success(
-                "AI 분석 실행 상태를 갱신했습니다.",
-                RunPodAnalysisControlResponseDto.from(callbackService.heartbeat(analysisId, request.toCommand()))
-        ));
+    @PostMapping("/analyses/{analysisId}/claim")
+    public RunPodAnalysisControlResponseDto claim(@PathVariable Long analysisId, HttpServletRequest request) throws IOException {
+        var json = body(request, "claimRequest");
+        var command = contract.convert(json, RunPodAnalysisClaimRequestDto.class).toCommand();
+        return RunPodAnalysisControlResponseDto.from(callbackService.claim(analysisId, command));
     }
 
-    @PostMapping("/{analysisId}/result")
-    public ResponseEntity<ApiResponse<RunPodAnalysisResultCallbackResponseDto>> result(
-            @PathVariable Long analysisId,
-            @RequestHeader(value = "Authorization", required = false) String authorization,
-            @Valid @RequestBody RunPodAnalysisResultCallbackRequestDto request
-    ) {
-        authentication.verify(authorization);
-        AnalysisResultIngestionDisposition disposition = callbackService.ingestResult(analysisId, request.toCommand());
-        return ResponseEntity.ok(ApiResponse.success(
-                disposition == AnalysisResultIngestionDisposition.IGNORED_DUPLICATE
-                        ? "AI 분석 결과를 이미 수신했습니다."
-                        : "AI 분석 결과를 수신했습니다.",
-                new RunPodAnalysisResultCallbackResponseDto(analysisId, request.status().name())
-        ));
+    @PostMapping("/analyses/{analysisId}/heartbeat")
+    public RunPodAnalysisControlResponseDto heartbeat(@PathVariable Long analysisId, HttpServletRequest request) throws IOException {
+        var json = body(request, "heartbeatRequest");
+        var command = contract.convert(json, RunPodAnalysisHeartbeatRequestDto.class).toCommand();
+        return RunPodAnalysisControlResponseDto.from(callbackService.heartbeat(analysisId, command));
     }
+
+    @PostMapping("/analyses/{analysisId}/result")
+    public RunPodAnalysisResultCallbackResponseDto result(@PathVariable Long analysisId, HttpServletRequest request) throws IOException {
+        var json = body(request, "result");
+        var dto = contract.convert(json, RunPodAnalysisResultCallbackRequestDto.class);
+        var disposition = callbackService.ingestResult(analysisId, dto.toCommand(contract.digest(json)));
+        return new RunPodAnalysisResultCallbackResponseDto(dto.eventId(), analysisId, dto.requestId(), dto.executionId(),
+                disposition == AnalysisResultIngestionDisposition.IGNORED_DUPLICATE ? "DUPLICATE" : "APPLIED", now());
+    }
+
+    private JsonNode body(HttpServletRequest request, String kind) throws IOException {
+        authenticate(request);
+        if (request.getContentType() == null || !request.getContentType().split(";")[0].trim().equals("application/json")
+                || (request.getHeader("Content-Encoding") != null && !"identity".equals(request.getHeader("Content-Encoding")))) {
+            throw new RunPodContractException(415, "UNSUPPORTED_MEDIA_TYPE");
+        }
+        int limit = kind.equals("result") ? RunPodContract.RESULT_LIMIT : RunPodContract.CONTROL_LIMIT;
+        if (request.getContentLengthLong() > limit) throw new RunPodContractException(413, "PAYLOAD_TOO_LARGE");
+        return contract.parse(request.getInputStream().readNBytes(limit + 1), kind);
+    }
+
+    private static String now() { return RunPodContract.timestamp(OffsetDateTime.now(ZoneOffset.UTC)); }
+    private void authenticate(HttpServletRequest request) {
+        var values = java.util.Collections.list(request.getHeaders("Authorization"));
+        if (values.size() != 1) throw new RunPodContractException(401, "UNAUTHENTICATED");
+        authentication.verify(values.getFirst());
+    }
+    public record Readiness(String status, String contractVersion, String serverTime) {}
 }

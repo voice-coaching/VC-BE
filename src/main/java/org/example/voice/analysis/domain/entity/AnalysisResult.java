@@ -109,6 +109,9 @@ public class AnalysisResult {
     @Column(name = "active_execution_id", length = 36)
     private String activeExecutionId;
 
+    @Column(name = "execution_deadline_at")
+    private OffsetDateTime executionDeadlineAt;
+
     @Column(name = "worker_instance_id", length = 100)
     private String workerInstanceId;
 
@@ -229,6 +232,12 @@ public class AnalysisResult {
         this.lastHeartbeatAt = null;
         this.lastResultEventId = null;
         this.lastResultPayloadSha256 = null;
+        this.executionDeadlineAt = null;
+    }
+
+    public void assignExecution(UUID executionId, OffsetDateTime deadline) {
+        assignExecution(executionId);
+        this.executionDeadlineAt = Objects.requireNonNull(deadline, "deadline");
     }
 
     public boolean isForActiveExecution(UUID executionId) {
@@ -239,6 +248,8 @@ public class AnalysisResult {
         if (!isForActiveRequest(requestEventId) || !isForActiveExecution(executionId) || isCompletedOrFailed()) {
             return false;
         }
+        if (this.workerInstanceId != null && (!this.workerInstanceId.equals(workerInstanceId)
+                || claimExpiresAt == null || !claimExpiresAt.isAfter(OffsetDateTime.now(ZoneOffset.UTC)))) return false;
         this.workerInstanceId = requireWorker(workerInstanceId);
         this.claimExpiresAt = Objects.requireNonNull(claimedUntil, "claimedUntil");
         this.lastHeartbeatAt = OffsetDateTime.now(ZoneOffset.UTC);
@@ -251,7 +262,8 @@ public class AnalysisResult {
         if (!isForActiveRequest(requestEventId) || !isForActiveExecution(executionId) || isCompletedOrFailed()) {
             return false;
         }
-        if (this.workerInstanceId != null && !this.workerInstanceId.equals(workerInstanceId)) {
+        if (this.workerInstanceId == null || !this.workerInstanceId.equals(workerInstanceId)
+                || this.claimExpiresAt == null || !this.claimExpiresAt.isAfter(heartbeatAt)) {
             return false;
         }
         this.workerInstanceId = requireWorker(workerInstanceId);

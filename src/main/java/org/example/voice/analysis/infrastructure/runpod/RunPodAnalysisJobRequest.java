@@ -18,7 +18,8 @@ record RunPodAnalysisJobRequest(
         String scriptText,
         String scriptSha256,
         MediaInput audio,
-        @JsonInclude(JsonInclude.Include.NON_NULL) MediaInput video,
+        MediaInput video,
+        @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "UTC")
         OffsetDateTime deadlineAt
 ) {
     static final String SCHEMA_VERSION = "voice-coaching.runpod-analysis-request.v1";
@@ -56,7 +57,6 @@ record RunPodAnalysisJobRequest(
         );
     }
 
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     record MediaInput(
             String objectKey,
             String mimeType,

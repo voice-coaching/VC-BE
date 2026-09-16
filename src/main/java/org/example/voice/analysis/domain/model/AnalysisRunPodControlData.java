@@ -6,8 +6,9 @@ public record AnalysisRunPodControlData(
         Long analysisId,
         UUID requestId,
         UUID executionId,
-        boolean accepted,
-        boolean canceled,
+        String workerInstanceId,
+        String serverTime,
+        String leaseExpiresAt,
         boolean continueProcessing
 ) {
 }

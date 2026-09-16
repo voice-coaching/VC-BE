@@ -72,6 +72,8 @@ public class AnalysisCancellationOutbox {
         this.lastErrorCode = null;
     }
 
+    public void reserveDeliveryUntil(OffsetDateTime until) { this.nextAttemptAt = until; }
+
     /** Cancellation is fail-closed and therefore keeps retrying with bounded backoff. */
     public void recordDeliveryFailure(String errorCode) {
         this.attemptCount += 1;

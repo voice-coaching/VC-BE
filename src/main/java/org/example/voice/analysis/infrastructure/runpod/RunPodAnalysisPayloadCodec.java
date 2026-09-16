@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class RunPodAnalysisPayloadCodec {
+    private final RunPodContract contract = new RunPodContract();
 
     private final ObjectMapper objectMapper;
 
@@ -21,7 +22,9 @@ public class RunPodAnalysisPayloadCodec {
 
     String encodeRequest(RunPodAnalysisJobRequest request) {
         try {
-            return objectMapper.writeValueAsString(request);
+            String json = objectMapper.writeValueAsString(request);
+            contract.parse(json.getBytes(java.nio.charset.StandardCharsets.UTF_8), "analysisRequest");
+            return json;
         } catch (JsonProcessingException error) {
             throw new IllegalStateException("runpod analysis request serialization failed", error);
         }
