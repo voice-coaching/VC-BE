@@ -9,6 +9,8 @@ public record AnalysisRunPodResultCommand(
         UUID eventId,
         UUID requestId,
         UUID executionId,
+        String workerInstanceId,
+        String payloadSha256,
         Long analysisId,
         Long recordingId,
         AnalysisStatus status,

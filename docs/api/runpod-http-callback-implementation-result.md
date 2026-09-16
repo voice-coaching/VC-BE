@@ -1,5 +1,7 @@
 # RunPod HTTP Callback 구현 결과
 
+> 2026-09-16: 아래 내용은 초기 구현 이력이다. 현재 적용할 계약과 변경 사항은 [HTTP v1.1 계약](ai-runpod-http-callback-contract.md)을 따른다. 이전 claim/heartbeat 시간 필드와 응답 envelope는 더 이상 사용하지 않는다.
+
 작성일: 2026-09-11
 
 ## 작업 유형

@@ -14,26 +14,32 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @EnabledIfEnvironmentVariable(named = "VC_BE_TEST_POSTGRES_URL", matches = ".+")
 class SupportPostgresMigrationTest {
-    @Test void freshMigrationCreatesSupportTablesAndConstraints() throws Exception { verify(false); }
-    @Test void upgradeFromV16PreservesExistingUsersAndAddsSupportTables() throws Exception { verify(true); }
+    @Test void freshMigrationCreatesSupportTablesAndConstraints() throws Exception { verify(null); }
+    @Test void upgradeFromV16PreservesExistingUsersAndAddsSupportTables() throws Exception { verify("16"); }
+    @Test void upgradeFromV17PreservesExistingUsersAndAddsSupportTables() throws Exception { verify("17"); }
 
-    private void verify(boolean upgrade) throws Exception {
+    private void verify(String previousVersion) throws Exception {
         String url = System.getenv("VC_BE_TEST_POSTGRES_URL");
         String user = System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER", "postgres");
         String password = System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_PASSWORD", "");
         String schema = "support_test_" + UUID.randomUUID().toString().replace("-", "");
         try (Connection db = DriverManager.getConnection(url, user, password)) {
             try {
-                if (upgrade) {
-                    flyway(url, user, password, schema, "16").migrate();
+                if (previousVersion != null) {
+                    flyway(url, user, password, schema, previousVersion).migrate();
                     db.setSchema(schema);
                     insertUser(db);
                 }
-                var migrations = flyway(url, user, password, schema, "17");
+                var migrations = flyway(url, user, password, schema, "18");
                 migrations.migrate();
                 migrations.validate();
                 db.setSchema(schema);
-                if (!upgrade) insertUser(db);
+                if (previousVersion == null) insertUser(db);
+                try (var query = db.createStatement(); var rows = query.executeQuery(
+                        "select count(*) from information_schema.columns where table_schema = current_schema() "
+                                + "and table_name = 'analysis_results' and column_name = 'execution_deadline_at'")) {
+                    rows.next(); assertThat(rows.getInt(1)).isEqualTo(1);
+                }
                 try (var query = db.createStatement(); var rows = query.executeQuery("select count(*) from users where id=900001")) {
                     rows.next(); assertThat(rows.getInt(1)).isEqualTo(1);
                 }
@@ -46,7 +52,8 @@ class SupportPostgresMigrationTest {
                     sql.executeUpdate(inquirySql("null"));
                     sql.executeUpdate(inquirySql("null"));
                 }
-                assertThat(migrations.info().current().getVersion().getVersion()).isEqualTo("17");
+                assertThat(migrations.info().current().getVersion().getVersion()).isEqualTo("18");
+                assertThat(migrations.info().pending()).isEmpty();
             } finally {
                 // Only the randomly generated schema owned by this test is removed.
                 db.setSchema("public");

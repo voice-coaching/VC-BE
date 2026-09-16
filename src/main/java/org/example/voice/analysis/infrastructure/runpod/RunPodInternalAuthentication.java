@@ -22,7 +22,8 @@ public class RunPodInternalAuthentication {
         String token = authorizationHeader.substring(BEARER_PREFIX.length());
         if (properties.getCallbackToken() == null
                 || properties.getCallbackToken().isBlank()
-                || !properties.getCallbackToken().equals(token)) {
+                || !java.security.MessageDigest.isEqual(properties.getCallbackToken().getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        token.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
             throw new BaseException(ErrorCode.ANALYSIS_INTERNAL_AUTH_FAILED);
         }
     }

@@ -4,17 +4,16 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.example.voice.analysis.domain.model.AnalysisRunPodClaimCommand;
 
-import java.time.OffsetDateTime;
+
 import java.util.UUID;
 
 public record RunPodAnalysisClaimRequestDto(
-        @NotBlank String schemaVersion,
         @NotNull UUID requestId,
         @NotNull UUID executionId,
         @NotBlank String workerInstanceId,
-        @NotNull OffsetDateTime claimedUntil
+        @NotBlank String requestPayloadSha256
 ) {
     public AnalysisRunPodClaimCommand toCommand() {
-        return new AnalysisRunPodClaimCommand(schemaVersion, requestId, executionId, workerInstanceId, claimedUntil);
+        return new AnalysisRunPodClaimCommand(requestId, executionId, workerInstanceId, requestPayloadSha256);
     }
 }

@@ -17,6 +17,8 @@ public class RunPodAnalysisClient {
 
     private final RunPodAnalysisProperties properties;
     private final RestClient.Builder restClientBuilder;
+    private final RunPodContract contract = new RunPodContract();
+    private final RunPodAnalysisPayloadCodec codec = new RunPodAnalysisPayloadCodec();
 
     public RunPodAnalysisJobAccepted submit(RunPodAnalysisJobRequest request) {
         if (!properties.isConfigured()) {
@@ -28,14 +30,15 @@ public class RunPodAnalysisClient {
                     .uri(properties.normalizedEndpointUrl() + "/v1/analysis-jobs")
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("Authorization", "Bearer " + properties.getApiToken())
-                    .body(request)
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, (httpRequest, response) -> {
+                    .body(codec.encodeRequest(request))
+                    .exchange((httpRequest, response) -> {
                         int status = response.getStatusCode().value();
-                        boolean retryable = status == 429 || status >= 500;
-                        throw new RunPodAnalysisDeliveryException("runpod_http_" + status, retryable, null);
-                    })
-                    .body(RunPodAnalysisJobAccepted.class);
+                        if (status != 200 && status != 202) {
+                            throw new RunPodAnalysisDeliveryException("runpod_http_" + status, status == 429 || status >= 500, null);
+                        }
+                        var json = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "jobAccepted");
+                        return contract.convert(json, RunPodAnalysisJobAccepted.class);
+                    });
         } catch (RunPodAnalysisDeliveryException error) {
             throw error;
         } catch (RestClientException error) {
@@ -54,13 +57,23 @@ public class RunPodAnalysisClient {
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("Authorization", "Bearer " + properties.getApiToken())
                     .body(new RunPodAnalysisCancelRequest(executionId))
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, (httpRequest, response) -> {
+                    .exchange((httpRequest, response) -> {
                         int status = response.getStatusCode().value();
-                        boolean retryable = status == 429 || status >= 500;
-                        throw new RunPodAnalysisDeliveryException("runpod_cancel_http_" + status, retryable, null);
-                    })
-                    .toBodilessEntity();
+                        if (status != 200 && status != 202) {
+                            if (status == 404 || status == 409) {
+                                var error = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "error");
+                                if (java.util.Set.of("UNKNOWN_EXECUTION", "STALE_EXECUTION", "TARGET_NOT_FOUND", "ANALYSIS_TERMINAL", "ANALYSIS_CANCELLED")
+                                        .contains(error.path("reasonCode").asText())) return null;
+                            }
+                            throw new RunPodAnalysisDeliveryException("runpod_cancel_http_" + status, status == 429 || status >= 500, null);
+                        }
+                        var json = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "cancelResponse");
+                        if (!requestId.toString().equals(json.path("requestId").asText())
+                                || !executionId.toString().equals(json.path("executionId").asText())) {
+                            throw new RunPodAnalysisDeliveryException("runpod_cancel_contract_invalid", false, null);
+                        }
+                        return null;
+                    });
         } catch (RunPodAnalysisDeliveryException error) {
             throw error;
         } catch (RestClientException error) {

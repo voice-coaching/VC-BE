@@ -38,7 +38,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return path.equals("/api/auth/email-availability") || path.equals("/api/auth/signup")
                 || path.equals("/api/auth/login") || path.equals("/api/auth/social-login")
                 || path.equals("/api/auth/token/refresh") || path.startsWith("/swagger-ui/")
-                || path.startsWith("/v3/api-docs/");
+                || path.startsWith("/v3/api-docs/")
+                // Internal AI callbacks use RunPodInternalAuthentication, not user JWTs.
+                || path.startsWith("/api/internal/ai/");
     }
 
     @Override

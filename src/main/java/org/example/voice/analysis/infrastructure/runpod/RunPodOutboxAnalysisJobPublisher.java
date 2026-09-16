@@ -39,12 +39,14 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
             throw new IllegalStateException("analysis request event does not match active analysis request");
         }
         UUID executionId = UUID.randomUUID();
-        analysisResult.assignExecution(executionId);
+        OffsetDateTime deadline = OffsetDateTime.now(ZoneOffset.UTC).plus(properties.getExecutionTimeout())
+                .truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+        analysisResult.assignExecution(executionId, deadline);
         RunPodAnalysisJobRequest runPodRequest = RunPodAnalysisJobRequest.from(
                 request,
                 executionId,
                 analysisResult.getRecording().getId(),
-                OffsetDateTime.now(ZoneOffset.UTC).plus(properties.getExecutionTimeout())
+                deadline
         );
         String payload = codec.encodeRequest(runPodRequest);
         if (codec.payloadBytes(payload) > properties.getMaximumPayloadBytes()) {

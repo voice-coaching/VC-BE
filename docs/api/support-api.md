@@ -58,7 +58,8 @@ ANALYZING에서만 최초 완료를 허용하고 음수 시간을 거절한다.
 
 - SupportApiIntegrationTest: HTTP 계약, 인증, 소유권, 페이지, 공지 공개 조건, 멱등성, 잘못된 입력, CORS.
 - InquiryConcurrencyIntegrationTest: 동시 요청 2개의 DB 결과가 하나인지 검증.
-- SupportPostgresMigrationTest: PostgreSQL에서 V0→V17 신규 및 V16→V17 업그레이드, 기존 데이터 보존과 unique 제약 검증.
+- 공지·문의 테이블은 V18 migration으로 생성한다. RunPod 실행 기한용 V17 이후 적용되며 버전이 중복되지 않는다.
+- SupportPostgresMigrationTest: PostgreSQL에서 V0→V18 신규 및 V16/V17→V18 업그레이드, 기존 사용자 보존, RunPod 실행 기한 컬럼 유지와 unique 제약 검증.
 - PostgreSQL 검증은 독립 테스트 DB에 `VC_BE_TEST_POSTGRES_URL`과 선택 USER/PASSWORD 변수를 지정한다. 테스트별 임의 schema만 만들고 삭제한다.
 - 전체 회귀 test/bootJar와 OpenAPI 한국어 문서 검증을 수행한다.
 

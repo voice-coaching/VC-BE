@@ -1,133 +1,143 @@
 package org.example.voice.analysis.application;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.domain.entity.AnalysisResult;
-import org.example.voice.analysis.domain.model.AnalysisRunPodClaimCommand;
-import org.example.voice.analysis.domain.model.AnalysisRunPodControlData;
-import org.example.voice.analysis.domain.model.AnalysisRunPodHeartbeatCommand;
-import org.example.voice.analysis.domain.model.AnalysisRunPodResultCommand;
+import org.example.voice.analysis.domain.model.*;
 import org.example.voice.analysis.domain.port.AnalysisResultReader;
 import org.example.voice.analysis.domain.port.AnalysisResultWriter;
 import org.example.voice.analysis.domain.type.AnalysisResultIngestionDisposition;
-import org.example.voice.analysis.infrastructure.runpod.RunPodAnalysisProperties;
-import org.example.voice.common.exception.BaseException;
-import org.example.voice.common.exception.ErrorCode;
+import org.example.voice.analysis.domain.type.AnalysisStatus;
+import org.example.voice.analysis.infrastructure.AnalysisRequestOutboxJpaRepository;
+import org.example.voice.analysis.infrastructure.runpod.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.HexFormat;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class AnalysisRunPodCallbackService {
-
-    private static final String CLAIM_SCHEMA_VERSION = "voice-coaching.runpod-analysis-claim.v1";
-    private static final String HEARTBEAT_SCHEMA_VERSION = "voice-coaching.runpod-analysis-heartbeat.v1";
-    private static final String RESULT_SCHEMA_VERSION = "voice-coaching.runpod-analysis-result.v1";
-
     private final AnalysisResultReader analysisResultReader;
     private final AnalysisResultWriter analysisResultWriter;
     private final AnalysisResultIngestionService ingestionService;
     private final RunPodAnalysisProperties properties;
-    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules()
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private final AnalysisRequestOutboxJpaRepository outboxRepository;
+    private final RunPodContract contract;
 
     @Transactional
     public AnalysisRunPodControlData claim(Long analysisId, AnalysisRunPodClaimCommand request) {
-        requireSchema(CLAIM_SCHEMA_VERSION, request.schemaVersion());
         AnalysisResult result = find(analysisId);
-        boolean accepted = result.claim(
-                request.requestId(),
-                request.executionId(),
-                request.workerInstanceId(),
-                request.claimedUntil()
-        );
-        if (!accepted) {
-            throw new BaseException(ErrorCode.ANALYSIS_INTERNAL_STALE_EXECUTION);
+        OffsetDateTime now = now();
+        requireActive(result, request.requestId(), request.executionId());
+        String payload = executionPayload(result, request.requestId(), request.executionId());
+        if (!contract.digest(payload).equals(request.requestPayloadSha256())) fail(409, "PAYLOAD_DIGEST_MISMATCH");
+        OffsetDateTime deadline = deadline(payload, now);
+        requireOwner(result, request.workerInstanceId(), now, false);
+        if (!result.claim(request.requestId(), request.executionId(), request.workerInstanceId(), cappedLease(now, deadline))) {
+            fail(409, "STALE_EXECUTION");
         }
         analysisResultWriter.save(result);
-        return new AnalysisRunPodControlData(analysisId, request.requestId(), request.executionId(),
-                true, false, true);
+        return control(result, request.requestId(), request.executionId(), now);
     }
 
     @Transactional
     public AnalysisRunPodControlData heartbeat(Long analysisId, AnalysisRunPodHeartbeatCommand request) {
-        requireSchema(HEARTBEAT_SCHEMA_VERSION, request.schemaVersion());
         AnalysisResult result = find(analysisId);
-        OffsetDateTime heartbeatAt = request.heartbeatAt() == null
-                ? OffsetDateTime.now(ZoneOffset.UTC)
-                : request.heartbeatAt();
-        boolean accepted = result.heartbeat(
-                request.requestId(),
-                request.executionId(),
-                request.workerInstanceId(),
-                heartbeatAt,
-                heartbeatAt.plus(properties.getClaimTtl())
-        );
-        if (!accepted) {
-            throw new BaseException(ErrorCode.ANALYSIS_INTERNAL_STALE_EXECUTION);
-        }
+        OffsetDateTime now = now();
+        requireActive(result, request.requestId(), request.executionId());
+        OffsetDateTime deadline = deadline(executionPayload(result, request.requestId(), request.executionId()), now);
+        requireOwner(result, request.workerInstanceId(), now, true);
+        if (!result.heartbeat(request.requestId(), request.executionId(), request.workerInstanceId(),
+                now, cappedLease(now, deadline))) fail(409, "STALE_EXECUTION");
         analysisResultWriter.save(result);
-        return new AnalysisRunPodControlData(analysisId, request.requestId(), request.executionId(),
-                true, false, true);
+        return control(result, request.requestId(), request.executionId(), now);
     }
 
     @Transactional
-    public AnalysisResultIngestionDisposition ingestResult(
-            Long analysisId,
-            AnalysisRunPodResultCommand request
-    ) {
-        requireSchema(RESULT_SCHEMA_VERSION, request.schemaVersion());
-        if (!analysisId.equals(request.analysisId())) {
-            throw new BaseException(ErrorCode.ANALYSIS_INTERNAL_CONTRACT_INVALID);
-        }
+    public AnalysisResultIngestionDisposition ingestResult(Long analysisId, AnalysisRunPodResultCommand request) {
+        if (!"voice-coaching.runpod-analysis-result.v1".equals(request.schemaVersion())
+                || !analysisId.equals(request.analysisId())) fail(422, "VALIDATION_FAILED");
         AnalysisResult result = find(analysisId);
-        if (!result.getRecording().getId().equals(request.recordingId())) {
-            throw new BaseException(ErrorCode.ANALYSIS_INTERNAL_CONTRACT_INVALID);
+        requireIdentity(result, request.requestId(), request.executionId());
+        if (!result.getRecording().getId().equals(request.recordingId())) fail(422, "VALIDATION_FAILED");
+        if (result.getWorkerInstanceId() == null) fail(409, "CLAIM_REQUIRED");
+        if (!request.workerInstanceId().equals(result.getWorkerInstanceId())) fail(409, "WORKER_CONFLICT");
+        if (result.isConflictingResultEvent(request.eventId(), request.payloadSha256())) fail(409, "RESULT_EVENT_CONFLICT");
+        // Identical committed events remain acknowledgeable after lease/deadline expiry.
+        if (result.isDuplicateResultEvent(request.eventId(), request.payloadSha256())) {
+            if (result.getRecording().getDeletedAt() != null || result.getStatus() != request.status()
+                    || (result.getFailureCode() != null && result.getFailureCode().contains("cancel"))) fail(409, "ANALYSIS_CANCELLED");
+            return AnalysisResultIngestionDisposition.IGNORED_DUPLICATE;
         }
-        if (result.isConflictingResultEvent(request.eventId(), payloadSha256(request))) {
-            throw new BaseException(ErrorCode.ANALYSIS_INTERNAL_RESULT_CONFLICT);
-        }
+        if (result.getLastResultEventId() != null) fail(409, "RESULT_ALREADY_FINALIZED");
+        requireActive(result, request.requestId(), request.executionId());
+        OffsetDateTime now = now();
+        deadline(executionPayload(result, request.requestId(), request.executionId()), now);
+        requireOwner(result, request.workerInstanceId(), now, true);
+        var evidence = request.workerResult().pronunciationEvidence();
+        if (evidence != null && evidence.selectedEndMs() != null
+                && (result.getRecording().getDurationMs() == null
+                || evidence.selectedEndMs() > result.getRecording().getDurationMs())) fail(422, "VALIDATION_FAILED");
         try {
-            AnalysisResultIngestionDisposition disposition = ingestionService.ingest(
-                    request.workerResult(),
-                    request.executionId(),
-                    payloadSha256(request)
-            );
-            if (disposition == AnalysisResultIngestionDisposition.IGNORED_STALE) {
-                throw new BaseException(ErrorCode.ANALYSIS_INTERNAL_STALE_EXECUTION);
-            }
+            var disposition = ingestionService.ingest(request.workerResult(), request.executionId(), request.payloadSha256());
+            if (disposition != AnalysisResultIngestionDisposition.APPLIED) fail(409, "RESULT_ALREADY_FINALIZED");
             return disposition;
         } catch (IllegalArgumentException error) {
-            throw new BaseException(ErrorCode.ANALYSIS_INTERNAL_CONTRACT_INVALID);
+            throw new RunPodContractException(422, "VALIDATION_FAILED");
         }
     }
 
-    private AnalysisResult find(Long analysisId) {
-        return analysisResultReader.findForIngestion(analysisId)
-                .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FOUND));
+    private AnalysisResult find(Long id) {
+        return analysisResultReader.findForIngestion(id).orElseThrow(() -> new RunPodContractException(404, "TARGET_NOT_FOUND"));
     }
 
-    private static void requireSchema(String expected, String actual) {
-        if (!expected.equals(actual)) {
-            throw new BaseException(ErrorCode.ANALYSIS_INTERNAL_CONTRACT_INVALID);
-        }
+    private void requireIdentity(AnalysisResult result, UUID request, UUID execution) {
+        if (!result.isForActiveRequest(request) || !result.isForActiveExecution(execution)) fail(409, "STALE_EXECUTION");
     }
 
-    private String payloadSha256(AnalysisRunPodResultCommand request) {
-        try {
-            byte[] payload = objectMapper.writeValueAsBytes(request);
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(payload));
-        } catch (JsonProcessingException | NoSuchAlgorithmException error) {
-            throw new IllegalStateException("callback payload digest failed", error);
-        }
+    private void requireActive(AnalysisResult result, UUID request, UUID execution) {
+        requireIdentity(result, request, execution);
+        if (result.getRecording().getDeletedAt() != null || !Boolean.TRUE.equals(result.getRecording().getSelected())
+                || (result.getFailureCode() != null && result.getFailureCode().contains("cancel"))) fail(409, "ANALYSIS_CANCELLED");
+        if (result.getStatus() == AnalysisStatus.COMPLETED || result.getStatus() == AnalysisStatus.FAILED) fail(409, "ANALYSIS_TERMINAL");
     }
+
+    private String executionPayload(AnalysisResult result, UUID request, UUID execution) {
+        var outbox = outboxRepository.findByEventIdAndExecutionIdAndTransport(request.toString(), execution.toString(), "RUNPOD_HTTP")
+                .orElseThrow(() -> new RunPodContractException(409, "UNKNOWN_EXECUTION"));
+        if (!result.getId().equals(outbox.getAnalysisResult().getId())) fail(409, "UNKNOWN_EXECUTION");
+        return outbox.getPayload();
+    }
+
+    private OffsetDateTime deadline(String payload, OffsetDateTime now) {
+        var json = contract.parse(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8), "analysisRequest");
+        OffsetDateTime deadline = OffsetDateTime.parse(json.get("deadlineAt").asText());
+        if (!deadline.isAfter(now)) fail(409, "DEADLINE_EXCEEDED");
+        return deadline;
+    }
+
+    private void requireOwner(AnalysisResult result, String worker, OffsetDateTime now, boolean required) {
+        if (result.getWorkerInstanceId() == null) {
+            if (required) fail(409, "CLAIM_REQUIRED");
+            return;
+        }
+        if (!worker.equals(result.getWorkerInstanceId())) fail(409, "WORKER_CONFLICT");
+        if (result.getClaimExpiresAt() == null || !result.getClaimExpiresAt().isAfter(now)) fail(409, "LEASE_EXPIRED");
+    }
+
+    private OffsetDateTime cappedLease(OffsetDateTime now, OffsetDateTime deadline) {
+        OffsetDateTime expires = now.plus(properties.getClaimTtl());
+        if (!expires.isAfter(now)) fail(503, "NOT_READY");
+        return expires.isBefore(deadline) ? expires : deadline;
+    }
+
+    private AnalysisRunPodControlData control(AnalysisResult result, UUID request, UUID execution, OffsetDateTime now) {
+        return new AnalysisRunPodControlData(result.getId(), request, execution, result.getWorkerInstanceId(),
+                RunPodContract.timestamp(now), RunPodContract.timestamp(result.getClaimExpiresAt()), true);
+    }
+
+    private static OffsetDateTime now() { return OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS); }
+    private static void fail(int status, String reason) { throw new RunPodContractException(status, reason); }
 }
