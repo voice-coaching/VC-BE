@@ -75,6 +75,12 @@ public class PracticeContent {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
+    @Column(name = "publisher")
+    private String publisher;
+
+    @Column(name = "speaker_name")
+    private String speakerName;
+
     @Column(name = "owner_id")
     private Long ownerId;
 

@@ -8,7 +8,13 @@ public record PracticeContentListItemDto(
         String title,
         String category,
         String difficulty,
-        Integer estimatedSeconds
+        Integer estimatedSeconds,
+        String publisher,
+        Integer paragraphCount,
+        Integer sentenceCount,
+        Integer syllableCount,
+        java.time.OffsetDateTime publishedAt,
+        String speakerName
 ) {
 
     public static PracticeContentListItemDto from(PracticeContentSummaryData data) {
@@ -18,7 +24,8 @@ public record PracticeContentListItemDto(
                 data.title(),
                 data.category(),
                 data.difficulty().name(),
-                data.estimatedSeconds()
+                data.estimatedSeconds(),
+                data.publisher(),data.paragraphCount(),data.sentenceCount(),data.syllableCount(),data.publishedAt(),data.speakerName()
         );
     }
 }
