@@ -178,6 +178,7 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/courses/{courseId}", "클래스", "클래스 상세 조회", "클래스 소개, 전체 단계 수와 현재 사용자의 진행 정보를 조회합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/courses/{courseId}/steps", "클래스", "클래스 단계 목록 조회", "클래스를 구성하는 학습 단계를 순서대로 조회합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/courses/{courseId}/steps/{stepId}", "클래스", "클래스 단계 교육 내용 조회", "게시된 구조화 교육 내용과 개정 번호를 조회합니다. 진행 중 학습은 고정된 개정을 사용하며 선택 sessionId로 본인 과거 학습 내용을 조회할 수 있습니다. 내용 미준비는 503입니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/practice-contents/custom", "학습 콘텐츠", "사용자 입력 문장 생성", "1~300 Unicode code point의 ko-KR 원고를 암호화 저장합니다. 숫자 id를 학습 contentId로 사용하며 소유자만 조회할 수 있습니다. 선택 Idempotency-Key를 지원합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/courses/{courseId}/start", "클래스", "클래스 학습 시작", "사용자의 클래스 진도 레코드를 만들거나 기존 진행 정보를 반환합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/courses/{courseId}/progress", "클래스", "클래스 진도 조회", "현재 사용자의 클래스 진행 단계와 완료율을 조회합니다.", false);
         add(map, PathItem.HttpMethod.PATCH, "/api/courses/{courseId}/progress", "클래스", "클래스 진도 수정", "완료한 단계와 학습 시간을 반영해 클래스 진도를 갱신합니다.", false);

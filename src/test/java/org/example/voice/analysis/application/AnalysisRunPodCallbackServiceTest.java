@@ -85,8 +85,9 @@ class AnalysisRunPodCallbackServiceTest {
         expect("ANALYSIS_CANCELLED", () -> service.claim(1L, claim(WORKER.toString(), contract.digest(payload))));
         when(result.getRecording().getSelected()).thenReturn(true);
         String expired = payload(OffsetDateTime.now().minusMinutes(1));
+        var expiredOutbox = AnalysisRequestOutbox.pendingHttp(REQUEST, EXECUTION, result, expired);
         when(outboxes.findByEventIdAndExecutionIdAndTransport(REQUEST.toString(), EXECUTION.toString(), "RUNPOD_HTTP"))
-                .thenReturn(Optional.of(AnalysisRequestOutbox.pendingHttp(REQUEST, EXECUTION, result, expired)));
+                .thenReturn(Optional.of(expiredOutbox));
         expect("DEADLINE_EXCEEDED", () -> service.claim(1L, claim(WORKER.toString(), contract.digest(expired))));
     }
 

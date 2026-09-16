@@ -59,18 +59,13 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     }
 
     @Override
-    @Cacheable(
-            cacheNames = MyPageCacheNames.HISTORY,
-            key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys)"
-                    + ".history(#p0, #p1, #p2, #p3, #p4, #p5, #p6)"
-    )
     public MyPageData.HistoryPage findHistory(Long userId, ContentType type, TrainingSessionStatus status,
                                               OffsetDateTime from, OffsetDateTime to, int page, int size) {
         TrainingSessionStatus selectedStatus = status == null ? TrainingSessionStatus.COMPLETED : status;
         String where = " where s.userId=:userId and s.status=:status and s.completedAt>=:from and s.completedAt<:to "
                 + (type == null ? "" : " and s.content.contentType=:type ");
         TypedQuery<Object[]> query = entityManager.createQuery("""
-                select s.id, c.id, c.contentType, c.title, s.status, a.overallScore, s.completedAt
+                select s.id, c.id, c.contentType, c, s.status, a.overallScore, s.completedAt
                 from TrainingSession s join s.content c
                 left join VoiceRecording r on r.trainingSession=s and r.selected=true and r.deletedAt is null
                 left join AnalysisResult a on a.recording=r and a.status=:analysisStatus
@@ -81,7 +76,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
         bindHistory(count, userId, selectedStatus, type, from, to);
         long total = count.getSingleResult();
         List<MyPageData.HistoryItem> items = query.getResultList().stream().map(row -> new MyPageData.HistoryItem(
-                (Long) row[0], (Long) row[1], row[2].toString(), (String) row[3], row[4].toString(),
+                (Long) row[0], (Long) row[1], row[2].toString(), ((PracticeContent) row[3]).getTitle(), row[4].toString(),
                 round((BigDecimal) row[5]), (OffsetDateTime) row[6])).toList();
         int pages = (int) Math.ceil((double) total / size);
         return new MyPageData.HistoryPage(items, page, size, total, pages, page + 1 < pages);
@@ -107,15 +102,10 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     }
 
     @Override
-    @Cacheable(
-            cacheNames = MyPageCacheNames.HISTORY_DETAIL,
-            key = "T(org.example.voice.mypage.infrastructure.cache.MyPageCacheKeys).historyDetail(#p0, #p1)",
-            unless = "#result == null"
-    )
     public Optional<MyPageData.HistoryDetail> findHistoryDetail(Long userId, Long sessionId) {
         List<Object[]> sessions = entityManager.createQuery("""
                 select s.id, s.status, s.startedAt, s.completedAt, s.totalLearningSeconds,
-                       c.id, c.title, c.scriptText
+                       c.id, c
                 from TrainingSession s join s.content c where s.id=:id and s.userId=:userId
                 """, Object[].class).setParameter("id", sessionId).setParameter("userId", userId).getResultList();
         if (sessions.isEmpty()) return Optional.empty();
@@ -138,7 +128,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
         return Optional.of(new MyPageData.HistoryDetail(
                 new MyPageData.Session((Long) session[0], session[1].toString(), (OffsetDateTime) session[2],
                         (OffsetDateTime) session[3], (Integer) session[4]),
-                new MyPageData.Content((Long) session[5], (String) session[6], (String) session[7]),
+                new MyPageData.Content((Long) session[5], ((PracticeContent) session[6]).getTitle(), ((PracticeContent) session[6]).getScriptText()),
                 new MyPageData.Recording((Long) analysis[0], (Integer) analysis[1], analysis[2].toString()),
                 new MyPageData.Analysis((Long) analysis[3], (String) analysis[4], round((BigDecimal) analysis[5])), segments));
     }

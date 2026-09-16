@@ -15,7 +15,10 @@ public record PracticeContentDetailResponseDto(
         String difficulty,
         List<String> targetPronunciations,
         Integer estimatedSeconds,
-        Boolean referenceAudioAvailable
+        Boolean referenceAudioAvailable,
+        String origin,
+        List<org.example.voice.practicecontent.domain.model.CustomContentData.Sentence> sentences,
+        java.time.OffsetDateTime createdAt
 ) {
 
     public static PracticeContentDetailResponseDto from(PracticeContentDetailData data) {
@@ -30,7 +33,13 @@ public record PracticeContentDetailResponseDto(
                 data.difficulty().name(),
                 data.targetPronunciations(),
                 data.estimatedSeconds(),
-                data.referenceAudioAvailable()
+                data.referenceAudioAvailable(), null, null, null
         );
+    }
+
+    public static PracticeContentDetailResponseDto fromCustom(org.example.voice.practicecontent.domain.model.CustomContentData data) {
+        return new PracticeContentDetailResponseDto(data.id(),data.contentType(),data.learningFocus().name(),data.category(),
+                data.title(),data.description(),data.scriptText(),data.difficulty(),data.targetPronunciations(),data.estimatedSeconds(),
+                false,data.origin(),data.sentences(),data.createdAt());
     }
 }

@@ -75,7 +75,39 @@ public class PracticeContent {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
+    @Column(name = "owner_id")
+    private Long ownerId;
+
+    @Column(name = "custom_script_ciphertext", columnDefinition = "text")
+    private org.example.voice.practicecontent.domain.model.PrivateText customScript;
+
+    @Column(name = "custom_title_ciphertext", columnDefinition = "text")
+    private org.example.voice.practicecontent.domain.model.PrivateText customTitle;
+
+    @Column(name = "custom_deleted_at")
+    private OffsetDateTime customDeletedAt;
+
+    public String getScriptText() { return ownerId == null ? scriptText : customScript == null ? "" : customScript.value(); }
+    public String getTitle() { return ownerId == null ? title : customTitle == null ? "삭제된 내 문장" : customTitle.value(); }
+
+    public static PracticeContent custom(Long userId, String title, String script, LearningFocus focus, OffsetDateTime now) {
+        PracticeContent content = new PracticeContent();
+        content.ownerId=userId; content.contentType=ContentType.SENTENCE; content.learningFocus=focus;
+        content.category="CUSTOM"; content.title="내 문장"; content.scriptText="[private]";
+        content.customTitle=new org.example.voice.practicecontent.domain.model.PrivateText(title);
+        content.customScript=new org.example.voice.practicecontent.domain.model.PrivateText(script);
+        content.description="직접 입력한 문장으로 연습해요."; content.difficulty=Difficulty.INTERMEDIATE;
+        content.targetPronunciations=List.of(); content.estimatedSeconds=Math.max(1,(script.codePointCount(0,script.length())+4)/5);
+        content.status=PublishStatus.HIDDEN; content.createdAt=now; content.updatedAt=now;
+        return content;
+    }
+
+    public void eraseCustom(OffsetDateTime now) {
+        if (ownerId == null) throw new IllegalStateException("Not user input");
+        customTitle=null; customScript=null; customDeletedAt=now; updatedAt=now;
+    }
+
     public boolean isPublished() {
-        return status == PublishStatus.PUBLISHED;
+        return ownerId == null && status == PublishStatus.PUBLISHED;
     }
 }

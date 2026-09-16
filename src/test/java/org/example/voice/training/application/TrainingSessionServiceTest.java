@@ -34,7 +34,8 @@ class TrainingSessionServiceTest {
                 consentLedger,
                 uploadIntentRegistry,
                 analysisCancellation,
-                mock(org.example.voice.title.domain.port.TitleExamSessionLink.class)
+                mock(org.example.voice.title.domain.port.TitleExamSessionLink.class),
+                mock(org.example.voice.practicecontent.domain.port.CustomContentLifecycle.class)
         );
         OffsetDateTime canceledAt = OffsetDateTime.now();
         when(reader.findSessionStatus(7L, 9L)).thenReturn(Optional.of(TrainingSessionStatus.ANALYZING));

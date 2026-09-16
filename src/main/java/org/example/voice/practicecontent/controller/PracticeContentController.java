@@ -39,8 +39,9 @@ public class PracticeContentController {
     }
 
     @GetMapping("/{contentId}")
-    public ApiResponse<PracticeContentDetailResponseDto> getPracticeContent(@PathVariable Long contentId) {
-        PracticeContentDetailResponseDto response = practiceContentService.getPracticeContent(contentId);
+    public ApiResponse<PracticeContentDetailResponseDto> getPracticeContent(@PathVariable Long contentId,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.example.voice.common.security.LoginUser user) {
+        PracticeContentDetailResponseDto response = practiceContentService.getPracticeContent(contentId,user.id());
         return ApiResponse.success("학습 콘텐츠를 조회했습니다.", response);
     }
 

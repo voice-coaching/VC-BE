@@ -60,7 +60,8 @@ class UserServiceTest {
                 recordingDeletionScheduler,
                 uploadIntentRegistry,
                 analysisCancellation,
-                mock(org.example.voice.profileimage.domain.port.ProfileImageLifecycle.class)
+                mock(org.example.voice.profileimage.domain.port.ProfileImageLifecycle.class),
+                mock(org.example.voice.practicecontent.domain.port.CustomContentLifecycle.class)
         );
     }
 
