@@ -62,6 +62,17 @@ public class AnalysisResult {
     @Column(name = "overall_score")
     private BigDecimal overallScore;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "clova_score_evidence", columnDefinition = "jsonb")
+    private Map<String, Object> clovaScoreEvidence;
+
+    public void applyClovaScore(BigDecimal score, org.example.voice.analysis.domain.model.ClovaScoreEvidence evidence) {
+        if (status != AnalysisStatus.COMPLETED) throw new IllegalArgumentException("score requires completion");
+        evidence.validate(score);
+        this.overallScore = score;
+        this.clovaScoreEvidence = evidence.audit();
+    }
+
     @Column(name = "pronunciation_score")
     private BigDecimal pronunciationScore;
 
@@ -415,6 +426,7 @@ public class AnalysisResult {
         this.sttConfidence = null;
         this.sttModelName = null;
         this.overallScore = null;
+        this.clovaScoreEvidence = null;
         this.pronunciationScore = null;
         this.intonationScore = null;
         this.speedWpm = null;

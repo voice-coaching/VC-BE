@@ -14,6 +14,8 @@ public record AnalysisRunPodResultCommand(
         Long analysisId,
         Long recordingId,
         AnalysisStatus status,
-        AnalysisWorkerResult workerResult
+        AnalysisWorkerResult workerResult,
+        java.math.BigDecimal overallScore,
+        ClovaScoreEvidence scoringEvidence
 ) {
 }

@@ -32,7 +32,9 @@ public record RunPodAnalysisResultCallbackRequestDto(
         String workerRevision,
         String pipelineRevision,
         String audioSha256,
-        AnalysisWorkerVisualSupplement visualSupplement
+        AnalysisWorkerVisualSupplement visualSupplement,
+        java.math.BigDecimal overallScore,
+        org.example.voice.analysis.domain.model.ClovaScoreEvidence scoringEvidence
 ) {
     public AnalysisRunPodResultCommand toCommand(String payloadSha256) {
         return new AnalysisRunPodResultCommand(
@@ -45,7 +47,7 @@ public record RunPodAnalysisResultCallbackRequestDto(
                 analysisId,
                 recordingId,
                 status,
-                toWorkerResult()
+                toWorkerResult(), overallScore, scoringEvidence
         );
     }
 
