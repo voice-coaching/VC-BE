@@ -57,8 +57,17 @@ public class AnalysisRunPodCallbackService {
 
     @Transactional
     public AnalysisResultIngestionDisposition ingestResult(Long analysisId, AnalysisRunPodResultCommand request) {
-        if (!"voice-coaching.runpod-analysis-result.v1".equals(request.schemaVersion())
+        boolean scored = "voice-coaching.runpod-analysis-result.v2".equals(request.schemaVersion());
+        if ((!scored && !"voice-coaching.runpod-analysis-result.v1".equals(request.schemaVersion()))
                 || !analysisId.equals(request.analysisId())) fail(422, "VALIDATION_FAILED");
+        try {
+            if (scored && request.status() == AnalysisStatus.COMPLETED) {
+                if (request.scoringEvidence() == null) fail(422, "VALIDATION_FAILED");
+                request.scoringEvidence().validate(request.overallScore());
+            } else if (request.overallScore() != null || request.scoringEvidence() != null) {
+                fail(422, "VALIDATION_FAILED");
+            }
+        } catch (IllegalArgumentException error) { throw new RunPodContractException(422, "VALIDATION_FAILED"); }
         AnalysisResult result = find(analysisId);
         requireIdentity(result, request.requestId(), request.executionId());
         if (!result.getRecording().getId().equals(request.recordingId())) fail(422, "VALIDATION_FAILED");
@@ -83,6 +92,10 @@ public class AnalysisRunPodCallbackService {
         try {
             var disposition = ingestionService.ingest(request.workerResult(), request.executionId(), request.payloadSha256());
             if (disposition != AnalysisResultIngestionDisposition.APPLIED) fail(409, "RESULT_ALREADY_FINALIZED");
+            if (scored && request.status() == AnalysisStatus.COMPLETED) {
+                result.applyClovaScore(request.overallScore(), request.scoringEvidence());
+                analysisResultWriter.save(result);
+            }
             return disposition;
         } catch (IllegalArgumentException error) {
             throw new RunPodContractException(422, "VALIDATION_FAILED");

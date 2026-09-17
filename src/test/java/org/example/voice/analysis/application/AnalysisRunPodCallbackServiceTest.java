@@ -112,6 +112,41 @@ class AnalysisRunPodCallbackServiceTest {
         return contract.convert(json, RunPodAnalysisResultCallbackRequestDto.class).toCommand(contract.digest(json));
     }
 
+    private String scoredResult() {
+        return result(UUID.randomUUID()).replace("runpod-analysis-result.v1", "runpod-analysis-result.v2")
+                .replace("\"failureReason\":null", """
+                  "failureReason":null,"overallScore":78.0,"scoringEvidence":{
+                  "rubricRevision":"clova-phone-rubric-v1","generator":"hyperclova",
+                  "modelRevision":"%s","evidenceSha256":"%s","expectedPhoneCount":10,
+                  "correctPhoneCount":7,"alignedPhoneCount":9,"unflaggedPhoneCount":9,
+                  "alignmentScore":42.0,"coverageScore":18.0,"stabilityScore":18.0}
+                  """.formatted("a".repeat(40), "c".repeat(64)));
+    }
+
+    @Test
+    void storesValidatedClovaScoreAndAuditWithIdempotentAck() {
+        service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
+        var scored = command(scoredResult());
+        assertThat(service.ingestResult(1L, scored)).isEqualTo(AnalysisResultIngestionDisposition.APPLIED);
+        assertThat(result.getOverallScore()).isEqualByComparingTo("78.0");
+        assertThat(result.getClovaScoreEvidence()).containsEntry("rubricRevision", "clova-phone-rubric-v1");
+        assertThat(service.ingestResult(1L, scored)).isEqualTo(AnalysisResultIngestionDisposition.IGNORED_DUPLICATE);
+        verify(segments, times(1)).replaceForAnalysis(any(), any());
+    }
+
+    @Test
+    void rejectsUnverifiedOrInvalidScoresBeforeChangingAnalysis() {
+        service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
+        String valid = scoredResult();
+        expect("VALIDATION_FAILED", () -> service.ingestResult(1L, command(valid.replace("\"overallScore\":78.0", "\"overallScore\":99.0"))));
+        expect("VALIDATION_FAILED", () -> command(valid.replace("runpod-analysis-result.v2", "runpod-analysis-result.v1")));
+        expect("VALIDATION_FAILED", () -> command(valid.replace("\"overallScore\":78.0,", "")));
+        expect("VALIDATION_FAILED", () -> command(valid.replace("\"overallScore\":78.0", "\"overallScore\":101")));
+        assertThat(result.getStatus()).isEqualTo(AnalysisStatus.PROCESSING);
+        assertThat(result.getOverallScore()).isNull();
+        assertThat(result.getLastResultEventId()).isNull();
+    }
+
     @Test
     void acceptsFailedResultWithoutInventedMediaEvidence() {
         service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
