@@ -147,6 +147,56 @@ class AnalysisRunPodCallbackServiceTest {
         assertThat(result.getLastResultEventId()).isNull();
     }
 
+    private String detailedScoredResult() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var body = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(scoredResult());
+        body.put("overallScore", 82.1);
+        var audit = body.putObject("scoringEvidence");
+        audit.put("rubricRevision", "clova-phone-rubric-v2"); audit.put("generator", "hyperclova");
+        audit.put("modelRevision", "a".repeat(40)); audit.put("evidenceSha256", "b".repeat(64));
+        audit.put("rubricSha256", org.example.voice.analysis.domain.model.ClovaScoreEvidence.POLICY_SHA256);
+        audit.put("promptSha256", "c".repeat(64));
+        audit.put("expectedPhoneCount", 4); audit.put("correctPhoneCount", 4);
+        audit.put("alignedPhoneCount", 4); audit.put("unflaggedPhoneCount", 3);
+        var rows = audit.putArray("criteria");
+        for (String id : java.util.List.of("vowels", "plain_stops", "tense_stops", "aspirated_stops",
+                "fricatives", "affricates", "nasals", "liquid", "coverage")) {
+            boolean active = id.equals("vowels") || id.equals("coverage");
+            var row = rows.addObject(); row.put("criterionId", id); row.put("sampleCount", active ? 4 : 0);
+            row.put("matchedClear", active ? 3 : 0); row.put("matchedFlagged", active ? 1 : 0);
+            row.put("substitutedClear", 0); row.put("substitutedFlagged", 0);
+            row.put("deletedClear", 0); row.put("deletedFlagged", 0);
+            if (active) row.put("level", id.equals("coverage") ? 4 : 3); else row.putNull("level");
+        }
+        return mapper.writeValueAsString(body);
+    }
+
+    @Test
+    void storesDetailedRubricWithAbsentCategoriesAndIdempotentAck() throws Exception {
+        service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
+        var command = command(detailedScoredResult());
+        assertThat(service.ingestResult(1L, command)).isEqualTo(AnalysisResultIngestionDisposition.APPLIED);
+        assertThat(result.getOverallScore()).isEqualByComparingTo("82.1");
+        assertThat(result.getClovaScoreEvidence()).containsKeys("criteria", "rubricSha256", "promptSha256");
+        assertThat(service.ingestResult(1L, command)).isEqualTo(AnalysisResultIngestionDisposition.IGNORED_DUPLICATE);
+    }
+
+    @Test
+    void rejectsDetailedRubricTamperingBeforeStateChanges() throws Exception {
+        service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
+        String raw = detailedScoredResult();
+        for (String invalid : java.util.List.of(
+                raw.replace("\"overallScore\":82.1", "\"overallScore\":100"),
+                raw.replace("\"level\":3", "\"level\":4"),
+                raw.replace("\"level\":null", "\"level\":4"),
+                raw.replace("\"criterionId\":\"liquid\"", "\"criterionId\":\"vowels\""),
+                raw.replace(org.example.voice.analysis.domain.model.ClovaScoreEvidence.POLICY_SHA256, "d".repeat(64)))) {
+            expect("VALIDATION_FAILED", () -> service.ingestResult(1L, command(invalid)));
+        }
+        assertThat(result.getOverallScore()).isNull();
+        assertThat(result.getStatus()).isEqualTo(AnalysisStatus.PROCESSING);
+    }
+
     @Test
     void acceptsFailedResultWithoutInventedMediaEvidence() {
         service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
