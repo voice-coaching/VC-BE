@@ -17,7 +17,8 @@ public record AnalysisScoreBreakdown(String rubricRevision, int applicableMaxSco
 
     public static AnalysisScoreBreakdown fromAudit(Map<String, Object> audit, BigDecimal overallScore) {
         if (audit == null || overallScore == null
-                || !ClovaScoreEvidence.DETAILED_RUBRIC.equals(audit.get("rubricRevision"))) return null;
+                || (!ClovaScoreEvidence.DETAILED_RUBRIC.equals(audit.get("rubricRevision"))
+                && !ClovaScoreEvidence.HIERARCHICAL_RUBRIC.equals(audit.get("rubricRevision")))) return null;
         try {
             return MAPPER.convertValue(audit, ClovaScoreEvidence.class).breakdown(overallScore);
         } catch (IllegalArgumentException | NullPointerException invalidStoredEvidence) {

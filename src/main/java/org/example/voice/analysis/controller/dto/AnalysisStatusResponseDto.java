@@ -6,7 +6,8 @@ import org.example.voice.analysis.domain.model.AnalysisScoreBreakdown;
 import java.math.BigDecimal;
 
 public record AnalysisStatusResponseDto(Long sessionId, Long analysisId, String status, String outcome, BigDecimal overallScore,
-        BigDecimal pronunciationScore, BigDecimal intonationScore, AnalysisScoreBreakdown scoreBreakdown) {
+        BigDecimal pronunciationScore, BigDecimal intonationScore, AnalysisScoreBreakdown scoreBreakdown,
+        org.example.voice.analysis.domain.model.AnalysisScoreHierarchy scoreHierarchy) {
     public static AnalysisStatusResponseDto from(Long sessionId, AnalysisResultData data) {
         return new AnalysisStatusResponseDto(
                 sessionId,
@@ -16,7 +17,8 @@ public record AnalysisStatusResponseDto(Long sessionId, Long analysisId, String 
                 data.overallScore(),
                 data.pronunciationScore(),
                 data.intonationScore(),
-                data.scoreBreakdown()
+                data.scoreBreakdown(),
+                data.scoreHierarchy()
         );
     }
 }

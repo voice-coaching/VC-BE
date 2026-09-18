@@ -14,7 +14,8 @@ public record AnalysisResultResponseDto(Long id, String status, String outcome, 
         List<String> weaknesses, String summaryFeedback,
         PronunciationEvidenceResponseDto pronunciationEvidence,
         VisualSupplementResponseDto visualSupplement,
-        OffsetDateTime analyzedAt, AnalysisScoreBreakdown scoreBreakdown) {
+        OffsetDateTime analyzedAt, AnalysisScoreBreakdown scoreBreakdown,
+        org.example.voice.analysis.domain.model.AnalysisScoreHierarchy scoreHierarchy) {
     public static AnalysisResultResponseDto from(AnalysisResultData data) {
         return new AnalysisResultResponseDto(
                 data.id(),
@@ -35,7 +36,8 @@ public record AnalysisResultResponseDto(Long id, String status, String outcome, 
                 PronunciationEvidenceResponseDto.from(data.pronunciationEvidence()),
                 VisualSupplementResponseDto.from(data.visualSupplement()),
                 data.analyzedAt(),
-                data.scoreBreakdown()
+                data.scoreBreakdown(),
+                data.scoreHierarchy()
         );
     }
 }

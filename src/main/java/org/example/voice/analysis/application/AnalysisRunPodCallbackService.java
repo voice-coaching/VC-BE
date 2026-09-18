@@ -64,6 +64,7 @@ public class AnalysisRunPodCallbackService {
             if (scored && request.status() == AnalysisStatus.COMPLETED) {
                 if (request.scoringEvidence() == null) fail(422, "VALIDATION_FAILED");
                 request.scoringEvidence().validate(request.overallScore());
+                org.example.voice.analysis.domain.model.HierarchicalScorePolicy.validateBinding(request.scoringEvidence(), request.workerResult());
             } else if (request.overallScore() != null || request.scoringEvidence() != null) {
                 fail(422, "VALIDATION_FAILED");
             }
