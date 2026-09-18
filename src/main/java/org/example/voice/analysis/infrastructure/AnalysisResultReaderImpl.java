@@ -88,7 +88,8 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
                 visualSupplement(result),
                 result.getAnalyzedAt(),
                 AnalysisScoreBreakdown.fromAudit(result.getClovaScoreEvidence(), result.getOverallScore()),
-                org.example.voice.analysis.domain.model.AnalysisScoreHierarchy.fromAudit(result.getClovaScoreEvidence(), result.getOverallScore())
+                org.example.voice.analysis.domain.model.AnalysisScoreHierarchy.fromAudit(result.getClovaScoreEvidence(), result.getOverallScore()),
+                result.getCoachingDocument()
         );
     }
 

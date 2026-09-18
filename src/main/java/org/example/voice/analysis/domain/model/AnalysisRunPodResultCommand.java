@@ -16,6 +16,14 @@ public record AnalysisRunPodResultCommand(
         AnalysisStatus status,
         AnalysisWorkerResult workerResult,
         java.math.BigDecimal overallScore,
-        ClovaScoreEvidence scoringEvidence
+        ClovaScoreEvidence scoringEvidence,
+        AnalysisCoaching coaching
 ) {
+    public AnalysisRunPodResultCommand(String schemaVersion, UUID eventId, UUID requestId,
+            UUID executionId, String workerInstanceId, String payloadSha256, Long analysisId,
+            Long recordingId, AnalysisStatus status, AnalysisWorkerResult workerResult,
+            java.math.BigDecimal overallScore, ClovaScoreEvidence scoringEvidence) {
+        this(schemaVersion, eventId, requestId, executionId, workerInstanceId, payloadSha256,
+                analysisId, recordingId, status, workerResult, overallScore, scoringEvidence, null);
+    }
 }

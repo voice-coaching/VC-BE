@@ -1,5 +1,11 @@
 # DB Schema - voice
 
+## V29 코칭 문서 추가
+
+`analysis_results.coaching_document`: nullable JSONB. 기존 row는 null로 유지한다. `ck_analysis_coaching_document`는 비 null 값이 객체이며 schemaVersion이 `voice-coaching.coaching-result.v1`인지 확인한다. 항목별 의미 검증은 애플리케이션에서 수행한다. [API 및 이행](../api/evidence-based-coaching.md).
+
+아래 V0..V15 설명은 초기 baseline 기록이며 현재 최종 migration 목록은 `src/main/resources/db/migration`을 기준으로 한다.
+
 - 데이터베이스: PostgreSQL
 - 현재 schema source of truth: `src/main/resources/db/migration/V0..V15`
 - `voicebackup(08.08.15.15).sql`은 2026-08-07 당시의 historical 참고자료이며 신규 배포 입력이 아니다.

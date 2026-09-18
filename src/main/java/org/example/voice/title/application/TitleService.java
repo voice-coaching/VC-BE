@@ -95,6 +95,9 @@ public class TitleService implements TitleExamSessionLink {
         }
         if (exam.getTrainingSessionId() == null) throw new TitleException(409, "ANALYSIS_NOT_COMPLETED");
         if (!titles.ownedAnalysis(analysisId,userId)) throw new TitleException(404,"RESOURCE_NOT_FOUND");
+        if (titles.coachingScoreUnavailable(analysisId, userId, exam.getTrainingSessionId(), exam.getPracticeContentId())) {
+            throw new TitleException(409, "ANALYSIS_SCORE_UNAVAILABLE");
+        }
         var score = titles.score(analysisId, userId, exam.getTrainingSessionId(), exam.getPracticeContentId())
                 .orElseThrow(() -> new TitleException(409, "ANALYSIS_NOT_COMPLETED"));
         var title = titles.title(userId).orElseThrow(() -> new TitleException(409, "CONFLICT"));

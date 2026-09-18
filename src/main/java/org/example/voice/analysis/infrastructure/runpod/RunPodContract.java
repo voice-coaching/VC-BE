@@ -121,6 +121,9 @@ public class RunPodContract {
         if (value.isObject()) schema.path("properties").fields().forEachRemaining(e -> {
             if (value.has(e.getKey())) utf16(value.get(e.getKey()), e.getValue(), root);
         });
+        if (value.isArray() && schema.path("items").isObject()) {
+            for (JsonNode item : value) utf16(item, schema.get("items"), root);
+        }
         for (String key : new String[]{"anyOf", "oneOf", "allOf"}) {
             for (JsonNode branch : schema.path(key)) utf16(value, branch, root);
         }
