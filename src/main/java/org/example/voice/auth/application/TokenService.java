@@ -46,6 +46,9 @@ public class TokenService {
         TokenClaims claims = tokenProvider.parseRefreshToken(rawRefreshToken);
         User user = userReader.findByIdForUpdate(claims.userId())
                 .orElseThrow(() -> new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN));
+        if (user.isWithdrawn() || user.isSuspended()) {
+            throw new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
         RefreshToken stored = refreshTokenReader.findByTokenHashForUpdate(hash(rawRefreshToken))
                 .orElseThrow(() -> new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN));
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);

@@ -68,4 +68,19 @@ class AuthServiceTest {
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_CREDENTIALS));
         verifyNoInteractions(passwordHasher);
     }
+
+    @Test
+    void loginRejectsWithdrawnUserWithoutIssuingNewSession() {
+        User user = mock(User.class);
+        when(userReader.findByEmail("withdrawn@example.com")).thenReturn(Optional.of(user));
+        when(passwordHasher.matches("Password123!", user.getPassword())).thenReturn(true);
+        when(user.isWithdrawn()).thenReturn(true);
+
+        assertThatThrownBy(() -> service.login("withdrawn@example.com", "Password123!"))
+                .isInstanceOfSatisfying(AuthException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USER_WITHDRAWN));
+
+        verify(tokenService, never()).issueSession(any());
+        verify(user, never()).recordLogin(any());
+    }
 }

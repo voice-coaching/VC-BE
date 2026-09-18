@@ -69,4 +69,21 @@ class TokenServiceTest {
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.REFRESH_TOKEN_EXPIRED));
         verify(writer).delete(stored);
     }
+
+    @Test
+    void refreshRejectsWithdrawnUserWithoutRotatingSession() {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        User user = mock(User.class);
+        when(user.isWithdrawn()).thenReturn(true);
+        when(provider.parseRefreshToken("withdrawn-token"))
+                .thenReturn(new TokenClaims(1L, UserRole.USER, "old-session", now.plusHours(1)));
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> service.rotate("withdrawn-token"))
+                .isInstanceOfSatisfying(InvalidTokenException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_REFRESH_TOKEN));
+
+        verifyNoInteractions(reader, writer);
+        verify(provider, never()).issue(anyLong(), any());
+    }
 }
