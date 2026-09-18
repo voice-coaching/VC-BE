@@ -9,12 +9,26 @@ public record ClovaScoreEvidence(String rubricRevision, String generator, String
         String evidenceSha256, int expectedPhoneCount, int alignedPhoneCount,
         int correctPhoneCount, int unflaggedPhoneCount,
         BigDecimal alignmentScore, BigDecimal coverageScore, BigDecimal stabilityScore,
-        String rubricSha256, String promptSha256, java.util.List<Criterion> criteria) {
+        String rubricSha256, String promptSha256, java.util.List<Criterion> criteria, java.util.List<Criterion> phoneCriteria,
+        HierarchicalScorePolicy.VisualObservation visualObservation, java.util.List<String> attentionCriterionIds) {
+    public ClovaScoreEvidence(String rubricRevision, String generator, String modelRevision,
+            String evidenceSha256, int expectedPhoneCount, int alignedPhoneCount,
+            int correctPhoneCount, int unflaggedPhoneCount, BigDecimal alignmentScore,
+            BigDecimal coverageScore, BigDecimal stabilityScore, String rubricSha256,
+            String promptSha256, java.util.List<Criterion> criteria) {
+        this(rubricRevision, generator, modelRevision, evidenceSha256, expectedPhoneCount,
+                alignedPhoneCount, correctPhoneCount, unflaggedPhoneCount, alignmentScore,
+                coverageScore, stabilityScore, rubricSha256, promptSha256, criteria, null, null, null);
+    }
+    public static final String HIERARCHICAL_RUBRIC = "clova-phone-rubric-v3";
     public static final String RUBRIC = "clova-phone-rubric-v1";
     public static final String DETAILED_RUBRIC = "clova-phone-rubric-v2";
     public void validate(BigDecimal overallScore) {
-        if (DETAILED_RUBRIC.equals(rubricRevision)) {
+        if (!HIERARCHICAL_RUBRIC.equals(rubricRevision)
+                && (phoneCriteria != null || visualObservation != null || attentionCriterionIds != null)) invalid();
+        if (DETAILED_RUBRIC.equals(rubricRevision) || HIERARCHICAL_RUBRIC.equals(rubricRevision)) {
             validateDetailed(overallScore);
+            if (HIERARCHICAL_RUBRIC.equals(rubricRevision)) HierarchicalScorePolicy.validate(this);
             return;
         }
         if (!RUBRIC.equals(rubricRevision) || !"hyperclova".equals(generator)
@@ -53,7 +67,7 @@ public record ClovaScoreEvidence(String rubricRevision, String generator, String
     private void validateDetailed(BigDecimal overallScore) {
         if (!"hyperclova".equals(generator) || modelRevision == null || !modelRevision.matches("[0-9a-f]{40}")
                 || evidenceSha256 == null || !evidenceSha256.matches("[0-9a-f]{64}")
-                || !POLICY_SHA256.equals(rubricSha256) || promptSha256 == null || !promptSha256.matches("[0-9a-f]{64}")
+                || !(HIERARCHICAL_RUBRIC.equals(rubricRevision) ? HierarchicalScorePolicy.SHA256 : POLICY_SHA256).equals(rubricSha256) || promptSha256 == null || !promptSha256.matches("[0-9a-f]{64}")
                 || expectedPhoneCount < 1 || expectedPhoneCount > 4096 || overallScore == null
                 || alignmentScore != null || coverageScore != null || stabilityScore != null
                 || criteria == null || criteria.size() != POLICY.get("criteria").size()) invalid();
@@ -98,18 +112,48 @@ public record ClovaScoreEvidence(String rubricRevision, String generator, String
         return BigDecimal.valueOf((long) count * weight)
                 .divide(BigDecimal.valueOf(expectedPhoneCount), 1, RoundingMode.HALF_UP);
     }
+
+    /** Public projection uses the same pinned rules as callback validation. */
+    public AnalysisScoreBreakdown breakdown(BigDecimal overallScore) {
+        validate(overallScore);
+        if (!DETAILED_RUBRIC.equals(rubricRevision) && !HIERARCHICAL_RUBRIC.equals(rubricRevision)) return null;
+        var items = new java.util.ArrayList<AnalysisScoreBreakdown.Item>();
+        int applicableMaxScore = 0;
+        for (int i = 0; i < criteria.size(); i++) {
+            var criterion = criteria.get(i);
+            var rule = POLICY.get("criteria").get(i);
+            int weight = rule.get("weight").asInt();
+            boolean applicable = criterion.sampleCount() > 0;
+            var phones = new java.util.ArrayList<String>();
+            rule.get("phones").forEach(phone -> phones.add(phone.asText()));
+            BigDecimal score = applicable
+                    ? BigDecimal.valueOf((long) weight * criterion.level()).divide(BigDecimal.valueOf(4))
+                    : null;
+            if (applicable) applicableMaxScore += weight;
+            items.add(new AnalysisScoreBreakdown.Item(criterion.criterionId(), rule.get("label").asText(),
+                    AnalysisScoreBreakdown.description(criterion.criterionId()), java.util.List.copyOf(phones),
+                    weight, applicable, criterion.sampleCount(), criterion.level(), score));
+        }
+        return new AnalysisScoreBreakdown(rubricRevision, applicableMaxScore, java.util.List.copyOf(items));
+    }
+
     public Map<String, Object> audit() {
         var values = new java.util.LinkedHashMap<String, Object>();
         values.put("rubricRevision", rubricRevision); values.put("generator", generator);
         values.put("modelRevision", modelRevision); values.put("evidenceSha256", evidenceSha256);
         values.put("expectedPhoneCount", expectedPhoneCount); values.put("alignedPhoneCount", alignedPhoneCount);
         values.put("correctPhoneCount", correctPhoneCount); values.put("unflaggedPhoneCount", unflaggedPhoneCount);
-        if (DETAILED_RUBRIC.equals(rubricRevision)) {
+        if (DETAILED_RUBRIC.equals(rubricRevision) || HIERARCHICAL_RUBRIC.equals(rubricRevision)) {
             values.put("rubricSha256", rubricSha256); values.put("promptSha256", promptSha256);
             values.put("criteria", criteria);
         } else {
             values.put("alignmentScore", alignmentScore); values.put("coverageScore", coverageScore);
             values.put("stabilityScore", stabilityScore);
+        }
+        if (HIERARCHICAL_RUBRIC.equals(rubricRevision)) {
+            values.put("phoneCriteria", phoneCriteria);
+            values.put("visualObservation", visualObservation);
+            values.put("attentionCriterionIds", attentionCriterionIds);
         }
         return values;
     }
