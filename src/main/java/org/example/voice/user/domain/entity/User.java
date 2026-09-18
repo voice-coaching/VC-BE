@@ -110,6 +110,8 @@ public class User {
 
     public void withdraw(OffsetDateTime now) {
         this.status = UserStatus.WITHDRAWN;
+        this.email = null;
+        this.password = null;
         this.deletedAt = now;
         this.updatedAt = now;
     }

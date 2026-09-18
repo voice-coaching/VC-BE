@@ -9,4 +9,5 @@ import java.util.List;
 interface SocialAccountJpaRepository extends JpaRepository<SocialAccount, Long> {
     Optional<SocialAccount> findByProviderAndProviderUserId(OAuthProvider provider, String providerUserId);
     List<SocialAccount> findAllByUserIdOrderByIdAsc(Long userId);
+    void deleteAllByUserId(Long userId);
 }

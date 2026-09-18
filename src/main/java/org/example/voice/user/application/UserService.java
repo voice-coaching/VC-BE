@@ -9,6 +9,7 @@ import org.example.voice.user.domain.model.UpdatedUserProfile;
 import org.example.voice.user.domain.model.UserProfile;
 import org.example.voice.user.domain.model.WithdrawalResult;
 import org.example.voice.user.domain.port.LoginProviderReader;
+import org.example.voice.user.domain.port.LoginIdentityRevoker;
 import org.example.voice.user.domain.port.UserReader;
 import org.example.voice.user.domain.port.UserSessionRevoker;
 import org.example.voice.user.domain.port.UserWriter;
@@ -32,6 +33,7 @@ public class UserService {
     private final UserReader userReader;
     private final UserWriter userWriter;
     private final LoginProviderReader loginProviderReader;
+    private final LoginIdentityRevoker loginIdentityRevoker;
     private final UserSessionRevoker userSessionRevoker;
     private final OnboardingProfileReader onboardingProfileReader;
     private final ProcessingConsentLedger processingConsentLedger;
@@ -84,6 +86,7 @@ public class UserService {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         user.withdraw(now);
         userWriter.save(user);
+        loginIdentityRevoker.revokeForUser(userId);
         userSessionRevoker.revokeAll(userId);
         analysisCancellation.cancelForUser(userId);
         processingConsentLedger.revokeForUser(userId);
