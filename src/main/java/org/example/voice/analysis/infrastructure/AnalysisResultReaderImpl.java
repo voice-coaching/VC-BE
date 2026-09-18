@@ -3,6 +3,7 @@ package org.example.voice.analysis.infrastructure;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.model.AnalysisResultData;
+import org.example.voice.analysis.domain.model.AnalysisScoreBreakdown;
 import org.example.voice.analysis.domain.model.PronunciationEvidenceData;
 import org.example.voice.analysis.domain.model.VisualSupplementData;
 import org.example.voice.analysis.domain.port.AnalysisResultReader;
@@ -85,7 +86,8 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
                 result.getSummaryFeedback(),
                 pronunciationEvidence(result),
                 visualSupplement(result),
-                result.getAnalyzedAt()
+                result.getAnalyzedAt(),
+                AnalysisScoreBreakdown.fromAudit(result.getClovaScoreEvidence(), result.getOverallScore())
         );
     }
 

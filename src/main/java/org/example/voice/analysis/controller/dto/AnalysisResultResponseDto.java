@@ -2,6 +2,7 @@ package org.example.voice.analysis.controller.dto;
 
 import org.example.voice.analysis.application.FeedbackRegenerationService;
 import org.example.voice.analysis.domain.model.AnalysisResultData;
+import org.example.voice.analysis.domain.model.AnalysisScoreBreakdown;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -13,7 +14,7 @@ public record AnalysisResultResponseDto(Long id, String status, String outcome, 
         List<String> weaknesses, String summaryFeedback,
         PronunciationEvidenceResponseDto pronunciationEvidence,
         VisualSupplementResponseDto visualSupplement,
-        OffsetDateTime analyzedAt) {
+        OffsetDateTime analyzedAt, AnalysisScoreBreakdown scoreBreakdown) {
     public static AnalysisResultResponseDto from(AnalysisResultData data) {
         return new AnalysisResultResponseDto(
                 data.id(),
@@ -33,7 +34,8 @@ public record AnalysisResultResponseDto(Long id, String status, String outcome, 
                 data.summaryFeedback(),
                 PronunciationEvidenceResponseDto.from(data.pronunciationEvidence()),
                 VisualSupplementResponseDto.from(data.visualSupplement()),
-                data.analyzedAt()
+                data.analyzedAt(),
+                data.scoreBreakdown()
         );
     }
 }

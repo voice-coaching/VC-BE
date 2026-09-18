@@ -98,6 +98,31 @@ public record ClovaScoreEvidence(String rubricRevision, String generator, String
         return BigDecimal.valueOf((long) count * weight)
                 .divide(BigDecimal.valueOf(expectedPhoneCount), 1, RoundingMode.HALF_UP);
     }
+
+    /** Public projection uses the same pinned rules as callback validation. */
+    public AnalysisScoreBreakdown breakdown(BigDecimal overallScore) {
+        validate(overallScore);
+        if (!DETAILED_RUBRIC.equals(rubricRevision)) return null;
+        var items = new java.util.ArrayList<AnalysisScoreBreakdown.Item>();
+        int applicableMaxScore = 0;
+        for (int i = 0; i < criteria.size(); i++) {
+            var criterion = criteria.get(i);
+            var rule = POLICY.get("criteria").get(i);
+            int weight = rule.get("weight").asInt();
+            boolean applicable = criterion.sampleCount() > 0;
+            var phones = new java.util.ArrayList<String>();
+            rule.get("phones").forEach(phone -> phones.add(phone.asText()));
+            BigDecimal score = applicable
+                    ? BigDecimal.valueOf((long) weight * criterion.level()).divide(BigDecimal.valueOf(4))
+                    : null;
+            if (applicable) applicableMaxScore += weight;
+            items.add(new AnalysisScoreBreakdown.Item(criterion.criterionId(), rule.get("label").asText(),
+                    AnalysisScoreBreakdown.description(criterion.criterionId()), java.util.List.copyOf(phones),
+                    weight, applicable, criterion.sampleCount(), criterion.level(), score));
+        }
+        return new AnalysisScoreBreakdown(rubricRevision, applicableMaxScore, java.util.List.copyOf(items));
+    }
+
     public Map<String, Object> audit() {
         var values = new java.util.LinkedHashMap<String, Object>();
         values.put("rubricRevision", rubricRevision); values.put("generator", generator);

@@ -25,7 +25,8 @@ public record AnalysisResultData(
         String summaryFeedback,
         PronunciationEvidenceData pronunciationEvidence,
         VisualSupplementData visualSupplement,
-        OffsetDateTime analyzedAt
+        OffsetDateTime analyzedAt,
+        AnalysisScoreBreakdown scoreBreakdown
 ) {
 
     public AnalysisResultData(
@@ -50,7 +51,7 @@ public record AnalysisResultData(
         this(id, status, outcome, transcript, sttConfidence, overallScore,
                 pronunciationScore, intonationScore, speedWpm, speedStatus,
                 stressScore, pauseScore, strengthsText, weaknessesText,
-                summaryFeedback, pronunciationEvidence, null, analyzedAt);
+                summaryFeedback, pronunciationEvidence, null, analyzedAt, null);
     }
 
     public boolean isCompleted() {
