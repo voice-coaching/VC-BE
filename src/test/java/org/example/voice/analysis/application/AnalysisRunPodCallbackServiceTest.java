@@ -112,6 +112,31 @@ class AnalysisRunPodCallbackServiceTest {
         return contract.convert(json, RunPodAnalysisResultCallbackRequestDto.class).toCommand(contract.digest(json));
     }
 
+    @Test
+    void storesCoachingWithoutScoreAndAcknowledgesExactReplay() {
+        service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
+        String raw = CoachingContractTest.result(UUID.randomUUID());
+        var coached = command(raw);
+        assertThat(service.ingestResult(1L, coached)).isEqualTo(AnalysisResultIngestionDisposition.APPLIED);
+        assertThat(result.getCoachingDocument().items()).hasSize(1);
+        assertThat(result.getOverallScore()).isNull();
+        assertThat(result.getClovaScoreEvidence()).isNull();
+        ReflectionTestUtils.setField(result, "claimExpiresAt", OffsetDateTime.now().minusSeconds(1));
+        assertThat(service.ingestResult(1L, coached)).isEqualTo(AnalysisResultIngestionDisposition.IGNORED_DUPLICATE);
+        expect("RESULT_EVENT_CONFLICT", () -> service.ingestResult(1L, command(raw.replace("연습 안내", "변경 안내"))));
+        verify(segments, times(1)).replaceForAnalysis(any(), any());
+    }
+
+    @Test
+    void invalidCoachingDoesNotFinalizeOrReplaceResult() {
+        service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
+        String raw = CoachingContractTest.result(UUID.randomUUID()).replace("phone-0", "phone-3");
+        expect("VALIDATION_FAILED", () -> service.ingestResult(1L, command(raw)));
+        assertThat(result.getStatus()).isEqualTo(AnalysisStatus.PROCESSING);
+        assertThat(result.getLastResultEventId()).isNull();
+        assertThat(result.getCoachingDocument()).isNull();
+    }
+
     private String scoredResult() {
         return result(UUID.randomUUID()).replace("runpod-analysis-result.v1", "runpod-analysis-result.v2")
                 .replace("\"failureReason\":null", """

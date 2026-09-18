@@ -19,5 +19,6 @@ public interface TitleRepository {
     boolean availableContent(Long id);
     boolean ownedAnalysis(Long id, Long userId);
     Optional<BigDecimal> score(Long analysisId, Long userId, Long sessionId, Long contentId);
+    boolean coachingScoreUnavailable(Long analysisId, Long userId, Long sessionId, Long contentId);
     Optional<TrainingSessionCreatedData> reusableSession(Long sessionId, Long userId);
 }

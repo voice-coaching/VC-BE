@@ -2,6 +2,8 @@
 
 This document is generated from the API table and endpoint pages in the local API spec directory.
 
+추가 계약: [근거 기반 코칭 응답·result v3·점수 보류](evidence-based-coaching.md). 완료 상세의 `data.coaching`은 nullable이며 구형 결과의 API 경로와 polling 방식을 유지한다.
+
 ## Common Request Headers
 
 ```http

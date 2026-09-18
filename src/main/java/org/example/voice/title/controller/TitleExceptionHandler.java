@@ -12,6 +12,9 @@ public class TitleExceptionHandler {
     // Also handles title-exam validation invoked by the existing training controller.
     @ExceptionHandler(TitleException.class)
     public ResponseEntity<ApiResponse<Void>> title(TitleException error) {
-        return ResponseEntity.status(error.status()).body(ApiResponse.error("승급 시험 요청을 처리할 수 없습니다.",error.getMessage()));
+        String message = "ANALYSIS_SCORE_UNAVAILABLE".equals(error.getMessage())
+                ? "발음 코칭은 완료됐지만 점수를 확정할 수 없어 승급 채점을 보류했습니다."
+                : "승급 시험 요청을 처리할 수 없습니다.";
+        return ResponseEntity.status(error.status()).body(ApiResponse.error(message, error.getMessage()));
     }
 }

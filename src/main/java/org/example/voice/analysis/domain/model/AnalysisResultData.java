@@ -27,8 +27,33 @@ public record AnalysisResultData(
         VisualSupplementData visualSupplement,
         OffsetDateTime analyzedAt,
         AnalysisScoreBreakdown scoreBreakdown,
-        AnalysisScoreHierarchy scoreHierarchy
+        AnalysisScoreHierarchy scoreHierarchy,
+        AnalysisCoaching coaching
 ) {
+    public AnalysisResultData(
+        Long id,
+        AnalysisStatus status,
+        AnalysisOutcome outcome,
+        String transcript,
+        BigDecimal sttConfidence,
+        BigDecimal overallScore,
+        BigDecimal pronunciationScore,
+        BigDecimal intonationScore,
+        BigDecimal speedWpm,
+        SpeedStatus speedStatus,
+        BigDecimal stressScore,
+        BigDecimal pauseScore,
+        String strengthsText,
+        String weaknessesText,
+        String summaryFeedback,
+        PronunciationEvidenceData pronunciationEvidence,
+        VisualSupplementData visualSupplement,
+        OffsetDateTime analyzedAt,
+        AnalysisScoreBreakdown scoreBreakdown,
+        AnalysisScoreHierarchy scoreHierarchy) {
+        this(id, status, outcome, transcript, sttConfidence, overallScore, pronunciationScore, intonationScore, speedWpm, speedStatus, stressScore, pauseScore, strengthsText, weaknessesText, summaryFeedback, pronunciationEvidence, visualSupplement, analyzedAt, scoreBreakdown, scoreHierarchy, null);
+    }
+
 
     public AnalysisResultData(Long id,
         AnalysisStatus status,
