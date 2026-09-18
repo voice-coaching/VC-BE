@@ -24,7 +24,12 @@
 | `docs/architecture` | directory | 아키텍처 문서 | 구조, 컴포넌트, 디렉토리, 상태, 흐름, 배포 문서를 둔다. |
 | `docs/database` | directory | DB 문서 | schema 문서를 둔다. |
 | `docs/troubleshooting` | directory | 장애 분석과 해결 기록 | 운영 중 발생한 오류의 로그, 원인 코드, 해결 방식, 배포 조치를 기록한다. |
-| `.codex/ai_rule_developer` | directory | AI 개발 규칙 문서 | API, 아키텍처, 코드 스타일 등 AI 작업 기준을 둔다. |
+| `AGENTS.md` | file | Codex 작업 진입점 | `.codex` 전역 규칙과 작업별 탐색표로 연결한다. 로컬 ignore 정책을 따른다. |
+| `.codex` | directory | 에이전트 작업 하네스 | `README.md`는 탐색표, `WORKFLOW.md`는 실행 절차, `HARNESS_CHECKS.md`는 규칙 점검표다. |
+| `.codex/ai_rule_developer` | directory | AI 개발 규칙 문서 | API, 아키텍처, 서비스, 도메인, 연동, 코드 스타일, 문서화, 검증 기준을 둔다. |
+| `.codex/ref_docs` | directory | 사용자 관리 외부 참고자료 | 생성 프로젝트 명세를 저장하지 않는다. |
+
+하네스 구성의 근거와 확인 범위는 [Codex 하네스 정비 기록](codex-harness.md)을 참고한다.
 
 ## 운영 코드 루트
 

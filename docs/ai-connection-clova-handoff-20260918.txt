@@ -1,0 +1,225 @@
+다른 Codex 세션용 컨텍스트 — 프론트 / AWS / RunPod / CLOVA
+작성: 2026-09-18 KST
+
+[범위와 취급]
+이 문서는 대화에서 확인한 연결 구조, 운영 진단, CLOVA 처리, 관련 프론트 수정만 추린 인계 요약이다. 대화 원문 전체가 아니다.
+비밀번호, JWT, AWS AccessKeyId/SecretAccessKey, 서비스 토큰 값은 포함하지 않는다. 환경파일 전체나 키 파일을 콘솔에 출력하지 말 것.
+아래 운영 상태는 확인 당시의 관측이다. 다음 세션은 읽기 전용으로 현재 리비전·프로세스·설정을 재확인해야 한다.
+사용자는 진단 중 RunPod/DGX/로컬의 임의 변경, 모델 개선·재학습·threshold 변경을 금지했다. 이후 명시적으로 승인한 최신 작업은 프론트 새 브랜치의 대기시간·오류 처리 수정이다.
+키 사본 삭제 금지 지시가 있었다. 과거 VC-BE/intelligentAI push·PR·병합·배포 승인을 새 프론트 배포 승인으로 확대 해석하지 말 것.
+
+[1. 저장소 및 파일]
+백엔드: C:\Users\to264\Documents\GitHub\VC-BE
+프론트: C:\Users\to264\Documents\GitHub\VC-FE
+기존 연결 인계: C:\Users\Public\Documents\ESTsoft\CreatorTemp\reverse-ssh-setup\HANDOFF.md
+기존 운영 검증 기록: VC-BE/docs/api/ai-api-live-verification-20260917.md
+API 명세: VC-BE/docs/api/backend-ai-api-spec.md
+백엔드–워커 계약: VC-BE/docs/api/ai-runpod-http-callback-contract.md
+관련 AI 작업 체크아웃: C:\Users\Public\Documents\ESTsoft\CreatorTemp\clova-title-ai-20260917
+관련 BE 작업 체크아웃: C:\Users\Public\Documents\ESTsoft\CreatorTemp\clova-title-be-20260917
+위 경로는 대화 기록 기준이며 사용 전 존재 여부 확인.
+VC-BE에는 사용자 작성 미추적 문서와 testvideo1.mp4/testvideo2.mp4가 있었다. 삭제·덮어쓰기 금지.
+프론트 AGENTS.md를 먼저 읽을 것. Lovable 연결 저장소이므로 공개 이력 force push/rebase/amend 금지. 코드 작성 전 설치된 Next 문서 확인 규칙이 있다.
+
+[2. 접속 방법 — PowerShell]
+AWS EC2:
+ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -i "$env:USERPROFILE\.ssh\id_ed25519" ec2-user@13.209.184.226
+RunPod:
+ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -i "$env:USERPROFILE\.ssh\id_ed25519" -p 22176 root@194.68.245.79
+공개키는 ec2-user에 등록되어 접속을 확인했다. 기존 키 보존. SSH 설정 변경이나 재시작 불필요.
+도구 네트워크/외부 경로 접근에 sandbox 승인이 필요할 수 있다. 우회하지 말고 정당한 read-only 또는 사용자 승인 변경 사유로 요청.
+DGX의 확정된 접속 정보는 이 인계 범위에 없다. 추측하지 말 것.
+
+[3. 실제 배포 연결 구조]
+프론트: https://vc-fe.vercel.app/home
+연습 화면 예: https://vc-fe.vercel.app/practice/101
+프론트 API base: /api/backend
+예: 브라우저 /api/backend/api/analysis-capabilities -> Vercel 프록시 -> AWS /api/analysis-capabilities
+백엔드 공개 주소: https://api.voice-coaching.site
+AI 공개 주소: https://ai.voice-coaching.site
+확인 당시 두 공개 API 호스트는 EC2 13.209.184.226에 연결.
+AWS ai.voice-coaching.site nginx upstream:
+https://s8hb5b0l5k4qlx-8080.proxy.runpod.net
+nginx upstream Host/SNI 및 TLS 검증 설정이 있었다. Pod 변경 시 이 URL은 재확인.
+프론트는 RunPod를 직접 호출하지 않는다. 사용자 JWT는 AWS 공개 API 인증용, 워커 서비스 토큰은 별도다.
+
+녹음 분석 흐름:
+1) GET /api/analysis-capabilities
+2) POST /api/training-sessions
+3) POST /api/training-sessions/{id}/recordings/upload-url
+4) 프론트가 발급된 presigned URL로 S3 PUT
+5) POST /api/training-sessions/{id}/recordings (등록·정규화)
+6) 녹음 목록으로 품질 확인, PATCH /api/training-sessions/{id}/recordings/{recordingId}/select
+7) POST /api/training-sessions/{id}/analyze
+   본문: {"accepted":true,"policyRevision":"capabilities 응답의 버전"}
+8) AWS가 비동기 outbox를 통해 RunPod POST /v1/analysis-jobs 호출 (접수 202)
+9) RunPod가 AWS claim/heartbeat/result 콜백 호출
+10) 프론트는 GET /api/training-sessions/{id}/analysis/status polling
+11) COMPLETED 후 GET /api/analyses/{analysisId}, GET /api/analyses/{analysisId}/segments
+분석 접수 200은 완료가 아니다. 최종 피드백은 AWS에 저장된 결과를 별도 GET으로 받는다. 현재 경로는 SSE가 아니다.
+
+워커 -> AWS 내부 API:
+GET /api/internal/ai/worker-readiness
+POST /api/internal/ai/analyses/{analysisId}/claim
+POST /api/internal/ai/analyses/{analysisId}/heartbeat
+POST /api/internal/ai/analyses/{analysisId}/result
+인증은 callback 서비스 Bearer 토큰. 사용자 JWT/RunPod 계정 API 키를 사용하지 않는다.
+claim은 요청 JCS SHA-256, requestId/executionId/workerInstanceId를 검증한다. 임의 claim/result를 보내 운영 상태를 변경하지 말 것.
+
+[4. 설정 위치와 S3]
+로컬 .env: VC-BE/.env (비밀값 출력 금지)
+AWS 운영 환경파일: /etc/alpha-backend.env
+RunPod 워커 환경파일: /run/intelligentai/analysis-http.env
+주요 설정 이름 및 확인된 비밀이 아닌 값:
+AI_ANALYSIS_TRANSPORT=runpod_http
+ANALYSIS_STREAM_ENABLED=false
+RUNPOD_ENDPOINT_URL=https://ai.voice-coaching.site
+AI_ANALYSIS_CALLBACK_BASE_URL=https://api.voice-coaching.site
+AI_ANALYSIS_EXECUTION_TIMEOUT=PT15M
+AI_ANALYSIS_CLAIM_TTL=PT90S
+AI_ANALYSIS_OUTBOX_POLL_INTERVAL=PT1S
+AI_ANALYSIS_BATCH_SIZE=25
+AI_ANALYSIS_DISPATCH_RETRY_MAX_ATTEMPTS=5
+AI_ANALYSIS_MAXIMUM_PAYLOAD_BYTES=65536
+ANALYSIS_CONSENT_POLICY_REVISION=voice-analysis-consent-v1
+MANAGEMENT_SERVER_ADDRESS=127.0.0.1 / MANAGEMENT_SERVER_PORT=9091
+비밀값 항목: AI_ANALYSIS_API_TOKEN, AI_ANALYSIS_CALLBACK_TOKEN. 원문 값은 이 문서에 없음.
+
+S3 버킷: vc-media-storage-977919068299-ap-northeast-2-an
+RunPod 전용 IAM 사용자: voice-coaching-runpod-s3-reader
+허용한 정책: s3:GetObject, arn:aws:s3:::vc-media-storage-977919068299-ap-northeast-2-an/recordings/*
+EC2 IAM role alpha-prod-ec2-role에는 IAM 사용자/키 생성 권한이 없어 실패했었다.
+사용자가 CloudShell의 Alpha-LeeCM IAM 사용자로 전용 reader 생성·정책·키 발급 완료.
+사용자 보관 키 파일 위치: C:\Users\to264\Downloads\runpod-s3-reader-access-key.json
+키 사본은 보존하라는 명시적 지시가 있다. 파일 내용 출력·문서 삽입 금지.
+EC2 IAM role이 RunPod에 자동 적용되는 것은 아니다.
+
+[5. RunPod 프로세스와 로그 — 확인 당시]
+프로젝트 cwd: /opt/intelligentai/app
+API: /opt/intelligentai/envs/scorer/bin/python, scripts/serve_backend_analysis_http.py, 0.0.0.0:8080
+CLOVA: /opt/intelligentai/envs/hyperclova/bin/python, scripts/serve_hyperclovax_grounded_advice.py, 127.0.0.1:8000
+supervisor 아래 API/executor 및 Seungun production runtime CUDA 프로세스가 실행 중이었다.
+PID는 바뀌므로 고정하지 말 것. ps/ss/실행 스크립트로 확인. 전체 환경변수·명령행에 비밀이 있으면 출력 필터링.
+RunPod nginx는 확인 당시 8081 -> 8080, 8001 -> 8000 포워딩도 있었다.
+RunPod API 상태 확인 경로: /health/services (서비스 인증 여부는 코드 확인)
+로그:
+  /run/intelligentai/logs/analysis-http.log
+  /run/intelligentai/logs/clova.log
+  /var/log/nginx/access.log 및 error.log
+AWS:
+  systemctl status alpha-backend / nginx (읽기 전용)
+  journalctl -u alpha-backend
+  /var/log/nginx/access.log 및 날짜별 회전 로그
+2026-09-18 진단 당시 RunPod access_log=False, API log_level=warning. 정상 작업의 단계별 로그가 부족했다.
+일부 오래된 clova_scoring_rejected 로그에는 시각·요청 ID가 없어 새 요청의 실패라고 단정하면 안 된다.
+현재 활성 실시간 로그 추적 세션은 인계하지 않는다. 필요하면 새로 시작할 것.
+
+[6. CLOVA·분석 계약 관련 확인 사항]
+배포 파이프라인의 확인된 경로:
+S3 오디오 materialize -> g2pK -> 16kHz mono PCM16 WAV decode -> CTC phone alignment / frozen detector
+-> deterministic policy -> (COACHING_READY인 경우) grounded CLOVA 피드백 -> 점수 처리 -> AWS 결과 callback
+해당 경로에서 prosody 단계가 실제 실행된다는 근거는 확인하지 못했다. 코드에 없는 단계를 있다고 가정하지 말 것.
+피드백에 fallback이 있어 summaryFeedback 존재만으로 CLOVA 실제 호출 성공을 증명할 수 없다.
+POST /api/analyses/{id}/feedback/regenerate는 저장된 승인 피드백 재사용이며 새 CLOVA 추론이 아니다.
+
+대화 중 사용자 요청에 따라 점수 계약을 확장했다는 이전 작업 기록:
+- 9개 기준 / 5개 등급의 세부 기준표 v2
+- 점수는 deterministic 계산 결과, CLOVA는 검증할 worksheet와 피드백을 생성하는 구조
+- 채점용 별도 프롬프트와 active.md -> pronunciation-v2.md Git 심볼릭 링크
+- 채점할 때 프롬프트 본문을 로더가 읽는 방식. LLM이 파일 링크를 스스로 읽는다고 가정하지 말 것.
+- 결과 계약 v2에 overallScore와 scoringEvidence 도입
+- 모델 가중치·threshold·재학습 변경은 없었다.
+이 항목은 이전 작업 인계 기록이며, 다음 세션은 실제 배포 소스로 프롬프트 경로·계산 책임·스키마를 재확인할 것.
+기록된 AI 배포 리비전: 9fad259ab3acaf5b7297943adba2334bc07fcdcb (intelligentAI PR #12 관련)
+기록된 BE 배포 jar 리비전: e65dbdf29dab900996681f05722f39ea01f5226b (VC-BE PR #77 관련)
+기록된 CLOVA 모델 pin: a6cdfd3464d1b767259cad23e164eaf39d3e3960
+팀원 개발 모델과 운영 모델이 완전히 분리되어 있는지는 이 문서만으로 확정하지 말 것. 실제 경로·프로세스·revision을 비교해야 한다.
+예전 API 명세의 '점수 미제공' 설명은 이후 v2 점수 계약과 다를 수 있다. 현행 배포 코드와 DTO가 우선.
+
+[7. 운영 장애 해결 및 진단 기록]
+2026-09-17 초기 영상 분석 실패:
+recording_deletion_outbox CHECK 제약에 ANALYSIS_COMPLETED가 없어 result callback 503 및 트랜잭션 롤백.
+VC-BE PR #71 / Flyway V26으로 기존 삭제 사유 보존하며 해당 값 추가.
+consentPolicyRevision 미설정도 voice-analysis-consent-v1 설정으로 해결.
+testvideo2.mp4 -> 세션22/녹음8/분석7 COMPLETED/COACHING_READY 확인.
+visualSupplement=null. 영상 보조 근거 생성 성공을 뜻하지 않는다.
+사용자가 두 테스트 영상의 S3/RunPod 전송·분석과 숨김 테스트 콘텐츠 추가를 승인했었다. 신규 데이터 전송의 포괄 승인은 아니다.
+
+2026-09-18 11:08 KST 인증/프론트 오류:
+11:08:34 콘텐츠103 GET 401 -> 11:08:36 refresh 200 -> 11:08:37 콘텐츠103 GET 200.
+초기401은 자동 복구됐다. 정확히 토큰 만료/누락 중 무엇인지는 헤더 로그 없어 미확정.
+VM53 reportAllChanges/startTime 오류는 Chrome DevTools web-vitals 이슈와 stack offset까지 일치.
+근거: https://github.com/GoogleChrome/web-vitals/issues/792
+브라우저 VM 원본 미확인으로 확정은 아니며 AI 실패와 구분.
+콘텐츠103 화면의 실제 오류는 '현재 AI 분석은 발음 연습만 지원합니다. 억양 분석은 준비 중입니다.'였다.
+프론트가 INTONATION을 capabilities의 [PRONUNCIATION]과 비교해 업로드 이전 차단. BOTH는 PRONUNCIATION으로 변환.
+
+2026-09-18 12:30~12:35 KST 새 문장 분석 — 실제 성공, 프론트 오표시:
+12:32:05 콘텐츠101 조회200
+12:32:22 세션30 생성200
+12:32:28 녹음13 등록200
+12:32:31 녹음13 선택200
+12:32:35 세션30 analyze200
+12:32:39 RunPod /v1/analysis-jobs202 및 분석12 claim200
+heartbeat/상태 polling 지속 성공
+12:33:55 상태조회401 -> refresh200 -> 12:33:58 상태조회200
+12:34:32.798 DB 분석12 완료 저장
+12:34:33 result callback200
+12:34:35 마지막 status GET200
+DB read-only 조회: status=COMPLETED, overallScore=70.30, summaryFeedback 존재, failureReason=null.
+이 조회에서는 outcome 출력이 null이었음. 실제 컬럼 매핑 확인 없이 특정 outcome을 단정하지 말 것.
+접수~완료 약118초. 프론트 기본 polling 제한120초와 응답 도착 시점 경합.
+마지막 status 응답 본문은 access log에 없어 COMPLETED 수신 여부를 단정할 수 없음.
+스크린샷 실제 예외는 AnalysisWaitTimeout 메시지:
+'분석이 예상보다 오래 걸리고 있습니다. 녹음을 다시 보내지 않고 분석 상태를 다시 확인할 수 있습니다.'
+프론트가 /음질|소리|마이크|녹음/ 정규식으로 분류해 '녹음' 단어 때문에 음질 실패 제목·재녹음 버튼 표시.
+원인은 실제 음질 불량이 아니라 프론트 대기 제한 및 오류 분류. RunPod 작업은 완료됨.
+요청별 CLOVA 소요시간은 기존 로그로 분리 측정 불가.
+
+연결 진단 주의:
+한때 AWS TCP 연결 timeout/RunPod readiness503이 있었으나 Sept18 오전 재점검에서 정상화.
+AWS -> RunPod 실제 Java HttpClient 경로200, RunPod -> AWS readiness200 확인.
+Python urllib에만 Cloudflare1010/403, curl/Java는200이었던 사례가 있다. 진단 클라이언트 차단을 운영 경로 장애로 혼동하지 말 것.
+
+[8. 최신 프론트 수정 — 로컬 커밋 완료, 미배포]
+요청: 새 브랜치에서 120초 -> 600초, 오류 메시지 세분화.
+저장소: C:\Users\to264\Documents\GitHub\VC-FE
+브랜치: fix/analysis-wait-600s-errors
+커밋: 97e58bc (fix: extend analysis wait and distinguish practice errors)
+기준 커밋: 70cdbc5 (fix: stabilize native auth and analysis sessions)
+인계 작성 때 branch/HEAD를 재확인했다.
+변경 파일:
+  src/lib/analysis-polling.ts
+  src/lib/practice-error.ts (신규)
+  src/components/practice-session.tsx
+  scripts/analysis-polling.test.ts
+  scripts/practice-error.test.ts (신규)
+내용:
+- polling 기본600_000ms. 개별 HTTP client timeout은 별도이며 변경하지 않음.
+- 이미 받은 COMPLETED/FAILED를 elapsed-time 검사보다 먼저 처리.
+- 문자열에 '녹음'이 있는지로 오류 종류를 추측하던 코드 제거.
+- AnalysisWaitTimeout / AnalysisFailed / ApiError / PracticeInputError 기반 안내 분리.
+- 음질, 길이·크기 조건, 미지원 유형, 오디오 준비, 인증, 네트워크, 서버, 일반 오류 구분.
+- canCheckAnalysis && sessionId일 때 '분석 상태 다시 확인' -> 기존 작업 조회. 재업로드하지 않음.
+- 실제 실패한 분석은 '분석 다시 시도'.
+검증: 관련 회귀 테스트9개, tsc --noEmit --incremental false, 변경 파일 eslint, git diff --check 통과.
+실제 브라우저 E2E/새 음성 추론은 이 수정 검증으로 실행하지 않았다.
+npm ci --ignore-scripts로 검증 의존성 설치. lockfile 변경 없음. 설치 시 moderate 취약점3개 알림이 있었으나 무관한 강제 업데이트는 하지 않음.
+push/PR/배포는 아직 하지 않았다. 따라서 운영 프론트에600초가 반영됐다고 말하면 안 된다.
+
+[9. 다음 세션 시작 순서]
+1) 최신 사용자 지시 및 각 저장소 AGENTS.md 확인.
+2) VC-FE branch/HEAD/status 확인, 사용자 변경 보존.
+3) 배포 요청이면 위 커밋 diff 검토 및 원격/배포 대상 확인 후 진행. 운영을 임의 변경하지 않음.
+4) 진단 요청이면 AWS/RunPod 연결 후 read-only ps/ss/리비전/로그만 확인. 새 분석은 별도 필요성과 사용자 범위를 확인.
+5) 시간대 변환: KST12:30~12:35 = UTC03:30~03:35. access log는 UTC였다.
+6) AWS nginx에는 status만 있고 JSON 본문은 없다. result200만으로 성공 outcome을 단정하지 말고 기존 DB/조회 응답 확인.
+7) DB 필요 시 AWS에 /usr/bin/psql 존재. /etc/alpha-backend.env의 DB_URL/DB_USERNAME/DB_PASSWORD를 프로세스 내부에서만 읽음.
+   PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=5000' 사용, 대상 행·상태·시각 등 필요한 필드만 SELECT.
+   psql -X 사용. 비밀번호를 명령줄 인자나 출력에 넣지 말 것. 이번 확인 테이블은 analysis_results, id=12.
+8) 최종 보고는 업로드/RunPod 접수/추론/LLM/콜백/프론트 조회를 구분. health200 또는 피드백 존재만으로 모든 단계 성공 주장 금지.
+
+[문서 검토]
+연결 비밀값은 제외하고 필요한 설정 이름·경로만 남겼다.
+최신 프론트 로컬 브랜치·커밋은 직접 재확인했다.
+기존 운영 관측과 현재 상태 재확인이 필요한 항목, 미배포 수정, 미검증 항목을 구분했다.

@@ -1,0 +1,11 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadRecordingObjectsAndReadinessProbe",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject"],
+      "Resource": "arn:aws:s3:::vc-media-storage-977919068299-ap-northeast-2-an/recordings/*"
+    }
+  ]
+}
