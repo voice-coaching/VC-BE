@@ -6,6 +6,7 @@ import org.example.voice.consent.domain.port.ProcessingConsentLedger;
 import org.example.voice.analysis.domain.port.AnalysisCancellation;
 import org.example.voice.user.domain.entity.User;
 import org.example.voice.user.domain.port.LoginProviderReader;
+import org.example.voice.user.domain.port.LoginIdentityRevoker;
 import org.example.voice.user.domain.port.UserReader;
 import org.example.voice.user.domain.port.UserSessionRevoker;
 import org.example.voice.user.domain.port.UserWriter;
@@ -30,6 +31,7 @@ class UserServiceTest {
     private UserReader userReader;
     private UserWriter userWriter;
     private LoginProviderReader loginProviderReader;
+    private LoginIdentityRevoker loginIdentityRevoker;
     private UserSessionRevoker userSessionRevoker;
     private OnboardingProfileReader onboardingProfileReader;
     private ProcessingConsentLedger processingConsentLedger;
@@ -43,6 +45,7 @@ class UserServiceTest {
         userReader = mock(UserReader.class);
         userWriter = mock(UserWriter.class);
         loginProviderReader = mock(LoginProviderReader.class);
+        loginIdentityRevoker = mock(LoginIdentityRevoker.class);
         userSessionRevoker = mock(UserSessionRevoker.class);
         onboardingProfileReader = mock(OnboardingProfileReader.class);
         processingConsentLedger = mock(ProcessingConsentLedger.class);
@@ -53,6 +56,7 @@ class UserServiceTest {
                 userReader,
                 userWriter,
                 loginProviderReader,
+                loginIdentityRevoker,
                 userSessionRevoker,
                 onboardingProfileReader,
                 processingConsentLedger,
@@ -103,13 +107,17 @@ class UserServiceTest {
 
     @Test
     void withdrawChangesStatusAndRevokesAllSessions() {
-        User user = mock(User.class);
+        OffsetDateTime createdAt = OffsetDateTime.parse("2026-09-01T00:00:00Z");
+        User user = User.createLocal("returning@example.com", "encoded-password", "returning", createdAt);
         when(userReader.findByIdForUpdate(1L)).thenReturn(Optional.of(user));
 
         var result = userService.withdraw(1L);
 
-        verify(user).withdraw(result.withdrawnAt());
+        assertThat(user.isWithdrawn()).isTrue();
+        assertThat(user.getEmail()).isNull();
+        assertThat(user.getPassword()).isNull();
         verify(userWriter).save(user);
+        verify(loginIdentityRevoker).revokeForUser(1L);
         verify(userSessionRevoker).revokeAll(1L);
         verify(analysisCancellation).cancelForUser(1L);
         verify(processingConsentLedger).revokeForUser(1L);
@@ -127,6 +135,7 @@ class UserServiceTest {
                 .isInstanceOf(WithdrawalAlreadyProcessedException.class);
         verifyNoInteractions(
                 userWriter,
+                loginIdentityRevoker,
                 userSessionRevoker,
                 processingConsentLedger,
                 recordingDeletionScheduler,
