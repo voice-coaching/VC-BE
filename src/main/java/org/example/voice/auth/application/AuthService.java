@@ -52,6 +52,7 @@ public class AuthService {
                 .orElseThrow(() -> new AuthException(ErrorCode.INVALID_CREDENTIALS));
         if (!passwordHasher.matches(password, user.getPassword())) throw new AuthException(ErrorCode.INVALID_CREDENTIALS);
         if (user.isSuspended()) throw new AuthException(ErrorCode.USER_SUSPENDED);
+        if (user.isWithdrawn()) throw new AuthException(ErrorCode.USER_WITHDRAWN);
         user.recordLogin(OffsetDateTime.now(ZoneOffset.UTC));
         userWriter.save(user);
         IssuedTokens tokens = tokenService.issueSession(user);
