@@ -1,7 +1,7 @@
 package org.example.voice.practicecontent.application;
 
 import lombok.RequiredArgsConstructor;
-import org.example.voice.practicecontent.domain.PracticeContentReader;
+import org.example.voice.practicecontent.domain.port.PracticeContentReader;
 import org.springframework.stereotype.Service;
 
 @Service

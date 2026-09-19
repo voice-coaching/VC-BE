@@ -1,8 +1,7 @@
 package org.example.voice.auth.exception;
 
-public class UnsupportedSocialProviderException extends AuthException {
+import org.example.voice.common.exception.ErrorCode;
 
-    public UnsupportedSocialProviderException(String message) {
-        super(message);
-    }
+public class UnsupportedSocialProviderException extends AuthException {
+    public UnsupportedSocialProviderException() { super(ErrorCode.UNSUPPORTED_SOCIAL_PROVIDER); }
 }

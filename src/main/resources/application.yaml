@@ -1,5 +1,10 @@
 spring:
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
   jackson:
     time-zone: Asia/Seoul
 
@@ -12,6 +17,12 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
 
   jpa:
     hibernate:
@@ -21,7 +32,149 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        default_batch_fetch_size: 100
     open-in-view: false
 
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 0
+    # Existing deployments can already have V1+ history from before the V0
+    # fresh-install baseline was introduced. Ignore only migrations Flyway
+    # classifies as "ignored" (lower than the installed version); pending,
+    # missing, failed, and checksum-mismatched migrations still fail validation.
+    ignore-migration-patterns: "*:ignored"
 
+auth:
+  jwt:
+    secret: ${JWT_SECRET}
+    issuer: ${JWT_ISSUER:voice-coaching}
+    access-token-seconds: ${JWT_ACCESS_TOKEN_SECONDS:600}
+    refresh-token-seconds: ${JWT_REFRESH_TOKEN_SECONDS:1209600}
+  cookie:
+    secure: ${AUTH_COOKIE_SECURE:true}
+    same-site: ${AUTH_COOKIE_SAME_SITE:None}
+  oauth:
+    google:
+      client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
+      client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
+    kakao:
+      client-id: ${KAKAO_OAUTH_CLIENT_ID:}
+      client-secret: ${KAKAO_OAUTH_CLIENT_SECRET:}
+    naver:
+      client-id: ${NAVER_OAUTH_CLIENT_ID:}
+      client-secret: ${NAVER_OAUTH_CLIENT_SECRET:}
 
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+profile-image:
+  enabled: ${PROFILE_IMAGE_ENABLED:false}
+  bucket: ${PROFILE_IMAGE_BUCKET:}
+  region: ${PROFILE_IMAGE_REGION:}
+  cdn-base-url: ${PROFILE_IMAGE_CDN_BASE_URL:}
+
+storage:
+  enabled: ${OBJECT_STORAGE_ENABLED:false}
+  bucket: ${OBJECT_STORAGE_BUCKET:}
+  region: ${OBJECT_STORAGE_REGION:}
+  endpoint: ${OBJECT_STORAGE_ENDPOINT:}
+  path-style-access: ${OBJECT_STORAGE_PATH_STYLE_ACCESS:false}
+  recordings-prefix: ${OBJECT_STORAGE_RECORDINGS_PREFIX:recordings/}
+  media-normalization:
+    enabled: ${MEDIA_NORMALIZATION_ENABLED:false}
+    workspace-root: ${MEDIA_NORMALIZATION_WORKSPACE_ROOT:/tmp/voice-coach-media-normalization}
+    sandbox-python-binary: ${MEDIA_NORMALIZATION_SANDBOX_PYTHON_BINARY:/usr/bin/python3.12}
+    sandbox-address-space-bytes: ${MEDIA_NORMALIZATION_SANDBOX_ADDRESS_SPACE_BYTES:2147483648}
+    ffmpeg-binary: ${MEDIA_NORMALIZATION_FFMPEG_BINARY:/usr/bin/ffmpeg}
+    ffprobe-binary: ${MEDIA_NORMALIZATION_FFPROBE_BINARY:/usr/bin/ffprobe}
+    process-timeout: ${MEDIA_NORMALIZATION_PROCESS_TIMEOUT:PT30S}
+    maximum-input-bytes: ${MEDIA_NORMALIZATION_MAXIMUM_INPUT_BYTES:104857600}
+    maximum-normalized-bytes: ${MEDIA_NORMALIZATION_MAXIMUM_OUTPUT_BYTES:20971520}
+    minimum-duration-ms: ${MEDIA_NORMALIZATION_MINIMUM_DURATION_MS:500}
+    maximum-duration-ms: ${MEDIA_NORMALIZATION_MAXIMUM_DURATION_MS:180000}
+
+analysis:
+  transport: ${AI_ANALYSIS_TRANSPORT:disabled}
+  runpod:
+    endpoint-url: ${RUNPOD_ENDPOINT_URL:}
+    api-token: ${AI_ANALYSIS_API_TOKEN:}
+    callback-token: ${AI_ANALYSIS_CALLBACK_TOKEN:}
+    callback-base-url: ${AI_ANALYSIS_CALLBACK_BASE_URL:}
+    execution-timeout: ${AI_ANALYSIS_EXECUTION_TIMEOUT:PT15M}
+    claim-ttl: ${AI_ANALYSIS_CLAIM_TTL:PT90S}
+    outbox-poll-interval: ${AI_ANALYSIS_OUTBOX_POLL_INTERVAL:PT1S}
+    batch-size: ${AI_ANALYSIS_BATCH_SIZE:25}
+    dispatch-max-attempts: ${AI_ANALYSIS_DISPATCH_RETRY_MAX_ATTEMPTS:5}
+    maximum-payload-bytes: ${AI_ANALYSIS_MAXIMUM_PAYLOAD_BYTES:65536}
+  authorization:
+    key-id: ${ANALYSIS_AUTHORIZATION_KEY_ID:}
+    signing-secret-base64: ${ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64:}
+    consent-policy-revision: ${ANALYSIS_CONSENT_POLICY_REVISION:}
+    grant-ttl: ${ANALYSIS_AUTHORIZATION_GRANT_TTL:PT5M}
+  stream:
+    enabled: ${ANALYSIS_STREAM_ENABLED:false}
+    closed-beta-enabled: ${ANALYSIS_CLOSED_BETA_ENABLED:false}
+    redis-host: ${ANALYSIS_REDIS_HOST:localhost}
+    redis-port: ${ANALYSIS_REDIS_PORT:6379}
+    redis-username: ${ANALYSIS_REDIS_USERNAME:}
+    redis-password: ${ANALYSIS_REDIS_PASSWORD:}
+    redis-ssl-enabled: ${ANALYSIS_REDIS_SSL_ENABLED:false}
+    redis-connect-timeout: ${ANALYSIS_REDIS_CONNECT_TIMEOUT:PT5S}
+    redis-command-timeout: ${ANALYSIS_REDIS_COMMAND_TIMEOUT:PT30S}
+    redis-shutdown-timeout: ${ANALYSIS_REDIS_SHUTDOWN_TIMEOUT:PT1S}
+    request-stream: ${ANALYSIS_REQUEST_STREAM:analysis:request:v1}
+    request-consumer-group: ${ANALYSIS_REQUEST_CONSUMER_GROUP:analysis-workers}
+    request-dead-letter-stream: ${ANALYSIS_REQUEST_DLQ_STREAM:analysis:request:dlq:v1}
+    result-stream: ${ANALYSIS_RESULT_STREAM:analysis:result:v1}
+    result-consumer-group: ${ANALYSIS_RESULT_CONSUMER_GROUP:backend-analysis-result-workers}
+    result-consumer-name: ${ANALYSIS_RESULT_CONSUMER_NAME:backend-analysis-result-1}
+    result-dead-letter-stream: ${ANALYSIS_RESULT_DLQ_STREAM:analysis:result:dlq:v1}
+    cancellation-key-prefix: ${ANALYSIS_CANCELLATION_KEY_PREFIX:analysis:canceled:v1:}
+    request-index-key-prefix: ${ANALYSIS_REQUEST_INDEX_KEY_PREFIX:analysis:request-index:v1:}
+    cancellation-outbox-poll-interval: ${ANALYSIS_CANCELLATION_OUTBOX_POLL_INTERVAL:PT1S}
+    retention-age: ${ANALYSIS_RETENTION_AGE:PT1H}
+    retention-poll-interval: ${ANALYSIS_RETENTION_POLL_INTERVAL:PT5M}
+    observation-poll-interval: ${ANALYSIS_OBSERVATION_POLL_INTERVAL:PT30S}
+    retention-batch-size: ${ANALYSIS_RETENTION_BATCH_SIZE:100}
+    outbox-poll-interval: ${ANALYSIS_OUTBOX_POLL_INTERVAL:PT1S}
+    result-poll-interval: ${ANALYSIS_RESULT_POLL_INTERVAL:PT1S}
+    result-block: ${ANALYSIS_RESULT_BLOCK:PT1S}
+    pending-claim-idle: ${ANALYSIS_PENDING_CLAIM_IDLE:PT5M}
+    batch-size: ${ANALYSIS_STREAM_BATCH_SIZE:25}
+    max-retries: ${ANALYSIS_STREAM_MAX_RETRIES:3}
+    maximum-payload-bytes: ${ANALYSIS_STREAM_MAXIMUM_PAYLOAD_BYTES:65536}
+    maximum-result-payload-bytes: ${ANALYSIS_STREAM_MAXIMUM_RESULT_PAYLOAD_BYTES:1048576}
+    dead-letter-maximum-length: ${ANALYSIS_RESULT_DLQ_MAXIMUM_LENGTH:10000}
+    max-concurrent-per-user: ${ANALYSIS_MAX_CONCURRENT_PER_USER:3}
+    execution-timeout: ${ANALYSIS_EXECUTION_TIMEOUT:PT15M}
+    timeout-sweep-interval: ${ANALYSIS_TIMEOUT_SWEEP_INTERVAL:PT1M}
+    timeout-sweep-batch-size: ${ANALYSIS_TIMEOUT_SWEEP_BATCH_SIZE:100}
+
+custom-content:
+  encryption-key: ${CUSTOM_CONTENT_ENCRYPTION_KEY:}
+
+management:
+  server:
+    address: ${MANAGEMENT_SERVER_ADDRESS:127.0.0.1}
+    port: ${MANAGEMENT_SERVER_PORT:9091}
+  endpoints:
+    web:
+      base-path: /internal/actuator
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+
+notification:
+  push:
+    encryption-key: ${PUSH_SUBSCRIPTION_ENCRYPTION_KEY:}
+  reminders:
+    enabled: ${PRACTICE_REMINDERS_ENABLED:false}
+    poll-interval: PT1M
+
+practice-examples:
+  tts:
+    enabled: ${CHIRP_TTS_ENABLED:false}
+    quota-project: ${GOOGLE_CLOUD_QUOTA_PROJECT:}

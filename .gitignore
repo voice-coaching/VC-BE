@@ -66,7 +66,7 @@ replay_pid*
 
 ### Uploaded / generated local files ###
 uploads/
-storage/
+/storage/
 tmp/
 temp/
 *.tmp
@@ -76,3 +76,9 @@ temp/
 AGENTS.md
 .codex/
 .codex_backup_*/
+
+### Local generated archives ###
+loggingStrategy/
+
+### Local reference documents ###
+API명세서/

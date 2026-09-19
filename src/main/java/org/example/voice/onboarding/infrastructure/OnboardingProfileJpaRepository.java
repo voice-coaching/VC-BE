@@ -1,6 +1,6 @@
 package org.example.voice.onboarding.infrastructure;
 
-import org.example.voice.onboarding.domain.OnboardingProfile;
+import org.example.voice.onboarding.domain.entity.OnboardingProfile;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

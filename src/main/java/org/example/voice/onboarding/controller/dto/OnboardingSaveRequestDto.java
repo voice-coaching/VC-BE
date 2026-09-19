@@ -1,6 +1,6 @@
 package org.example.voice.onboarding.controller.dto;
 
-import org.example.voice.onboarding.domain.CurrentLevel;
+import org.example.voice.onboarding.domain.type.CurrentLevel;
 
 public record OnboardingSaveRequestDto(
         CurrentLevel currentLevel,

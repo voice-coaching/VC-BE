@@ -6,10 +6,10 @@ import org.example.voice.onboarding.controller.dto.OnboardingPatchResponseDto;
 import org.example.voice.onboarding.controller.dto.OnboardingResponseDto;
 import org.example.voice.onboarding.controller.dto.OnboardingSaveRequestDto;
 import org.example.voice.onboarding.controller.dto.OnboardingUpdateRequestDto;
-import org.example.voice.onboarding.domain.OnboardingProfile;
-import org.example.voice.onboarding.domain.OnboardingProfileReader;
-import org.example.voice.onboarding.domain.OnboardingProfileWriter;
-import org.example.voice.onboarding.domain.SurveyAnswers;
+import org.example.voice.onboarding.domain.entity.OnboardingProfile;
+import org.example.voice.onboarding.domain.port.OnboardingProfileReader;
+import org.example.voice.onboarding.domain.port.OnboardingProfileWriter;
+import org.example.voice.onboarding.domain.entity.SurveyAnswers;
 import org.example.voice.onboarding.exception.OnboardingNotFoundException;
 import org.example.voice.onboarding.exception.RequiredAnswerMissingException;
 import org.springframework.stereotype.Service;
@@ -19,16 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class OnboardingService {
 
-    private static final Long TEMP_LOGIN_USER_ID = 1L;
-
     private final OnboardingProfileReader onboardingProfileReader;
     private final OnboardingProfileWriter onboardingProfileWriter;
 
     @Transactional
-    public OnboardingResponseDto saveMyOnboarding(OnboardingSaveRequestDto request) {
+    public OnboardingResponseDto saveMyOnboarding(Long userId, OnboardingSaveRequestDto request) {
         validateRequiredAnswers(request);
 
-        Long userId = TEMP_LOGIN_USER_ID;
         SurveyAnswers surveyAnswers = SurveyAnswers.from(request.surveyAnswers());
         OnboardingProfile profile = onboardingProfileReader.findByUserId(userId)
                 .map(existingProfile -> {
@@ -55,16 +52,14 @@ public class OnboardingService {
     }
 
     @Transactional(readOnly = true)
-    public OnboardingDetailResponseDto getMyOnboarding() {
-        Long userId = TEMP_LOGIN_USER_ID;
+    public OnboardingDetailResponseDto getMyOnboarding(Long userId) {
         OnboardingProfile profile = onboardingProfileReader.findByUserId(userId)
                 .orElseThrow(OnboardingNotFoundException::new);
         return OnboardingDetailResponseDto.from(profile);
     }
 
     @Transactional
-    public OnboardingPatchResponseDto updateMyOnboarding(OnboardingUpdateRequestDto request) {
-        Long userId = TEMP_LOGIN_USER_ID;
+    public OnboardingPatchResponseDto updateMyOnboarding(Long userId, OnboardingUpdateRequestDto request) {
         OnboardingProfile profile = onboardingProfileReader.findByUserId(userId)
                 .orElseThrow(OnboardingNotFoundException::new);
         profile.patch(

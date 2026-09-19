@@ -1,8 +1,8 @@
 package org.example.voice.onboarding.infrastructure;
 
 import lombok.RequiredArgsConstructor;
-import org.example.voice.onboarding.domain.OnboardingProfile;
-import org.example.voice.onboarding.domain.OnboardingProfileReader;
+import org.example.voice.onboarding.domain.entity.OnboardingProfile;
+import org.example.voice.onboarding.domain.port.OnboardingProfileReader;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;

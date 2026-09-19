@@ -1,8 +1,8 @@
 package org.example.voice.auth.exception;
 
-public class InvalidTokenException extends AuthException {
+import org.example.voice.common.exception.ErrorCode;
 
-    public InvalidTokenException(String message) {
-        super(message);
-    }
+public class InvalidTokenException extends AuthException {
+    public InvalidTokenException(ErrorCode errorCode) { super(errorCode); }
+    public InvalidTokenException(ErrorCode errorCode, Throwable cause) { super(errorCode, cause); }
 }

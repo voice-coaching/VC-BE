@@ -1,6 +1,7 @@
 package org.example.voice.common.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.ConstraintViolationException;
 import org.example.voice.common.response.ApiResponse;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,11 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMultipartSize(Exception ignored) {
+        return ResponseEntity.status(413).body(ApiResponse.error("업로드 용량 제한을 초과했습니다.", "PAYLOAD_TOO_LARGE"));
+    }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException exception) {
@@ -30,19 +36,31 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining(", "));
         log.warn("Validation failed: {}", message);
         return ResponseEntity.badRequest()
-                .body(ApiResponse.error(message));
+                .body(ApiResponse.error(ErrorCode.VALIDATION_ERROR.getMessage()));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(ConstraintViolationException exception) {
+        log.warn("Constraint violation: {}", exception.getMessage());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(exception.getConstraintViolations().stream()
+                        .allMatch(violation -> violation.getConstraintDescriptor().getAnnotation()
+                                .annotationType().equals(jakarta.validation.constraints.Email.class))
+                        && !exception.getConstraintViolations().isEmpty()
+                        ? ErrorCode.INVALID_EMAIL_FORMAT.getMessage()
+                        : ErrorCode.INVALID_INPUT_VALUE.getMessage()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleMessageNotReadable(HttpMessageNotReadableException exception) {
-        log.warn("Message not readable: {}", exception.getMessage());
+        log.warn("Request message was not readable");
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error(ErrorCode.INVALID_INPUT_VALUE.getMessage()));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException exception) {
-        log.warn("DB constraint violation: {}", exception.getMessage());
+        log.warn("DB constraint violation");
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error(ErrorCode.INVALID_INPUT_VALUE.getMessage()));
     }

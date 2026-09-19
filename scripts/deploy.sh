@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly RELEASE_ID="${1:?release id is required}"
+if [[ ! "${RELEASE_ID}" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Release id must be a 40-character Git commit SHA." >&2
+  exit 2
+fi
+readonly APP_ROOT="/opt/alpha"
+readonly RELEASES_DIR="${APP_ROOT}/releases"
+readonly APP_LINK="${APP_ROOT}/app.jar"
+readonly INCOMING_JAR="/tmp/alpha-${RELEASE_ID}.jar"
+readonly RELEASE_JAR="${RELEASES_DIR}/${RELEASE_ID}.jar"
+readonly SERVICE_NAME="alpha-backend"
+readonly INTERNAL_HEALTH_URL="http://127.0.0.1:9091/internal/actuator/health"
+readonly PUBLIC_HEALTH_URL="https://api.voice-coaching.site/v3/api-docs"
+readonly HEALTH_WAIT_SECONDS=180
+
+previous_release=""
+if [[ -L "${APP_LINK}" ]]; then
+  previous_release="$(readlink -f "${APP_LINK}" || true)"
+fi
+if [[ -n "${previous_release}" && "${previous_release}" != "${RELEASES_DIR}/"*.jar ]]; then
+  previous_release=""
+fi
+
+healthy() {
+  systemctl is-active --quiet "${SERVICE_NAME}" \
+    && curl --fail --silent --show-error --connect-timeout 3 --max-time 5 "${INTERNAL_HEALTH_URL}" > /dev/null \
+    && curl --fail --silent --show-error --connect-timeout 3 --max-time 10 "${PUBLIC_HEALTH_URL}" > /dev/null
+}
+
+wait_until_healthy() {
+  local deadline=$((SECONDS + HEALTH_WAIT_SECONDS))
+  while (( SECONDS < deadline )); do
+    if healthy; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+rollback() {
+  local original_status=${1:-$?}
+  trap - ERR
+  if [[ -n "${previous_release}" && -f "${previous_release}" ]]; then
+    echo "Deployment failed. Rolling back to ${previous_release}."
+    ln -sfn "${previous_release}" "${APP_LINK}"
+    systemctl restart "${SERVICE_NAME}"
+    if wait_until_healthy; then
+      echo "Previous release is healthy after rollback."
+      return "${original_status}"
+    fi
+    echo "Previous release rollback did not become healthy." >&2
+  else
+    echo "Deployment failed and no previous release is available."
+  fi
+  return "${original_status}"
+}
+
+trap rollback ERR
+
+test -s "${INCOMING_JAR}"
+install -d -m 755 "${RELEASES_DIR}"
+install -m 644 "${INCOMING_JAR}" "${RELEASE_JAR}"
+ln -sfn "${RELEASE_JAR}" "${APP_LINK}"
+systemctl restart "${SERVICE_NAME}"
+
+if wait_until_healthy; then
+  rm -f "${INCOMING_JAR}"
+  trap - ERR
+  echo "Release ${RELEASE_ID} deployed successfully."
+  exit 0
+fi
+
+echo "Health check failed for release ${RELEASE_ID}." >&2
+rollback 1
+exit 1

@@ -1,0 +1,28 @@
+services:
+  redis:
+    image: redis:7
+    container_name: voice-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: voice-redis-insight
+    ports:
+      - "127.0.0.1:5540:5540"
+    depends_on:
+      - redis
+    volumes:
+      - redis_insight_data:/data
+
+volumes:
+  redis_data:
+  redis_insight_data:
