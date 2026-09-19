@@ -8,7 +8,8 @@ import org.example.voice.practiceexample.domain.model.ExampleTtsData.Job;
 public interface ExampleTtsStore {
     void reconcile(String revision, String fingerprint);
     Optional<Job> claim(String revision);
+    default Optional<Generated> cached(Job job) { return Optional.empty(); }
     boolean complete(Job job, Generated audio);
     void fail(Job job, String code, boolean retryable, long delaySeconds);
-    Optional<Audio> approved(String exampleId, String revision);
+    Optional<Audio> playable(String exampleId, String revision);
 }

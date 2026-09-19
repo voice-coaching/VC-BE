@@ -19,6 +19,7 @@ public class ExampleTtsWorker {
     private final ExampleTtsProperties properties;
     private final ExampleTtsStore store;
     private final ExampleTtsGenerator generator;
+    private final org.example.voice.practiceexample.domain.port.ExampleTtsAssets assets;
     private final ExecutorService worker=Executors.newSingleThreadExecutor(Thread.ofPlatform().name("example-tts").factory());
     private final AtomicBoolean busy=new AtomicBoolean();
     private volatile boolean halted;
@@ -34,7 +35,9 @@ public class ExampleTtsWorker {
                 }
                 store.claim(properties.getRevision()).ifPresent(job->{
                     try {
-                        boolean accepted=store.complete(job,generator.generate(job));
+                        var audio=store.cached(job).orElseGet(()->generator.generate(job));
+                        assets.store(job,audio);
+                        boolean accepted=store.complete(job,audio);
                         log.info("example_tts job={} result={}",job.id(),accepted ? "GENERATED":"STALE");
                     } catch(Exception e) {
                         boolean retry=e instanceof ExampleTtsFailure failure && failure.retryable();
