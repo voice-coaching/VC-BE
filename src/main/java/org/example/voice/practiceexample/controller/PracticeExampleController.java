@@ -29,7 +29,7 @@ public class PracticeExampleController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "429", description = "TTS_RATE_LIMITED", content = @io.swagger.v3.oas.annotations.media.Content(mediaType = "application/json"))
     })
     public ResponseEntity<byte[]> audio(@AuthenticationPrincipal LoginUser user, @PathVariable String exampleId,
-            @RequestParam(defaultValue = ExampleAudioService.DEFAULT_VOICE) String voice,
+            @RequestParam(required = false) String voice,
             @RequestParam Map<String, String> query, WebRequest request) {
         if (query.keySet().stream().anyMatch(key -> !key.equals("voice"))) throw PracticeExampleException.invalid();
         var data = audio.audio(user.id(), exampleId, voice);
