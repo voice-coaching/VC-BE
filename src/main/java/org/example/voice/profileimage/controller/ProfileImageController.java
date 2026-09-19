@@ -42,6 +42,7 @@ public class ProfileImageController {
         return ApiResponse.success("프로필 사진을 조회했습니다.", ProfileImageResponse.from(service.current(user.id())));
     }
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "415", description = "UNSUPPORTED_MEDIA_TYPE: multipart/form-data 요청이 필요합니다.")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<ProfileImageResponse> create(@AuthenticationPrincipal LoginUser user,
             @RequestPart("file") MultipartFile file,
@@ -50,6 +51,10 @@ public class ProfileImageController {
                 bytes(file), file.getOriginalFilename(), key)));
     }
     @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "프로필 사진을 교체했습니다."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "415", description = "UNSUPPORTED_MEDIA_TYPE: multipart/form-data 요청이 필요합니다.")
+    })
     public ApiResponse<ProfileImageResponse> replace(@AuthenticationPrincipal LoginUser user, @RequestPart("file") MultipartFile file) {
         return ApiResponse.success("프로필 사진을 교체했습니다.", ProfileImageResponse.from(service.upload(user.id(), true,
                 bytes(file), file.getOriginalFilename(), null)));
