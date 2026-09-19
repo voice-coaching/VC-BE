@@ -6,7 +6,9 @@ import org.example.voice.common.response.ApiResponse;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -49,6 +51,22 @@ public class GlobalExceptionHandler {
                         && !exception.getConstraintViolations().isEmpty()
                         ? ErrorCode.INVALID_EMAIL_FORMAT.getMessage()
                         : ErrorCode.INVALID_INPUT_VALUE.getMessage()));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingRequestParameter(MissingServletRequestParameterException exception) {
+        log.warn("Required request parameter missing: {}", exception.getParameterName());
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(ErrorCode.VALIDATION_ERROR.getMessage(), ErrorCode.VALIDATION_ERROR.name()));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
+        log.warn("Unsupported request Content-Type");
+        ErrorCode errorCode = ErrorCode.UNSUPPORTED_MEDIA_TYPE;
+        return ResponseEntity.status(errorCode.getHttpStatus())
+                .headers(exception.getHeaders())
+                .body(ApiResponse.error(errorCode.getMessage(), errorCode.name()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

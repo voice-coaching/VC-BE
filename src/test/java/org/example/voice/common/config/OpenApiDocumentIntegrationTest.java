@@ -41,6 +41,20 @@ class OpenApiDocumentIntegrationTest {
     }
 
     @Test
+    void photoUploadDocumentsMediaTypeErrorsAndSuccessResponses() throws Exception {
+        String body = mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        JsonNode path = objectMapper.readTree(body).path("paths").path("/api/users/me/profile-image");
+        assertThat(path.path("post").path("responses").has("201")).isTrue();
+        assertThat(path.path("put").path("responses").has("200")).isTrue();
+        for (String method : Set.of("post", "put")) {
+            assertThat(path.path(method).path("responses").path("415").path("description").asText())
+                    .contains("UNSUPPORTED_MEDIA_TYPE");
+            assertThat(path.path(method).path("requestBody").path("content").has("multipart/form-data")).isTrue();
+        }
+    }
+
+    @Test
     void generatedOpenApiContainsKoreanDocumentationForEveryEndpoint() throws Exception {
         String body = mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())

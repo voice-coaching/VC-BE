@@ -19,6 +19,7 @@ POST는 선택 Idempotency-Key(공백 없는 ASCII 1~128자)를 지원한다. �
 
 ## 검증 및 저장
 
+- POST/PUT 요청은 `multipart/form-data`여야 한다. JSON 등 지원하지 않는 요청 Content-Type은 415 `UNSUPPORTED_MEDIA_TYPE`이며, `Accept: multipart/form-data` 응답 헤더로 지원 형식을 안내한다. multipart 요청에 `file`만 빠진 경우는 기존대로 400 `VALIDATION_ERROR`다.
 - JPEG/PNG/WebP 파일 signature 및 실제 디코딩 검증. 요청 MIME이나 확장자는 신뢰하지 않는다.
 - 파일 최대 5MiB, multipart 요청 전체 최대 6MiB. 크기 초과 413 PAYLOAD_TOO_LARGE.
 - 가로·세로 각각 128~4096px. 지원하지 않는 형식·손상 파일·치수 오류는 400 INVALID_PROFILE_IMAGE.
