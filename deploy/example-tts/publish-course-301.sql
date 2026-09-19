@@ -24,8 +24,8 @@ BEGIN
         (4,'맑은 물결이 잔잔하게 흘러갑니다.','겹받침과 받침 ㄹ을 또렷하게 읽어요.'),
         (5,'옷을 입고 밝은 아침길을 걸었습니다.','받침 뒤에 모음이 올 때 연음에 집중해요.')
     ) AS authored(position,text,hint) LOOP
-        INSERT INTO practice_contents(content_type,learning_focus,title,script_text,difficulty,status,published_at,created_at,updated_at)
-            VALUES('CLASS_PRACTICE','PRONUNCIATION','받침 발음 예문 '||item.position,item.text,'BEGINNER','PUBLISHED',now(),now(),now())
+        INSERT INTO practice_contents(content_type,learning_focus,category,title,script_text,difficulty,status,published_at,created_at,updated_at)
+            VALUES('CLASS_PRACTICE','PRONUNCIATION','FINAL_CONSONANT','받침 발음 예문 '||item.position,item.text,'BEGINNER','PUBLISHED',now(),now(),now())
             RETURNING id INTO content;
         INSERT INTO practice_examples(id,set_id,content_id,example_order,hint,focus,locale)
             VALUES('course301-step303-r1-'||item.position,example_set,content,item.position,item.hint,'PRONUNCIATION','ko-KR');
