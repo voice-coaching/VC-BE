@@ -1,12 +1,16 @@
 package org.example.voice.practiceexample.application;
 
 import jakarta.annotation.PreDestroy;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.voice.practiceexample.domain.ExampleTtsFailure;
-import org.example.voice.practiceexample.domain.port.*;
+import org.example.voice.practiceexample.domain.port.ExampleTtsGenerator;
+import org.example.voice.practiceexample.domain.port.ExampleTtsStore;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 

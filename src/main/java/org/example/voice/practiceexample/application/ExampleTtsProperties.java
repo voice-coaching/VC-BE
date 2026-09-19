@@ -1,17 +1,18 @@
 package org.example.voice.practiceexample.application;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-@Data
+@Getter
+@Setter
 @Component
 @ConfigurationProperties("example.tts")
 public class ExampleTtsProperties {
     private String provider = "google";
     private boolean workerEnabled = false;
     private String baseUrl = "";
-    @lombok.ToString.Exclude
     private String apiToken = "";
     private String revision = "";
     private String fingerprint = "";

@@ -2,10 +2,13 @@ package org.example.voice.practiceexample.infrastructure;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.*;
+import java.util.HexFormat;
+import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.practiceexample.domain.model.ExampleData.Audio;
-import org.example.voice.practiceexample.domain.model.ExampleTtsData.*;
+import org.example.voice.practiceexample.domain.model.ExampleTtsData.Generated;
+import org.example.voice.practiceexample.domain.model.ExampleTtsData.Job;
 import org.example.voice.practiceexample.domain.port.ExampleTtsStore;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;

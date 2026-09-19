@@ -1852,3 +1852,13 @@ Content-Type: application/json
 ```
 - Status codes: 200 OK, 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable Entity, 503 Service Unavailable
 - Error cases: callback token 누락 또는 불일치, analysis id 불일치, stale request id, stale execution id, 이미 terminal 상태인 analysis, 지원하지 않는 result schema, 결과 저장 실패
+# 예문 음성 공급자 전환 (2026-09-19)
+
+- Method/path: `GET /api/practice-examples/{exampleId}/audio`.
+- Auth: 사용자 Bearer JWT; 기존 공개 예문/사용자 상태 검증 적용.
+- Query: 선택적 `voice`; 생략 시 구성한 공급자의 기본 음성. Google `ko-KR-Chirp3-HD-Aoede`, RunPod `ko-KR-practice-v1`.
+- Body: 없음. 성공 `200 audio/mpeg` 바이트, ETag 일치 시 body 없는 304. MP3에 JSON envelope를 붙이지 않는다.
+- Errors: 400 `VALIDATION_ERROR`(명시한 음성 불일치), 401/403/404(기존 접근 검증), 429 `TTS_RATE_LIMITED`, 503 `TTS_UNAVAILABLE`.
+- RunPod에서 503은 미생성·미승인·digest 불일치도 포함한다. GET은 합성 접수를 하지 않으며 재시도 완료 시각을 약속하지 않는다.
+- 자동 생성과 공개 승인은 별개다. 작업 완료 후 두 개의 서로 다른 검토자 승인이 저장된 MP3 digest와 일치해야 제공한다.
+- 배포 기본값: 기존 Google 설정 유지, TTS 워커 비활성. 상세 운영 절차는 `deploy/example-tts/README.md` 참조.
