@@ -57,9 +57,27 @@ public class AnalysisRunPodCallbackService {
 
     @Transactional
     public AnalysisResultIngestionDisposition ingestResult(Long analysisId, AnalysisRunPodResultCommand request) {
-        if (!"voice-coaching.runpod-analysis-result.v1".equals(request.schemaVersion())
+        boolean scored = "voice-coaching.runpod-analysis-result.v2".equals(request.schemaVersion());
+        boolean coached = "voice-coaching.runpod-analysis-result.v3".equals(request.schemaVersion());
+        if ((!scored && !coached && !"voice-coaching.runpod-analysis-result.v1".equals(request.schemaVersion()))
                 || !analysisId.equals(request.analysisId())) fail(422, "VALIDATION_FAILED");
+        if ((coached && request.status() == AnalysisStatus.COMPLETED) != (request.coaching() != null)) {
+            fail(422, "VALIDATION_FAILED");
+        }
+        try {
+            if (scored && request.status() == AnalysisStatus.COMPLETED) {
+                if (request.scoringEvidence() == null) fail(422, "VALIDATION_FAILED");
+                request.scoringEvidence().validate(request.overallScore());
+                org.example.voice.analysis.domain.model.HierarchicalScorePolicy.validateBinding(request.scoringEvidence(), request.workerResult());
+            } else if (request.overallScore() != null || request.scoringEvidence() != null) {
+                fail(422, "VALIDATION_FAILED");
+            }
+        } catch (IllegalArgumentException error) { throw new RunPodContractException(422, "VALIDATION_FAILED"); }
         AnalysisResult result = find(analysisId);
+        if (request.coaching() != null) {
+            try { request.coaching().validate(result.getRecording().getDurationMs()); }
+            catch (IllegalArgumentException error) { throw new RunPodContractException(422, "VALIDATION_FAILED"); }
+        }
         requireIdentity(result, request.requestId(), request.executionId());
         if (!result.getRecording().getId().equals(request.recordingId())) fail(422, "VALIDATION_FAILED");
         if (result.getWorkerInstanceId() == null) fail(409, "CLAIM_REQUIRED");
@@ -83,6 +101,14 @@ public class AnalysisRunPodCallbackService {
         try {
             var disposition = ingestionService.ingest(request.workerResult(), request.executionId(), request.payloadSha256());
             if (disposition != AnalysisResultIngestionDisposition.APPLIED) fail(409, "RESULT_ALREADY_FINALIZED");
+            if (scored && request.status() == AnalysisStatus.COMPLETED) {
+                result.applyClovaScore(request.overallScore(), request.scoringEvidence());
+                analysisResultWriter.save(result);
+            }
+            if (coached && request.status() == AnalysisStatus.COMPLETED) {
+                result.applyCoaching(request.coaching());
+                analysisResultWriter.save(result);
+            }
             return disposition;
         } catch (IllegalArgumentException error) {
             throw new RunPodContractException(422, "VALIDATION_FAILED");

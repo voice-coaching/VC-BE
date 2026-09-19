@@ -57,6 +57,18 @@ public class TitlePersistence implements TitleRepository {
         return em.createQuery("select count(a) from AnalysisResult a where a.id=:id and a.recording.trainingSession.userId=:user", Long.class)
                 .setParameter("id",id).setParameter("user",userId).getSingleResult() == 1;
     }
+    public boolean coachingScoreUnavailable(Long analysisId, Long userId, Long sessionId, Long contentId) {
+        return em.createQuery("""
+                select count(a) from AnalysisResult a join a.recording r join r.trainingSession s
+                where a.id=:id and s.userId=:user and s.id=:session and s.content.id=:content
+                and a.status=org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
+                and a.coachingDocument is not null and a.overallScore is null
+                and r.selected=true and r.deletedAt is null
+                and s.status in (org.example.voice.training.domain.type.TrainingSessionStatus.ANALYZING,
+                                 org.example.voice.training.domain.type.TrainingSessionStatus.COMPLETED)
+                """, Long.class).setParameter("id", analysisId).setParameter("user", userId)
+                .setParameter("session", sessionId).setParameter("content", contentId).getSingleResult() == 1;
+    }
     public Optional<TrainingSessionCreatedData> reusableSession(Long sessionId, Long userId) {
         if (sessionId == null) return Optional.empty();
         return em.createQuery("select s from TrainingSession s join fetch s.content where s.id=:id and s.userId=:user and s.status not in (org.example.voice.training.domain.type.TrainingSessionStatus.CANCELED,org.example.voice.training.domain.type.TrainingSessionStatus.FAILED)", TrainingSession.class)

@@ -43,4 +43,4 @@ V20의 title_policies에 기본 자격 5/15/30/60과 합격점 70/75/80/85를 �
 
 운영 콘텐츠 지정과 실제 음성 분석을 통한 프론트 종단 검증은 별도로 필요하다. 기존 #57 프로필 사진 V19 다음에 V20을 적용한다.
 
-현재 RunPod HTTP v1.1 결과 스키마와 RunPodAnalysisResultCallbackRequestDto는 overallScore를 전달하지 않는다. 콜백 변환에서 점수는 null로 저장되므로 AI 계약 보강 전에는 해당 경로의 분석으로 실제 승급 채점이 불가능하다. 점수 값을 추측하거나 발음 evidence 값을 점수로 임의 변환하지 않는다. 테스트는 서버 DB에 소유권이 확인된 유효 분석 점수가 존재하는 경우의 채점 규칙을 검증한다.
+RunPod 제어 계약은 v1.1을 유지하며, 결과 계약 `voice-coaching.runpod-analysis-result.v2`는 CLOVA가 [상세 채점표](clova-detailed-scoring-v2.md)로 생성한 overallScore와 근거를 전달한다. 워커와 백엔드가 기준표 일치 여부를 검증하고 V27의 근거 JSONB와 점수를 저장한다. submit은 클라이언트가 보낸 점수가 아니라 이 저장값을 사용한다. 기존 v1 결과의 null 점수는 소급 채우지 않으며 승급 채점에 사용할 수 없다. 실제 운영 검증 범위와 시험 생성의 학습 횟수·게시 콘텐츠 조건은 구분한다.

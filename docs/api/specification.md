@@ -2,6 +2,8 @@
 
 This document is generated from the API table and endpoint pages in the local API spec directory.
 
+추가 계약: [근거 기반 코칭 응답·result v3·점수 보류](evidence-based-coaching.md). 완료 상세의 `data.coaching`은 nullable이며 구형 결과의 API 경로와 polling 방식을 유지한다.
+
 ## Common Request Headers
 
 ```http
@@ -88,7 +90,7 @@ Content-Type: application/json
 1. `upload-url` 발급 → 응답의 `requiredHeaders`로 객체 업로드 → `recordings` 등록 → 녹음 선택 → 동의와 함께 `analyze` → 상태·결과 조회 순서를 사용한다.
 2. 저장소 미설정 상태의 업로드·재생·실제 객체 확인은 `503`이다. 가짜 URL이나 성공한 삭제로 응답하지 않는다. 분석 Stream이 비활성화되어 있으면 분석 요청도 `503`이며 분석 job과 동의 변경 transaction은 롤백된다.
 3. 등록 시 사용자→세션→발급 intent 순서로 잠근다. 발급 내역 부재는 `409 UPLOAD_INTENT_NOT_FOUND`, 만료·이미 소비된 상태는 `409 UPLOAD_INTENT_NOT_ACTIVE`, 발급 MIME·크기 불일치는 `422 ANALYSIS_SOURCE_NOT_READY`다. 실제 등록 완료 여부에 따른 `RECORDING_ALREADY_REGISTERED` 오류도 유지한다. 공통 HTTP 오류 body는 기존 `result/message/data` 형식을 따르며 enum 이름은 별도 응답 필드로 추가하지 않았다.
-4. 상세 결과의 `summaryFeedback`은 워커가 보낸 승인 문장을 그대로 저장·반환한다. 결과의 음성 SHA-256은 등록된 canonical WAV와 일치해야 하며 영상이 등록되지 않은 시도의 시각 결과는 거부한다. `pronunciationEvidence`와 `visualSupplement`의 같은 음소 관계도 유지한다. 현재 STT·발음 총점·억양·속도 점수는 공급되지 않아 null이며 임의 점수로 채우지 않는다.
+4. 상세 결과의 `summaryFeedback`은 워커가 보낸 승인 문장을 그대로 저장·반환한다. 결과의 음성 SHA-256은 등록된 canonical WAV와 일치해야 하며 영상이 등록되지 않은 시도의 시각 결과는 거부한다. `pronunciationEvidence`와 `visualSupplement`의 같은 음소 관계도 유지한다. HTTP 결과 v2의 `overallScore`는 [CLOVA 상세 기준표](clova-detailed-scoring-v2.md)로 생성·검증한 학습용 점수다. 기존 점수 없는 결과는 null을 유지한다. STT·별도 발음 점수·억양·속도 점수는 이번 계약에서 공급하지 않는다.
 5. `/feedback/regenerate`의 현재 구현은 저장된 승인 문장을 다시 제공한다. Clova의 새 추론이나 새 교정 행동 생성으로 해석하지 않는다.
 
 기본 분석 전송 계약은 RunPod HTTP request + Backend callback이다. 기존 Redis Stream 계약은 이번 RunPod 단계에서는 사용하지 않고 향후 내부 worker 또는 managed Redis 전환 시 참고 문서로 보관한다. [RunPod HTTP callback 계약](ai-runpod-http-callback-contract.md), [이번 API 연결 안내](../runpod_pipeline_api_20260910.md)를 참고한다.
@@ -794,7 +796,7 @@ Content-Type: application/json
     "outcome": "String | null", // result.v2 완료 값: COACHING_READY, COMPLETED_NO_ISSUE
     "transcript": "String | null", // result.v2 현재 미측정
     "sttConfidence": "Number | null", // result.v2 현재 미측정
-    "overallScore": "Number | null", // result.v2 현재 미측정
+    "overallScore": "Number | null", // HTTP 결과 v2: 검증된 CLOVA 학습 점수(0~100); 기존 점수 없는 결과: null
     "pronunciationScore": "Number | null", // result.v2 현재 미측정
     "intonationScore": "Number | null", // result.v2 현재 미측정
     "speedWpm": "Number | null", // result.v2 현재 미측정

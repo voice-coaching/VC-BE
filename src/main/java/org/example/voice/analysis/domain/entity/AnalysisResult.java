@@ -62,6 +62,30 @@ public class AnalysisResult {
     @Column(name = "overall_score")
     private BigDecimal overallScore;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "clova_score_evidence", columnDefinition = "jsonb")
+    private Map<String, Object> clovaScoreEvidence;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "coaching_document", columnDefinition = "jsonb")
+    private org.example.voice.analysis.domain.model.AnalysisCoaching coachingDocument;
+
+    public void applyCoaching(org.example.voice.analysis.domain.model.AnalysisCoaching coaching) {
+        if (status != AnalysisStatus.COMPLETED) throw new IllegalArgumentException("coaching requires completion");
+        coaching.validate(recording.getDurationMs());
+        this.coachingDocument = coaching;
+        // Uncalibrated/insufficient evidence must not become a title-exam grade.
+        this.overallScore = null;
+        this.clovaScoreEvidence = null;
+    }
+
+    public void applyClovaScore(BigDecimal score, org.example.voice.analysis.domain.model.ClovaScoreEvidence evidence) {
+        if (status != AnalysisStatus.COMPLETED) throw new IllegalArgumentException("score requires completion");
+        evidence.validate(score);
+        this.overallScore = score;
+        this.clovaScoreEvidence = evidence.audit();
+    }
+
     @Column(name = "pronunciation_score")
     private BigDecimal pronunciationScore;
 
@@ -411,10 +435,12 @@ public class AnalysisResult {
     }
 
     private void clearWorkerResult() {
+        this.coachingDocument = null;
         this.transcript = null;
         this.sttConfidence = null;
         this.sttModelName = null;
         this.overallScore = null;
+        this.clovaScoreEvidence = null;
         this.pronunciationScore = null;
         this.intonationScore = null;
         this.speedWpm = null;

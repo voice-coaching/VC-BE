@@ -50,6 +50,7 @@ class SocialAccountService {
             socialAccountWriter.save(SocialAccount.create(user.getId(), provider, profile.providerUserId(), email, now));
         }
         if (user.isSuspended()) throw new AuthException(ErrorCode.USER_SUSPENDED);
+        if (user.isWithdrawn()) throw new AuthException(ErrorCode.USER_WITHDRAWN);
         user.recordLogin(now);
         userWriter.save(user);
         IssuedTokens tokens = tokenService.issueSession(user);

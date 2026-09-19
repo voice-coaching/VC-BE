@@ -43,9 +43,14 @@ class TitleIntegrationTest {
     @Autowired TitleService titles;
     @Autowired TrainingSessionService sessions;
     @Autowired MockMvc mvc;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    org.springframework.cache.CacheManager cacheManager;
     Long user, other, content;
     TransactionTemplate tx;
     @BeforeEach void setup() {
+        var localCaches = new org.springframework.cache.concurrent.ConcurrentMapCacheManager();
+        org.mockito.Mockito.when(cacheManager.getCache(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(call -> localCaches.getCache(call.getArgument(0)));
         tx = new TransactionTemplate(manager);
         tx.executeWithoutResult(s -> {
             var now = OffsetDateTime.now(ZoneOffset.UTC);
@@ -115,6 +120,29 @@ class TitleIntegrationTest {
         Long unready=analysis(user,session,BigDecimal.valueOf(100));
         tx.executeWithoutResult(s->ReflectionTestUtils.setField(em.find(AnalysisResult.class,unready),"status",AnalysisStatus.PROCESSING));
         assertCode(()->titles.submit(user,exam.id(),unready),"ANALYSIS_NOT_COMPLETED");
+    }
+    @Test void coachingWithheldScoreDoesNotGradeOrPromote() throws Exception {
+        completed(5); var exam = titles.create(user, null); Long session = bind(exam.id());
+        Long id = analysis(user, session, BigDecimal.valueOf(99));
+        tx.executeWithoutResult(s -> {
+            try {
+                var document = new com.fasterxml.jackson.databind.ObjectMapper().readValue(
+                        org.example.voice.analysis.infrastructure.runpod.CoachingContractTest.coaching(),
+                        org.example.voice.analysis.domain.model.AnalysisCoaching.class);
+                em.find(AnalysisResult.class, id).applyCoaching(document);
+            } catch (java.io.IOException error) { throw new AssertionError(error); }
+        });
+        assertCode(() -> titles.submit(user, exam.id(), id), "ANALYSIS_SCORE_UNAVAILABLE");
+        mvc.perform(get("/api/analyses/{id}", id).with(as(user))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.coaching.schemaVersion").value("voice-coaching.coaching-result.v1"))
+                .andExpect(jsonPath("$.data.coaching.items[0].candidateId").value("candidate-0"))
+                .andExpect(jsonPath("$.data.overallScore").doesNotExist());
+        mvc.perform(get("/api/analyses/{id}", id).with(as(other))).andExpect(status().isNotFound());
+        assertThat(titles.progress(user).code()).isEqualTo(TitleRank.values()[0].name());
+        tx.executeWithoutResult(s -> {
+            var stored = em.find(org.example.voice.title.domain.entity.TitleExam.class, exam.id());
+            assertThat(stored.graded()).isFalse();
+        });
     }
     @Test void httpContractIncludesAuthenticationErrorsAndLinkedSession() throws Exception {
         mvc.perform(get("/api/users/me/title")).andExpect(status().isUnauthorized());

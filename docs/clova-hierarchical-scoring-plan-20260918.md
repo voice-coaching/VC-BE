@@ -62,45 +62,45 @@ RunPod 배포 폴더에는 .git이 없어 Git HEAD를 얻지 못했다. 대신 �
 
 | 번호 | 대분류 | 소분류 ID | 평가 항목/대상 | 근거·활성 조건 |
 | ---: | --- | --- | --- | --- |
-| 1 | A. 모음 | vowel.a | ㅏ 대응 | 음성 R |
-| 2 | A. 모음 | vowel.ae | ㅐ 대응 | 음성 R |
-| 3 | A. 모음 | vowel.ya | ㅑ 대응 | 음성 R |
-| 4 | A. 모음 | vowel.yae | ㅒ 대응 | 음성 R |
-| 5 | A. 모음 | vowel.eo | ㅓ 대응 | 음성 R |
-| 6 | A. 모음 | vowel.e | ㅔ 대응 | 음성 R |
-| 7 | A. 모음 | vowel.yeo | ㅕ 대응 | 음성 R |
-| 8 | A. 모음 | vowel.ye | ㅖ 대응 | 음성 R |
-| 9 | A. 모음 | vowel.o | ㅗ 대응 | 음성 R |
-| 10 | A. 모음 | vowel.wa | ㅘ 대응 | 음성 R |
-| 11 | A. 모음 | vowel.wae | ㅙ 대응 | 음성 R |
-| 12 | A. 모음 | vowel.oe | ㅚ 대응 | 음성 R |
-| 13 | A. 모음 | vowel.yo | ㅛ 대응 | 음성 R |
-| 14 | A. 모음 | vowel.u | ㅜ 대응 | 음성 R |
-| 15 | A. 모음 | vowel.wo | ㅝ 대응 | 음성 R |
-| 16 | A. 모음 | vowel.we | ㅞ 대응 | 음성 R |
-| 17 | A. 모음 | vowel.wi | ㅟ 대응 | 음성 R |
-| 18 | A. 모음 | vowel.yu | ㅠ 대응 | 음성 R |
-| 19 | A. 모음 | vowel.eu | ㅡ 대응 | 음성 R |
-| 20 | A. 모음 | vowel.ui | ㅢ 대응 | 음성 R |
-| 21 | A. 모음 | vowel.i | ㅣ 대응 | 음성 R |
-| 22 | B. 평음 파열음 | plain.g | ㄱ 대응 | 음성 R |
-| 23 | B. 평음 파열음 | plain.d | ㄷ 대응 | 음성 R |
-| 24 | B. 평음 파열음 | plain.b | ㅂ 대응 | 음성 R |
-| 25 | C. 경음 파열음 | tense.gg | ㄲ 대응 | 음성 R |
-| 26 | C. 경음 파열음 | tense.dd | ㄸ 대응 | 음성 R |
-| 27 | C. 경음 파열음 | tense.bb | ㅃ 대응 | 음성 R |
-| 28 | D. 격음 파열음 | aspirated.k | ㅋ 대응 | 음성 R |
-| 29 | D. 격음 파열음 | aspirated.t | ㅌ 대응 | 음성 R |
-| 30 | D. 격음 파열음 | aspirated.p | ㅍ 대응 | 음성 R |
-| 31 | E. 마찰음 | fricative.s | ㅅ 대응 | 음성 R |
-| 32 | E. 마찰음 | fricative.ss | ㅆ 대응 | 음성 R |
-| 33 | E. 마찰음 | fricative.h | ㅎ 대응 | 음성 R |
-| 34 | F. 파찰음 | affricate.j | ㅈ 대응 | 음성 R |
-| 35 | F. 파찰음 | affricate.jj | ㅉ 대응 | 음성 R |
-| 36 | F. 파찰음 | affricate.ch | ㅊ 대응 | 음성 R |
-| 37 | G. 비음 | nasal.n | ㄴ 대응 | 음성 R |
-| 38 | G. 비음 | nasal.m | ㅁ 대응 | 음성 R |
-| 39 | G. 비음 | nasal.ng | ㅇ 기대 표지 대응 | 음성 R. 원문 초성 ㅇ을 자동 가산하지 않음 |
+| 1 | A. 모음 | vowels.a | ㅏ 대응 | 음성 R |
+| 2 | A. 모음 | vowels.ae | ㅐ 대응 | 음성 R |
+| 3 | A. 모음 | vowels.ya | ㅑ 대응 | 음성 R |
+| 4 | A. 모음 | vowels.yae | ㅒ 대응 | 음성 R |
+| 5 | A. 모음 | vowels.eo | ㅓ 대응 | 음성 R |
+| 6 | A. 모음 | vowels.e | ㅔ 대응 | 음성 R |
+| 7 | A. 모음 | vowels.yeo | ㅕ 대응 | 음성 R |
+| 8 | A. 모음 | vowels.ye | ㅖ 대응 | 음성 R |
+| 9 | A. 모음 | vowels.o | ㅗ 대응 | 음성 R |
+| 10 | A. 모음 | vowels.wa | ㅘ 대응 | 음성 R |
+| 11 | A. 모음 | vowels.wae | ㅙ 대응 | 음성 R |
+| 12 | A. 모음 | vowels.oe | ㅚ 대응 | 음성 R |
+| 13 | A. 모음 | vowels.yo | ㅛ 대응 | 음성 R |
+| 14 | A. 모음 | vowels.u | ㅜ 대응 | 음성 R |
+| 15 | A. 모음 | vowels.wo | ㅝ 대응 | 음성 R |
+| 16 | A. 모음 | vowels.we | ㅞ 대응 | 음성 R |
+| 17 | A. 모음 | vowels.wi | ㅟ 대응 | 음성 R |
+| 18 | A. 모음 | vowels.yu | ㅠ 대응 | 음성 R |
+| 19 | A. 모음 | vowels.eu | ㅡ 대응 | 음성 R |
+| 20 | A. 모음 | vowels.ui | ㅢ 대응 | 음성 R |
+| 21 | A. 모음 | vowels.i | ㅣ 대응 | 음성 R |
+| 22 | B. 평음 파열음 | plain_stops.g | ㄱ 대응 | 음성 R |
+| 23 | B. 평음 파열음 | plain_stops.d | ㄷ 대응 | 음성 R |
+| 24 | B. 평음 파열음 | plain_stops.b | ㅂ 대응 | 음성 R |
+| 25 | C. 경음 파열음 | tense_stops.gg | ㄲ 대응 | 음성 R |
+| 26 | C. 경음 파열음 | tense_stops.dd | ㄸ 대응 | 음성 R |
+| 27 | C. 경음 파열음 | tense_stops.bb | ㅃ 대응 | 음성 R |
+| 28 | D. 격음 파열음 | aspirated_stops.k | ㅋ 대응 | 음성 R |
+| 29 | D. 격음 파열음 | aspirated_stops.t | ㅌ 대응 | 음성 R |
+| 30 | D. 격음 파열음 | aspirated_stops.p | ㅍ 대응 | 음성 R |
+| 31 | E. 마찰음 | fricatives.s | ㅅ 대응 | 음성 R |
+| 32 | E. 마찰음 | fricatives.ss | ㅆ 대응 | 음성 R |
+| 33 | E. 마찰음 | fricatives.h | ㅎ 대응 | 음성 R |
+| 34 | F. 파찰음 | affricates.j | ㅈ 대응 | 음성 R |
+| 35 | F. 파찰음 | affricates.jj | ㅉ 대응 | 음성 R |
+| 36 | F. 파찰음 | affricates.ch | ㅊ 대응 | 음성 R |
+| 37 | G. 비음 | nasals.n | ㄴ 대응 | 음성 R |
+| 38 | G. 비음 | nasals.m | ㅁ 대응 | 음성 R |
+| 39 | G. 비음 | nasals.ng | ㅇ 기대 표지 대응 | 음성 R. 원문 초성 ㅇ을 자동 가산하지 않음 |
 | 40 | H. 유음 | liquid.r | ㄹ 대응 | 음성 R. 탄설·측음 원인을 자동 진단하지 않음 |
 | 41 | I. 대응 범위 | coverage.aligned | 전체 기대 음소 정렬 대응 | 현재 coverage 계산 유지 |
 | 42 | J. 입술 형상 | lip.inner_aperture | 안쪽 벌림 비율의 문맥별 적합성 | inner_aperture_ratio + 검증 참조 필요 |
@@ -253,3 +253,6 @@ AI 경로는 검토 SHA `90ffc747539e5f650a62ffaa21d688ddc69cba16` 기준이다.
 - BE `src/main/java/org/example/voice/title/application/TitleService.java:98` — 저장 점수 기반 승급 채점.
 
 이번 산출물은 이 계획 문서뿐이다. 기존 PR #82/#19, 모델, threshold, 프롬프트, 환경설정, 운영 데이터는 변경하지 않았다.
+## 실행 재검토 — 2026-09-18
+
+실제 구현과 남은 단계는 [구현 인계](clova-hierarchy-v3-implementation.md)를 따른다. 음성41항목과 선택 구간 입술관측4개 연결, 8개 영상항목 미채점 상태, BE 계약·FE 표시는 구현했다. 512토큰 제약 때문에 CLOVA는 전체 수치 복제가 아닌 검산된 총점과 최대3개 우선확인ID를 반환한다. 다구간 영상계측·전문가 참조·입술 점수 승격은 미완료다. 기본v2를 유지하며 운영은 변경하지 않았다. 소분류ID는 코드 정본과 일치하도록 위 표의 대분류 접두사를 통일했다.

@@ -1,6 +1,8 @@
 # Backend–RunPod HTTP 계약 v1.1
 
-2026-09-16. 이 문서는 이전 2026-09-10 계약을 대체한다. 기준은 현재 A40 팟에 배포된 `voice-coaching.runpod-http.v1.1`이다. 공개 사용자 API는 변경하지 않는다.
+2026-09-18 추가: [근거 기반 코칭 result v3](evidence-based-coaching.md)를 선택적으로 수신한다. v1/v2 호환을 유지하며 새 코칭의 미확정 점수는 null이다. 제어 계약 v1.1과 endpoint는 유지한다. 운영 발행 전 BE reader 선배포가 필요하다.
+
+2026-09-17 갱신. 제어 계약은 `voice-coaching.runpod-http.v1.1`이며 결과는 기존 v1과 CLOVA 점수를 포함하는 v2를 수신한다. 공개 상세 API는 기존 `overallScore` 필드에 검증된 점수를 반환한다. 아래 2026-09-16 검증 절은 당시 기록이다.
 
 ## 비교와 결정
 
@@ -22,7 +24,7 @@
 - [제어/요청 JSON Schema](../contracts/runpod_http_control_v1.schema.json)
 - [결과 JSON Schema](../contracts/runpod_result_v1.schema.json)
 
-두 파일은 A40 팟 worker revision `b4057a008ad45c89f540e4cb6e19b6f29cd53aed`에서 가져온 원본이다. Gradle이 같은 파일을 JAR의 `contracts/`에 포함한다. 백엔드 런타임은 이를 직접 검증한다. HTTP DTO에만 별도 규칙을 복사하여 운영하지 않는다.
+두 파일의 최초 기준은 worker revision `b4057a008ad45c89f540e4cb6e19b6f29cd53aed`다. 이후 결과 스키마에 v2 점수와 상세 기준표 근거를 추가했다. Gradle이 같은 파일을 JAR의 `contracts/`에 포함하고 백엔드 런타임이 직접 검증한다. 점수의 의미와 산식은 [상세 CLOVA 기준표](clova-detailed-scoring-v2.md)를 따른다.
 
 RFC8785 JCS를 적용한 JSON의 UTF-8 bytes에 SHA-256을 계산한다. 요청 digest는 DB outbox의 **불변 요청 payload**와 비교한다. 단순 문자열 hash나 언어별 기본 JSON 정렬을 사용하지 않는다. 구현 근거: [Java JCS](https://github.com/erdtman/java-json-canonicalization), [JSON Schema validator](https://github.com/networknt/json-schema-validator/tree/1.5.9).
 
@@ -82,7 +84,13 @@ leaseResponse는 analysisId, requestId, executionId, workerInstanceId, serverTim
 
 ## 결과와 중복 처리
 
-결과 스키마에 있는 필드만 전송한다. workerInstanceId는 필수다. STT·종합 점수·segments·debug·closedBetaLipObservation은 HTTP 계약에서 허용하지 않는다.
+결과 스키마에 있는 필드만 전송한다. workerInstanceId는 필수다. STT·segments·debug·closedBetaLipObservation은 HTTP 계약에서 허용하지 않는다.
+
+- `voice-coaching.runpod-analysis-result.v1`은 점수 필드가 없는 기존 계약이다.
+- `voice-coaching.runpod-analysis-result.v2`는 `overallScore`, `scoringEvidence`가 모두 필수이며, COMPLETED에서는 유효한 값, FAILED에서는 둘 다 null이다.
+- `scoringEvidence.rubricRevision`으로 기존 3항목 v1과 상세 9항목 v2를 구분한다. 상세 v2는 항목별 근거 개수·단계와 기준표/프롬프트 SHA-256을 저장한다.
+- 워커와 백엔드가 근거 개수, 단계, 제외 항목 및 최종 합산을 검증한다. V27의 `clova_score_evidence`와 기존 `overall_score`를 함께 저장하며, 기존 결과에 점수를 소급 생성하지 않는다.
+- 프론트는 analyze의 접수 응답을 받은 뒤 status를 polling하고, COMPLETED일 때 `GET /api/analyses/{analysisId}`로 피드백과 `overallScore`를 조회한다. 승급 submit은 같은 DB 점수를 사용한다.
 
 - 새 결과는 현재 request/execution, claim 소유자, lease/deadline, recording, audio hash와 근거 관계를 만족해야 한다.
 - 같은 eventId와 같은 canonical content는 DB에 이미 저장된 경우 DUPLICATE이다. 전달 재시도는 lease/deadline 만료 후에도 승인 가능하다.
@@ -124,7 +132,7 @@ status는 APPLIED 또는 DUPLICATE이다.
 
 요청 dispatcher는 짧은 DB 예약 → transaction 밖 HTTP → 별도 완료 transaction 순서다. 프로세스 중단 시 예약 만료 후 재전송한다. 이미 claim된 작업은 접수 응답 유실만으로 실패 처리하지 않는다. 취소도 같은 방식이며 현재 분석의 새 executionId가 아니라 원래 outbox의 executionId를 사용한다.
 
-## 배포 및 검증 범위
+## 최초 v1.1 도입의 배포 및 검증 범위 — 2026-09-16 기록
 
 - V17 migration은 execution_deadline_at을 추가하고 기존 HTTP outbox에서 deadline을 가져온다.
 - 이 변경은 이전 워커 시간 필드를 사용하는 callback과 호환되지 않는 내부 계약 변경이다.

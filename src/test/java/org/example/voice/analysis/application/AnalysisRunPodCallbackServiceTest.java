@@ -113,6 +113,116 @@ class AnalysisRunPodCallbackServiceTest {
     }
 
     @Test
+    void storesCoachingWithoutScoreAndAcknowledgesExactReplay() {
+        service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
+        String raw = CoachingContractTest.result(UUID.randomUUID());
+        var coached = command(raw);
+        assertThat(service.ingestResult(1L, coached)).isEqualTo(AnalysisResultIngestionDisposition.APPLIED);
+        assertThat(result.getCoachingDocument().items()).hasSize(1);
+        assertThat(result.getOverallScore()).isNull();
+        assertThat(result.getClovaScoreEvidence()).isNull();
+        ReflectionTestUtils.setField(result, "claimExpiresAt", OffsetDateTime.now().minusSeconds(1));
+        assertThat(service.ingestResult(1L, coached)).isEqualTo(AnalysisResultIngestionDisposition.IGNORED_DUPLICATE);
+        expect("RESULT_EVENT_CONFLICT", () -> service.ingestResult(1L, command(raw.replace("연습 안내", "변경 안내"))));
+        verify(segments, times(1)).replaceForAnalysis(any(), any());
+    }
+
+    @Test
+    void invalidCoachingDoesNotFinalizeOrReplaceResult() {
+        service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
+        String raw = CoachingContractTest.result(UUID.randomUUID()).replace("phone-0", "phone-3");
+        expect("VALIDATION_FAILED", () -> service.ingestResult(1L, command(raw)));
+        assertThat(result.getStatus()).isEqualTo(AnalysisStatus.PROCESSING);
+        assertThat(result.getLastResultEventId()).isNull();
+        assertThat(result.getCoachingDocument()).isNull();
+    }
+
+    private String scoredResult() {
+        return result(UUID.randomUUID()).replace("runpod-analysis-result.v1", "runpod-analysis-result.v2")
+                .replace("\"failureReason\":null", """
+                  "failureReason":null,"overallScore":78.0,"scoringEvidence":{
+                  "rubricRevision":"clova-phone-rubric-v1","generator":"hyperclova",
+                  "modelRevision":"%s","evidenceSha256":"%s","expectedPhoneCount":10,
+                  "correctPhoneCount":7,"alignedPhoneCount":9,"unflaggedPhoneCount":9,
+                  "alignmentScore":42.0,"coverageScore":18.0,"stabilityScore":18.0}
+                  """.formatted("a".repeat(40), "c".repeat(64)));
+    }
+
+    @Test
+    void storesValidatedClovaScoreAndAuditWithIdempotentAck() {
+        service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
+        var scored = command(scoredResult());
+        assertThat(service.ingestResult(1L, scored)).isEqualTo(AnalysisResultIngestionDisposition.APPLIED);
+        assertThat(result.getOverallScore()).isEqualByComparingTo("78.0");
+        assertThat(result.getClovaScoreEvidence()).containsEntry("rubricRevision", "clova-phone-rubric-v1");
+        assertThat(service.ingestResult(1L, scored)).isEqualTo(AnalysisResultIngestionDisposition.IGNORED_DUPLICATE);
+        verify(segments, times(1)).replaceForAnalysis(any(), any());
+    }
+
+    @Test
+    void rejectsUnverifiedOrInvalidScoresBeforeChangingAnalysis() {
+        service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
+        String valid = scoredResult();
+        expect("VALIDATION_FAILED", () -> service.ingestResult(1L, command(valid.replace("\"overallScore\":78.0", "\"overallScore\":99.0"))));
+        expect("VALIDATION_FAILED", () -> command(valid.replace("runpod-analysis-result.v2", "runpod-analysis-result.v1")));
+        expect("VALIDATION_FAILED", () -> command(valid.replace("\"overallScore\":78.0,", "")));
+        expect("VALIDATION_FAILED", () -> command(valid.replace("\"overallScore\":78.0", "\"overallScore\":101")));
+        assertThat(result.getStatus()).isEqualTo(AnalysisStatus.PROCESSING);
+        assertThat(result.getOverallScore()).isNull();
+        assertThat(result.getLastResultEventId()).isNull();
+    }
+
+    private String detailedScoredResult() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var body = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(scoredResult());
+        body.put("overallScore", 82.1);
+        var audit = body.putObject("scoringEvidence");
+        audit.put("rubricRevision", "clova-phone-rubric-v2"); audit.put("generator", "hyperclova");
+        audit.put("modelRevision", "a".repeat(40)); audit.put("evidenceSha256", "b".repeat(64));
+        audit.put("rubricSha256", org.example.voice.analysis.domain.model.ClovaScoreEvidence.POLICY_SHA256);
+        audit.put("promptSha256", "c".repeat(64));
+        audit.put("expectedPhoneCount", 4); audit.put("correctPhoneCount", 4);
+        audit.put("alignedPhoneCount", 4); audit.put("unflaggedPhoneCount", 3);
+        var rows = audit.putArray("criteria");
+        for (String id : java.util.List.of("vowels", "plain_stops", "tense_stops", "aspirated_stops",
+                "fricatives", "affricates", "nasals", "liquid", "coverage")) {
+            boolean active = id.equals("vowels") || id.equals("coverage");
+            var row = rows.addObject(); row.put("criterionId", id); row.put("sampleCount", active ? 4 : 0);
+            row.put("matchedClear", active ? 3 : 0); row.put("matchedFlagged", active ? 1 : 0);
+            row.put("substitutedClear", 0); row.put("substitutedFlagged", 0);
+            row.put("deletedClear", 0); row.put("deletedFlagged", 0);
+            if (active) row.put("level", id.equals("coverage") ? 4 : 3); else row.putNull("level");
+        }
+        return mapper.writeValueAsString(body);
+    }
+
+    @Test
+    void storesDetailedRubricWithAbsentCategoriesAndIdempotentAck() throws Exception {
+        service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
+        var command = command(detailedScoredResult());
+        assertThat(service.ingestResult(1L, command)).isEqualTo(AnalysisResultIngestionDisposition.APPLIED);
+        assertThat(result.getOverallScore()).isEqualByComparingTo("82.1");
+        assertThat(result.getClovaScoreEvidence()).containsKeys("criteria", "rubricSha256", "promptSha256");
+        assertThat(service.ingestResult(1L, command)).isEqualTo(AnalysisResultIngestionDisposition.IGNORED_DUPLICATE);
+    }
+
+    @Test
+    void rejectsDetailedRubricTamperingBeforeStateChanges() throws Exception {
+        service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
+        String raw = detailedScoredResult();
+        for (String invalid : java.util.List.of(
+                raw.replace("\"overallScore\":82.1", "\"overallScore\":100"),
+                raw.replace("\"level\":3", "\"level\":4"),
+                raw.replace("\"level\":null", "\"level\":4"),
+                raw.replace("\"criterionId\":\"liquid\"", "\"criterionId\":\"vowels\""),
+                raw.replace(org.example.voice.analysis.domain.model.ClovaScoreEvidence.POLICY_SHA256, "d".repeat(64)))) {
+            expect("VALIDATION_FAILED", () -> service.ingestResult(1L, command(invalid)));
+        }
+        assertThat(result.getOverallScore()).isNull();
+        assertThat(result.getStatus()).isEqualTo(AnalysisStatus.PROCESSING);
+    }
+
+    @Test
     void acceptsFailedResultWithoutInventedMediaEvidence() {
         service.claim(1L, claim(WORKER.toString(), contract.digest(payload)));
         String raw = result(UUID.randomUUID()).replace("\"status\":\"COMPLETED\"", "\"status\":\"FAILED\"")
