@@ -168,3 +168,11 @@ This document summarizes the API list exported from the local API spec directory
 | GET | `/api/courses/{courseId}/progress` | Bearer accessToken | 완료 | 클래스 진행 상태 조회 |
 | PATCH | `/api/courses/{courseId}/progress` | Bearer accessToken | 완료 | 클래스 진행 상태 수정 |
 | POST | `/api/courses/{courseId}/complete` | Bearer accessToken | 완료 | 클래스 완료 처리 |
+# 예문 음성 공급자 전환 (2026-09-19)
+
+`GET /api/practice-examples/{exampleId}/audio`는 기존 사용자 인증과 발행 예문 접근 검증을 유지한다.
+성공은 JSON이 아닌 `200 audio/mpeg`이며 ETag 조건이 맞으면 304다. `voice` 생략은 선택된 공급자의
+기본 음성을 사용한다. Google은 `ko-KR-Chirp3-HD-Aoede`, RunPod는 `ko-KR-practice-v1`만 허용하며
+다른 음성을 명시하면 400 `VALIDATION_ERROR`다. RunPod는 두 검토자가 승인한 동일 digest의 저장 음성만
+반환한다. 캐시 미스·미승인·손상은 503 `TTS_UNAVAILABLE`이고 공개 GET에서 합성을 시작하지 않는다.
+신규 생성은 DB outbox/전용 워커가 담당한다. 인증 실패 401, 접근/리소스 오류 403/404 계약은 유지한다.

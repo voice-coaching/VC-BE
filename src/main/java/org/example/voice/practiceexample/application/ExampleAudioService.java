@@ -19,11 +19,21 @@ public class ExampleAudioService {
     private final ExampleAudioCache cache;
     private final ExampleSpeechSynthesizer synthesizer;
     private final Clock clock;
+    private final ExampleTtsProperties tts;
+    private final ExampleTtsStore generated;
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Audio audio(Long userId, String exampleId, String voice) {
-        if (!DEFAULT_VOICE.equals(voice)) throw PracticeExampleException.invalid();
         Snapshot example = examples.audioSource(userId, exampleId);
+        if (tts.runpod()) {
+            if (voice != null && !tts.getVoice().equals(voice)) throw PracticeExampleException.invalid();
+            try { return generated.approved(exampleId, tts.getRevision()).orElseThrow(PracticeExampleException::unavailable); }
+            catch (PracticeExampleException e) { throw e; }
+            catch (RuntimeException e) { throw PracticeExampleException.unavailable(); }
+        }
+        if ("disabled".equals(tts.getProvider())) throw PracticeExampleException.unavailable();
+        if (voice == null) voice = DEFAULT_VOICE;
+        if (!DEFAULT_VOICE.equals(voice)) throw PracticeExampleException.invalid();
         String key = hash((example.id() + "|" + example.revision() + "|" + voice + "|0.92").getBytes(StandardCharsets.UTF_8));
         var cached = cache.cached(key);
         if (cached.isPresent()) return cached.get();
