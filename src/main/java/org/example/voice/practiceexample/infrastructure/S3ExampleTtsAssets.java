@@ -25,7 +25,8 @@ public class S3ExampleTtsAssets implements ExampleTtsAssets {
             clients.getObject().putObject(PutObjectRequest.builder().bucket(properties.getBucket()).key(ExampleTtsAssets.key(job,audio))
                 .contentType("audio/mpeg").metadata(Map.of("sha256",audio.sha256()))
                 .overrideConfiguration(AwsRequestOverrideConfiguration.builder().apiCallTimeout(Duration.ofSeconds(15)).build()).build(),RequestBody.fromBytes(audio.bytes()));
-        } catch(Exception e){throw new ExampleTtsFailure("TTS_STORAGE_WRITE",true);}
+        } catch(S3Exception e){throw new ExampleTtsFailure(e.statusCode()==403 ? "TTS_STORAGE_AUTH":"TTS_STORAGE_WRITE",e.statusCode()!=403);}
+        catch(Exception e){throw new ExampleTtsFailure("TTS_STORAGE_WRITE",true);}
     }
     public Playback playback(String key) {
         if(key==null || !key.matches("tts/practice/[0-9]+/[a-f0-9]{64}\\.mp3") || signers.getIfAvailable()==null) throw new IllegalStateException("TTS_ASSET_UNAVAILABLE");

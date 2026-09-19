@@ -61,6 +61,16 @@ public class ExampleTtsPersistence implements ExampleTtsStore {
             """, (rs,n)->new Job(rs.getLong(1),rs.getString(2),rs.getString(3),rs.getInt(4),rs.getString(5),owner,rs.getInt(6)),id).stream().findFirst();
     }
     @Override @Transactional
+    public boolean stage(Job job, Generated audio) {
+        var owned=db.queryForList("SELECT id FROM example_tts_jobs WHERE id=? AND state='RUNNING' AND lease_owner=? AND lease_until>now() FOR UPDATE",Long.class,job.id(),job.owner());
+        if(owned.isEmpty()) return false;
+        if(!hash(audio.bytes()).equals(audio.sha256()) || audio.durationMs()<=0) throw new IllegalStateException("TTS_CACHE_DIGEST_MISMATCH");
+        String key=hash(("runpod-job:"+job.id()+":"+audio.sha256()).getBytes(StandardCharsets.UTF_8));
+        db.update("INSERT INTO example_audio_cache(id,audio,etag) VALUES (?,?,?) ON CONFLICT DO NOTHING",key,audio.bytes(),'"'+audio.sha256()+'"');
+        db.update("UPDATE example_tts_jobs SET cache_key=?,audio_sha256=?,duration_ms=?,updated_at=now() WHERE id=?",key,audio.sha256(),audio.durationMs(),job.id());
+        return true;
+    }
+    @Override @Transactional
     public boolean complete(Job job, Generated audio) {
         var current=db.queryForList("SELECT c.id FROM practice_contents c JOIN example_tts_jobs j ON j.content_id=c.id WHERE j.id=? AND c.tts_revision=j.text_revision AND c.owner_id IS NULL AND c.status='PUBLISHED' FOR UPDATE OF c",Long.class,job.id());
         if(current.isEmpty()) { fail(job,"TTS_STALE_CONTENT",false,0);return false; }
@@ -88,7 +98,7 @@ public class ExampleTtsPersistence implements ExampleTtsStore {
     public Optional<Audio> playable(String exampleId,String revision) {
         return db.query("""
             SELECT c.audio,c.etag,j.audio_sha256 FROM example_tts_jobs j JOIN example_audio_cache c ON c.id=j.cache_key
-            WHERE j.example_id=? AND j.profile_revision=? AND j.state='GENERATED'
+            WHERE j.example_id=? AND j.profile_revision=? AND j.cache_key IS NOT NULL
             AND EXISTS(SELECT 1 FROM practice_contents p WHERE p.id=j.content_id AND p.tts_revision=j.text_revision AND p.owner_id IS NULL AND p.status='PUBLISHED')
             AND NOT EXISTS(SELECT 1 FROM example_audio_approvals a WHERE a.job_id=j.id AND a.audio_sha256=j.audio_sha256 AND a.decision='REJECTED')
             """,(rs,n)-> {

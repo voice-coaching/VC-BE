@@ -36,13 +36,14 @@ public class ExampleTtsWorker {
                 store.claim(properties.getRevision()).ifPresent(job->{
                     try {
                         var audio=store.cached(job).orElseGet(()->generator.generate(job));
+                        if(!store.stage(job,audio)) return;
                         assets.store(job,audio);
                         boolean accepted=store.complete(job,audio);
                         log.info("example_tts job={} result={}",job.id(),accepted ? "GENERATED":"STALE");
                     } catch(Exception e) {
                         boolean retry=e instanceof ExampleTtsFailure failure && failure.retryable();
                         String code=e instanceof ExampleTtsFailure ? e.getMessage():"TTS_INTERNAL_ERROR";
-                        if(code.equals("TTS_AUTH") || code.equals("TTS_REVISION")) halted=true;
+                        if(code.equals("TTS_AUTH") || code.equals("TTS_REVISION") || code.equals("TTS_STORAGE_AUTH")) halted=true;
                         long[] delays={10,30,120,600,600};
                         store.fail(job,code,retry,delays[Math.min(job.attempt()-1,4)]+ThreadLocalRandom.current().nextInt(5));
                         log.warn("example_tts job={} error={}",job.id(),code);

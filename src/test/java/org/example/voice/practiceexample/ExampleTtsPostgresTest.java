@@ -57,6 +57,9 @@ class ExampleTtsPostgresTest {
             byte[] bytes={73,68,51,1,2}; String digest=ExampleTtsPersistence.hash(bytes);
             var audio=new Generated(bytes,digest,1000);
             Boolean stale=tx.execute(s->store.complete(first,audio));
+            assertThat(tx.<Boolean>execute(s->store.stage(replacement,audio))).isTrue();
+            assertThat(store.cached(replacement)).isPresent();
+            assertThat(store.playable(replacement.exampleId(),"r1")).isPresent();
             Boolean accepted=tx.execute(s->store.complete(replacement,audio));
             assertThat(stale).isFalse();
             assertThat(accepted).isTrue();
