@@ -12,6 +12,28 @@ import static org.assertj.core.api.Assertions.*;
 class ContentCatalogPostgresMigrationTest {
     @Test void freshDatabaseInstallsTaxonomyAndIndex() throws Exception {verify(false);}
     @Test void upgradePreservesOriginalContentWithoutInventingPublisher() throws Exception {verify(true);}
+    @Test void exampleQuestionSeedAddsPublishedSentenceContentPerDifficulty() throws Exception {
+        String url=System.getenv("VC_BE_TEST_POSTGRES_URL"),user=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER","postgres"),password=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_PASSWORD","");
+        String schema="catalog_seed_test_"+UUID.randomUUID().toString().replace("-","");
+        try(var db=DriverManager.getConnection(url,user,password);var sql=db.createStatement()){
+            try {
+                migrate(url,user,password,schema,"32");db.setSchema(schema);
+                try(var rows=sql.executeQuery("""
+                        select difficulty,count(*) from practice_contents
+                        where owner_id is null and content_type='SENTENCE' and learning_focus='PRONUNCIATION'
+                          and category='EXAMPLE_QUESTION' and status='PUBLISHED'
+                        group by difficulty
+                        """)) {
+                    java.util.Map<String,Integer> counts=new java.util.HashMap<>();
+                    while(rows.next()) counts.put(rows.getString(1),rows.getInt(2));
+                    assertThat(counts).containsEntry("BEGINNER",5).containsEntry("INTERMEDIATE",5).containsEntry("ADVANCED",5);
+                }
+                try(var rows=sql.executeQuery("select label from content_categories where content_type='SENTENCE' and code='EXAMPLE_QUESTION'")){
+                    assertThat(rows.next()).isTrue();assertThat(rows.getString(1)).isEqualTo("예시문제");
+                }
+            }finally{db.setSchema("public");sql.execute("drop schema if exists "+schema+" cascade");}
+        }
+    }
     private void verify(boolean upgrade) throws Exception {
         String url=System.getenv("VC_BE_TEST_POSTGRES_URL"),user=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER","postgres"),password=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_PASSWORD","");
         String schema="catalog_test_"+UUID.randomUUID().toString().replace("-","");
