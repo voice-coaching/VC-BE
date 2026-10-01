@@ -176,3 +176,14 @@ This document summarizes the API list exported from the local API spec directory
 다른 음성을 명시하면 400 `VALIDATION_ERROR`다. RunPod는 두 검토자가 승인한 동일 digest의 저장 음성만
 반환한다. 캐시 미스·미승인·손상은 503 `TTS_UNAVAILABLE`이고 공개 GET에서 합성을 시작하지 않는다.
 신규 생성은 DB outbox/전용 워커가 담당한다. 인증 실패 401, 접근/리소스 오류 403/404 계약은 유지한다.
+
+# 칭호 승급 시험 API 보강 목록
+
+아래 네 개 API는 프론트 승급 시험 플로우에 연결되는 로그인 사용자 API다. 상세 계약은 [title-exam-api.md](title-exam-api.md)와 [specification.md](specification.md)의 칭호 승급 시험 섹션을 따른다.
+
+| Method | URL | Auth | Implementation Status | Description |
+| --- | --- | --- | --- | --- |
+| GET | `/api/users/me/title` | Bearer accessToken | 완료 | 현재 칭호, 누적 완료 연습 횟수, 다음 승급 시험 응시 가능 여부 조회 |
+| POST | `/api/users/me/title-exams` | Bearer accessToken | 완료 | 다음 칭호 승급 시험 생성. 선택 헤더 `Idempotency-Key` 지원 |
+| GET | `/api/users/me/title-exams/{examId}` | Bearer accessToken | 완료 | 본인 승급 시험 상태와 연결된 학습 세션 조회 |
+| POST | `/api/users/me/title-exams/{examId}/submit` | Bearer accessToken | 완료 | 완료된 분석 결과를 서버 저장 점수로 채점하고 합격 시 한 단계 승급 |
