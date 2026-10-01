@@ -9,10 +9,15 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-@Order(-31) @RestControllerAdvice(assignableTypes = TitleController.class)
+@Order(-31)
+@RestControllerAdvice(assignableTypes = TitleController.class)
 public class TitleValidationHandler {
-    @ExceptionHandler({MethodArgumentNotValidException.class,HttpMessageNotReadableException.class,MethodArgumentTypeMismatchException.class})
+    @ExceptionHandler({
+            MethodArgumentNotValidException.class,
+            HttpMessageNotReadableException.class,
+            MethodArgumentTypeMismatchException.class
+    })
     public ResponseEntity<ApiResponse<Void>> invalid(Exception ignored) {
-        return ResponseEntity.badRequest().body(ApiResponse.error("입력값을 확인해 주세요.","VALIDATION_ERROR"));
+        return ResponseEntity.badRequest().body(ApiResponse.error("입력값을 확인해 주세요.", "VALIDATION_ERROR"));
     }
 }

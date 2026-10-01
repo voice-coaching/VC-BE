@@ -1862,3 +1862,134 @@ Content-Type: application/json
 - RunPod에서 503은 미생성·미승인·digest 불일치도 포함한다. GET은 합성 접수를 하지 않으며 재시도 완료 시각을 약속하지 않는다.
 - 자동 생성과 공개 승인은 별개다. 작업 완료 후 두 개의 서로 다른 검토자 승인이 저장된 MP3 digest와 일치해야 제공한다.
 - 배포 기본값: 기존 Google 설정 유지, TTS 워커 비활성. 상세 운영 절차는 `deploy/example-tts/README.md` 참조.
+
+# 칭호 승급 시험 API 보강 명세
+
+이 섹션은 프론트 승급 시험 플로우와 백엔드 구현을 맞추기 위한 보강 명세다. 모든 요청은 로그인 사용자 기준이며 `Authorization: Bearer <accessToken>`이 필요하다. 상세 운영 정책과 예시는 [title-exam-api.md](title-exam-api.md)를 따른다.
+
+## GET /api/users/me/title
+
+- Description: 현재 칭호, 누적 완료 연습 횟수, 다음 승급 시험 응시 가능 여부 조회
+- Auth: Bearer accessToken
+- Request body: 없음
+- Status codes: `200 OK`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`
+
+```json
+{
+  "result": true,
+  "message": "칭호를 조회했습니다.",
+  "data": {
+    "code": "ABSOLUTE_BEGINNER",
+    "label": "왕초보",
+    "completedTrainingCount": 5,
+    "minimumTrainingCount": 0,
+    "next": {
+      "code": "BEGINNER",
+      "label": "초보",
+      "requiredTrainingCount": 5,
+      "remainingTrainingCount": 0,
+      "passingScore": 70,
+      "eligible": true
+    },
+    "updatedAt": "2026-09-15T13:30:00Z"
+  }
+}
+```
+
+## POST /api/users/me/title-exams
+
+- Description: 다음 칭호 승급 시험 생성
+- Auth: Bearer accessToken
+- Headers: 선택 `Idempotency-Key`
+- Request body: 없음
+- Status codes: `201 Created`, `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `409 Conflict`, `503 Service Unavailable`
+
+```json
+{
+  "result": true,
+  "message": "승급 시험을 준비했습니다.",
+  "data": {
+    "id": 456,
+    "currentTitle": "왕초보",
+    "targetTitle": "초보",
+    "practiceContentId": 123,
+    "requiredTrainingCount": 5,
+    "passingScore": 70,
+    "status": "READY",
+    "createdAt": "2026-09-15T13:31:00Z",
+    "trainingSessionId": null
+  }
+}
+```
+
+현재 구현은 생성 응답을 최초 생성 시점의 계약으로 고정한다. 진행 중인 시험의 최신 `status`, `trainingSessionId`가 필요하면 조회 API를 호출한다.
+
+## GET /api/users/me/title-exams/{examId}
+
+- Description: 승급 시험 상태 조회
+- Auth: Bearer accessToken
+- Path params: `examId`
+- Request body: 없음
+- Status codes: `200 OK`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`
+
+```json
+{
+  "result": true,
+  "message": "승급 시험을 조회했습니다.",
+  "data": {
+    "id": 456,
+    "currentTitle": "왕초보",
+    "targetTitle": "초보",
+    "practiceContentId": 123,
+    "requiredTrainingCount": 5,
+    "passingScore": 70,
+    "status": "IN_PROGRESS",
+    "createdAt": "2026-09-15T13:31:00Z",
+    "trainingSessionId": 789
+  }
+}
+```
+
+## POST /api/users/me/title-exams/{examId}/submit
+
+- Description: 분석 결과 제출, 서버 저장 점수 기반 채점, 합격 시 한 단계 승급
+- Auth: Bearer accessToken
+- Path params: `examId`
+- Status codes: `200 OK`, `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `409 Conflict`
+
+```json
+{
+  "analysisId": 789
+}
+```
+
+```json
+{
+  "result": true,
+  "message": "승급 시험 채점이 완료됐습니다.",
+  "data": {
+    "examId": 456,
+    "status": "PASSED",
+    "score": 82.5,
+    "passingScore": 70,
+    "passed": true,
+    "previousTitle": "왕초보",
+    "currentTitle": "초보",
+    "evaluatedAt": "2026-09-15T13:35:00Z"
+  }
+}
+```
+
+## 승급 시험 주요 오류
+
+| HTTP | Code | Meaning |
+| --- | --- | --- |
+| 400 | `VALIDATION_ERROR` | 요청 본문 또는 `Idempotency-Key` 형식 오류 |
+| 404 | `RESOURCE_NOT_FOUND` | 대상 없음 또는 다른 사용자 소유 |
+| 409 | `TITLE_EXAM_NOT_ELIGIBLE` | 누적 완료 연습 횟수 부족 |
+| 409 | `MAX_TITLE_REACHED` | 이미 최고 칭호 |
+| 409 | `TITLE_EXAM_CONTENT_MISMATCH` | 시험 콘텐츠와 세션 콘텐츠 불일치 |
+| 409 | `ANALYSIS_NOT_COMPLETED` | 채점 가능한 완료 분석 없음 |
+| 409 | `ANALYSIS_SCORE_UNAVAILABLE` | 분석은 완료됐지만 승급 채점용 점수 없음 |
+| 409 | `TITLE_EXAM_ALREADY_GRADED` | 이미 채점된 시험 |
+| 503 | `TITLE_EXAM_CONTENT_UNAVAILABLE` | 운영 DB에 시험용 게시 콘텐츠가 준비되지 않음 |
