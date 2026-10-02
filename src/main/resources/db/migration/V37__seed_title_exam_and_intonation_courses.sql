@@ -186,6 +186,7 @@ WITH step_source(course_title, theory_title, theory_body) AS (
          '긴 문장은 한 번에 밀어 읽지 않고 의미 단위마다 짧게 쉬며 높낮이를 조절합니다.'),
         ('발표 억양 클래스',
          '핵심 단어 강조하기',
+         '청중에게 중요한 단어를 분명히 들리게 하되 문장 전체의 흐름이 끊기지 않도록 조절합니다.')
 )
 INSERT INTO course_steps(course_id, practice_content_id, step_type, step_order, title, body, required)
 SELECT course.id, NULL, 'THEORY', 1, source.theory_title, source.theory_body, TRUE
