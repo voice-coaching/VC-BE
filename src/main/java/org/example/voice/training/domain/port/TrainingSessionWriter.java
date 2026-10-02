@@ -11,6 +11,9 @@ public interface TrainingSessionWriter {
 
     void beginUpload(Long sessionId);
 
+    /** Keep the selected source stable until the surrounding request/retry transaction commits. */
+    void lockAnalysisSelection(Long sessionId, Long userId);
+
     void startAnalysis(Long sessionId);
 
     void assertAnalysisRetryAllowed(Long sessionId);

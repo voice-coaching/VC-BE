@@ -65,8 +65,8 @@ public class TrainingSessionService {
 
     @Transactional
     public TrainingSessionCompletionData complete(Long sessionId, Integer totalLearningSeconds, Long userId) {
-        // 현재 명세에서는 분석이 완료된 뒤에만 학습 완료가 가능하다.
-        // AI 연동 전 테스트에서는 analysis_results.status를 COMPLETED로 직접 바꿔야 이 조건을 통과한다.
+        // Legacy keeps its completion rule; canonical additionally requires a verified,
+        // visible current ACCEPT result. The writer rechecks under the session lock.
         assertSessionExists(sessionId, userId);
         if (!trainingAnalysisReader.existsCompletedAnalysisForSelectedRecording(sessionId, userId)) {
             throw new BaseException(ErrorCode.ANALYSIS_NOT_COMPLETED);

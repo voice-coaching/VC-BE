@@ -32,6 +32,17 @@ public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResul
     @Query("select a from AnalysisResult a where a.id = :analysisId")
     Optional<AnalysisResult> findForIngestion(@Param("analysisId") Long analysisId);
 
+    /** Called only after locking the owning session: session -> analysis, as for retry/cancel. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select a from AnalysisResult a
+            where a.recording.trainingSession.id = :sessionId
+              and a.recording.trainingSession.userId = :userId
+              and a.recording.selected = true and a.recording.deletedAt is null
+            order by a.id
+            """)
+    List<AnalysisResult> findSelectedForRecovery(@Param("sessionId") Long sessionId, @Param("userId") Long userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<AnalysisResult> findFirstByActiveRequestEventId(String activeRequestEventId);
 

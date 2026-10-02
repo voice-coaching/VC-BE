@@ -7,6 +7,7 @@ import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
 import org.example.voice.analysis.domain.model.AnalysisClosedBetaContext;
 import org.example.voice.analysis.domain.model.AnalysisWorkerVisualInput;
 import org.example.voice.analysis.domain.port.AnalysisAuthorizationIssuer;
+import org.example.voice.analysis.domain.type.AnalysisExecutionProfile;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.consent.domain.model.ProcessingConsentReceipt;
@@ -50,10 +51,18 @@ public class TrainingAnalysisRequestService {
 
     @Transactional
     public AnalysisRequestData requestAnalysis(Long sessionId, Long userId, AnalysisConsentData consent) {
+        return requestAnalysis(sessionId, userId, consent, AnalysisExecutionProfile.LEGACY);
+    }
+
+    @Transactional
+    public AnalysisRequestData requestAnalysis(Long sessionId, Long userId, AnalysisConsentData consent,
+                                              AnalysisExecutionProfile profile) {
+        java.util.Objects.requireNonNull(profile, "profile");
         // 1. 분석 요청은 "사용자 소유 세션 + 최종 선택 녹음 + 통과한 음질"이 모두 만족될 때만 가능하다.
         trainingSessionService.assertSessionExists(sessionId, userId);
         analysisAdmissionGuard.acquireAndAssertAvailable(userId);
         validateConsent(consent);
+        trainingSessionWriter.lockAnalysisSelection(sessionId, userId);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.SELECTED_RECORDING_NOT_FOUND));
         validateSupportedFocus(source);
@@ -81,7 +90,7 @@ public class TrainingAnalysisRequestService {
         analysisJobPublisher.publish(toWorkerRequest(
                 result.analysisId(), requestEventId, userId, sessionId, source,
                 consent.policyRevision(), consentReceipt.receiptSha256()
-        ));
+        ), profile);
         return result;
     }
 
@@ -95,11 +104,19 @@ public class TrainingAnalysisRequestService {
 
     @Transactional
     public AnalysisRetryData retry(Long sessionId, Long userId, AnalysisConsentData consent) {
+        return retry(sessionId, userId, consent, AnalysisExecutionProfile.LEGACY);
+    }
+
+    @Transactional
+    public AnalysisRetryData retry(Long sessionId, Long userId, AnalysisConsentData consent,
+                                   AnalysisExecutionProfile profile) {
+        java.util.Objects.requireNonNull(profile, "profile");
         // 재시도는 실패한 분석만 대상으로 한다.
         // 실패 row를 새 request event id의 PENDING 상태로 전환하고 outbox에 다시 기록한다.
         trainingSessionService.assertSessionExists(sessionId, userId);
         analysisAdmissionGuard.acquireAndAssertAvailable(userId);
         validateConsent(consent);
+        trainingSessionWriter.lockAnalysisSelection(sessionId, userId);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
         validateSupportedFocus(source);
@@ -123,7 +140,7 @@ public class TrainingAnalysisRequestService {
         analysisJobPublisher.publish(toWorkerRequest(
                 result.analysisId(), requestEventId, userId, sessionId, source,
                 consent.policyRevision(), consentReceipt.receiptSha256()
-        ));
+        ), profile);
         return result;
     }
 

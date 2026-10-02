@@ -21,6 +21,15 @@ public class RunPodAnalysisClient {
     private final RunPodAnalysisPayloadCodec codec = new RunPodAnalysisPayloadCodec();
 
     public RunPodAnalysisJobAccepted submit(RunPodAnalysisJobRequest request) {
+        return submitPayload(codec.encodeRequest(request));
+    }
+
+    public RunPodAnalysisJobAccepted submitStored(String payload) {
+        codec.decodeRequest(payload);
+        return submitPayload(payload);
+    }
+
+    private RunPodAnalysisJobAccepted submitPayload(String payload) {
         if (!properties.isConfigured()) {
             throw new RunPodAnalysisDeliveryException("runpod_analysis_not_configured", false, null);
         }
@@ -30,7 +39,7 @@ public class RunPodAnalysisClient {
                     .uri(properties.normalizedEndpointUrl() + "/v1/analysis-jobs")
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("Authorization", "Bearer " + properties.getApiToken())
-                    .body(codec.encodeRequest(request))
+                    .body(payload)
                     .exchange((httpRequest, response) -> {
                         int status = response.getStatusCode().value();
                         if (status != 200 && status != 202) {

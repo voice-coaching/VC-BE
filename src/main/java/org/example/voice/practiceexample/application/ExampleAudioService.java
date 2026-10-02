@@ -27,7 +27,7 @@ public class ExampleAudioService {
         Snapshot example = examples.audioSource(userId, exampleId);
         if (tts.runpod()) {
             if (voice != null && !tts.getVoice().equals(voice)) throw PracticeExampleException.invalid();
-            try { return generated.approved(exampleId, tts.getRevision()).orElseThrow(PracticeExampleException::unavailable); }
+            try { return generated.playable(exampleId, tts.getRevision()).orElseThrow(PracticeExampleException::unavailable); }
             catch (PracticeExampleException e) { throw e; }
             catch (RuntimeException e) { throw PracticeExampleException.unavailable(); }
         }

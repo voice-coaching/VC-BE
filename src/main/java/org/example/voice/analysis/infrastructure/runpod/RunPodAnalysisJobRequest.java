@@ -20,9 +20,20 @@ record RunPodAnalysisJobRequest(
         MediaInput audio,
         MediaInput video,
         @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "UTC")
-        OffsetDateTime deadlineAt
+        OffsetDateTime deadlineAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String resultSchemaVersion,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String analysisProfile
 ) {
-    static final String SCHEMA_VERSION = "voice-coaching.runpod-analysis-request.v1";
+    static final String SCHEMA_VERSION = RunPodContract.REQUEST_V1;
+
+    // Preserve the legacy constructor and serialized field order; v1 has no routing fields.
+    RunPodAnalysisJobRequest(String schemaVersion, UUID requestId, UUID executionId, Long analysisId,
+                             Long recordingId, Long contentId, String learningFocus, String promptRevision,
+                             String scriptText, String scriptSha256, MediaInput audio, MediaInput video,
+                             OffsetDateTime deadlineAt) {
+        this(schemaVersion, requestId, executionId, analysisId, recordingId, contentId, learningFocus,
+                promptRevision, scriptText, scriptSha256, audio, video, deadlineAt, null, null);
+    }
 
     static RunPodAnalysisJobRequest from(AnalysisWorkerRequest request, UUID executionId, Long recordingId,
                                          OffsetDateTime deadlineAt) {
@@ -55,6 +66,15 @@ record RunPodAnalysisJobRequest(
                 ),
                 deadlineAt
         );
+    }
+
+    static RunPodAnalysisJobRequest canonicalFrom(AnalysisWorkerRequest request, UUID executionId,
+                                                  Long recordingId, OffsetDateTime deadlineAt) {
+        var legacy = from(request, executionId, recordingId, deadlineAt);
+        return new RunPodAnalysisJobRequest(RunPodContract.REQUEST_V2, legacy.requestId(), legacy.executionId(),
+                legacy.analysisId(), legacy.recordingId(), legacy.contentId(), legacy.learningFocus(),
+                legacy.promptRevision(), legacy.scriptText(), legacy.scriptSha256(), legacy.audio(), legacy.video(),
+                legacy.deadlineAt(), RunPodContract.RESULT_V4, "CANONICAL_FROZEN_20260928_V4");
     }
 
     record MediaInput(

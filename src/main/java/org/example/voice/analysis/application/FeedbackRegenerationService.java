@@ -38,6 +38,7 @@ public class FeedbackRegenerationService {
     public AnalysisResult regenerate(Long analysisId, Long userId, FeedbackStyle style) {
         AnalysisResult result = reader.findOwnedForUpdate(analysisId, userId).orElseThrow(AnalysisNotFoundException::new);
         if (!result.isCompleted()) throw new AnalysisNotCompletedException();
+        if (result.isCanonicalExecution()) throw new FeedbackEvidenceUnavailableException();
         if (result.getFeedbackRegenerationCount() >= LIMIT) throw new FeedbackRegenerationLimitException();
         if (result.getAnalysisOutcome() != AnalysisOutcome.COACHING_READY
                 || result.getSummaryFeedback() == null

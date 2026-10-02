@@ -7,7 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@Order(-30) @RestControllerAdvice
+@Order(-30)
+@RestControllerAdvice
 public class TitleExceptionHandler {
     // Also handles title-exam validation invoked by the existing training controller.
     @ExceptionHandler(TitleException.class)

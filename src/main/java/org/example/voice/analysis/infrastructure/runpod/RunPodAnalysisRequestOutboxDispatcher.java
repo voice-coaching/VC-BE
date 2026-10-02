@@ -52,7 +52,7 @@ public class RunPodAnalysisRequestOutboxDispatcher {
             boolean retryable = true;
             try {
                 var request = codec.decodeRequest(delivery.payload());
-                var accepted = client.submit(request);
+                var accepted = client.submitStored(delivery.payload());
                 if (accepted == null || !request.requestId().equals(accepted.requestId())
                         || !request.executionId().equals(accepted.executionId()) || accepted.workerInstanceId() == null) {
                     throw new RunPodAnalysisDeliveryException("runpod_acceptance_contract_invalid", false, null);

@@ -151,6 +151,18 @@ public class AnalysisResult {
     @Column(name = "last_result_payload_sha256", length = 64)
     private String lastResultPayloadSha256;
 
+    @Column(name = "analysis_profile", nullable = false, length = 100)
+    private String analysisProfile = "LEGACY_SEUNGUN_V3";
+
+    @Column(name = "expected_result_schema_version", length = 100)
+    private String expectedResultSchemaVersion;
+
+    @Column(name = "canonical_result_event_id")
+    private UUID canonicalResultEventId;
+
+    @Column(name = "committed_result_schema_version", length = 100)
+    private String committedResultSchemaVersion;
+
     @Column(name = "worker_revision", length = 100)
     private String workerRevision;
 
@@ -239,6 +251,8 @@ public class AnalysisResult {
         this.status = AnalysisStatus.PENDING;
         this.activeRequestEventId = requestEventId.toString();
         this.activeExecutionId = null;
+        this.analysisProfile = "LEGACY_SEUNGUN_V3";
+        this.expectedResultSchemaVersion = null;
         this.retryCount += 1;
         clearWorkerResult();
         this.analyzedAt = OffsetDateTime.now(SEOUL_ZONE_ID);
@@ -257,6 +271,39 @@ public class AnalysisResult {
         this.lastResultEventId = null;
         this.lastResultPayloadSha256 = null;
         this.executionDeadlineAt = null;
+        this.analysisProfile = "LEGACY_SEUNGUN_V3";
+        this.expectedResultSchemaVersion = null;
+        this.canonicalResultEventId = null;
+        this.committedResultSchemaVersion = null;
+    }
+
+    /** Only the server's admitted canonical publisher may select this profile. */
+    public void assignCanonicalProfile() {
+        if(activeExecutionId==null || isCompletedOrFailed())throw new IllegalStateException("CANONICAL_EXECUTION_REQUIRED");
+        analysisProfile="CANONICAL_FROZEN_20260928_V4";
+        expectedResultSchemaVersion="voice-coaching.runpod-analysis-result.v4";
+    }
+
+    public boolean isCanonicalExecution() { return "CANONICAL_FROZEN_20260928_V4".equals(analysisProfile); }
+
+    /** Clears legacy score/selected-phone/coaching fields, without fabricating a legacy result. */
+    public boolean finishCanonical(org.example.voice.analysis.domain.model.CanonicalResultCompletion result) {
+        if(!isCanonicalExecution() || !isForActiveRequest(result.requestId()) || !isForActiveExecution(result.executionId())
+                || !"voice-coaching.runpod-analysis-result.v4".equals(expectedResultSchemaVersion))
+            throw new IllegalArgumentException("CANONICAL_EXECUTION_MISMATCH");
+        if(isCompletedOrFailed())return false;
+        if(recording==null || !Objects.equals(recording.getAudioSha256(),result.audioSha256()))
+            throw new IllegalArgumentException("CANONICAL_AUDIO_MISMATCH");
+        clearWorkerResult();
+        status=result.status();
+        summaryFeedback=result.summary();
+        failureCode=result.failureCode();failureReason=result.failureReason();
+        audioSha256=result.audioSha256();workerRevision=result.workerRevision();pipelineRevision=result.pipelineRevision();
+        canonicalResultEventId=result.eventId();
+        committedResultSchemaVersion="voice-coaching.runpod-analysis-result.v4";
+        rememberResultEvent(result.eventId(),result.payloadSha256());
+        analyzedAt=OffsetDateTime.now(SEOUL_ZONE_ID);
+        return true;
     }
 
     public void assignExecution(UUID executionId, OffsetDateTime deadline) {
@@ -435,6 +482,8 @@ public class AnalysisResult {
     }
 
     private void clearWorkerResult() {
+        this.canonicalResultEventId = null;
+        this.committedResultSchemaVersion = null;
         this.coachingDocument = null;
         this.transcript = null;
         this.sttConfidence = null;

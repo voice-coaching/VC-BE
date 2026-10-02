@@ -44,6 +44,7 @@ public class TitlePersistence implements TitleRepository {
                 select a.overallScore from AnalysisResult a join a.recording r join r.trainingSession s
                 where a.id=:id and s.userId=:user and s.id=:session and s.content.id=:content
                 and a.status=org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
+                and a.analysisProfile<>'CANONICAL_FROZEN_20260928_V4'
                 and (a.analysisOutcome is null or a.analysisOutcome in
                     (org.example.voice.analysis.domain.type.AnalysisOutcome.COACHING_READY,
                      org.example.voice.analysis.domain.type.AnalysisOutcome.COMPLETED_NO_ISSUE))
@@ -62,7 +63,8 @@ public class TitlePersistence implements TitleRepository {
                 select count(a) from AnalysisResult a join a.recording r join r.trainingSession s
                 where a.id=:id and s.userId=:user and s.id=:session and s.content.id=:content
                 and a.status=org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
-                and a.coachingDocument is not null and a.overallScore is null
+                and ((a.coachingDocument is not null and a.overallScore is null)
+                    or a.analysisProfile='CANONICAL_FROZEN_20260928_V4')
                 and r.selected=true and r.deletedAt is null
                 and s.status in (org.example.voice.training.domain.type.TrainingSessionStatus.ANALYZING,
                                  org.example.voice.training.domain.type.TrainingSessionStatus.COMPLETED)
