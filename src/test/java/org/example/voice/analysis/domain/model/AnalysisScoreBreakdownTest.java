@@ -12,6 +12,7 @@ import org.example.voice.analysis.controller.dto.AnalysisStatusResponseDto;
 import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 import org.example.voice.analysis.infrastructure.AnalysisResultReaderImpl;
+import org.example.voice.analysis.infrastructure.canonical.CanonicalReadFence;
 import org.example.voice.training.infrastructure.AnalysisResultJpaRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -88,14 +89,16 @@ class AnalysisScoreBreakdownTest {
 
     @Test void readerAndBothPublicDtosExposeOnlySafeProjection() throws Exception {
         var repository = mock(AnalysisResultJpaRepository.class);
+        var canonicalReadFence = mock(CanonicalReadFence.class);
         var entity = mock(AnalysisResult.class);
+        when(canonicalReadFence.visible(12L, 17L)).thenReturn(true);
         when(entity.getId()).thenReturn(12L);
         when(entity.getStatus()).thenReturn(AnalysisStatus.COMPLETED);
         when(entity.getOverallScore()).thenReturn(new BigDecimal("82.1"));
         when(entity.getClovaScoreEvidence()).thenReturn(stored(false));
         when(repository.findByIdAndRecordingTrainingSessionUserId(12L, 17L))
                 .thenReturn(java.util.Optional.of(entity));
-        var data = new AnalysisResultReaderImpl(repository).findOwnedData(12L, 17L).orElseThrow();
+        var data = new AnalysisResultReaderImpl(repository, canonicalReadFence).findOwnedData(12L, 17L).orElseThrow();
         var detail = AnalysisResultResponseDto.from(data);
         var summary = AnalysisStatusResponseDto.from(30L, data);
         assertThat(detail.scoreBreakdown()).isEqualTo(summary.scoreBreakdown());

@@ -1,8 +1,10 @@
 package org.example.voice.analysis.controller;
 
 import org.example.voice.analysis.application.AnalysisRunPodCallbackService;
+import org.example.voice.analysis.application.CanonicalCallbackService;
 import org.example.voice.analysis.domain.model.AnalysisRunPodControlData;
 import org.example.voice.analysis.domain.type.AnalysisResultIngestionDisposition;
+import org.example.voice.analysis.infrastructure.canonical.CanonicalBackendReadiness;
 import org.example.voice.analysis.infrastructure.runpod.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,8 @@ class InternalRunPodAnalysisControllerTest {
     private final RunPodContract contract = new RunPodContract();
     private final AnalysisRunPodCallbackService service = mock(AnalysisRunPodCallbackService.class);
     private final RunPodBackendReadiness readiness = mock(RunPodBackendReadiness.class);
+    private final CanonicalBackendReadiness canonicalReadiness = mock(CanonicalBackendReadiness.class);
+    private final CanonicalCallbackService canonicalCallbacks = mock(CanonicalCallbackService.class);
     private MockMvc mvc;
     private final String base = "/api/internal/ai";
     private final String token = "callback-test-token";
@@ -28,7 +32,14 @@ class InternalRunPodAnalysisControllerTest {
     void setup() {
         RunPodAnalysisProperties properties = new RunPodAnalysisProperties();
         properties.setCallbackToken(token);
-        var controller = new InternalRunPodAnalysisController(new RunPodInternalAuthentication(properties), service, contract, readiness);
+        var controller = new InternalRunPodAnalysisController(
+                new RunPodInternalAuthentication(properties),
+                service,
+                contract,
+                readiness,
+                canonicalReadiness,
+                canonicalCallbacks
+        );
         mvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new RunPodExceptionHandler()).build();
     }
 

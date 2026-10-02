@@ -23,11 +23,12 @@ class AnalysisRunPodCallbackServiceTest {
     private final AnalysisResultReader reader = mock(AnalysisResultReader.class);
     private final AnalysisResultWriter writer = mock(AnalysisResultWriter.class);
     private final AnalysisSegmentWriter segments = mock(AnalysisSegmentWriter.class);
+    private final CanonicalExecutionRegistry canonicalExecutions = mock(CanonicalExecutionRegistry.class);
     private final AnalysisRequestOutboxJpaRepository outboxes = mock(AnalysisRequestOutboxJpaRepository.class);
     private final RunPodContract contract = new RunPodContract();
     private final RunPodAnalysisProperties properties = new RunPodAnalysisProperties();
     private final AnalysisResultIngestionService ingestion = new AnalysisResultIngestionService(reader, writer, segments, mock(RecordingDeletionScheduler.class));
-    private final AnalysisRunPodCallbackService service = new AnalysisRunPodCallbackService(reader, writer, ingestion, properties, outboxes, contract);
+    private final AnalysisRunPodCallbackService service = new AnalysisRunPodCallbackService(reader, writer, ingestion, properties, outboxes, contract, canonicalExecutions);
     private AnalysisResult result;
     private String payload;
     private OffsetDateTime deadline;
