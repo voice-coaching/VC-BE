@@ -45,12 +45,23 @@ class TitleIntegrationTest {
     @Autowired MockMvc mvc;
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     org.springframework.cache.CacheManager cacheManager;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    org.example.voice.analysis.infrastructure.canonical.CanonicalReadFence canonicalReadFence;
     Long user, other, content;
     TransactionTemplate tx;
     @BeforeEach void setup() {
         var localCaches = new org.springframework.cache.concurrent.ConcurrentMapCacheManager();
         org.mockito.Mockito.when(cacheManager.getCache(org.mockito.ArgumentMatchers.anyString()))
                 .thenAnswer(call -> localCaches.getCache(call.getArgument(0)));
+        org.mockito.Mockito.when(canonicalReadFence.hasHistory(org.mockito.ArgumentMatchers.anyLong())).thenReturn(false);
+        org.mockito.Mockito.when(canonicalReadFence.sessionHasHistory(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong()
+        )).thenReturn(false);
+        org.mockito.Mockito.when(canonicalReadFence.visible(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong()
+        )).thenReturn(true);
         tx = new TransactionTemplate(manager);
         tx.executeWithoutResult(s -> {
             var now = OffsetDateTime.now(ZoneOffset.UTC);

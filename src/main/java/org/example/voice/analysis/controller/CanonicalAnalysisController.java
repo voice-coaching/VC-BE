@@ -1,5 +1,6 @@
 package org.example.voice.analysis.controller;
 
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.application.CanonicalAnalysisQueryService;
 import org.example.voice.analysis.domain.model.CanonicalAnalysisView;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
+@Hidden
 @RequestMapping("/api/v2/analyses")
 public class CanonicalAnalysisController {
     private final CanonicalAnalysisQueryService queries;
