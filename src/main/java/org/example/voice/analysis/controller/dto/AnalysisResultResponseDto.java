@@ -1,5 +1,6 @@
 package org.example.voice.analysis.controller.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.example.voice.analysis.application.FeedbackRegenerationService;
 import org.example.voice.analysis.domain.model.AnalysisResultData;
 import org.example.voice.analysis.domain.model.AnalysisScoreBreakdown;
@@ -8,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record AnalysisResultResponseDto(Long id, String status, String outcome, String transcript, BigDecimal sttConfidence,
         BigDecimal overallScore, BigDecimal pronunciationScore, BigDecimal intonationScore, BigDecimal speedWpm,
         String speedStatus, BigDecimal stressScore, BigDecimal pauseScore, List<String> strengths,

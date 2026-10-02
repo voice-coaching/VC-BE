@@ -46,6 +46,20 @@ public class OpenApiKoreanDocumentation {
                     operation.getResponses().get("200").setDescription("요청을 정상적으로 처리했습니다.");
                 }
             });
+            openApi.getPaths().forEach((path, pathItem) ->
+                    pathItem.readOperationsMap().forEach((method, operation) -> {
+                        if (!hasKorean(operation.getSummary())) {
+                            operation.setSummary("API 요청 처리");
+                        }
+                        if (!hasKorean(operation.getDescription())) {
+                            operation.setDescription("요청한 리소스 또는 유스케이스를 처리합니다.");
+                        }
+                        if (operation.getTags() == null || operation.getTags().isEmpty()
+                                || !hasKorean(operation.getTags().getFirst())) {
+                            operation.setTags(List.of("기타"));
+                        }
+                    })
+            );
             describeSchemas(openApi);
         };
     }
@@ -220,4 +234,8 @@ public class OpenApiKoreanDocumentation {
 
     record ApiKey(PathItem.HttpMethod method, String path) {}
     record ApiDoc(String tag, String summary, String description, boolean publicApi) {}
+
+    private static boolean hasKorean(String value) {
+        return value != null && value.matches(".*[가-힣].*");
+    }
 }
