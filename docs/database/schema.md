@@ -1,5 +1,16 @@
 # DB Schema - voice
 
+## V37 승급시험 문제 및 억양 클래스 seed
+
+`V37__seed_title_exam_and_intonation_courses.sql`은 공개 운영 데이터 seed다. 새 테이블을 만들지 않고 기존 `practice_contents`, `content_categories`, `title_policies`, `courses`, `course_steps`, `course_step_revisions`를 사용한다.
+
+- `SENTENCE / TITLE_EXAM`: 승급시험 정책별 `practice_content_id`에 연결되는 공개 시험 문장 4개
+- `CLASS_PRACTICE / INTONATION_CLASS`: 억양 클래스의 연습 단계에서 사용하는 공개 연습 콘텐츠 3개
+- `INTONATION` course 3개: 초급/중급/고급 억양 클래스
+- 각 억양 클래스는 `THEORY` 1개와 `PRACTICE` 1개 step을 가지며, step별 `course_step_revisions` revision 1을 함께 생성한다.
+
+상세 확인 방법은 [승급시험 문제 및 억양 클래스 Seed](../api/title-exam-intonation-content-seed.md)를 기준으로 한다.
+
 ## V29 코칭 문서 추가
 
 `analysis_results.coaching_document`: nullable JSONB. 기존 row는 null로 유지한다. `ck_analysis_coaching_document`는 비 null 값이 객체이며 schemaVersion이 `voice-coaching.coaching-result.v1`인지 확인한다. 항목별 의미 검증은 애플리케이션에서 수행한다. [API 및 이행](../api/evidence-based-coaching.md).
