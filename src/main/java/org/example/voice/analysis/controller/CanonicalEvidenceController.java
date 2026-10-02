@@ -9,8 +9,10 @@ import org.example.voice.analysis.infrastructure.runpod.RunPodContract;
 import org.example.voice.analysis.infrastructure.runpod.RunPodContractException;
 import org.example.voice.analysis.infrastructure.runpod.RunPodInternalAuthentication;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.UUID;
 
@@ -21,16 +23,17 @@ import java.util.UUID;
 public class CanonicalEvidenceController {
     private final RunPodInternalAuthentication authentication;
     private final CanonicalEvidenceRegistrationService receipts;
+    private final RunPodContract contract;
 
     @PostMapping
-    public ResponseEntity<Receipt> register(@PathVariable long analysisId,HttpServletRequest request) throws IOException {
+    public ResponseEntity<byte[]> register(@PathVariable long analysisId,HttpServletRequest request) throws IOException {
         UUID worker=authenticate(request);
         var registered=receipts.register(analysisId,worker,RunPodRequestBody.readJson(request,RunPodContract.CONTROL_LIMIT));
         return response(registered.created()?202:200,registered.receipt());
     }
 
     @GetMapping("/{receiptId}")
-    public ResponseEntity<Receipt> status(@PathVariable long analysisId,@PathVariable UUID receiptId,HttpServletRequest request) {
+    public ResponseEntity<byte[]> status(@PathVariable long analysisId,@PathVariable UUID receiptId,HttpServletRequest request) {
         return response(200,receipts.status(analysisId,receiptId,authenticate(request)));
     }
 
@@ -43,9 +46,12 @@ public class CanonicalEvidenceController {
             throw new RunPodContractException(422,"VALIDATION_FAILED");
         return UUID.fromString(workers.getFirst());
     }
-    private ResponseEntity<Receipt> response(int status,Receipt receipt) {
-        var builder=ResponseEntity.status(status).header("Cache-Control","no-store");
+    private ResponseEntity<byte[]> response(int status,Receipt receipt) {
+        // Preserve nested Jackson 2 association bytes across MVC's Jackson 3 boundary.
+        byte[] body=contract.encode(receipt,"evidenceReceipt").getBytes(StandardCharsets.UTF_8);
+        var builder=ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON)
+                .header("Cache-Control","no-store");
         if (receipt.status().equals("PENDING") || receipt.status().equals("VERIFYING")) builder.header("Retry-After","1");
-        return builder.body(receipt);
+        return builder.body(body);
     }
 }

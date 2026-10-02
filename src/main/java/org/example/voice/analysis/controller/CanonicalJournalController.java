@@ -6,8 +6,10 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.infrastructure.canonical.CanonicalBackendJournal;
 import org.example.voice.analysis.infrastructure.runpod.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.UUID;
 
@@ -18,6 +20,7 @@ import java.util.UUID;
 public class CanonicalJournalController {
     private final RunPodInternalAuthentication authentication;
     private final CanonicalBackendJournal journal;
+    private final RunPodContract contract;
     private final org.example.voice.analysis.application.CanonicalCallbackService callbacks;
 
     @GetMapping("/callback/ack")
@@ -28,16 +31,16 @@ public class CanonicalJournalController {
     }
 
     @PostMapping("/reserve")
-    public ResponseEntity<CanonicalBackendJournal.Snapshot> reserve(@PathVariable long analysisId,@PathVariable UUID executionId,
+    public ResponseEntity<byte[]> reserve(@PathVariable long analysisId,@PathVariable UUID executionId,
                                                                    HttpServletRequest request) throws IOException {
         UUID worker=authenticate(request);
         var result=journal.reserve(analysisId,executionId,worker,one(request,"X-Worker-Revision"),one(request,"X-Pipeline-Revision"),
                 RunPodRequestBody.readJson(request,RunPodContract.CONTROL_LIMIT));
-        return ResponseEntity.ok().header("Cache-Control","no-store").body(result);
+        return snapshotResponse(result);
     }
     @GetMapping
-    public ResponseEntity<CanonicalBackendJournal.Snapshot> status(@PathVariable long analysisId,@PathVariable UUID executionId,HttpServletRequest request) {
-        return ResponseEntity.ok().header("Cache-Control","no-store").body(journal.status(analysisId,executionId,authenticate(request)));
+    public ResponseEntity<byte[]> status(@PathVariable long analysisId,@PathVariable UUID executionId,HttpServletRequest request) {
+        return snapshotResponse(journal.status(analysisId,executionId,authenticate(request)));
     }
     @PostMapping("/prepare")
     public ResponseEntity<Void> prepare(@PathVariable long analysisId,@PathVariable UUID executionId,HttpServletRequest request) throws IOException {
@@ -85,4 +88,12 @@ public class CanonicalJournalController {
         if(request.getContentLengthLong()>0 || request.getInputStream().read()!=-1)throw new RunPodContractException(422,"VALIDATION_FAILED");
     }
     private static ResponseEntity<Void> done(){return ResponseEntity.noContent().header("Cache-Control","no-store").build();}
+
+    private ResponseEntity<byte[]> snapshotResponse(CanonicalBackendJournal.Snapshot snapshot) {
+        // The contract owns Jackson 2 JsonNodes. Boot 4's MVC Jackson 3 mapper
+        // otherwise serializes them as bean flags instead of their JSON content.
+        byte[] body=contract.encode(snapshot,"journalSnapshot").getBytes(StandardCharsets.UTF_8);
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON)
+                .header("Cache-Control","no-store").body(body);
+    }
 }
