@@ -1,5 +1,10 @@
 # API Specification - voice
 
+Canonical D1 rollout (2026-10-02 KST): the additive [canonical view](canonical-analysis-view-v1.md)
+and [internal journal](../contracts/runpod_canonical_journal_v1.md) are installed with V33-V36.
+Admission remains disabled; this is not full RunPod/FE integration or developer acceptance.
+Existing public requests/envelopes/TTS are not replaced. See [deployment boundary](../architecture/canonical-result-adapter.md).
+
 This document is generated from the API table and endpoint pages in the local API spec directory.
 
 추가 계약: [근거 기반 코칭 응답·result v3·점수 보류](evidence-based-coaching.md). 완료 상세의 `data.coaching`은 nullable이며 구형 결과의 API 경로와 polling 방식을 유지한다.

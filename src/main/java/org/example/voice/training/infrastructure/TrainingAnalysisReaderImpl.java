@@ -17,6 +17,7 @@ import java.util.Optional;
 public class TrainingAnalysisReaderImpl implements TrainingAnalysisReader {
 
     private final AnalysisResultJpaRepository analysisResultJpaRepository;
+    private final org.example.voice.analysis.infrastructure.canonical.CanonicalCompletionEligibility canonicalCompletion;
 
     @Override
     public boolean existsRunningAnalysis(Long recordingId) {
@@ -54,6 +55,13 @@ public class TrainingAnalysisReaderImpl implements TrainingAnalysisReader {
 
     @Override
     public boolean existsCompletedAnalysisForSelectedRecording(Long sessionId, Long userId) {
+        var current = analysisResultJpaRepository
+                .findFirstByRecordingTrainingSessionIdAndRecordingTrainingSessionUserIdAndRecordingSelectedTrueAndRecordingDeletedAtIsNullOrderByCreatedAtDescIdDesc(
+                        sessionId,userId);
+        if (current.isPresent() && current.get().isCanonicalExecution()) {
+            return canonicalCompletion.allows(current.get());
+        }
+        // Preserve legacy eligibility; do not re-grade historical results as canonical.
         return analysisResultJpaRepository
                 .existsByRecordingTrainingSessionIdAndRecordingTrainingSessionUserIdAndRecordingSelectedTrueAndRecordingDeletedAtIsNullAndStatus(
                         sessionId,

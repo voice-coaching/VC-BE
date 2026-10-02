@@ -17,7 +17,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TrainingAnalysisWriterImpl implements TrainingAnalysisWriter {
 
-    private static final int MAX_RETRY_COUNT = 3;
+    private static final int MAX_RETRY_COUNT = org.example.voice.analysis.domain.model.AnalysisRetryPolicy.MAX_RETRY_COUNT;
 
     private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;
     private final AnalysisResultJpaRepository analysisResultJpaRepository;

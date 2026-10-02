@@ -4,6 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.domain.entity.AnalysisRequestOutbox;
 import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.model.AnalysisWorkerRequest;
+import org.example.voice.analysis.domain.type.AnalysisExecutionProfile;
+import org.example.voice.analysis.domain.type.AnalysisStatus;
+import org.example.voice.analysis.domain.port.CanonicalExecutionRegistry;
 import org.example.voice.analysis.infrastructure.AnalysisRequestOutboxJpaRepository;
 import org.example.voice.common.exception.BaseException;
 import org.example.voice.common.exception.ErrorCode;
@@ -26,23 +29,41 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
     private final AnalysisResultJpaRepository analysisResultRepository;
     private final RunPodAnalysisPayloadCodec codec;
     private final RunPodAnalysisProperties properties;
+    private final CanonicalExecutionRegistry canonicalExecutions;
+    private final org.example.voice.analysis.infrastructure.canonical.CanonicalRequestScope canonicalScope;
 
     @Override
     @Transactional
     public void publish(AnalysisWorkerRequest request) {
+        persist(request, AnalysisExecutionProfile.LEGACY);
+    }
+
+    @Override
+    @Transactional
+    public void publish(AnalysisWorkerRequest request, AnalysisExecutionProfile profile) {
+        persist(request, java.util.Objects.requireNonNull(profile, "profile"));
+    }
+
+    private void persist(AnalysisWorkerRequest request, AnalysisExecutionProfile profile) {
         if (!properties.isConfigured()) {
             throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
         }
-        AnalysisResult analysisResult = analysisResultRepository.findById(request.analysisId())
+        boolean canonical = profile == AnalysisExecutionProfile.CANONICAL;
+        AnalysisResult analysisResult = (canonical ? analysisResultRepository.findForIngestion(request.analysisId())
+                : analysisResultRepository.findById(request.analysisId()))
                 .orElseThrow(() -> new IllegalStateException("analysis result disappeared before outbox write"));
         if (!analysisResult.isForActiveRequest(request.eventId())) {
             throw new IllegalStateException("analysis request event does not match active analysis request");
         }
+        if (canonical) assertCanonicalScope(analysisResult, request);
         UUID executionId = UUID.randomUUID();
         OffsetDateTime deadline = OffsetDateTime.now(ZoneOffset.UTC).plus(properties.getExecutionTimeout())
                 .truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
         analysisResult.assignExecution(executionId, deadline);
-        RunPodAnalysisJobRequest runPodRequest = RunPodAnalysisJobRequest.from(
+        if (canonical) analysisResult.assignCanonicalProfile();
+        RunPodAnalysisJobRequest runPodRequest = canonical
+                ? RunPodAnalysisJobRequest.canonicalFrom(request, executionId, analysisResult.getRecording().getId(), deadline)
+                : RunPodAnalysisJobRequest.from(
                 request,
                 executionId,
                 analysisResult.getRecording().getId(),
@@ -58,5 +79,21 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
                 analysisResult,
                 payload
         ));
+        if (canonical) {
+            // Flush pending session/profile/outbox changes before the registry's JDBC fences.
+            // This is NOT a commit: registry failure rolls back the whole admission transaction.
+            outboxRepository.flush();
+            canonicalExecutions.registerCurrent(analysisResult.getId(), request.eventId(), executionId);
+        }
+    }
+
+    private void assertCanonicalScope(AnalysisResult result, AnalysisWorkerRequest request) {
+        if (result.getStatus() != AnalysisStatus.PENDING || result.getActiveExecutionId() != null
+                || request.visualInput() != null || !canonicalScope.eligible(result)
+                || request.learningFocus() != org.example.voice.practicecontent.domain.type.LearningFocus.PRONUNCIATION
+                ) {
+            // Initial rollout is standalone audio practice, not lip/course/title grading.
+            throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
+        }
     }
 }

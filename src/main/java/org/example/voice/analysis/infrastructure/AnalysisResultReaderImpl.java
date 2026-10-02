@@ -19,13 +19,17 @@ import java.util.Optional;
 public class AnalysisResultReaderImpl implements AnalysisResultReader {
 
     private final AnalysisResultJpaRepository repository;
+    private final org.example.voice.analysis.infrastructure.canonical.CanonicalReadFence canonicalReadFence;
 
     public Optional<AnalysisResult> findOwned(Long analysisId, Long userId) {
+        if(!canonicalReadFence.visible(analysisId,userId))return Optional.empty();
         return repository.findByIdAndRecordingTrainingSessionUserId(analysisId, userId);
     }
 
     public Optional<AnalysisResult> findOwnedForUpdate(Long analysisId, Long userId) {
-        return repository.findOwnedForUpdate(analysisId, userId);
+        // Acquire the existing analysis lock before checking mutable canonical visibility.
+        return repository.findOwnedForUpdate(analysisId, userId)
+                .filter(result -> canonicalReadFence.visible(analysisId,userId));
     }
 
     @Override
@@ -45,9 +49,11 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
     @Cacheable(
             cacheNames = AnalysisCacheNames.DETAIL,
             key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).owned(#p1, #p0)",
+            condition = "!@canonicalReadFence.hasHistory(#p0)",
             unless = "#result == null || !#result.isCompleted()"
     )
     public Optional<AnalysisResultData> findOwnedData(Long analysisId, Long userId) {
+        if(!canonicalReadFence.visible(analysisId,userId))return Optional.empty();
         return repository.findByIdAndRecordingTrainingSessionUserId(analysisId, userId)
                 .map(this::toData);
     }
@@ -56,6 +62,7 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
     @Cacheable(
             cacheNames = AnalysisCacheNames.SESSION_RESULT,
             key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).session(#p1, #p0)",
+            condition = "!@canonicalReadFence.sessionHasHistory(#p0, #p1)",
             unless = "#result == null || !#result.isCompleted()"
     )
     public Optional<AnalysisResultData> findLatestBySessionData(Long sessionId, Long userId) {
@@ -64,6 +71,7 @@ public class AnalysisResultReaderImpl implements AnalysisResultReader {
                         sessionId,
                         userId
                 )
+                .filter(result -> canonicalReadFence.visible(result.getId(),userId))
                 .map(this::toData);
     }
 

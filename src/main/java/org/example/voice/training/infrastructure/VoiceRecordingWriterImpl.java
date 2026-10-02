@@ -73,6 +73,14 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
         // 한 세션에서는 최종 녹음이 하나만 선택되어야 한다.
         // 먼저 같은 세션의 선택을 모두 해제하고, 요청받은 녹음 하나만 다시 선택한다.
         TrainingSession session = findMutableSession(sessionId);
+        // The service's earlier read may predate a concurrent delete. Recheck under the session lock.
+        VoiceRecording recording = voiceRecordingJpaRepository
+                .findByIdAndTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNull(
+                        recordingId, sessionId, session.getUserId())
+                .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
+        if (recording.getQualityStatus() != org.example.voice.training.domain.type.RecordingQualityStatus.PASS) {
+            throw new BaseException(ErrorCode.RECORDING_QUALITY_FAILED);
+        }
         voiceRecordingJpaRepository
                 .findByTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNullOrderByAttemptNoAsc(
                         sessionId,
@@ -80,11 +88,6 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
                 )
                 .forEach(VoiceRecording::unselect);
 
-        VoiceRecording recording = voiceRecordingJpaRepository.findById(recordingId)
-                .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
-        if (!recording.getTrainingSession().getId().equals(sessionId)) {
-            throw new BaseException(ErrorCode.RECORDING_NOT_FOUND);
-        }
         recording.select();
         return new RecordingSelectionData(
                 sessionId,

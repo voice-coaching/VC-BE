@@ -108,6 +108,14 @@ public class TrainingSession {
         return status == TrainingSessionStatus.RECORDING || status == TrainingSessionStatus.UPLOADING;
     }
 
+    /** Caller must hold the session lock and verify the current canonical non-ACCEPT result. */
+    public void beginCanonicalRerecordUpload() {
+        if (status != TrainingSessionStatus.ANALYZING) {
+            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
+        }
+        status = TrainingSessionStatus.UPLOADING;
+    }
+
     public boolean startAnalysis() {
         if (!allowsRecordingChanges()) {
             return false;
