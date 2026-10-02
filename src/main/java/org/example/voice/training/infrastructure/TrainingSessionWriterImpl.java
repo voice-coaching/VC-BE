@@ -32,6 +32,9 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     private final RecordingDeletionScheduler recordingDeletionScheduler;
     private final org.example.voice.course.domain.port.CourseEducationReader courseEducation;
     private final org.example.voice.practiceexample.domain.port.PracticeExampleReader examples;
+    private final org.example.voice.training.domain.port.TrainingAnalysisReader trainingAnalysisReader;
+    private final AnalysisResultJpaRepository analysisResults;
+    private final org.example.voice.analysis.infrastructure.canonical.CanonicalRerecordEligibility canonicalRerecord;
 
     @Override
     @Transactional
@@ -60,8 +63,25 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     @CacheEvict(cacheNames = HomeCacheNames.RECENT_TRAINING, allEntries = true)
     public void beginUpload(Long sessionId) {
         TrainingSession session = findForUpdate(sessionId);
+        if (session.getStatus() == TrainingSessionStatus.ANALYZING) {
+            var selected = analysisResults.findSelectedForRecovery(sessionId, session.getUserId());
+            if (selected.size() == 1 && canonicalRerecord.allowsRecovery(selected.getFirst())) {
+                // Keep the previous selected recording/result intact until an explicit new selection.
+                // Upload intent creation and this transition share the caller's transaction.
+                session.beginCanonicalRerecordUpload();
+            }
+        }
         if (!session.beginUpload()) {
             throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
+        }
+    }
+
+    @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void lockAnalysisSelection(Long sessionId, Long userId) {
+        TrainingSession session = findForUpdate(sessionId);
+        if (!session.getUserId().equals(userId)) {
+            throw new BaseException(ErrorCode.RESOURCE_NOT_FOUND);
         }
     }
 
@@ -105,6 +125,11 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     })
     public TrainingSessionCompletionData complete(Long sessionId, Integer totalLearningSeconds) {
         TrainingSession session = findForUpdate(sessionId);
+        // Recheck current-generation eligibility under the existing session mutation lock.
+        // The service's earlier read alone must not authorize a later stale completion.
+        if (!trainingAnalysisReader.existsCompletedAnalysisForSelectedRecording(sessionId,session.getUserId())) {
+            throw new BaseException(ErrorCode.ANALYSIS_NOT_COMPLETED);
+        }
         session.complete(totalLearningSeconds);
         return new TrainingSessionCompletionData(session.getId(), session.getStatus(), session.getCompletedAt());
     }

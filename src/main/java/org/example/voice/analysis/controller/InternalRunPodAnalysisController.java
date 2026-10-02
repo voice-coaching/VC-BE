@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import com.fasterxml.jackson.databind.JsonNode;
 
 @RestController
@@ -23,6 +24,8 @@ public class InternalRunPodAnalysisController {
     private final AnalysisRunPodCallbackService callbackService;
     private final RunPodContract contract;
     private final RunPodBackendReadiness readiness;
+    private final org.example.voice.analysis.infrastructure.canonical.CanonicalBackendReadiness canonicalReadiness;
+    private final org.example.voice.analysis.application.CanonicalCallbackService canonicalCallbacks;
 
     @GetMapping("/worker-readiness")
     public ResponseEntity<Readiness> readiness(HttpServletRequest request) {
@@ -30,6 +33,26 @@ public class InternalRunPodAnalysisController {
         boolean ready = readiness.isReady();
         return ResponseEntity.status(ready ? 200 : 503)
                 .body(new Readiness(ready ? "ready" : "not_ready", RunPodContract.VERSION, now()));
+    }
+
+    @GetMapping("/worker-readiness/v2")
+    public ResponseEntity<RunPodWorkerReadinessV2ResponseDto> readinessV2(HttpServletRequest request) {
+        authenticate(request);
+        var digests = org.example.voice.analysis.infrastructure.canonical.CanonicalBackendReadiness.SCHEMAS.stream()
+                .map(file -> new RunPodWorkerReadinessV2ResponseDto.SchemaDigestDto(file, contract.schemaSha256(file)))
+                .toList();
+        boolean supported=canonicalReadiness.supported();
+        boolean admission=canonicalReadiness.admissionEnabled();
+        var versions=new java.util.ArrayList<>(List.of("voice-coaching.runpod-analysis-result.v1",
+                "voice-coaching.runpod-analysis-result.v2","voice-coaching.runpod-analysis-result.v3"));
+        var profiles=new java.util.ArrayList<>(List.of("LEGACY_SEUNGUN_V3"));
+        if(supported){versions.add(RunPodContract.RESULT_V4);profiles.add("CANONICAL_FROZEN_20260928_V4");}
+        return ResponseEntity.status(supported ? 200 : 503).header("Cache-Control", "no-store")
+                .body(new RunPodWorkerReadinessV2ResponseDto(
+                        supported ? "ready" : "not_ready", RunPodContract.CAPABILITY_VERSION, now(), readiness.isReady(),
+                        versions, profiles, digests, supported, admission,
+                        supported ? "READY" : "NOT_READY", supported ? "READY" : "NOT_READY",
+                        supported ? null : "NOT_READY"));
     }
 
     @PostMapping("/analyses/{analysisId}/claim")
@@ -48,7 +71,14 @@ public class InternalRunPodAnalysisController {
 
     @PostMapping("/analyses/{analysisId}/result")
     public RunPodAnalysisResultCallbackResponseDto result(@PathVariable Long analysisId, HttpServletRequest request) throws IOException {
-        var json = body(request, "result");
+        byte[] raw = rawBody(request, "result");
+        var json = contract.parse(raw, "result");
+        if (RunPodContract.RESULT_V4.equals(json.path("schemaVersion").asText())) {
+            var document=org.example.voice.analysis.infrastructure.canonical.CanonicalCallbackDocument.parse(raw,contract);
+            var disposition=canonicalCallbacks.ingest(analysisId,document);
+            return canonicalCallbacks.acknowledgement(analysisId,document,
+                    disposition==AnalysisResultIngestionDisposition.IGNORED_DUPLICATE?"DUPLICATE":"APPLIED");
+        }
         var dto = contract.convert(json, RunPodAnalysisResultCallbackRequestDto.class);
         var disposition = callbackService.ingestResult(analysisId, dto.toCommand(contract.digest(json)));
         return new RunPodAnalysisResultCallbackResponseDto(dto.eventId(), analysisId, dto.requestId(), dto.executionId(),
@@ -56,14 +86,22 @@ public class InternalRunPodAnalysisController {
     }
 
     private JsonNode body(HttpServletRequest request, String kind) throws IOException {
+        return contract.parse(rawBody(request,kind),kind);
+    }
+
+    @PostMapping("/analyses/{analysisId}/result/ack")
+    public ResponseEntity<RunPodAnalysisResultCallbackResponseDto> confirmCanonicalResult(
+            @PathVariable Long analysisId, HttpServletRequest request) throws IOException {
+        var document=org.example.voice.analysis.infrastructure.canonical.CanonicalCallbackDocument.parse(
+                rawBody(request,"result"),contract);
+        return ResponseEntity.ok().header("Cache-Control","no-store").body(
+                canonicalCallbacks.acknowledgement(analysisId,document,"DUPLICATE"));
+    }
+
+    private byte[] rawBody(HttpServletRequest request, String kind) throws IOException {
         authenticate(request);
-        if (request.getContentType() == null || !request.getContentType().split(";")[0].trim().equals("application/json")
-                || (request.getHeader("Content-Encoding") != null && !"identity".equals(request.getHeader("Content-Encoding")))) {
-            throw new RunPodContractException(415, "UNSUPPORTED_MEDIA_TYPE");
-        }
         int limit = kind.equals("result") ? RunPodContract.RESULT_LIMIT : RunPodContract.CONTROL_LIMIT;
-        if (request.getContentLengthLong() > limit) throw new RunPodContractException(413, "PAYLOAD_TOO_LARGE");
-        return contract.parse(request.getInputStream().readNBytes(limit + 1), kind);
+        return RunPodRequestBody.readJson(request, limit);
     }
 
     private static String now() { return RunPodContract.timestamp(OffsetDateTime.now(ZoneOffset.UTC)); }

@@ -17,7 +17,7 @@ public class AnalysisSegmentService {
 
     @Transactional(readOnly = true)
     public AnalysisSegmentPageData getSegments(Long analysisId, Long userId, int page, int size) {
-        analysisResultReader.findOwned(analysisId, userId)
+        var current = analysisResultReader.findOwned(analysisId, userId)
                 .map(result -> {
                     if (!result.isCompleted()) {
                         throw new AnalysisNotCompletedException();
@@ -25,6 +25,7 @@ public class AnalysisSegmentService {
                     return result;
                 })
                 .orElseThrow(AnalysisNotFoundException::new);
+        if(current.isCanonicalExecution())return new AnalysisSegmentPageData(java.util.List.of(),page,size,0);
         return analysisSegmentReader.findPageData(analysisId, userId, page, size);
     }
 }

@@ -7,6 +7,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
 @Component
 public class RunPodAnalysisPayloadCodec {
     private final RunPodContract contract = new RunPodContract();
@@ -23,7 +26,7 @@ public class RunPodAnalysisPayloadCodec {
     String encodeRequest(RunPodAnalysisJobRequest request) {
         try {
             String json = objectMapper.writeValueAsString(request);
-            contract.parse(json.getBytes(java.nio.charset.StandardCharsets.UTF_8), "analysisRequest");
+            contract.parse(json.getBytes(StandardCharsets.UTF_8), "analysisRequest");
             return json;
         } catch (JsonProcessingException error) {
             throw new IllegalStateException("runpod analysis request serialization failed", error);
@@ -31,12 +34,19 @@ public class RunPodAnalysisPayloadCodec {
     }
 
     RunPodAnalysisJobRequest decodeRequest(String payload) {
+        if (payload == null) throw new RunPodContractException(422, "VALIDATION_FAILED");
+        var node = contract.parse(payload.getBytes(StandardCharsets.UTF_8), "analysisRequest");
         try {
-            return objectMapper.readerFor(RunPodAnalysisJobRequest.class)
+            RunPodAnalysisJobRequest request = objectMapper.readerFor(RunPodAnalysisJobRequest.class)
                     .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                    .readValue(payload);
-        } catch (JsonProcessingException error) {
-            throw new IllegalArgumentException("runpod analysis request payload is invalid", error);
+                    .readValue(node);
+            // Never silently change the immutable request identity while mapping its typed fields.
+            if (!contract.digest(payload).equals(contract.digest(encodeRequest(request)))) {
+                throw new RunPodContractException(422, "VALIDATION_FAILED");
+            }
+            return request;
+        } catch (IOException error) {
+            throw new RunPodContractException(422, "VALIDATION_FAILED");
         }
     }
 

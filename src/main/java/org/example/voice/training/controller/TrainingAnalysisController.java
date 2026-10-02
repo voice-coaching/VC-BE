@@ -1,9 +1,14 @@
 package org.example.voice.training.controller;
 
 import lombok.RequiredArgsConstructor;
+import jakarta.servlet.http.HttpServletRequest;
+import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.common.response.ApiResponse;
 import org.example.voice.common.security.LoginUser;
 import org.example.voice.training.application.TrainingAnalysisRequestService;
+import org.example.voice.training.application.TrainingAnalysisSchemaAdmissionService;
+import org.example.voice.analysis.domain.type.AnalysisExecutionProfile;
+import org.example.voice.training.exception.AnalysisSchemaAdmissionException;
 import org.example.voice.training.controller.dto.AnalysisProgressResponseDto;
 import org.example.voice.training.controller.dto.AnalysisRequestResponseDto;
 import org.example.voice.training.controller.dto.AnalysisRetryResponseDto;
@@ -17,23 +22,28 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Collections;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/training-sessions")
 public class TrainingAnalysisController {
 
     private final TrainingAnalysisRequestService trainingAnalysisRequestService;
+    private final TrainingAnalysisSchemaAdmissionService schemaAdmissionService;
 
     @PostMapping("/{sessionId}/analyze")
     public ApiResponse<AnalysisRequestResponseDto> requestAnalysis(
             @AuthenticationPrincipal LoginUser user,
             @PathVariable Long sessionId,
-            @Valid @RequestBody AnalysisConsentRequestDto request
+            @Valid @RequestBody AnalysisConsentRequestDto request,
+            HttpServletRequest httpRequest
     ) {
+        var profile = requestedProfile(httpRequest);
         return ApiResponse.success(
                 "음성 분석을 요청했습니다.",
                 AnalysisRequestResponseDto.from(
-                        trainingAnalysisRequestService.requestAnalysis(sessionId, user.id(), request.toData())
+                        trainingAnalysisRequestService.requestAnalysis(sessionId, user.id(), request.toData(), profile)
                 )
         );
     }
@@ -53,13 +63,22 @@ public class TrainingAnalysisController {
     public ApiResponse<AnalysisRetryResponseDto> retryAnalysis(
             @AuthenticationPrincipal LoginUser user,
             @PathVariable Long sessionId,
-            @Valid @RequestBody AnalysisConsentRequestDto request
+            @Valid @RequestBody AnalysisConsentRequestDto request,
+            HttpServletRequest httpRequest
     ) {
+        var profile = requestedProfile(httpRequest);
         return ApiResponse.success(
                 "음성 분석을 다시 요청했습니다.",
                 AnalysisRetryResponseDto.from(
-                        trainingAnalysisRequestService.retry(sessionId, user.id(), request.toData())
+                        trainingAnalysisRequestService.retry(sessionId, user.id(), request.toData(), profile)
                 )
         );
+    }
+
+    private AnalysisExecutionProfile requestedProfile(HttpServletRequest request) {
+        var values = Collections.list(request.getHeaders("X-Analysis-Result-Schema"));
+        if (values.size() > 1) throw new AnalysisSchemaAdmissionException(ErrorCode.INVALID_INPUT_VALUE);
+        // A comma-joined repeated header also fails the service's exact supported-value check.
+        return schemaAdmissionService.selectProfile(values.isEmpty() ? null : values.getFirst());
     }
 }

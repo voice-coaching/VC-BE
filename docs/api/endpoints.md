@@ -1,5 +1,14 @@
 # Endpoint List - voice
 
+Canonical D1 rollout (2026-10-02 KST): additive storage/reader code and V33-V36
+are deployed; new canonical admission and internal worker switches remain off.
+`GET /api/v2/analyses/{analysisId}` uses existing user authentication, a no-store
+typed view and current-attempt visibility; see [view contract](canonical-analysis-view-v1.md).
+Internal journal routes remain under `/api/internal/ai/analyses/{analysisId}/journal/{executionId}`
+with callback Bearer and original worker binding; see [journal contract](../contracts/runpod_canonical_journal_v1.md).
+`GET /api/internal/ai/worker-readiness/v2` returns 503 / canonical disabled.
+Existing public endpoints, default legacy requests and TTS wire contracts remain unchanged.
+
 This document summarizes the API list exported from the local API spec directory. See [specification.md](specification.md) for request/response details.
 
 | Method | URL | Auth | Description |

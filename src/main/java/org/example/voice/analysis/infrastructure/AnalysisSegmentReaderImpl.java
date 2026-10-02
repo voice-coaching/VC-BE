@@ -29,7 +29,8 @@ public class AnalysisSegmentReaderImpl implements AnalysisSegmentReader {
     @Override
     @Cacheable(
             cacheNames = AnalysisCacheNames.SEGMENTS,
-            key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).segments(#p1, #p0, #p2, #p3)"
+            key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).segments(#p1, #p0, #p2, #p3)",
+            condition = "!@canonicalReadFence.hasHistory(#p0)"
     )
     public AnalysisSegmentPageData findPageData(Long analysisId, Long userId, int page, int size) {
         List<AnalysisSegmentData> items = repository

@@ -25,6 +25,7 @@ public class AnalysisRunPodCallbackService {
     private final RunPodAnalysisProperties properties;
     private final AnalysisRequestOutboxJpaRepository outboxRepository;
     private final RunPodContract contract;
+    private final org.example.voice.analysis.domain.port.CanonicalExecutionRegistry canonicalExecutions;
 
     @Transactional
     public AnalysisRunPodControlData claim(Long analysisId, AnalysisRunPodClaimCommand request) {
@@ -92,7 +93,7 @@ public class AnalysisRunPodCallbackService {
         if (result.getLastResultEventId() != null) fail(409, "RESULT_ALREADY_FINALIZED");
         requireActive(result, request.requestId(), request.executionId());
         OffsetDateTime now = now();
-        deadline(executionPayload(result, request.requestId(), request.executionId()), now);
+        deadline(executionPayload(result, request.requestId(), request.executionId()), now, request.schemaVersion());
         requireOwner(result, request.workerInstanceId(), now, true);
         var evidence = request.workerResult().pronunciationEvidence();
         if (evidence != null && evidence.selectedEndMs() != null
@@ -128,6 +129,11 @@ public class AnalysisRunPodCallbackService {
         if (result.getRecording().getDeletedAt() != null || !Boolean.TRUE.equals(result.getRecording().getSelected())
                 || (result.getFailureCode() != null && result.getFailureCode().contains("cancel"))) fail(409, "ANALYSIS_CANCELLED");
         if (result.getStatus() == AnalysisStatus.COMPLETED || result.getStatus() == AnalysisStatus.FAILED) fail(409, "ANALYSIS_TERMINAL");
+        if (result.isCanonicalExecution() && canonicalExecutions.findCurrentForOwner(
+                result.getId(), result.getRecording().getTrainingSession().getUserId()).isEmpty()) {
+            // Canonical claim/heartbeat must also honor current user/content/session visibility.
+            fail(409, "ANALYSIS_CANCELLED");
+        }
     }
 
     private String executionPayload(AnalysisResult result, UUID request, UUID execution) {
@@ -138,7 +144,16 @@ public class AnalysisRunPodCallbackService {
     }
 
     private OffsetDateTime deadline(String payload, OffsetDateTime now) {
+        return deadline(payload, now, null);
+    }
+
+    private OffsetDateTime deadline(String payload, OffsetDateTime now, String resultSchemaVersion) {
+        // Select the schema from the immutable outbox request, including v2 for claim/heartbeat.
         var json = contract.parse(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8), "analysisRequest");
+        if (RunPodContract.REQUEST_V2.equals(json.path("schemaVersion").asText()) && resultSchemaVersion != null
+                && !resultSchemaVersion.equals(json.path("resultSchemaVersion").asText())) {
+            fail(422, "VALIDATION_FAILED");
+        }
         OffsetDateTime deadline = OffsetDateTime.parse(json.get("deadlineAt").asText());
         if (!deadline.isAfter(now)) fail(409, "DEADLINE_EXCEEDED");
         return deadline;
