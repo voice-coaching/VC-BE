@@ -1,5 +1,9 @@
 # DB Schema - voice
 
+## V38 RunPod capacity 대기
+
+`V38__analysis_dispatch_capacity.sql`은 outbox에 `busy_count INTEGER NOT NULL DEFAULT 0 CHECK (busy_count >= 0)`을 추가한다. 기존 `attempt_count`는 실제 전송 실패 횟수다. `analysis_dispatch_gates`는 endpoint SHA-256 기본키, UUID claim, claim 만료 시각, 다음 시도 시각을 보관한다. 신규 DB 적용·운영 검증 전이며 행 삭제·기존 결과 변환은 없다. [처리 계약과 배포 선행조건](../canonical-latency-20261004.md)을 따른다.
+
 ## V37 승급시험 문제 및 억양 클래스 seed
 
 `V37__seed_title_exam_and_intonation_courses.sql`은 공개 운영 데이터 seed다. 새 테이블을 만들지 않고 기존 `practice_contents`, `content_categories`, `title_policies`, `courses`, `course_steps`, `course_step_revisions`를 사용한다.

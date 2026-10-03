@@ -1,5 +1,7 @@
 # Backend–RunPod HTTP 계약 v1.1
 
+2026-10-04 로컬 변경: [capacity 대기·deadline·검증 병렬화](../canonical-latency-20261004.md). 확인된 `CAPACITY_EXCEEDED`는 전송 실패 예산과 분리한다. 공개 analysis/status는 선택적 `deadlineAt`, `serverTime`을 추가한다. v4 B2 receipt 필수 조건과 기존 내부 endpoint는 유지한다.
+
 2026-09-18 추가: [근거 기반 코칭 result v3](evidence-based-coaching.md)를 선택적으로 수신한다. v1/v2 호환을 유지하며 새 코칭의 미확정 점수는 null이다. 제어 계약 v1.1과 endpoint는 유지한다. 운영 발행 전 BE reader 선배포가 필요하다.
 
 2026-09-17 갱신. 제어 계약은 `voice-coaching.runpod-http.v1.1`이며 결과는 기존 v1과 CLOVA 점수를 포함하는 v2를 수신한다. 공개 상세 API는 기존 `overallScore` 필드에 검증된 점수를 반환한다. 아래 2026-09-16 검증 절은 당시 기록이다.

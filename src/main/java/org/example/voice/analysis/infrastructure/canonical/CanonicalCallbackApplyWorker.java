@@ -50,7 +50,8 @@ public final class CanonicalCallbackApplyWorker {
             event=(UUID)rows.getFirst().get("event_id");attempt=((Number)rows.getFirst().get("attempts")).intValue();
             var raw=jdbc.queryForObject("SELECT callback_bytes FROM analysis_canonical_callback_inbox WHERE event_id=?",byte[].class,event);
             var doc=CanonicalCallbackDocument.parse(raw,contract);
-            callbacks.ingest(doc.identity().analysisId(),doc);
+            CanonicalTiming.measure(doc.identity().analysisId(),doc.identity().executionId(),"RESULT_COMMIT",
+                    () -> callbacks.ingest(doc.identity().analysisId(),doc));
             finish(event,claim,"DONE",0);lastReason=null;
         } catch(RunPodContractException error) {
             lastReason="DEPENDENCY_UNAVAILABLE";
