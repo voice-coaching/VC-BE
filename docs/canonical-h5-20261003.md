@@ -1,5 +1,7 @@
 # Canonical H5 표현 하네스 수용
 
+**2026-10-03 후속:** 사용자 직접 배포 승인으로 source `68ecde1` JAR과 아래 verifier를 AWS에 활성화했다. 14:55 KST RunPod H5와 공유 schema 일치·양쪽 canonical 접수 ON을 확인했다. PR은 병합하지 않았고 실제 녹음·GPT·전체 callback QA는 미수행이다. 아래 비활성 준비 기록은 전환 전 시점이다.
+
 사용자가 기존 canonical v4에 H5의 짧은 행동 총평을 선택했다. v4 요청 프로필과 공개 DTO, 기존 S7 결과는 유지하고 결과 schema에 H5의 manifest/lock/prompt 조합을 추가한다. 서로 다른 하네스의 해시를 섞은 조합은 거절한다.
 
 - H5 manifest: `9f10296b6944249ded9f5ce2ccfdfa7c53b6e4af670999fe68e9e477e97eaf45`
