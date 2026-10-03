@@ -297,6 +297,7 @@ public class AnalysisResult {
         clearWorkerResult();
         status=result.status();
         summaryFeedback=result.summary();
+        overallScore=result.overallScore();
         failureCode=result.failureCode();failureReason=result.failureReason();
         audioSha256=result.audioSha256();workerRevision=result.workerRevision();pipelineRevision=result.pipelineRevision();
         canonicalResultEventId=result.eventId();
