@@ -55,7 +55,7 @@ public class CanonicalCallbackCommitter {
                 doc.adapterStatus(),doc.generationStatus());
         var completion=new CanonicalResultCompletion(id.eventId(),id.requestId(),id.executionId(),doc.payloadSha256(),
                 doc.status(),doc.source().audioSha256(),doc.workerRevision(),doc.pipelineRevision(),summary(doc),
-                doc.failure()==null?null:doc.failure().code(),doc.failure()==null?null:failureReason());
+                doc.failure()==null?null:doc.failure().code(),doc.failure()==null?null:failureReason(),doc.overallScore());
         if(!result.finishCanonical(completion))throw new RunPodContractException(409,"RESULT_ALREADY_FINALIZED");
         writer.save(result);
         var session=result.getRecording().getTrainingSession();
@@ -71,12 +71,15 @@ public class CanonicalCallbackCommitter {
         // actions already satisfy max3, single-sentence and UTF-16 140 limits.
         if(doc.decision().status()==CanonicalCallbackDocument.DecisionStatus.ACCEPT
                 && doc.feedbackDeliveryAllowed() && "READY".equals(doc.adapterStatus())
-                && "9f10296b6944249ded9f5ce2ccfdfa7c53b6e4af670999fe68e9e477e97eaf45".equals(doc.source().llmManifestSha256())
+                && java.util.Set.of("9f10296b6944249ded9f5ce2ccfdfa7c53b6e4af670999fe68e9e477e97eaf45",
+                    "820d600fab4c49615050b9a038e7236f0429f68249dc631a39c0f5ab0be6f0f6").contains(doc.source().llmManifestSha256())
                 && !doc.coachingActions().isEmpty()) {
             return String.join("\n",doc.coachingActions());
         }
         return switch(doc.decision().status()) {
-            case ACCEPT -> "분석을 완료했습니다. 상세 근거는 새 분석 결과 화면에서 확인해 주세요. 발음이 정상이라는 판정이나 점수는 제공하지 않습니다.";
+            case ACCEPT -> doc.overallScore()!=null
+                ? "분석과 근거 기반 채점을 완료했습니다. 이번 분석에서 안내할 수 있는 발음 연습 후보는 없습니다."
+                : "분석을 완료했습니다. 상세 근거는 새 분석 결과 화면에서 확인해 주세요. 발음이 정상이라는 판정이나 점수는 제공하지 않습니다.";
             case REJECT -> "입력이 분석 조건을 충족하지 않아 교정을 제공하지 않았습니다. 입력을 확인한 뒤 다시 녹음해 주세요.";
             case INCONCLUSIVE -> "근거가 충분하지 않아 판단을 보류했습니다. 상세 안내를 확인한 뒤 다시 녹음해 주세요.";
             case SYSTEM_FAILURE -> failureReason();

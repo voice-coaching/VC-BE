@@ -1,5 +1,7 @@
 # Canonical public view v1 — local implementation
 
+2026-10-03: [scored-H5 점수 계약](../canonical-scoring-20261003.md)을 추가했다. 새 하네스는 숫자 overallScore/rubricRevision/9개 criteria를 반환한다. 아래 점수 null 고정 설명은 기존 S7/H5 결과에 적용한다. 새 채점 실패는 UNSCORABLE이며 완료할 수 없다.
+
 2026-10-01. Implemented in this worktree; **not deployed or runtime-validated**.
 Admission/readiness remain off. This GET does not enable submission, create a job,
 run AI/GPT, register evidence or read B2. V32–V34 must be installed before deploying

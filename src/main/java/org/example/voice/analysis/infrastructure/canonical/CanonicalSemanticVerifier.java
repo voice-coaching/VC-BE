@@ -47,7 +47,10 @@ public final class CanonicalSemanticVerifier {
                     || !"1413b196616c919aeaab243fdd57771e70221ffc53a37f9b018d1881499b8c73".equals(response.path("llmManifestSha256").asText())
                     || !"d8356763579dcfee347073a3f0ff72f4a0f67e33a29fa3b4c71012afcfd4ba01".equals(response.path("llmLockSha256").asText())
                     || !"9f10296b6944249ded9f5ce2ccfdfa7c53b6e4af670999fe68e9e477e97eaf45".equals(response.path("h5ManifestSha256").asText())
-                    || !"93636f0c4befe7f1e34358e74b1077cc94cb2b82064781485b0183c53357d2f5".equals(response.path("h5LockSha256").asText()))unavailable();
+                    || !"93636f0c4befe7f1e34358e74b1077cc94cb2b82064781485b0183c53357d2f5".equals(response.path("h5LockSha256").asText())
+                    || !"6ca67fcdaed390cc3da634fbafaef153890e52b8775c431f3fefae7dc122c776".equals(response.path("scoredCoreManifestSha256").asText())
+                    || !"820d600fab4c49615050b9a038e7236f0429f68249dc631a39c0f5ab0be6f0f6".equals(response.path("scoredManifestSha256").asText())
+                    || !"17d327b5898b183274418996468b577f3c455d8c1a5868b9cf3e00a34d53114d".equals(response.path("scoredLockSha256").asText()))unavailable();
         } catch(InterruptedException error){Thread.currentThread().interrupt();unavailable();}
         catch(Exception error){unavailable();}
         finally {if(child!=null && child.isAlive())child.destroyForcibly();}

@@ -53,7 +53,13 @@ public record CanonicalAnalysisView(
     public record FailedCoaching(String schemaVersion, String adapterStatus, String generationStatus,
                                  List<CoachingItem> items, int dispatchAttempts, String errorCode) implements Coaching {}
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Score(BigDecimal overallScore, String validity, String reason) {}
+    public record Score(BigDecimal overallScore, String validity, String reason,
+                        @JsonInclude(JsonInclude.Include.NON_NULL)
+                        String rubricRevision,
+                        @JsonInclude(JsonInclude.Include.NON_NULL)
+                        List<ScoreCriterion> criteria) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record ScoreCriterion(String criterionId, Integer level) {}
     public record Visual(String status, boolean correctiveClaimsAllowed) {}
     public record Actions(boolean canRetry, boolean canRerecord, boolean canComplete, boolean canRegenerate,
                           UnavailableReasons unavailableReasonCodes) {}
