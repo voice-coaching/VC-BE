@@ -31,6 +31,12 @@ AI 배포 진단/overlay 의존 소스: [intelligentAI 4a63fd0](https://github.c
 
 ## 최초 운영 준비 (필수)
 
+후속 testvideo1 실제 요청에서 scored v1의 Git checkout 의존성 누락을 발견했다.
+scored v2는 모델 실행 시 Git을 호출하지 않고 고정 release 출처를 읽는다. Backend의
+새 설치 pin은 core `08fd8a19`, H5 manifest `4afc1c2c`, lock `b4ff1aa7`로 갱신한다.
+verifier는 원래 S7/H5와 scored v1을 함께 보존해 과거 결과 검증을 유지한다. 아래
+20:02 KST 기록은 이전 v1의 준비 관측이며 새 v2의 실제 실행 성공 기록이 아니다.
+
 2026-10-03 운영 준비 완료: nginx include·root runtime profile·호환 current manifest를
 설치하고 AWS verifier 전체 233개 파일, RunPod scored core/H5·영구 overlay·진단 route,
 FE main `36a49772c3ddc3df00cd44542064c502953469ac`의 Vercel production 배포를 확인했다.
