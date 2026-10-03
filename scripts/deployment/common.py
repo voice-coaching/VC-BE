@@ -60,7 +60,7 @@ def fetch(url, token=None, *, limit=131072):
     require(target.username is None and target.password is None and
             (target.scheme == 'https' or (target.scheme == 'http' and target.hostname == '127.0.0.1')),
             'DEPLOYMENT_URL_INVALID')
-    headers = {'Accept-Encoding': 'identity'}
+    headers = {'Accept-Encoding': 'identity', 'User-Agent': 'voice-coaching-deployment/1'}
     if token: headers['Authorization'] = 'Bearer ' + token
     with build_opener(ProxyHandler({}), NoRedirect()).open(Request(url, headers=headers), timeout=10) as reply:
         require(reply.status == 200 and reply.headers.get('Content-Encoding', 'identity') == 'identity', 'PROBE_HTTP_FAILED')

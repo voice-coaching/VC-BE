@@ -92,6 +92,13 @@ PROCESSING, dispatch/cancel outbox, receipt/callback 검증, apply, effects, act
 미완료 작업으로 다시 만들지 않는다. 20분 초과나 조회 실패 시 기존 프로세스를 유지하고
 marker를 남긴다. 강제 FAILED, lease 초기화, 강제 종료로 drain을 통과시키지 않는다.
 
+실제 설치 점검에서 2026-08-09의 미접수 legacy PENDING 기록을 확인했다. 현재 생성자는
+반드시 request event ID를 부여한다. 따라서 request/execution ID가 모두 없고 canonical
+계약이 없으며 dispatch 이력이 전혀 없는 legacy PENDING만 실행 대기 수에서 제외한다.
+요청 ID·outbox가 있는 미완료 작업과 모든 PROCESSING은 계속 차단한다. 과거 행은 변경하지 않는다.
+HTTP probe는 식별 가능한 `voice-coaching-deployment/1` User-Agent를 사용한다.
+기본 Python User-Agent는 운영 ingress에서 403이지만 이 식별자로는 인증 조회가 성공했다.
+
 JAR와 verifier 경로를 교체한 뒤 AWS supported/admission, Pod executor/admission/
 reasonCode 및 schema 9개를 15초 간격으로 세 번 확인한다. 마지막에 FE와 drain을
 재확인한 뒤 접수를 연다. 단일 프로세스 재시작의 GET 공백은 남으므로 FE의 제한된

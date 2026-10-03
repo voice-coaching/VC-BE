@@ -90,7 +90,10 @@ def ready(doc, env):
 
 def drain(env):
     counts = query(env, '''SELECT json_build_object(
-      'analyses',(SELECT count(*) FROM analysis_results WHERE status IN ('PENDING','PROCESSING')),
+      'analyses',(SELECT count(*) FROM analysis_results a WHERE status IN ('PENDING','PROCESSING')
+          AND NOT (status='PENDING' AND active_request_event_id IS NULL AND active_execution_id IS NULL
+              AND analysis_profile='LEGACY_SEUNGUN_V3' AND expected_result_schema_version IS NULL
+              AND NOT EXISTS (SELECT 1 FROM analysis_request_outbox o WHERE o.analysis_id=a.id))),
       'dispatch',(SELECT count(*) FROM analysis_request_outbox WHERE status='PENDING'),
       'cancellation',(SELECT count(*) FROM analysis_cancellation_outbox WHERE status='PENDING'),
       'receipts',(SELECT count(*) FROM analysis_evidence_receipts WHERE status IN ('PENDING','VERIFYING')),
