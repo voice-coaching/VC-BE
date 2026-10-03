@@ -74,7 +74,8 @@ public class CanonicalCallbackCommitter {
                 && java.util.Set.of("9f10296b6944249ded9f5ce2ccfdfa7c53b6e4af670999fe68e9e477e97eaf45",
                     "820d600fab4c49615050b9a038e7236f0429f68249dc631a39c0f5ab0be6f0f6",
                     "4afc1c2cdbf7b5440742cf154fe96ab2083beda69cd9e07c47a241fb0d784fcf",
-                    "e3d6d6be9d896ede8d75d5f35f5daf4520a8d42f484e5f84a6fc32f8a05fb2e3").contains(doc.source().llmManifestSha256())
+                    "e3d6d6be9d896ede8d75d5f35f5daf4520a8d42f484e5f84a6fc32f8a05fb2e3",
+                    "885a2f0a67494dc3bebed28962222bfe95a0143292fe2de04194b84ea8beadc5").contains(doc.source().llmManifestSha256())
                 && !doc.coachingActions().isEmpty()) {
             return String.join("\n",doc.coachingActions());
         }

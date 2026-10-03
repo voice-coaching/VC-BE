@@ -49,11 +49,15 @@ public final class CanonicalCallbackVerifierWorker {
             var context=inbox.load(task,doc);
             var claimed=task;
             var originals=context.manifest()==null ? List.<byte[]>of()
-                    : artifacts.load(context.manifest(),task.analysisId(),task.executionId(),() -> fence(claimed));
+                    : CanonicalTiming.measure(task.analysisId(),task.executionId(),"CALLBACK_READ",
+                        () -> artifacts.loadForCallback(context.manifest(),claimed.analysisId(),claimed.executionId(),() -> fence(claimed)));
             fence(task);
             var budget=Duration.between(OffsetDateTime.now(ZoneOffset.UTC),task.deadline());
-            if(context.manifest()==null)verifier.verifyPrecore(context.request(),task.callback(),budget);
-            else verifier.verifyCallback(context.request(),context.manifest(),originals,doc.retention().receiptId(),task.callback(),budget);
+            CanonicalTiming.measure(task.analysisId(),task.executionId(),"CALLBACK_SEMANTIC", () -> {
+                if(context.manifest()==null)verifier.verifyPrecore(context.request(),claimed.callback(),budget);
+                else verifier.verifyCallback(context.request(),context.manifest(),originals,doc.retention().receiptId(),claimed.callback(),budget);
+                return null;
+            });
             fence(task);
             inbox.finish(task,true,false);
             lastReason=null;
