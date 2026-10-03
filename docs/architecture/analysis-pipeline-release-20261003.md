@@ -3,7 +3,9 @@
 2026-10-03 구현. 세션 107 장애에서는 진행 중인 분석의 상태 GET이 단일 Spring
 프로세스 교체 중 502가 됐고, 별도로 새 JAR와 이전 AWS verifier/RunPod의 계약이
 달랐다. JAR의 일반 health만 확인하는 배포를 호환 묶음 확인으로 교체한다.
-이 문서는 운영 배포 완료 기록이 아니다.
+구현 계약과 운영 절차를 기술한다. 아래 초기 운영 준비는 2026-10-03 20:02 KST에
+수행됐으며, 상세 근거는 [운영 선행조건 달성 기록](https://github.com/voice-coaching/intelligentAI/blob/7d67b25/docs/canonical-integration/production-prerequisites-20261003.md)에 있다.
+이 PR의 새 Backend JAR 자체는 아직 배포하지 않았다.
 
 AI 배포 진단/overlay 의존 소스: [intelligentAI 4a63fd0](https://github.com/voice-coaching/intelligentAI/commit/4a63fd0e70986c6fc4a8f365c4f7e71791d90dbb).
 
@@ -28,6 +30,15 @@ AI 배포 진단/overlay 의존 소스: [intelligentAI 4a63fd0](https://github.c
   verifier 출력, 토큰, URL, 근거 원문은 기록하지 않는다. 공개 reason enum은 유지한다.
 
 ## 최초 운영 준비 (필수)
+
+2026-10-03 운영 준비 완료: nginx include·root runtime profile·호환 current manifest를
+설치하고 AWS verifier 전체 233개 파일, RunPod scored core/H5·영구 overlay·진단 route,
+FE main `36a49772c3ddc3df00cd44542064c502953469ac`의 Vercel production 배포를 확인했다.
+AWS/RunPod readiness 및 진행 작업 0을 세 번 확인한 뒤 접수를 열었고, 기존 JAR
+`1bdd87650192e21ec75e228d760b2008fed5ed61`에 대한 `release.py check`는
+`PREFLIGHT_READY`였다. 설치 도구는 `2511242`, 새 verifier bundle은
+`f4730d4d5e3b92a87df20271aa63903e66330ff502c49cef6220726b58d78954`다.
+새 JAR/FE/AI가 변경되면 해당 배포 시점에 다시 검사한다. 실제 음성/GPT·브라우저 QA는 미실행이다.
 
 운영자는 먼저 AI 변경을 별도 배포해야 한다. RunPod 인증 GET `/health/deployment`와
 gateway 경로, 영구 overlay, scored core/H5, AWS verifier 전체 묶음이 필요하다.
