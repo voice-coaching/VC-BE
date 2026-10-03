@@ -8,13 +8,17 @@ import org.example.voice.analysis.domain.type.AnalysisExecutionProfile;
 @Service
 public class TrainingAnalysisSchemaAdmissionService {
     private final org.example.voice.analysis.infrastructure.canonical.CanonicalBackendReadiness readiness;
+    private final org.example.voice.analysis.domain.port.AnalysisSubmissionAdmission submissions;
     public TrainingAnalysisSchemaAdmissionService(
-            org.example.voice.analysis.infrastructure.canonical.CanonicalBackendReadiness readiness) {
+            org.example.voice.analysis.infrastructure.canonical.CanonicalBackendReadiness readiness,
+            org.example.voice.analysis.domain.port.AnalysisSubmissionAdmission submissions) {
         this.readiness=readiness;
+        this.submissions=submissions;
     }
     public static final String CANONICAL_RESULT_SCHEMA = "voice-coaching.runpod-analysis-result.v4";
 
     public AnalysisExecutionProfile selectProfile(String requestedResultSchema) {
+        submissions.assertOpen();
         assertAvailable(requestedResultSchema);
         return requestedResultSchema == null ? AnalysisExecutionProfile.LEGACY : AnalysisExecutionProfile.CANONICAL;
     }

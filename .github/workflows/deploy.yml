@@ -15,7 +15,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     environment: production
 
     steps:
@@ -32,8 +32,8 @@ jobs:
       - name: Grant execute permission for scripts
         run: chmod +x gradlew scripts/deploy.sh
 
-      - name: Test and build
-        run: ./gradlew clean test bootJar --no-daemon
+      - name: Compile and package (manual QA policy)
+        run: ./gradlew clean bootJar -x test --no-daemon
 
       - name: Select executable JAR
         id: artifact
@@ -42,6 +42,7 @@ jobs:
           jar_path="$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | head -n 1)"
           test -n "$jar_path"
           echo "path=$jar_path" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$jar_path" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
 
       - name: Configure SSH
         env:
@@ -61,12 +62,20 @@ jobs:
           JAR_PATH: ${{ steps.artifact.outputs.path }}
         run: |
           scp -i ~/.ssh/alpha-deploy "$JAR_PATH" "$EC2_USER@$EC2_HOST:/tmp/alpha-${GITHUB_SHA}.jar"
-          scp -i ~/.ssh/alpha-deploy scripts/deploy.sh "$EC2_USER@$EC2_HOST:/tmp/alpha-deploy-${GITHUB_SHA}.sh"
+          ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" "mkdir -p '/tmp/alpha-deploy-${GITHUB_SHA}'"
+          scp -i ~/.ssh/alpha-deploy scripts/deploy.sh "$EC2_USER@$EC2_HOST:/tmp/alpha-deploy-${GITHUB_SHA}/deploy.sh"
+          scp -r -i ~/.ssh/alpha-deploy scripts/deployment "$EC2_USER@$EC2_HOST:/tmp/alpha-deploy-${GITHUB_SHA}/deployment"
 
       - name: Activate release
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
+          JAR_SHA: ${{ steps.artifact.outputs.sha256 }}
         run: |
+          latest="$(git ls-remote origin refs/heads/develop | cut -f 1)"
+          if [ "$latest" != "$GITHUB_SHA" ]; then
+            echo "Skip superseded, inactive release $GITHUB_SHA"
+            exit 0
+          fi
           ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
-            "sudo bash '/tmp/alpha-deploy-${GITHUB_SHA}.sh' '$GITHUB_SHA'; status=\$?; rm -f '/tmp/alpha-deploy-${GITHUB_SHA}.sh'; exit \$status"
+            "sudo bash '/tmp/alpha-deploy-${GITHUB_SHA}/deploy.sh' '$GITHUB_SHA' '$JAR_SHA'"

@@ -84,10 +84,8 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
 
     @Override
     public Map<String, String> requiredHeaders(String mimeType, long fileSizeBytes) {
-        return Map.of(
-                "Content-Type", mimeType,
-                "Content-Length", Long.toString(fileSizeBytes)
-        );
+        // Keep the signed body size and object verification; omit browser-managed headers.
+        return Map.of("Content-Type", mimeType);
     }
 
     @Override

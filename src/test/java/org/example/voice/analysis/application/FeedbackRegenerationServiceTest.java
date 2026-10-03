@@ -37,7 +37,7 @@ class FeedbackRegenerationServiceTest {
         when(result.getPipelineRevision()).thenReturn("seungun-v1");
         when(provider.regenerate(any(), eq(FeedbackStyle.COACHING))).thenReturn(new AiFeedbackProvider.GeneratedFeedback(List.of("강점"), List.of("약점"), "요약"));
         when(writer.save(result)).thenReturn(result);
-        new FeedbackRegenerationService(reader, writer, provider).regenerate(1L, 7L, FeedbackStyle.COACHING);
+        new FeedbackRegenerationService(reader, writer, provider, () -> {}).regenerate(1L, 7L, FeedbackStyle.COACHING);
         verify(result).regenerateFeedback(eq("강점"), eq("약점"), eq("요약"), any());
         verify(writer).save(result);
     }
@@ -47,7 +47,7 @@ class FeedbackRegenerationServiceTest {
         when(reader.findOwnedForUpdate(1L, 7L)).thenReturn(Optional.of(result));
         when(result.isCompleted()).thenReturn(true);
         when(result.getFeedbackRegenerationCount()).thenReturn(3);
-        FeedbackRegenerationService service = new FeedbackRegenerationService(reader, writer, provider);
+        FeedbackRegenerationService service = new FeedbackRegenerationService(reader, writer, provider, () -> {});
         assertThatThrownBy(() -> service.regenerate(1L, 7L, FeedbackStyle.COACHING)).isInstanceOf(FeedbackRegenerationLimitException.class);
         verifyNoInteractions(provider, writer);
     }
@@ -59,7 +59,7 @@ class FeedbackRegenerationServiceTest {
         when(result.getFeedbackRegenerationCount()).thenReturn(0);
         when(result.getAnalysisOutcome()).thenReturn(AnalysisOutcome.COACHING_READY);
 
-        FeedbackRegenerationService service = new FeedbackRegenerationService(reader, writer, provider);
+        FeedbackRegenerationService service = new FeedbackRegenerationService(reader, writer, provider, () -> {});
 
         assertThatThrownBy(() -> service.regenerate(1L, 7L, FeedbackStyle.COACHING))
                 .isInstanceOf(FeedbackEvidenceUnavailableException.class);

@@ -2,6 +2,8 @@
 
 이 문서는 EC2 배포 환경에서 운영 보조 서비스에 접근하는 방식을 기록한다.
 
+2026-10-03 canonical HTTP 배포 변경은 [분석 파이프라인 배포와 접수 보호](analysis-pipeline-release-20261003.md)를 따른다. 아래 Redis 설명은 해당 전송 경로의 기록이며 현재 canonical 배포 절차를 대체하지 않는다.
+
 ## Redis Streams for AI analysis
 
 AI analysis uses a dedicated private Redis endpoint configured by
