@@ -31,6 +31,12 @@ AI 배포 진단/overlay 의존 소스: [intelligentAI 4a63fd0](https://github.c
 
 ## 최초 운영 준비 (필수)
 
+후속 testvideo1 실제 요청에서 scored v1의 Git checkout 의존성 누락을 발견했다.
+scored v2는 모델 실행 시 Git을 호출하지 않고 고정 release 출처를 읽는다. Backend의
+새 설치 pin은 core `08fd8a19`, H5 manifest `4afc1c2c`, lock `b4ff1aa7`로 갱신한다.
+verifier는 원래 S7/H5와 scored v1을 함께 보존해 과거 결과 검증을 유지한다. 아래
+20:02 KST 기록은 이전 v1의 준비 관측이며 새 v2의 실제 실행 성공 기록이 아니다.
+
 2026-10-03 운영 준비 완료: nginx include·root runtime profile·호환 current manifest를
 설치하고 AWS verifier 전체 233개 파일, RunPod scored core/H5·영구 overlay·진단 route,
 FE main `36a49772c3ddc3df00cd44542064c502953469ac`의 Vercel production 배포를 확인했다.
@@ -142,3 +148,7 @@ Java 컴파일, Python 구문, 계약/경로 및 문서 정적 확인 범위다.
 drain, 음성/GPT/callback 생성, 브라우저·회귀 QA를 수행한 기록이 아니다.
 개발자는 격리한 개발 환경에서 정상 전환, 진행 작업 대기, 누락 artifact, timeout,
 실패 단계별 복구, 신규 요청 차단과 기존 callback 지속을 수동 확인해야 한다.
+
+Scored v2 후속: v4 schema의 binding/association/sourceIdentity 허용 묶음과 scored 분기에 v2를 추가한다. S7/H5/v1 검증은 유지하며 H5 코칭 요약도 v2를 포함한다. Git 없는 core가 성공한 뒤 PREFLIGHT에서 거절되는 배포 계약 누락을 수정한다.
+
+Scored H5 v3는 활성 Seungun의 g2pk_detector_phone_contract_v2 출처를 검증한다. core v2와 점수 기준은 유지한다. Backend의 설치 pin과 v4 허용 목록·H5 요약 목록에 v3를 추가하고 과거 하네스 결과 검증을 보존한다.
