@@ -148,3 +148,5 @@ Java 컴파일, Python 구문, 계약/경로 및 문서 정적 확인 범위다.
 drain, 음성/GPT/callback 생성, 브라우저·회귀 QA를 수행한 기록이 아니다.
 개발자는 격리한 개발 환경에서 정상 전환, 진행 작업 대기, 누락 artifact, timeout,
 실패 단계별 복구, 신규 요청 차단과 기존 callback 지속을 수동 확인해야 한다.
+
+Scored v2 후속: v4 schema의 binding/association/sourceIdentity 허용 묶음과 scored 분기에 v2를 추가한다. S7/H5/v1 검증은 유지하며 H5 코칭 요약도 v2를 포함한다. Git 없는 core가 성공한 뒤 PREFLIGHT에서 거절되는 배포 계약 누락을 수정한다.
