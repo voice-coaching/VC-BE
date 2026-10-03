@@ -10,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Schema-checked PRIVATE envelope, not proof of frozen semantics or a public DTO.
@@ -39,6 +41,7 @@ public final class CanonicalCallbackDocument {
     private final Retention retention;
     private final String representation, coreStatus, adapterStatus, generationStatus;
     private final boolean feedbackDeliveryAllowed;
+    private final List<String> coachingActions;
 
     private CanonicalCallbackDocument(byte[] raw, JsonNode node, String digest) {
         this.raw = raw.clone();
@@ -67,6 +70,13 @@ public final class CanonicalCallbackDocument {
         retention = r.isNull() ? null : new Retention(uuid(r,"evidenceReceiptId"),r.get("manifestSha256").asText());
         adapterStatus = nullable(node.get("coaching"),"adapterStatus");
         generationStatus = nullable(node.get("coaching"),"generationStatus");
+        var actions = new ArrayList<String>();
+        if ("READY".equals(adapterStatus)) {
+            for (var item : node.get("coaching").get("items")) {
+                actions.add(item.get("expression").get("action").textValue());
+            }
+        }
+        coachingActions = List.copyOf(actions);
     }
 
     public static CanonicalCallbackDocument parse(byte[] raw, RunPodContract contract) {
@@ -89,6 +99,7 @@ public final class CanonicalCallbackDocument {
     public String representation() { return representation; }
     public String coreStatus() { return coreStatus; }
     public boolean feedbackDeliveryAllowed() { return feedbackDeliveryAllowed; }
+    public List<String> coachingActions() { return coachingActions; }
     public String adapterStatus() { return adapterStatus; }
     public String generationStatus() { return generationStatus; }
     public String workerRevision() { return workerRevision; }
