@@ -67,6 +67,14 @@ public class CanonicalCallbackCommitter {
     }
     private static String summary(CanonicalCallbackDocument doc) {
         if(doc.status()==AnalysisStatus.FAILED)return failureReason();
+        // This commit path follows independent semantic verification. H5's
+        // actions already satisfy max3, single-sentence and UTF-16 140 limits.
+        if(doc.decision().status()==CanonicalCallbackDocument.DecisionStatus.ACCEPT
+                && doc.feedbackDeliveryAllowed() && "READY".equals(doc.adapterStatus())
+                && "9f10296b6944249ded9f5ce2ccfdfa7c53b6e4af670999fe68e9e477e97eaf45".equals(doc.source().llmManifestSha256())
+                && !doc.coachingActions().isEmpty()) {
+            return String.join("\n",doc.coachingActions());
+        }
         return switch(doc.decision().status()) {
             case ACCEPT -> "분석을 완료했습니다. 상세 근거는 새 분석 결과 화면에서 확인해 주세요. 발음이 정상이라는 판정이나 점수는 제공하지 않습니다.";
             case REJECT -> "입력이 분석 조건을 충족하지 않아 교정을 제공하지 않았습니다. 입력을 확인한 뒤 다시 녹음해 주세요.";
