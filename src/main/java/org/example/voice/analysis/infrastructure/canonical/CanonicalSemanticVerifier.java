@@ -49,8 +49,8 @@ public final class CanonicalSemanticVerifier {
                     || !"9f10296b6944249ded9f5ce2ccfdfa7c53b6e4af670999fe68e9e477e97eaf45".equals(response.path("h5ManifestSha256").asText())
                     || !"93636f0c4befe7f1e34358e74b1077cc94cb2b82064781485b0183c53357d2f5".equals(response.path("h5LockSha256").asText())
                     || !"08fd8a19b6897d0c3890b0944986685830f24e6e676ea19422038b03a940ba80".equals(response.path("scoredCoreManifestSha256").asText())
-                    || !"4afc1c2cdbf7b5440742cf154fe96ab2083beda69cd9e07c47a241fb0d784fcf".equals(response.path("scoredManifestSha256").asText())
-                    || !"b4ff1aa729d9c981a048d5b7df1293d9637df53269d0598d7ae6069f2b0cc989".equals(response.path("scoredLockSha256").asText()))unavailable();
+                    || !"e3d6d6be9d896ede8d75d5f35f5daf4520a8d42f484e5f84a6fc32f8a05fb2e3".equals(response.path("scoredManifestSha256").asText())
+                    || !"dc3db9cc03a3355ddeb5d5819cd6fd46726935c8ca9b830f513e37163c89f4d8".equals(response.path("scoredLockSha256").asText()))unavailable();
         } catch(InterruptedException error){Thread.currentThread().interrupt();unavailable();}
         catch(Exception error){unavailable();}
         finally {if(child!=null && child.isAlive())child.destroyForcibly();}

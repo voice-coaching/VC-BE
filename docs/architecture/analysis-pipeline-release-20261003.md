@@ -150,3 +150,5 @@ drain, 음성/GPT/callback 생성, 브라우저·회귀 QA를 수행한 기록�
 실패 단계별 복구, 신규 요청 차단과 기존 callback 지속을 수동 확인해야 한다.
 
 Scored v2 후속: v4 schema의 binding/association/sourceIdentity 허용 묶음과 scored 분기에 v2를 추가한다. S7/H5/v1 검증은 유지하며 H5 코칭 요약도 v2를 포함한다. Git 없는 core가 성공한 뒤 PREFLIGHT에서 거절되는 배포 계약 누락을 수정한다.
+
+Scored H5 v3는 활성 Seungun의 g2pk_detector_phone_contract_v2 출처를 검증한다. core v2와 점수 기준은 유지한다. Backend의 설치 pin과 v4 허용 목록·H5 요약 목록에 v3를 추가하고 과거 하네스 결과 검증을 보존한다.
