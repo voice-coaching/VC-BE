@@ -41,10 +41,8 @@ public class PresignedUrlProvider implements RecordingObjectStoragePort {
 
     @Override
     public Map<String, String> requiredHeaders(String mimeType, long fileSizeBytes) {
-        return Map.of(
-                "Content-Type", mimeType,
-                "Content-Length", Long.toString(fileSizeBytes)
-        );
+        // Browsers derive Content-Length from the body; storage still verifies size.
+        return Map.of("Content-Type", mimeType);
     }
 
     @Override

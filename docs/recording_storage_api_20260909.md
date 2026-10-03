@@ -40,6 +40,8 @@ column에 넣지 않는다. 원본 업로드와 정규화된 WAV/MP4는 연결�
 3. 응답의 `uploadUrl`에 파일을 PUT한다. 발급한 MIME과 정확한 파일 크기를 유지하고
    `requiredHeaders`에 맞춘다. 브라우저의 `Content-Length`는 파일 body로 브라우저가
    계산하므로 자바스크립트에서 강제로 설정하지 않는다.
+   2026-10-03부터 S3/기본 provider의 `requiredHeaders`에는 `Content-Length`를 반환하지 않는다.
+   S3 presign의 contentLength 조건과 등록 시 실제 크기·MIME·digest 검증은 유지한다.
 4. 발급 시각부터 10분 이내에
    `POST /api/training-sessions/{sessionId}/recordings`를 호출한다.
 5. 등록 응답의 `qualityStatus`가 `PASS`이면 해당 녹음을 최종 선택할 수 있다.
