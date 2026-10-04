@@ -196,3 +196,19 @@ This document summarizes the API list exported from the local API spec directory
 | POST | `/api/users/me/title-exams` | Bearer accessToken | 완료 | 다음 칭호 승급 시험 생성. 선택 헤더 `Idempotency-Key` 지원 |
 | GET | `/api/users/me/title-exams/{examId}` | Bearer accessToken | 완료 | 본인 승급 시험 상태와 연결된 학습 세션 조회 |
 | POST | `/api/users/me/title-exams/{examId}/submit` | Bearer accessToken | 완료 | 완료된 분석 결과를 서버 저장 점수로 채점하고 합격 시 한 단계 승급 |
+
+
+## Canonical v5 handoff
+
+| Method | Path | Authentication | Purpose |
+|---|---|---|---|
+| GET | `/health/handoff` (RunPod) | API Bearer | Executor configuration and schema digests |
+| GET | `/api/internal/ai/worker-readiness/handoff` | Callback Bearer | Backend verification readiness |
+| POST | `/api/internal/ai/analyses/{id}/handoffs` | Callback Bearer + worker ID | Durable original handoff |
+| PUT | `/api/internal/ai/analyses/{id}/handoffs/{handoffId}/artifacts/{kind}` | Callback Bearer + worker ID | Stage raw artifact |
+| POST | `/api/internal/ai/analyses/{id}/handoffs/{handoffId}/seal` | Callback Bearer + worker ID | Transfer ownership atomically |
+| GET | `/api/internal/ai/analyses/{id}/handoffs/{handoffId}` | Callback Bearer + worker ID | Reconcile delivery outcome |
+| POST | `/api/internal/ai/archives/{handoffId}/artifacts/{kind}/reconciliation` | Separate operations Bearer | Verify an observed B2 version |
+| GET | `/api/analysis-capabilities/canonical` | User login | Available submission contracts |
+| GET | `/api/analyses/{id}/result-contract` | User login + ownership | Current attempt contract |
+| GET | `/api/v3/analyses/{id}` | User login + ownership | Committed v5 public result |

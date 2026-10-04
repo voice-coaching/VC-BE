@@ -481,3 +481,24 @@
 - 별도의 `roles`, `sessions`, `tokens`, `audit` 테이블은 현재 덤프에 존재하지 않는다.
 - 권한은 `users.role` 컬럼의 CHECK 제약(`USER`, `ADMIN`)으로 관리한다.
 - 소셜 로그인 제공자는 `social_accounts.provider` 컬럼의 CHECK 제약(`GOOGLE`, `KAKAO`, `NAVER`, `APPLE`)으로 관리한다.
+
+
+## Canonical v5 handoff (2026-10-04)
+
+[Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.
+
+
+### V39 durable ownership and archive storage
+
+Owner: canonical analysis infrastructure. All originals are INDEFINITE, no cascade or automatic TTL. Exact SQL column types/defaults/checks and immutable triggers are in `src/main/resources/db/migration/V39__canonical_handoff_archive.sql`.
+
+| Table / column | Keys, required fields and state |
+|---|---|
+| `analysis_results.handoff_received_at` | Nullable timestamptz, set atomically at RECEIVED; reset on a new execution. Heartbeat timeout excludes this attempt; overall deadline still applies. |
+| `analysis_canonical_handoffs` | PK handoff UUID; unique execution/event; execution FK. Required request/analysis/worker IDs, metadata/projection BYTEA, JCS handoff SHA, reserved bytes. STAGING default; RECEIVED/VERIFYING/COMMITTED/REJECTED/REVOKED. Nullable received/verified/committed timestamps and claim ID/until; attempts default 0; next_attempt/created timestamps default now; nullable fixed reason code. Pending index on next_attempt. |
+| `analysis_canonical_handoff_artifacts` | Composite PK handoff/kind, handoff FK. Required schema version, SHA, byte_size 1..16MiB; raw BYTEA initially null then write-once. Up to five contract-defined kinds. |
+| `analysis_canonical_results.handoff_id` | Nullable FK, required exclusively for v5. v4 still requires a verified callback origin and receipt for core evidence; v5 requires the claimed matching handoff and no receipt. Result originals remain immutable. |
+| `analysis_canonical_archive_jobs` | PK/FK handoff. PENDING default, UPLOADING/VERIFYING/ARCHIVED/RETRY_WAIT/RECONCILE_REQUIRED. Nullable claim ID/until, reason, archived_at; attempts 0; next_attempt default now. Created atomically with result/cache effects. |
+| `analysis_canonical_archive_artifacts` | Composite PK handoff/kind and FK to original. PENDING default, same archive states. Nullable object_key/version_id; definitive_rejection boolean defaults false and permits retry only after an explicit rejected PUT response; known version cannot be replaced and ARCHIVED is terminal. |
+
+Execution registry checks expand to exact v2/v4 and v3/v5 request/result/profile tuples. They do not reclassify historical executions. The v4 result event FK is replaced with an origin trigger because v5 events belong to the handoff table; v4 still must reference a VERIFIED inbox row at insertion. No historical bytes are updated.

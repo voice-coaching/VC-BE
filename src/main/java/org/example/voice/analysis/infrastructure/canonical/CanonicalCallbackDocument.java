@@ -32,6 +32,7 @@ public final class CanonicalCallbackDocument {
     public record Retention(UUID receiptId, String manifestSha256) {}
 
     private final byte[] raw;
+    private final String schemaVersion, analysisProfile;
     private final String rawSha256, payloadSha256, workerRevision, pipelineRevision;
     private final Identity identity;
     private final AnalysisStatus status;
@@ -46,6 +47,7 @@ public final class CanonicalCallbackDocument {
 
     private CanonicalCallbackDocument(byte[] raw, JsonNode node, String digest) {
         this.raw = raw.clone();
+        schemaVersion=node.path("schemaVersion").asText(); analysisProfile=node.path("analysisProfile").asText();
         rawSha256 = sha256(raw);
         payloadSha256 = digest;
         identity = new Identity(uuid(node,"eventId"),uuid(node,"requestId"),uuid(node,"executionId"),
@@ -67,8 +69,8 @@ public final class CanonicalCallbackDocument {
         source = new Source(s.get("scriptSha256").asText(),s.get("audioSha256").asText(),nullable(s,"preparedWavSha256"),
                 nullable(s,"canonicalAnalysisId"),nullable(s,"coreSha256"),s.get("parentManifestSha256").asText(),
                 s.get("llmManifestSha256").asText(),s.get("llmDependencyLockSha256").asText(),s.get("promptSha256").asText());
-        var r = node.get("retainedEvidence");
-        retention = r.isNull() ? null : new Retention(uuid(r,"evidenceReceiptId"),r.get("manifestSha256").asText());
+        var r = node.path("retainedEvidence");
+        retention = (r.isNull() || r.isMissingNode()) ? null : new Retention(uuid(r,"evidenceReceiptId"),r.get("manifestSha256").asText());
         adapterStatus = nullable(node.get("coaching"),"adapterStatus");
         generationStatus = nullable(node.get("coaching"),"generationStatus");
         var actions = new ArrayList<String>();
@@ -84,11 +86,13 @@ public final class CanonicalCallbackDocument {
 
     public static CanonicalCallbackDocument parse(byte[] raw, RunPodContract contract) {
         var node = contract.parse(raw,"result");
-        if (!RunPodContract.RESULT_V4.equals(node.path("schemaVersion").asText()))
+        if (!java.util.Set.of(RunPodContract.RESULT_V4,RunPodContract.RESULT_V5).contains(node.path("schemaVersion").asText()))
             throw new RunPodContractException(422,"VALIDATION_FAILED");
         return new CanonicalCallbackDocument(raw,node,contract.digest(new String(raw,StandardCharsets.UTF_8)));
     }
 
+    public String schemaVersion(){return schemaVersion;}
+    public String analysisProfile(){return analysisProfile;}
     public byte[] bytes() { return raw.clone(); }
     public String storageJson() { return new String(raw,StandardCharsets.UTF_8); }
     public String rawSha256() { return rawSha256; }

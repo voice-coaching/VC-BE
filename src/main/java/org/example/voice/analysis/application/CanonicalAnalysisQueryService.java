@@ -49,9 +49,9 @@ public class CanonicalAnalysisQueryService {
                 || !result.getRecording().getId().equals(binding.recordingId())
                 || !result.getRecording().getTrainingSession().getContent().getId().equals(binding.contentId())
                 || !Objects.equals(result.getRecording().getAudioSha256(),binding.audioSha256())
-                || !RunPodContract.RESULT_V4.equals(result.getExpectedResultSchemaVersion())
-                || !RunPodContract.RESULT_V4.equals(binding.resultSchemaVersion())
-                || !RunPodContract.REQUEST_V2.equals(binding.requestSchemaVersion())) {
+                || !binding.resultSchemaVersion().equals(result.getExpectedResultSchemaVersion())
+                || !java.util.Set.of(RunPodContract.RESULT_V4,RunPodContract.RESULT_V5).contains(binding.resultSchemaVersion())
+                || !java.util.Set.of(RunPodContract.REQUEST_V2,RunPodContract.REQUEST_V3).contains(binding.requestSchemaVersion())) {
             stable(result,userId);
             throw error(CANONICAL_RESULT_UNAVAILABLE);
         }
@@ -77,8 +77,8 @@ public class CanonicalAnalysisQueryService {
                 failure=new ServiceFailure(f.origin(),f.code(),f.stage());
             }
         }
-        var view=new CanonicalAnalysisView(CanonicalAnalysisView.SCHEMA_VERSION,analysisId,binding.recordingId(),
-                binding.requestId(),binding.executionId(),result.getStatus(),CanonicalAnalysisView.PROFILE,
+        var view=new CanonicalAnalysisView(RunPodContract.RESULT_V5.equals(binding.resultSchemaVersion())?"voice-coaching.canonical-analysis-view.v2":CanonicalAnalysisView.SCHEMA_VERSION,analysisId,binding.recordingId(),
+                binding.requestId(),binding.executionId(),result.getStatus(),result.getAnalysisProfile(),
                 canonical,failure,actions.current(result));
         stable(result,userId);
         return view;

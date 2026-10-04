@@ -43,6 +43,7 @@ public final class CanonicalSemanticVerifier {
             var response=mapper.readTree(raw);
             if(response==null || !PROTOCOL.equals(response.path("protocol").asText())
                     || !"READY".equals(response.path("status").asText())
+                    || !"voice-coaching.canonical-handoff.v1".equals(response.path("handoffContractVersion").asText())
                     || !"95f2347ad53ab53030f68a65795cfc5a84ca1c8c41bd03119c9a9fb15d0367c2".equals(response.path("coreManifestSha256").asText())
                     || !"1413b196616c919aeaab243fdd57771e70221ffc53a37f9b018d1881499b8c73".equals(response.path("llmManifestSha256").asText())
                     || !"d8356763579dcfee347073a3f0ff72f4a0f67e33a29fa3b4c71012afcfd4ba01".equals(response.path("llmLockSha256").asText())
@@ -59,6 +60,9 @@ public final class CanonicalSemanticVerifier {
         finally {if(child!=null && child.isAlive())child.destroyForcibly();}
     }
 
+    public void verifyHandoff(byte[] request,byte[] metadata,List<byte[]> originals,byte[] projection,Duration budget) {
+        verify("VERIFY_HANDOFF",request,metadata,originals,null,projection,budget);
+    }
     public void verifyEvidence(byte[] request,byte[] manifest,List<byte[]> originals,Duration budget) {
         verify("VERIFY_EVIDENCE",request,manifest,originals,null,null,budget);
     }
@@ -93,7 +97,7 @@ public final class CanonicalSemanticVerifier {
                         frame(out,request,65536);
                         if(manifest!=null) {
                             frame(out,manifest,65536);
-                            if(originals.size()<4 || originals.size()>5)throw new IllegalArgumentException("ARTIFACT_COUNT");
+                            if((!mode.equals("VERIFY_HANDOFF") && originals.size()<4) || originals.size()>5)throw new IllegalArgumentException("ARTIFACT_COUNT");
                             for(byte[] raw:originals)frame(out,raw,16*1024*1024);
                         }
                         if(callback!=null)frame(out,callback,1024*1024);
