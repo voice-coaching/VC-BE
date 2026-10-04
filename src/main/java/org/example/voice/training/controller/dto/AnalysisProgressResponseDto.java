@@ -12,7 +12,8 @@ public record AnalysisProgressResponseDto(
         String failureReason,
         OffsetDateTime updatedAt,
         OffsetDateTime deadlineAt,
-        OffsetDateTime serverTime
+        OffsetDateTime serverTime,
+        boolean resultAvailable
 ) {
 
     public static AnalysisProgressResponseDto from(AnalysisProgressData data) {
@@ -24,7 +25,8 @@ public record AnalysisProgressResponseDto(
                 data.failureReason(),
                 data.updatedAt(),
                 data.deadlineAt(),
-                data.serverTime()
+                data.serverTime(),
+                data.resultAvailable()
         );
     }
 }

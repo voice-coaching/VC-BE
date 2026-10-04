@@ -1,4 +1,9 @@
 # Install the new verifier bundle and V39 first. This file does not activate v5.
+# Result-first mode: deploy compatible FE and provision durable 0700 directory first.
+# Separate from DB handoff budget; retained files are not automatically deleted.
+analysis.canonical.delivery.enabled=false
+analysis.canonical.delivery.directory=/var/lib/alpha-canonical-delivery
+analysis.canonical.delivery.budget-bytes=536870912
 analysis.canonical.handoff.admission-enabled=false
 analysis.canonical.handoff.worker-enabled=false
 analysis.canonical.handoff.archive-enabled=false

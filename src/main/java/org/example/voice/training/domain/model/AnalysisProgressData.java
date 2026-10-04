@@ -12,10 +12,13 @@ public record AnalysisProgressData(
         String failureReason,
         OffsetDateTime updatedAt,
         OffsetDateTime deadlineAt,
-        OffsetDateTime serverTime
+        OffsetDateTime serverTime,
+        boolean resultAvailable
 ) {
     public AnalysisProgressData(Long analysisId, AnalysisStatus status, String stage,
             Integer progressPercent, String failureReason, OffsetDateTime updatedAt) {
-        this(analysisId, status, stage, progressPercent, failureReason, updatedAt, null, null);
+        this(analysisId, status, stage, progressPercent, failureReason, updatedAt, null, null,false);
     }
+    public AnalysisProgressData(Long analysisId,AnalysisStatus status,String stage,Integer progressPercent,String failureReason,
+            OffsetDateTime updatedAt,OffsetDateTime deadlineAt,OffsetDateTime serverTime){this(analysisId,status,stage,progressPercent,failureReason,updatedAt,deadlineAt,serverTime,false);}
 }

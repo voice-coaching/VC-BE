@@ -26,7 +26,8 @@ class RunPodExecutionTimeoutSweeperTest {
         var event = AnalysisRequestOutbox.pendingHttp(REQUEST, EXECUTION, result, "{}");
         when(results.findExpiredHttpForUpdate(any(), any(), any())).thenReturn(List.of(result));
         when(outboxes.findByAnalysisResultIdAndStatus(1L, AnalysisRequestOutboxStatus.PENDING)).thenReturn(List.of(event));
-        new RunPodExecutionTimeoutSweeper(results, outboxes, cancellations, new RunPodAnalysisProperties()).expire();
+        new RunPodExecutionTimeoutSweeper(results, outboxes, cancellations, new RunPodAnalysisProperties(),
+                mock(org.example.voice.analysis.infrastructure.canonical.CanonicalDeliverySpool.class)).expire();
         assertThat(result.getStatus()).isEqualTo(AnalysisStatus.FAILED);
         assertThat(event.getStatus()).isEqualTo(AnalysisRequestOutboxStatus.FAILED);
         verify(cancellations).schedule(REQUEST);

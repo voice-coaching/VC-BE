@@ -22,6 +22,13 @@ public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResul
     List<AnalysisResult> findExpiredHttpForUpdate(@Param("statuses") Collection<AnalysisStatus> statuses,
             @Param("now") OffsetDateTime now, Pageable pageable);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from AnalysisResult a where a.status in :statuses and a.activeExecutionId is not null "
+            + "and a.activeExecutionId not in :received "
+            + "and (a.executionDeadlineAt <= :now or (a.handoffReceivedAt is null and a.claimExpiresAt <= :now)) order by a.id")
+    List<AnalysisResult> findExpiredHttpExcludingReceivedForUpdate(@Param("statuses") Collection<AnalysisStatus> statuses,
+            @Param("now") OffsetDateTime now, @Param("received") Collection<String> received, Pageable pageable);
+
     Optional<AnalysisResult> findByIdAndRecordingTrainingSessionUserId(Long id, Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

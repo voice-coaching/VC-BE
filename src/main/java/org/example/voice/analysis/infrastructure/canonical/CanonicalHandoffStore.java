@@ -15,10 +15,19 @@ public class CanonicalHandoffStore {
     private final RunPodContract contract;
     private final CanonicalEvidenceRegistrationService executions;
     private final CanonicalHandoffSettings settings;
+    private final CanonicalDeliverySpool delivery;
     public record Snapshot(UUID handoffId,String handoffSha256,String state) {}
 
     @Transactional(timeout=10)
     public Snapshot receive(long analysis,UUID worker,CanonicalHandoffDocument doc) {
+        return receiveLocked(analysis,worker,doc,false);
+    }
+    @Transactional(timeout=10)
+    public Snapshot receiveDeferred(long analysis,UUID worker,CanonicalHandoffDocument doc) {
+        if(!delivery.verified(doc.id(),doc.digest()))fail(409,"VERIFIED_DELIVERY_REQUIRED");
+        return receiveLocked(analysis,worker,doc,true);
+    }
+    private Snapshot receiveLocked(long analysis,UUID worker,CanonicalHandoffDocument doc,boolean deferred) {
         var id=doc.projection().identity();
         if(analysis!=id.analysisId() || !worker.equals(id.workerId()))fail(409,"WORKER_CONFLICT");
         executions.requireVisibleForCallback(analysis,id.requestId(),id.executionId(),worker);
@@ -28,7 +37,8 @@ public class CanonicalHandoffStore {
             var current=owned(analysis,doc.id(),worker);
             if(!"STAGING".equals(current.get("state")))return snapshot(current);
         } else {
-            executions.requireActiveForVerification(analysis,id.requestId(),id.executionId(),worker);
+            if(deferred)executions.requireDeliveryOwned(analysis,id.requestId(),id.executionId(),worker);
+            else executions.requireActiveForVerification(analysis,id.requestId(),id.executionId(),worker);
             var registry=jdbc.queryForMap("SELECT * FROM analysis_canonical_executions WHERE execution_id=?",id.executionId());
             var journal=jdbc.queryForMap("SELECT * FROM analysis_canonical_journals WHERE execution_id=?",id.executionId());
             if(!RunPodContract.RESULT_V5.equals(registry.get("result_schema_version"))
@@ -43,13 +53,27 @@ public class CanonicalHandoffStore {
                 INSERT INTO analysis_canonical_handoffs(handoff_id,execution_id,event_id,request_id,analysis_id,
                 worker_instance_id,metadata_bytes,projection_bytes,handoff_sha256,reserved_bytes) VALUES (?,?,?,?,?,?,?,?,?,?)
                 """,doc.id(),id.executionId(),id.eventId(),id.requestId(),analysis,worker,doc.metadataBytes(),doc.projection().bytes(),doc.digest(),doc.reservedBytes());
-            for(var item:doc.metadata().get("artifacts"))jdbc.update("""
-                INSERT INTO analysis_canonical_handoff_artifacts(handoff_id,kind,schema_version,sha256,byte_size) VALUES (?,?,?,?,?)
-                """,doc.id(),item.path("kind").asText(),item.path("schemaVersion").asText(),item.path("sha256").asText(),item.path("byteSize").asInt());
+            // One DB round trip for all immutable originals. Parsing/hash checks happened before this transaction.
+            var values=new ArrayList<String>();var args=new ArrayList<Object>();
+            boolean complete=true;
+            for(var item:doc.metadata().get("artifacts")){
+                String kind=item.path("kind").asText();byte[] raw=doc.inline().get(kind);
+                if(raw!=null)CanonicalHandoffDocument.checkBytes(item,raw);else complete=false;
+                values.add("(?,?,?,?,?,?)");Collections.addAll(args,doc.id(),kind,item.path("schemaVersion").asText(),item.path("sha256").asText(),item.path("byteSize").asInt(),raw);
+            }
+            if(!values.isEmpty())jdbc.update("INSERT INTO analysis_canonical_handoff_artifacts(handoff_id,kind,schema_version,sha256,byte_size,raw_bytes) VALUES "+String.join(",",values),args.toArray());
+            if(complete)return sealLocked(analysis,doc.id(),id.executionId(),doc.digest());
+            return new Snapshot(doc.id(),doc.digest(),"STAGING");
         }
         for(var entry:doc.inline().entrySet())stage(analysis,doc.id(),worker,entry.getKey(),entry.getValue());
         if(Boolean.FALSE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM analysis_canonical_handoff_artifacts WHERE handoff_id=? AND raw_bytes IS NULL)",Boolean.class,doc.id())))return seal(analysis,doc.id(),worker);
         return status(analysis,doc.id(),worker);
+    }
+    private Snapshot sealLocked(long analysis,UUID handoff,UUID execution,String digest){
+        jdbc.execute("SET LOCAL synchronous_commit = on");
+        jdbc.update("UPDATE analysis_canonical_handoffs SET state='RECEIVED',received_at=CURRENT_TIMESTAMP WHERE handoff_id=?",handoff);
+        jdbc.update("UPDATE analysis_results SET handoff_received_at=CURRENT_TIMESTAMP WHERE id=? AND active_execution_id=?",analysis,execution.toString());
+        return new Snapshot(handoff,digest,"RECEIVED");
     }
     @Transactional(timeout=10)
     public void stage(long analysis,UUID handoff,UUID worker,String kind,byte[] raw) {

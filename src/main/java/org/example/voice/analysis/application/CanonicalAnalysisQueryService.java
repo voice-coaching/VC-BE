@@ -27,6 +27,7 @@ public class CanonicalAnalysisQueryService {
     private final CanonicalViewVisibility visibility;
     private final CanonicalPublicProjection projection;
     private final CanonicalActionPolicy actions;
+    private final CanonicalDeliverySpool delivery;
 
     @Transactional(readOnly=true,isolation=Isolation.READ_COMMITTED,timeout=10)
     public CanonicalAnalysisView get(Long analysisId,Long userId) {
@@ -58,6 +59,17 @@ public class CanonicalAnalysisQueryService {
             throw error(CANONICAL_RESULT_UNAVAILABLE);
         }
         boolean pending=result.getStatus()==AnalysisStatus.PENDING || result.getStatus()==AnalysisStatus.PROCESSING;
+        var preview=delivery.current(result);
+        if(pending && preview!=null && preview.verified){
+            var d=preview.document.projection();var f=d.failure();
+            var reason=java.util.List.of("RESULT_PERSISTENCE_PENDING");
+            var unavailable=new CanonicalAnalysisView.UnavailableReasons(reason,reason,reason,reason);
+            var view=new CanonicalAnalysisView("voice-coaching.canonical-analysis-view.v2",analysisId,binding.recordingId(),
+                binding.requestId(),binding.executionId(),d.status(),result.getAnalysisProfile(),projection.project(d),
+                f==null?null:new ServiceFailure(f.origin(),f.code(),f.stage()),
+                new CanonicalAnalysisView.Actions(false,false,false,false,unavailable),preview.attempts>0?"RETRYING":"SAVING");
+            stable(result,userId);return view;
+        }
         CanonicalCallbackDocument document=null;
         if(result.getCanonicalResultEventId()!=null) {
             document=committed.findCurrent(result).orElse(null);
@@ -81,7 +93,7 @@ public class CanonicalAnalysisQueryService {
         }
         var view=new CanonicalAnalysisView(RunPodContract.RESULT_V5.equals(binding.resultSchemaVersion())?"voice-coaching.canonical-analysis-view.v2":CanonicalAnalysisView.SCHEMA_VERSION,analysisId,binding.recordingId(),
                 binding.requestId(),binding.executionId(),result.getStatus(),result.getAnalysisProfile(),
-                canonical,failure,actions.current(result));
+                canonical,failure,actions.current(result),delivery.enabled()?(document==null?"NONE":"SAVED"):null);
         stable(result,userId);
         return view;
     }
