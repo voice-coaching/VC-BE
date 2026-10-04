@@ -77,7 +77,8 @@ class InternalRunPodAnalysisControllerTest {
                     .andExpect(status().isUnauthorized());
             mvc.perform(post(base+"/analyses/1"+endpoint).header("Authorization", "Bearer "+token)
                     .contentType("application/json").content(raw)).andExpect(status().isGone())
-                    .andExpect(jsonPath("$.code").value("HANDOFF_REQUIRED"));
+                    .andExpect(jsonPath("$.reasonCode").value("HANDOFF_REQUIRED"))
+                    .andExpect(jsonPath("$.retryable").value(false));
         }
         verify(service, never()).ingestResult(anyLong(), any());
         verifyNoInteractions(canonicalCallbacks);
