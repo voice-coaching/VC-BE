@@ -18,8 +18,10 @@ Structured spans separate evidence reads, semantic subprocess work, receipt comm
 
 ## Resident identity prerequisite
 
-The shared v4 schema, `CanonicalSemanticVerifier`, and H5 summary adapter recognize the additive `canonical_resident_core_20261004_v1` / `canonical_resident_h5_20261004_v1` identity. AI owns the builder and exporter. Install the new offline verifier bundle (including old frozen histories) before deploying this JAR. The new core pin is `ce16f635da012237b5316b36161d5eeff9432279cd08dbbe7967f5ab7ace7f7e`, H5 pin `885a2f0a67494dc3bebed28962222bfe95a0143292fe2de04194b84ea8beadc5`, lock `1945dcf2fad7fc97621830abed34353c2d372d8224cc9ad11a9c422eabfdf9f4`.
+The shared v4 schema, `CanonicalSemanticVerifier`, and H5 summary adapter recognize the additive `canonical_resident_core_20261004_v1` / `canonical_resident_h5_20261004_v1` identity. AI owns the builder and exporter. The deployed scored verifier remains valid without optional resident fields. If any resident field is advertised, all three pins must match. Install the new offline verifier bundle before activating resident inference; this JAR alone does not require that activation. The new core pin is `ce16f635da012237b5316b36161d5eeff9432279cd08dbbe7967f5ab7ace7f7e`, H5 pin `885a2f0a67494dc3bebed28962222bfe95a0143292fe2de04194b84ea8beadc5`, lock `1945dcf2fad7fc97621830abed34353c2d372d8224cc9ad11a9c422eabfdf9f4`.
 
 No v5 handoff, post-result archive worker, writer credential injection, or heartbeat ownership transfer is implemented here. Existing result completion still waits for verified v4 retention. No admission flag is enabled by this migration.
 
 Validation: offline `compileJava` and static source/contract checks. No migration against an actual database, automated tests, deployment, or inference QA was performed. Target branch: `develop`.
+
+CI correction: the dispatch test now supplies the required endpoint gate, configured mock endpoints and current FIFO query. It verifies HTTP actually ran outside the transaction and releases the gate after a lost acknowledgement. Installation checks cover the existing scored verifier and reject changed pins or incomplete resident identities. CI uses the existing `clean test bootJar` workflow; production deployment and database migration are separate and are not triggered by updating this PR branch.
