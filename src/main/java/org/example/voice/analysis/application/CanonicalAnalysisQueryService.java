@@ -28,10 +28,20 @@ public class CanonicalAnalysisQueryService {
     private final CanonicalPublicProjection projection;
     private final CanonicalActionPolicy actions;
     private final CanonicalDeliverySpool delivery;
+    private final CanonicalPublishedResults published;
 
     @Transactional(readOnly=true,isolation=Isolation.READ_COMMITTED,timeout=10)
     public CanonicalAnalysisView get(Long analysisId,Long userId) {
         if(analysisId==null || analysisId<1 || analysisId>9007199254740991L)throw error(INVALID_ANALYSIS_ID);
+        var direct=published.current(analysisId,userId);
+        if(direct!=null){
+            var id=direct.identity();var f=direct.failure();var reason=java.util.List.of("RESULT_PERSISTENCE_PENDING");
+            var unavailable=new CanonicalAnalysisView.UnavailableReasons(reason,reason,reason,reason);
+            return new CanonicalAnalysisView("voice-coaching.canonical-analysis-view.v2",analysisId,id.recordingId(),
+                id.requestId(),id.executionId(),direct.status(),direct.analysisProfile(),projection.project(direct),
+                f==null?null:new ServiceFailure(f.origin(),f.code(),f.stage()),
+                new CanonicalAnalysisView.Actions(false,false,false,false,unavailable),"SAVING");
+        }
         if(!visibility.visible(analysisId,userId))throw error(RESOURCE_NOT_FOUND);
         var result=results.findByIdAndRecordingTrainingSessionUserId(analysisId,userId)
                 .orElseThrow(()->error(RESOURCE_NOT_FOUND));

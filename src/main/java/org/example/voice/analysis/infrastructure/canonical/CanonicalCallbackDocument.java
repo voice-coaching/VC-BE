@@ -17,7 +17,7 @@ import java.util.List;
  * Schema-checked PRIVATE envelope, not proof of frozen semantics or a public DTO.
  * Operational fields are typed. Full frozen inputValidation/selection/coaching and
  * MFA decimals remain in the exact bytes, never a legacy worker-result conversion.
- * Only the offline verifier can promote this document to a committable inbox entry.
+ * The authenticated v5 delivery path trusts RunPod preflight; AWS still fences current ownership.
  */
 @JsonIgnoreType
 public final class CanonicalCallbackDocument {

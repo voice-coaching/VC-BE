@@ -53,12 +53,13 @@ public final class CanonicalHandoffWorker {
                 byte[] bytes=jdbc.queryForObject("SELECT raw_bytes FROM analysis_canonical_handoff_artifacts WHERE handoff_id=? AND kind=?",byte[].class,job.get("handoff_id"),item.path("kind").asText());
                 CanonicalHandoffDocument.checkBytes(item,bytes);raw.add(bytes);
             }
-            byte[] request=jdbc.queryForObject("SELECT request_bytes FROM analysis_canonical_journals WHERE execution_id=?",byte[].class,job.get("execution_id"));
-            var deadline=jdbc.queryForObject("SELECT deadline_at FROM analysis_canonical_executions WHERE execution_id=?",java.time.OffsetDateTime.class,job.get("execution_id"));
             long started=System.nanoTime();
-            if(!delivery.verified((UUID)job.get("handoff_id"),(String)job.get("handoff_sha256")))
+            if(!delivery.enabled()){
+                byte[] request=jdbc.queryForObject("SELECT request_bytes FROM analysis_canonical_journals WHERE execution_id=?",byte[].class,job.get("execution_id"));
+                var deadline=jdbc.queryForObject("SELECT deadline_at FROM analysis_canonical_executions WHERE execution_id=?",java.time.OffsetDateTime.class,job.get("execution_id"));
                 verifier.verifyHandoff(request,(byte[])job.get("metadata_bytes"),raw,(byte[])job.get("projection_bytes"),
-                    delivery.owns(((Number)job.get("analysis_id")).longValue(),(UUID)job.get("execution_id"))?Duration.ofSeconds(100):Duration.between(java.time.Instant.now(),deadline.toInstant()));
+                    Duration.between(java.time.Instant.now(),deadline.toInstant()));
+            }
             org.slf4j.LoggerFactory.getLogger(getClass()).info("canonical_handoff_verify analysisId={} executionId={} elapsedMs={}",job.get("analysis_id"),job.get("execution_id"),TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));
             var doc=CanonicalCallbackDocument.parse((byte[])job.get("projection_bytes"),contract);
             tx.executeWithoutResult(t->{

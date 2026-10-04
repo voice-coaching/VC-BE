@@ -9,18 +9,19 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Verification publishes the result; a different lane retries database persistence. */
+/** RunPod owns semantic preflight. AWS checks the current execution and persists asynchronously. */
 @Component
 public final class CanonicalDeliveryWorker {
     private final CanonicalDeliverySpool spool;
     private final CanonicalSemanticVerifier verifier;
     private final CanonicalHandoffStore database;
     private final JdbcTemplate jdbc;
+    private final CanonicalPublishedResults published;
     private volatile long verificationTick,saveTick;
     public boolean operational(){return !spool.enabled() || (!verifyLane.isShutdown() && !saveLane.isShutdown() && System.nanoTime()-verificationTick<TimeUnit.SECONDS.toNanos(150) && System.nanoTime()-saveTick<TimeUnit.SECONDS.toNanos(150));}
     private final ScheduledExecutorService verifyLane=Executors.newSingleThreadScheduledExecutor(r->new Thread(r,"canonical-delivery-verify"));
     private final ScheduledExecutorService saveLane=Executors.newSingleThreadScheduledExecutor(r->new Thread(r,"canonical-delivery-save"));
-    public CanonicalDeliveryWorker(CanonicalDeliverySpool spool,CanonicalSemanticVerifier verifier,CanonicalHandoffStore database,JdbcTemplate jdbc){this.spool=spool;this.verifier=verifier;this.database=database;this.jdbc=jdbc;}
+    public CanonicalDeliveryWorker(CanonicalDeliverySpool spool,CanonicalSemanticVerifier verifier,CanonicalHandoffStore database,JdbcTemplate jdbc,CanonicalPublishedResults published){this.spool=spool;this.verifier=verifier;this.database=database;this.jdbc=jdbc;this.published=published;}
     @PostConstruct public void start(){verifyLane.scheduleWithFixedDelay(this::verify,1,1,TimeUnit.SECONDS);saveLane.scheduleWithFixedDelay(this::save,1,1,TimeUnit.SECONDS);}
     private List<CanonicalDeliverySpool.Entry> pending(){return spool.entries().stream().filter(e->e.receivedAt!=null && !e.rejected && !e.committed).sorted(Comparator.comparing(e->e.receivedAt)).toList();}
     private boolean settled(CanonicalDeliverySpool.Entry entry){
@@ -65,10 +66,9 @@ public final class CanonicalDeliveryWorker {
             long started=System.nanoTime();
             try{
                 if(settled(e))return; // Recover a commit that completed immediately before restart.
-                var request=context(e);var d=e.document;
-                verifier.verifyHandoff(request,d.metadataBytes(),spool.originals(e),d.projection().bytes(),Duration.ofSeconds(100));
-                context(e); // Current ownership after Python; never expose a superseded/canceled attempt.
+                context(e); // Transport hashes were checked at receive/seal; no duplicate Python preflight.
                 e.verified=true;e.retryAt=0;
+                published.signal(e.document.projection().identity().analysisId());
                 log("AVAILABLE",e,started);
             }catch(Exception error){failed(e,error,started);}return;
         }
