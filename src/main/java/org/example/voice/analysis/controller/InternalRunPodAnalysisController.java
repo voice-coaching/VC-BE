@@ -35,26 +35,6 @@ public class InternalRunPodAnalysisController {
                 .body(new Readiness(ready ? "ready" : "not_ready", RunPodContract.VERSION, now()));
     }
 
-    @GetMapping("/worker-readiness/v2")
-    public ResponseEntity<RunPodWorkerReadinessV2ResponseDto> readinessV2(HttpServletRequest request) {
-        authenticate(request);
-        var digests = org.example.voice.analysis.infrastructure.canonical.CanonicalBackendReadiness.SCHEMAS.stream()
-                .map(file -> new RunPodWorkerReadinessV2ResponseDto.SchemaDigestDto(file, contract.schemaSha256(file)))
-                .toList();
-        boolean supported=canonicalReadiness.supported();
-        boolean admission=canonicalReadiness.admissionEnabled();
-        var versions=new java.util.ArrayList<>(List.of("voice-coaching.runpod-analysis-result.v1",
-                "voice-coaching.runpod-analysis-result.v2","voice-coaching.runpod-analysis-result.v3"));
-        var profiles=new java.util.ArrayList<>(List.of("LEGACY_SEUNGUN_V3"));
-        if(supported){versions.add(RunPodContract.RESULT_V4);profiles.add("CANONICAL_FROZEN_20260928_V4");}
-        return ResponseEntity.status(supported ? 200 : 503).header("Cache-Control", "no-store")
-                .body(new RunPodWorkerReadinessV2ResponseDto(
-                        supported ? "ready" : "not_ready", RunPodContract.CAPABILITY_VERSION, now(), readiness.isReady(),
-                        versions, profiles, digests, supported, admission,
-                        supported ? "READY" : "NOT_READY", supported ? "READY" : "NOT_READY",
-                        supported ? null : "NOT_READY"));
-    }
-
     @PostMapping("/analyses/{analysisId}/claim")
     public RunPodAnalysisControlResponseDto claim(@PathVariable Long analysisId, HttpServletRequest request) throws IOException {
         var json = body(request, "claimRequest");
@@ -71,19 +51,8 @@ public class InternalRunPodAnalysisController {
 
     @PostMapping("/analyses/{analysisId}/result")
     public RunPodAnalysisResultCallbackResponseDto result(@PathVariable Long analysisId, HttpServletRequest request) throws IOException {
-        byte[] raw = rawBody(request, "result");
-        var json = contract.parse(raw, "result");
-        if (RunPodContract.RESULT_V4.equals(json.path("schemaVersion").asText())) {
-            var document=org.example.voice.analysis.infrastructure.canonical.CanonicalCallbackDocument.parse(raw,contract);
-            var disposition=canonicalCallbacks.ingest(analysisId,document);
-            return canonicalCallbacks.acknowledgement(analysisId,document,
-                    disposition==AnalysisResultIngestionDisposition.IGNORED_DUPLICATE?"DUPLICATE":"APPLIED");
-        }
-        if(RunPodContract.RESULT_V5.equals(json.path("schemaVersion").asText()))throw new RunPodContractException(422,"HANDOFF_REQUIRED");
-        var dto = contract.convert(json, RunPodAnalysisResultCallbackRequestDto.class);
-        var disposition = callbackService.ingestResult(analysisId, dto.toCommand(contract.digest(json)));
-        return new RunPodAnalysisResultCallbackResponseDto(dto.eventId(), analysisId, dto.requestId(), dto.executionId(),
-                disposition == AnalysisResultIngestionDisposition.IGNORED_DUPLICATE ? "DUPLICATE" : "APPLIED", now());
+        authenticate(request);
+        throw new RunPodContractException(410,"HANDOFF_REQUIRED");
     }
 
     private JsonNode body(HttpServletRequest request, String kind) throws IOException {
@@ -93,10 +62,8 @@ public class InternalRunPodAnalysisController {
     @PostMapping("/analyses/{analysisId}/result/ack")
     public ResponseEntity<RunPodAnalysisResultCallbackResponseDto> confirmCanonicalResult(
             @PathVariable Long analysisId, HttpServletRequest request) throws IOException {
-        var document=org.example.voice.analysis.infrastructure.canonical.CanonicalCallbackDocument.parse(
-                rawBody(request,"result"),contract);
-        return ResponseEntity.ok().header("Cache-Control","no-store").body(
-                canonicalCallbacks.acknowledgement(analysisId,document,"DUPLICATE"));
+        authenticate(request);
+        throw new RunPodContractException(410,"HANDOFF_REQUIRED");
     }
 
     private byte[] rawBody(HttpServletRequest request, String kind) throws IOException {

@@ -1,3 +1,5 @@
+> Current analysis API: [v5-only migration](../canonical-v5-only-migration-20261004.md). Earlier v4 entries below are legacy documentation.
+
 # Endpoint List - voice
 
 Canonical D1 rollout (2026-10-02 KST): additive storage/reader code and V33-V36

@@ -18,7 +18,7 @@ public class CanonicalResultContractController {
     @GetMapping("/api/analyses/{analysisId}/result-contract")
     public ResponseEntity<ApiResponse<Contract>> contract(@PathVariable Long analysisId,@AuthenticationPrincipal LoginUser user){
         var view=queries.get(analysisId,user.id());
-        var schema=RunPodContract.HANDOFF_PROFILE.equals(view.analysisProfile())?RunPodContract.RESULT_V5:RunPodContract.RESULT_V4;
+        var schema=RunPodContract.RESULT_V5;
         return ResponseEntity.ok().header("Cache-Control","no-store").body(ApiResponse.success("Analysis contract",new Contract(view.analysisId(),view.recordingId(),view.requestId(),view.executionId(),view.analysisProfile(),schema)));
     }
 }

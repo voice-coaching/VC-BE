@@ -12,7 +12,7 @@ def profile(path):
     doc = json.loads(trusted(path).read_bytes())
     require(set(doc) == {'version', 'aiGitRevision', 'runpodBundleSha256', 'verifierBundleSha256',
                         'pins', 'schemaDigests', 'frontend'}, 'PROFILE_FIELDS')
-    require(doc['version'] == 1 and re.fullmatch('[0-9a-f]{40}', doc['aiGitRevision']), 'PROFILE_VERSION')
+    require(doc['version'] == 2 and re.fullmatch('[0-9a-f]{40}', doc['aiGitRevision']), 'PROFILE_VERSION')
     for key in ('runpodBundleSha256', 'verifierBundleSha256'):
         require(SHA.fullmatch(doc[key]), 'PROFILE_DIGEST')
     require(set(doc['pins']) == {'coreManifestSha256', 'llmManifestSha256', 'llmLockSha256',
@@ -44,7 +44,7 @@ def verifier(doc, env):
         env['ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_RECORDINGS_PREFIX'], '--check-installation'],
         user=account.pw_uid, group=account.pw_gid, extra_groups=[], timeout=25,
         env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'}))
-    require(result.get('status') == 'READY' and all(result.get(k) == v for k, v in doc['pins'].items()),
+    require(result.get('status') == 'READY' and result.get('handoffContractVersion') == 'voice-coaching.canonical-handoff.v1' and all(result.get(k) == v for k, v in doc['pins'].items()),
             'VERIFIER_PINS_MISMATCH')
     for name, sha in doc['schemaDigests'].items():
         require(digest(root / 'app/docs/contracts' / name) == sha, 'VERIFIER_SCHEMA_MISMATCH')
@@ -77,14 +77,13 @@ def pod_identity(doc, env):
 
 def ready(doc, env):
     # Verify support independently of the external maintenance gate.
-    state = json.loads(fetch('http://127.0.0.1:8080/api/internal/ai/worker-readiness/v2', env['AI_ANALYSIS_CALLBACK_TOKEN']))
-    require(state.get('canonicalSupported') is True and state.get('canonicalAdmissionEnabled') is True,
+    state = json.loads(fetch('http://127.0.0.1:8080/api/internal/ai/worker-readiness/handoff', env['AI_ANALYSIS_CALLBACK_TOKEN']))
+    require(state.get('supported') is True and state.get('admissionEnabled') is True,
             'BACKEND_CANONICAL_NOT_READY')
     require(schemas(state) == doc['schemaDigests'], 'BACKEND_SCHEMA_MISMATCH')
     base, token = pod(env)
-    state = json.loads(fetch(base + '/health/canonical', token))
-    require(state.get('executorConfigured') is True and state.get('admissionEnabled') is True
-            and state.get('reasonCode') is None, 'POD_CANONICAL_NOT_READY')
+    state = json.loads(fetch(base + '/health/handoff', token))
+    require(state.get('executorConfigured') is True and state.get('admissionEnabled') is True, 'POD_CANONICAL_NOT_READY')
     require(schemas(state) == doc['schemaDigests'], 'POD_SCHEMA_MISMATCH')
     pod_identity(doc, env)
 
@@ -108,7 +107,7 @@ def drain(env):
       'transactions',(SELECT count(DISTINCT pid) FROM pg_locks
           WHERE relation='analysis_results'::regclass AND pid<>pg_backend_pid()
           AND mode IN ('RowShareLock','RowExclusiveLock')),
-      'ack',(SELECT count(*) FROM analysis_canonical_results r WHERE NOT EXISTS
+      'ack',(SELECT count(*) FROM analysis_canonical_results r WHERE r.schema_version='voice-coaching.runpod-analysis-result.v4' AND NOT EXISTS
             (SELECT 1 FROM analysis_canonical_ack_journal a WHERE a.event_id=r.event_id))
     )''')
     base, token = pod(env)

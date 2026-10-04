@@ -13,7 +13,6 @@ import java.util.*;
 @RestController @RequiredArgsConstructor
 public class CanonicalHandoffReadinessController {
     private final CanonicalHandoffReadiness readiness;
-    private final CanonicalBackendReadiness v4;
     private final RunPodInternalAuthentication authentication;
     @Hidden
     @GetMapping("/api/internal/ai/worker-readiness/handoff")
@@ -23,7 +22,7 @@ public class CanonicalHandoffReadinessController {
     }
     @GetMapping("/api/analysis-capabilities/canonical")
     public ResponseEntity<ApiResponse<Map<String,Object>>> publicCapabilities(){
-        var schemas=new ArrayList<String>();if(v4.admissionEnabled())schemas.add(RunPodContract.RESULT_V4);if(readiness.admission())schemas.add(RunPodContract.RESULT_V5);
+        var schemas=new ArrayList<String>();if(readiness.admission())schemas.add(RunPodContract.RESULT_V5);
         return ResponseEntity.ok().header("Cache-Control","no-store").body(ApiResponse.success("Analysis contracts",Map.of("resultSchemas",schemas)));
     }
 }

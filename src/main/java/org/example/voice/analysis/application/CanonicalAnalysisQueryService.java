@@ -40,6 +40,8 @@ public class CanonicalAnalysisQueryService {
                 throw error(CANONICAL_RESULT_UNAVAILABLE);
             throw error(CANONICAL_ANALYSIS_NOT_FOUND);
         }
+        if (!RunPodContract.HANDOFF_PROFILE.equals(result.getAnalysisProfile()))
+            throw error(CANONICAL_ANALYSIS_NOT_FOUND);
         var binding=executions.findCurrentForOwner(analysisId,userId).orElse(null);
         if(binding==null) {
             stable(result,userId);
@@ -50,8 +52,8 @@ public class CanonicalAnalysisQueryService {
                 || !result.getRecording().getTrainingSession().getContent().getId().equals(binding.contentId())
                 || !Objects.equals(result.getRecording().getAudioSha256(),binding.audioSha256())
                 || !binding.resultSchemaVersion().equals(result.getExpectedResultSchemaVersion())
-                || !java.util.Set.of(RunPodContract.RESULT_V4,RunPodContract.RESULT_V5).contains(binding.resultSchemaVersion())
-                || !java.util.Set.of(RunPodContract.REQUEST_V2,RunPodContract.REQUEST_V3).contains(binding.requestSchemaVersion())) {
+                || !RunPodContract.RESULT_V5.equals(binding.resultSchemaVersion())
+                || !RunPodContract.REQUEST_V3.equals(binding.requestSchemaVersion())) {
             stable(result,userId);
             throw error(CANONICAL_RESULT_UNAVAILABLE);
         }

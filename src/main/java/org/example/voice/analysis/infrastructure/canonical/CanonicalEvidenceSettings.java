@@ -10,17 +10,13 @@ public final class CanonicalEvidenceSettings {
     private static final String PREFIX = "analysis.canonical.evidence.";
     public CanonicalEvidenceSettings(Environment environment) { this.environment = environment; }
 
-    public boolean registrationEnabled() {
-        return "true".equals(environment.getProperty(PREFIX + "registration-enabled"));
-    }
-    public boolean verifierEnabled() {
-        return "true".equals(environment.getProperty(PREFIX + "verifier-enabled"));
-    }
+    public boolean registrationEnabled() { return false; }
+    public boolean verifierEnabled() { return false; }
     // Installed reader switches, NOT public admission switches. Leave on for retained delivery.
     public boolean callbackEnabled() { return "true".equals(environment.getProperty(PREFIX + "callback-enabled")); }
-    public boolean callbackVerifierEnabled() { return "true".equals(environment.getProperty(PREFIX + "callback-verifier-enabled")); }
+    public boolean callbackVerifierEnabled() { return false; }
     public boolean journalEnabled() { return "true".equals(environment.getProperty(PREFIX + "journal-enabled")); }
-    public boolean callbackApplyEnabled() { return "true".equals(environment.getProperty(PREFIX + "callback-apply-enabled")); }
+    public boolean callbackApplyEnabled() { return false; }
     public long journalStagingBudgetBytes() {
         try {
             long value=Long.parseLong(environment.getProperty(PREFIX+"journal-staging-budget-bytes","0"));
