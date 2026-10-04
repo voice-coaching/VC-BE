@@ -14,7 +14,12 @@ import java.util.UUID;
 public record CanonicalAnalysisView(
         String schemaVersion, long analysisId, long recordingId, UUID requestId, UUID executionId,
         AnalysisStatus jobStatus, String analysisProfile, Canonical canonicalAnalysis,
-        ServiceFailure serviceFailure, Actions actions) {
+        ServiceFailure serviceFailure, Actions actions, @JsonInclude(JsonInclude.Include.NON_NULL) String persistenceStatus) {
+    public CanonicalAnalysisView(String schemaVersion,long analysisId,long recordingId,UUID requestId,UUID executionId,
+            AnalysisStatus jobStatus,String analysisProfile,Canonical canonicalAnalysis,ServiceFailure serviceFailure,Actions actions){
+        this(schemaVersion,analysisId,recordingId,requestId,executionId,jobStatus,analysisProfile,canonicalAnalysis,serviceFailure,actions,
+                null);
+    }
     public static final String SCHEMA_VERSION = "voice-coaching.canonical-analysis-view.v1";
     public static final String PROFILE = "CANONICAL_FROZEN_20260928_V4";
 

@@ -2,6 +2,8 @@
 
 # API Specification - voice
 
+Optional result-first v5: status adds `resultAvailable`; view v2 adds optional `persistenceStatus`. SAVING/RETRYING exposes verified results before DB writes complete and disables completion actions. See [contract and activation order](../canonical-result-first-20261004.md). Default OFF.
+
 Canonical D1 rollout (2026-10-02 KST): the additive [canonical view](canonical-analysis-view-v1.md)
 and [internal journal](../contracts/runpod_canonical_journal_v1.md) are installed with V33-V36.
 Admission remains disabled; this is not full RunPod/FE integration or developer acceptance.

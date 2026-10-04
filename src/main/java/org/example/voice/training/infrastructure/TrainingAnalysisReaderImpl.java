@@ -18,6 +18,7 @@ public class TrainingAnalysisReaderImpl implements TrainingAnalysisReader {
 
     private final AnalysisResultJpaRepository analysisResultJpaRepository;
     private final org.example.voice.analysis.infrastructure.canonical.CanonicalCompletionEligibility canonicalCompletion;
+    private final org.example.voice.analysis.infrastructure.canonical.CanonicalDeliverySpool delivery;
 
     @Override
     public boolean existsRunningAnalysis(Long recordingId) {
@@ -80,7 +81,8 @@ public class TrainingAnalysisReaderImpl implements TrainingAnalysisReader {
                 analysisResult.getFailureReason(),
                 analysisResult.updatedAt(),
                 analysisResult.getExecutionDeadlineAt(),
-                java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
+                java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC),
+                delivery.resultAvailable(analysisResult)
         );
     }
 

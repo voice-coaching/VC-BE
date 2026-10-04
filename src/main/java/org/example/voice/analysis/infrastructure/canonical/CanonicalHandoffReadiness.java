@@ -21,13 +21,17 @@ public final class CanonicalHandoffReadiness {
     private final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).followRedirects(HttpClient.Redirect.NEVER).build();
     private final ScheduledExecutorService lane=Executors.newSingleThreadScheduledExecutor(r->{var t=new Thread(r,"canonical-handoff-readiness");t.setDaemon(true);return t;});
     private volatile long installedUntil,podUntil;
+    private final CanonicalDeliverySpool delivery;
+    private final CanonicalDeliveryWorker deliveryWorker;
     public CanonicalHandoffReadiness(CanonicalHandoffSettings settings,CanonicalEvidenceSettings evidence,CanonicalSemanticVerifier verifier,
-        CanonicalHandoffWorker worker,CanonicalArchiveWorker archive,CanonicalArchiveWriter writer,CanonicalResultEffectsWorker effects,RunPodContract contract,RunPodAnalysisProperties pod){
+        CanonicalHandoffWorker worker,CanonicalArchiveWorker archive,CanonicalArchiveWriter writer,CanonicalResultEffectsWorker effects,RunPodContract contract,RunPodAnalysisProperties pod,CanonicalDeliverySpool delivery,CanonicalDeliveryWorker deliveryWorker){
+        this.deliveryWorker=deliveryWorker;
+        this.delivery=delivery;
         this.settings=settings;this.evidence=evidence;this.verifier=verifier;this.worker=worker;this.archive=archive;this.writer=writer;this.effects=effects;this.contract=contract;this.pod=pod;
     }
     public Map<String,String> digests(){var result=new LinkedHashMap<String,String>();for(var file:SCHEMAS)result.put(file,contract.schemaSha256(file));return result;}
-    public boolean supported(){return System.nanoTime()<installedUntil && settings.workerEnabled() && worker.operational() && effects.operational();}
-    public boolean admission(){try{return supported() && settings.admissionEnabled() && settings.archiveEnabled() && writer.configured() && archive.operational() && System.nanoTime()<podUntil && settings.used()+CanonicalHandoffSettings.RESERVATION<=settings.budget();}catch(Exception e){return false;}}
+    public boolean supported(){return delivery.operational() && deliveryWorker.operational() && System.nanoTime()<installedUntil && settings.workerEnabled() && worker.operational() && effects.operational();}
+    public boolean admission(){try{return supported() && delivery.headroom() && settings.admissionEnabled() && settings.archiveEnabled() && writer.configured() && archive.operational() && System.nanoTime()<podUntil && settings.used()+CanonicalHandoffSettings.RESERVATION<=settings.budget();}catch(Exception e){return false;}}
     @PostConstruct public void start(){lane.scheduleWithFixedDelay(this::probe,2,15,TimeUnit.SECONDS);}
     private void probe(){
         if(!settings.workerEnabled() || settings.budget()==0 || !evidence.journalEnabled() || !evidence.callbackEnabled())return;

@@ -2,6 +2,8 @@
 
 # Endpoint List - voice
 
+Result-first v5 (default OFF): existing handoff, status, and v3 result routes gain [asynchronous persistence behavior](../canonical-result-first-20261004.md). No new route is added.
+
 Canonical D1 rollout (2026-10-02 KST): additive storage/reader code and V33-V36
 are deployed; new canonical admission and internal worker switches remain off.
 `GET /api/v2/analyses/{analysisId}` uses existing user authentication, a no-store
