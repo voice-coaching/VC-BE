@@ -23,3 +23,5 @@ Backend `analysis.canonical.handoff.*`의 worker/archive/admission, `INDEFINITE`
 GitHub Actions는 JAR와 배포 도구를 디스크 기반 `/var/tmp/alpha-*` 경로로 전달하고 해당 실행의 업로드 사본만 종료 시 정리한다. 활성 JAR와 복구 사본은 `/opt/alpha/releases` 및 root 전용 배포 기록에 유지한다. RAM 기반 `/tmp`에 과거 JAR가 쌓여 2026-10-04 두 배포가 업로드 단계에서 실패한 문제를 방지한다.
 
 v5 writer는 `canonical-evidence/v5/`로 제한한 별도 키이며 삭제 권한이 없다. DB 원본은 `INDEFINITE`로 보존하고 명시적인 spool 예산을 넘으면 신규 접수를 거절한다. 키 만료 전에 교체하고 B2 작업 오류와 저장 용량을 모니터링해야 한다.
+
+공급자가 발급한 application key는 영문·숫자만으로 제한하지 않고 특수문자를 보존한다. 설정 검사에서는 빈 값·공백·제어문자·비정상 길이를 거부하며 실제 인증 권한은 B2에서 검증한다.

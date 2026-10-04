@@ -26,8 +26,12 @@ public final class CanonicalArchiveWriter {
             && value("endpoint").equals("https://s3."+value("region")+".backblazeb2.com")
             && value("bucket").matches("[A-Za-z0-9][A-Za-z0-9-]{4,48}[A-Za-z0-9]")
             && prefix.length()<=800 && prefix.matches("[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*/")
-            && value("writer-key-id").matches("[A-Za-z0-9]+") && value("writer-application-key").matches("[A-Za-z0-9]+")
+            && value("writer-key-id").matches("[A-Za-z0-9]+") && validApplicationKey(value("writer-application-key"))
             && "INDEFINITE".equals(settings.value("retention"));
+    }
+    /** Provider-issued opaque secret: preserve punctuation, reject unsafe env/control bytes. */
+    private static boolean validApplicationKey(String key){
+        return !key.isEmpty() && key.length()<=512 && key.chars().allMatch(c->c>32 && c<127);
     }
     private synchronized S3Client client(){
         if(!configured())throw new EvidenceFailure(true);
