@@ -67,10 +67,12 @@ Backend `analysis.canonical.handoff.*`:
 
 순서: 새 verifier bundle 설치 → Backend V39와 JAR(worker ON, admission OFF) → RunPod overlay와 `AI_CANONICAL_HANDOFF_ENABLED=true` → FE parser 배포 → 개발자 수용 → Backend admission ON. v5 Pod는 B2 writer envelope를 읽지 않으며 v4 신규 admission을 끈다. 교체 전에 v4 실행을 drain한다. core/H5 패키지를 새로 변경하는 작업은 아니다.
 
-양쪽 `/health/handoff`와 `/api/internal/ai/worker-readiness/handoff`가 기존 9개 + 신규 3개 schema SHA를 대조한다. verifier 설치 확인도 handoff 지원 버전을 확인한다. 설정을 켠 것만으로 운영 완료를 주장하지 않는다.
+양쪽 `/health/handoff`와 `/api/internal/ai/worker-readiness/handoff`가 기존 9개 + 신규 3개 schema SHA를 대조한다. v5 readiness의 `assertHandoffInstalled()`만 handoff 지원 버전을 필수로 확인한다. 기존 v4 `assertInstalled()`는 현재 scored 검증기를 계속 허용하며, resident 필드가 있으면 세 pin을 모두 검증한다. v5 설정이 꺼진 상태에서 새 검증기 미설치를 이유로 기존 v4 readiness를 막지 않는다. 설정을 켠 것만으로 운영 완료를 주장하지 않는다.
 
 롤백은 Backend 신규 admission OFF부터 수행한다. 이미 접수된 request와 RECEIVED/COMMITTED archive는 계속 처리한다. 새 결과를 읽는 Backend/FE와 verifier를 유지하며 원본·테이블을 제거하지 않는다.
 
 ## 확인 범위와 남은 수용
 
 에이전트는 소스·schema 정적 확인과 Python/Java/TypeScript 컴파일만 수행한다. 자동 회귀 테스트·fixture·브라우저 QA·실제 요청 실행은 하지 않는다. 개발자는 인계 응답 유실, B2 장애, PUT 후 재시작, 취소/재시도 세대 교체, 기존 v4 이력, testvideo1 점수·warm latency를 확인해야 한다. 최대 활성 추론 1개는 유지하며 P2의 추론/GPT 두 실행 겹치기는 이번 인계 구현과 별도다.
+
+2026-10-04 CI 수정 요청에서는 기존 `clean test bootJar` 검증을 수행한다. Dispatcher 테스트 생성자·설정·FIFO 조회를 수정하고, 기존 scored 설치 허용·pin 불일치 거절·v5 capability 분리 검증을 추가했다. AWS 재시작·DB migration·운영 설정 변경은 이 PR 수정 작업에 포함하지 않는다. v5 단일 운영 전환은 별도 배포 작업이며 현재 PR은 기존 운영과 병행 설치 가능한 상태를 유지한다.

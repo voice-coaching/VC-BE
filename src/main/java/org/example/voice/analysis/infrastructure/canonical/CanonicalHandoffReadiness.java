@@ -31,7 +31,7 @@ public final class CanonicalHandoffReadiness {
     @PostConstruct public void start(){lane.scheduleWithFixedDelay(this::probe,2,15,TimeUnit.SECONDS);}
     private void probe(){
         if(!settings.workerEnabled() || settings.budget()==0 || !evidence.journalEnabled() || !evidence.callbackEnabled())return;
-        try{verifier.assertInstalled();settings.used();installedUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(90);}catch(Exception e){installedUntil=podUntil=0;return;}
+        try{verifier.assertHandoffInstalled();settings.used();installedUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(90);}catch(Exception e){installedUntil=podUntil=0;return;}
         try{
             var uri=URI.create(pod.normalizedEndpointUrl()+"/health/handoff");
             if(!"https".equals(uri.getScheme()) || uri.getUserInfo()!=null)throw new IllegalStateException();
