@@ -36,6 +36,7 @@ public class CanonicalHandoffStore {
             if(!doc.id().equals(existing.getFirst().get("handoff_id")) || !doc.digest().equals(existing.getFirst().get("handoff_sha256")))fail(409,"RESULT_EVENT_CONFLICT");
             var current=owned(analysis,doc.id(),worker);
             if(!"STAGING".equals(current.get("state")))return snapshot(current);
+            return resumeStaging(doc,current,deferred);
         } else {
             if(deferred)executions.requireDeliveryOwned(analysis,id.requestId(),id.executionId(),worker);
             else executions.requireActiveForVerification(analysis,id.requestId(),id.executionId(),worker);
@@ -65,9 +66,38 @@ public class CanonicalHandoffStore {
             if(complete)return sealLocked(analysis,doc.id(),id.executionId(),doc.digest());
             return new Snapshot(doc.id(),doc.digest(),"STAGING");
         }
-        for(var entry:doc.inline().entrySet())stage(analysis,doc.id(),worker,entry.getKey(),entry.getValue());
-        if(Boolean.FALSE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM analysis_canonical_handoff_artifacts WHERE handoff_id=? AND raw_bytes IS NULL)",Boolean.class,doc.id())))return seal(analysis,doc.id(),worker);
-        return status(analysis,doc.id(),worker);
+    }
+    /** Resume a partial handoff with one ownership check and one update for all missing originals. */
+    private Snapshot resumeStaging(CanonicalHandoffDocument doc,Map<String,Object> current,boolean deferred) {
+        var rows=jdbc.queryForList("SELECT kind,sha256,byte_size,raw_bytes FROM analysis_canonical_handoff_artifacts WHERE handoff_id=? ORDER BY kind FOR UPDATE",doc.id());
+        var expected=new HashSet<String>();
+        for(var item:doc.metadata().get("artifacts"))expected.add(item.path("kind").asText());
+        var present=new HashSet<String>();
+        var values=new ArrayList<String>();var args=new ArrayList<Object>();
+        boolean complete=true;
+        for(var row:rows) {
+            String kind=(String)row.get("kind");present.add(kind);
+            byte[] incoming=doc.inline().get(kind);byte[] stored=(byte[])row.get("raw_bytes");
+            if(incoming!=null) {
+                if(incoming.length!=((Number)row.get("byte_size")).intValue() || !CanonicalCallbackDocument.sha256(incoming).equals(row.get("sha256")))fail(422,"VALIDATION_FAILED");
+                if(stored!=null && !Arrays.equals(incoming,stored))fail(409,"PAYLOAD_DIGEST_MISMATCH");
+                if(stored==null) {values.add("(?::varchar(40),?::bytea)");Collections.addAll(args,kind,incoming);}
+            } else if(stored==null)complete=false;
+        }
+        if(!expected.equals(present))fail(422,"VALIDATION_FAILED");
+        if(!values.isEmpty() || complete) {
+            long analysis=((Number)current.get("analysis_id")).longValue();
+            if(deferred)executions.requireDeliveryOwned(analysis,(UUID)current.get("request_id"),(UUID)current.get("execution_id"),(UUID)current.get("worker_instance_id"));
+            else active(current,false);
+        }
+        if(!values.isEmpty()) {
+            args.add(doc.id());
+            int changed=jdbc.update("UPDATE analysis_canonical_handoff_artifacts AS a SET raw_bytes=v.raw_bytes FROM (VALUES "
+                +String.join(",",values)+") AS v(kind,raw_bytes) WHERE a.handoff_id=? AND a.kind=v.kind AND a.raw_bytes IS NULL",args.toArray());
+            if(changed!=values.size())fail(409,"RESULT_EVENT_CONFLICT");
+        }
+        if(complete)return sealLocked(((Number)current.get("analysis_id")).longValue(),doc.id(),(UUID)current.get("execution_id"),doc.digest());
+        return snapshot(current);
     }
     private Snapshot sealLocked(long analysis,UUID handoff,UUID execution,String digest){
         jdbc.execute("SET LOCAL synchronous_commit = on");
