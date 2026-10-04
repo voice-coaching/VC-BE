@@ -80,3 +80,8 @@ Backend `analysis.canonical.handoff.*`:
 에이전트는 소스·schema 정적 확인과 Python/Java/TypeScript 컴파일만 수행한다. 자동 회귀 테스트·fixture·브라우저 QA·실제 요청 실행은 하지 않는다. 개발자는 인계 응답 유실, B2 장애, PUT 후 재시작, 취소/재시도 세대 교체, 기존 v4 이력, testvideo1 점수·warm latency를 확인해야 한다. 최대 활성 추론 1개는 유지하며 P2의 추론/GPT 두 실행 겹치기는 이번 인계 구현과 별도다.
 
 2026-10-04 CI 수정 요청에서는 기존 `clean test bootJar` 검증을 수행한다. Dispatcher 테스트 생성자·설정·FIFO 조회를 수정하고, 기존 scored 설치 허용·pin 불일치 거절·v5 capability 분리 검증을 추가했다. AWS 재시작·DB migration·운영 설정 변경은 이 PR 수정 작업에 포함하지 않는다. v5 단일 운영 전환은 별도 배포 작업이며 현재 PR은 기존 운영과 병행 설치 가능한 상태를 유지한다.
+
+
+## 2026-10-04 완료·복구 정책
+
+[API 경계 구현 인계](api-boundary-implementation-20261004.md)의 v5 COMMITTED 증명, capability, RunPod terminal reconciliation을 따른다. 학습 완료·재녹음은 v5에 없는 receipt나 B2 archive 완료를 요구하지 않는다.

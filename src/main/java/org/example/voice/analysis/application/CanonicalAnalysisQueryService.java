@@ -118,6 +118,7 @@ public class CanonicalAnalysisQueryService {
     }
 
     private static ServiceFailure backendFailure(String code) {
+        if("runpod_execution_failed".equals(code))return new ServiceFailure("RUNPOD","CANONICAL_EXECUTION_FAILED","EXECUTION");
         // Do not echo arbitrary historic failureReason/code/exception text into the new public contract.
         if("analysis_execution_timeout".equals(code))return new ServiceFailure("BACKEND","ANALYSIS_EXECUTION_TIMEOUT","EXECUTION");
         if("runpod_analysis_request_delivery_failed".equals(code))return new ServiceFailure("BACKEND","ANALYSIS_DELIVERY_FAILED","DISPATCH");
