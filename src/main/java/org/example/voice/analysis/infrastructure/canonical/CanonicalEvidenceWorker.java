@@ -42,12 +42,17 @@ public final class CanonicalEvidenceWorker {
             if(task==null)return;
             byte[] request=jobs.loadRequest(task);
             var claimed=task;
-            var originals=artifacts.load(task.manifest(),task.analysisId(),task.executionId(),() -> fence(claimed));
+            var originals=CanonicalTiming.measure(task.analysisId(),task.executionId(),"EVIDENCE_READ",
+                    () -> artifacts.load(claimed.manifest(),claimed.analysisId(),claimed.executionId(),() -> fence(claimed)));
             fence(task);
-            verifier.verifyEvidence(request,task.manifest(),originals,
-                    Duration.between(OffsetDateTime.now(ZoneOffset.UTC),task.deadline()));
+            CanonicalTiming.measure(task.analysisId(),task.executionId(),"EVIDENCE_SEMANTIC", () -> {
+                verifier.verifyEvidence(request,claimed.manifest(),originals,
+                    Duration.between(OffsetDateTime.now(ZoneOffset.UTC),claimed.deadline())); return null;
+            });
             fence(task);
-            jobs.finish(task,true,false);
+            CanonicalTiming.measure(task.analysisId(),task.executionId(),"EVIDENCE_COMMIT", () -> {
+                jobs.finish(claimed,true,false); return null;
+            });
             lastReason=null;
         } catch(EvidenceFailure error) {
             lastReason=error.getMessage();

@@ -78,7 +78,9 @@ public class TrainingAnalysisReaderImpl implements TrainingAnalysisReader {
                 stage(status),
                 progressPercent(status),
                 analysisResult.getFailureReason(),
-                analysisResult.updatedAt()
+                analysisResult.updatedAt(),
+                analysisResult.getExecutionDeadlineAt(),
+                java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
         );
     }
 

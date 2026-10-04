@@ -43,7 +43,13 @@ public class RunPodAnalysisClient {
                     .exchange((httpRequest, response) -> {
                         int status = response.getStatusCode().value();
                         if (status != 200 && status != 202) {
-                            throw new RunPodAnalysisDeliveryException("runpod_http_" + status, status == 429 || status >= 500, null);
+                            String code = "runpod_http_" + status;
+                            if (status == 429) {
+                                var error = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "error");
+                                if ("CAPACITY_EXCEEDED".equals(error.path("reasonCode").asText())) code = "runpod_capacity_busy";
+                            }
+                            throw new RunPodAnalysisDeliveryException(code, status == 429 || status >= 500, null)
+                                    .retryAfter(response.getHeaders().getFirst("Retry-After"));
                         }
                         var json = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "jobAccepted");
                         return contract.convert(json, RunPodAnalysisJobAccepted.class);

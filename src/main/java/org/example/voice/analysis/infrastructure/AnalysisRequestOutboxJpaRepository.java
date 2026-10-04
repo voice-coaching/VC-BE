@@ -21,6 +21,10 @@ public interface AnalysisRequestOutboxJpaRepository extends JpaRepository<Analys
     Optional<AnalysisRequestOutbox> findByEventIdAndTransport(String eventId, String transport);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<AnalysisRequestOutbox> findFirstByTransportAndStatusOrderByIdAsc(
+            String transport, AnalysisRequestOutboxStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from AnalysisRequestOutbox o where o.id = :id")
     Optional<AnalysisRequestOutbox> findForDeliveryUpdate(@Param("id") Long id);
 

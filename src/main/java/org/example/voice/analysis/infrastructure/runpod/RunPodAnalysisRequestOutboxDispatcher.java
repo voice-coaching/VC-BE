@@ -25,62 +25,99 @@ public class RunPodAnalysisRequestOutboxDispatcher {
     private final RunPodAnalysisPayloadCodec codec;
     private final RunPodAnalysisProperties properties;
     private final TransactionTemplate transactions;
+    private final RunPodDispatchGate gate;
 
     public RunPodAnalysisRequestOutboxDispatcher(AnalysisRequestOutboxJpaRepository outboxRepository,
             AnalysisResultJpaRepository analysisResultRepository, RunPodAnalysisClient client,
-            RunPodAnalysisPayloadCodec codec, RunPodAnalysisProperties properties, PlatformTransactionManager manager) {
+            RunPodAnalysisPayloadCodec codec, RunPodAnalysisProperties properties, PlatformTransactionManager manager, RunPodDispatchGate gate) {
         this.outboxRepository = outboxRepository;
         this.analysisResultRepository = analysisResultRepository;
         this.client = client;
         this.codec = codec;
         this.properties = properties;
+        this.gate = gate;
         this.transactions = new TransactionTemplate(manager);
+        this.transactions.setTimeout(5);
     }
 
     @Scheduled(fixedDelayString = "${analysis.runpod.outbox-poll-interval:PT1S}")
     public void dispatchPending() {
-        for (int i = 0; i < properties.getBatchSize(); i++) {
+        if (!properties.isConfigured()) return;
+        var claim = gate.acquire(properties.normalizedEndpointUrl());
+        if (claim == null) return;
+        var next = OffsetDateTime.now(ZoneOffset.UTC);
+        try {
             Delivery delivery = transactions.execute(status -> outboxRepository
-                    .findFirstByTransportAndStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(
-                            "RUNPOD_HTTP", AnalysisRequestOutboxStatus.PENDING, OffsetDateTime.now(ZoneOffset.UTC))
+                    .findFirstByTransportAndStatusOrderByIdAsc("RUNPOD_HTTP", AnalysisRequestOutboxStatus.PENDING)
                     .map(event -> {
-                        event.reserveDeliveryUntil(OffsetDateTime.now(ZoneOffset.UTC).plusSeconds(30));
-                        return new Delivery(event.getId(), event.getAnalysisResult().getId(), event.getPayload());
+                        var now = OffsetDateTime.now(ZoneOffset.UTC);
+                        var analysis = event.getAnalysisResult();
+                        if (analysis.getStatus() == org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
+                                || analysis.getStatus() == org.example.voice.analysis.domain.type.AnalysisStatus.FAILED
+                                || !analysis.isForActiveRequest(UUID.fromString(event.getEventId()))
+                                || !analysis.isForActiveExecution(UUID.fromString(event.getExecutionId()))) {
+                            event.cancelPending("stale_or_terminal_execution");
+                            return null;
+                        }
+                        if (event.getNextAttemptAt().isAfter(now))
+                            return new Delivery(event.getId(), event.getAnalysisResult().getId(), null, event.getNextAttemptAt());
+                        event.reserveDeliveryUntil(now.plusSeconds(60));
+                        log.info("analysis_dispatch_queue analysisId={} requestId={} executionId={} queueAgeMs={}",
+                                analysis.getId(), event.getEventId(), event.getExecutionId(),
+                                java.time.Duration.between(event.getCreatedAt(), now).toMillis());
+                        return new Delivery(event.getId(), event.getAnalysisResult().getId(), event.getPayload(), now);
                     }).orElse(null));
             if (delivery == null) return;
+            if (delivery.payload() == null) { next = delivery.readyAt(); return; }
             String error = null;
             boolean retryable = true;
+            int retryAfter = 1;
+            long started = System.nanoTime();
             try {
                 var request = codec.decodeRequest(delivery.payload());
-                var accepted = client.submit(request);
-                if (accepted == null || !request.requestId().equals(accepted.requestId())
-                        || !request.executionId().equals(accepted.executionId()) || accepted.workerInstanceId() == null) {
-                    throw new RunPodAnalysisDeliveryException("runpod_acceptance_contract_invalid", false, null);
+                if (!request.deadlineAt().isAfter(OffsetDateTime.now(ZoneOffset.UTC))) {
+                    error = "analysis_execution_timeout";
+                    retryable = false;
+                } else {
+                    var accepted = client.submit(request);
+                    if (accepted == null || !request.requestId().equals(accepted.requestId())
+                            || !request.executionId().equals(accepted.executionId()) || accepted.workerInstanceId() == null)
+                        throw new RunPodAnalysisDeliveryException("runpod_acceptance_contract_invalid", false, null);
                 }
             } catch (RunPodAnalysisDeliveryException failure) {
-                error = failure.code();
-                retryable = failure.isRetryable();
+                error = failure.code(); retryable = failure.isRetryable(); retryAfter = failure.retryAfterSeconds();
             } catch (RunPodContractException failure) {
-                error = "runpod_contract_invalid";
-                retryable = false;
-            } catch (RuntimeException failure) {
-                error = FAILURE;
-            }
+                error = "runpod_contract_invalid"; retryable = false;
+            } catch (RuntimeException failure) { error = FAILURE; }
             final String outcome = error;
             final boolean retry = retryable;
-            transactions.executeWithoutResult(status -> finish(delivery, outcome, retry));
+            final int delay = retryAfter;
+            next = transactions.execute(status -> finish(delivery, outcome, retry, delay));
+            log.info("analysis_dispatch_span analysisId={} elapsedMs={} code={}", delivery.analysisId(),
+                    (System.nanoTime()-started)/1_000_000, outcome == null ? "ACCEPTED" : outcome);
+        } finally {
+            gate.release(claim, next == null ? OffsetDateTime.now(ZoneOffset.UTC).plusSeconds(1) : next);
         }
     }
 
-    private void finish(Delivery delivery, String error, boolean retryable) {
+    private OffsetDateTime finish(Delivery delivery, String error, boolean retryable, int retryAfter) {
         // Match cancellation/result lock order: analysis first, then outbox.
         var result = analysisResultRepository.findForIngestion(delivery.analysisId()).orElse(null);
         var event = outboxRepository.findForDeliveryUpdate(delivery.id()).orElse(null);
-        if (result == null || event == null || event.getStatus() != AnalysisRequestOutboxStatus.PENDING) return;
+        if (result == null || event == null || event.getStatus() != AnalysisRequestOutboxStatus.PENDING) return OffsetDateTime.now(ZoneOffset.UTC);
         if (!result.isForActiveRequest(UUID.fromString(event.getEventId()))
                 || !result.isForActiveExecution(UUID.fromString(event.getExecutionId()))) {
             event.cancelPending("stale_execution");
-            return;
+            return OffsetDateTime.now(ZoneOffset.UTC);
+        }
+        if (result.getStatus() == org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
+                || result.getStatus() == org.example.voice.analysis.domain.type.AnalysisStatus.FAILED) {
+            event.cancelPending("terminal_execution");
+            return OffsetDateTime.now(ZoneOffset.UTC);
+        }
+        if ("runpod_capacity_busy".equals(error) && result.getWorkerInstanceId() == null) {
+            log.info("analysis_capacity_wait analysisId={} busyCount={}", delivery.analysisId(), event.getBusyCount()+1);
+            return event.deferCapacity(retryAfter);
         }
         // A claim proves delivery even if its HTTP acknowledgment was lost; never fail live inference.
         if (error == null || result.getWorkerInstanceId() != null) {
@@ -88,10 +125,14 @@ public class RunPodAnalysisRequestOutboxDispatcher {
         } else {
             log.warn("runpod delivery failed: eventId={}, code={}", event.getEventId(), error);
             if (event.recordDispatchFailure(error, retryable ? properties.getDispatchMaxAttempts() : 1)) {
-                result.fail(FAILURE, "분석 작업을 전달하지 못했습니다. 다시 시도해 주세요.", null, null);
+                boolean expired = "analysis_execution_timeout".equals(error);
+                result.fail(expired ? error : FAILURE, expired ? "분석 제한 시간이 지났습니다. 다시 시도해 주세요."
+                        : "분석 작업을 전달하지 못했습니다. 다시 시도해 주세요.", null, null);
             }
         }
+        return event.getStatus() == AnalysisRequestOutboxStatus.PENDING
+                ? event.getNextAttemptAt() : OffsetDateTime.now(ZoneOffset.UTC);
     }
 
-    private record Delivery(Long id, Long analysisId, String payload) {}
+    private record Delivery(Long id, Long analysisId, String payload, OffsetDateTime readyAt) {}
 }
