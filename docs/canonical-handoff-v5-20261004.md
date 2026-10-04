@@ -47,6 +47,8 @@ archive 실패는 사용자 점수를 취소하거나 GPT를 재실행하지 않
 - GET `/api/analyses/{id}/result-contract`: 로그인·현재 소유 관계 확인. analysisId/recordingId/requestId/executionId/analysisProfile/resultSchemaVersion을 반환한다.
 - GET `/api/v3/analyses/{id}`: v5 전용. 공개 view `voice-coaching.canonical-analysis-view.v2`, profile v5이며 안전한 코칭·점수·actions 구조는 v1과 같다. 기존 `/api/v2/analyses/{id}`는 v4 전용이다.
 
+OpenAPI에는 접수 버전·결과 계약 조회 2개를 명시적으로 문서화한다. 서버 간 handoff·archive 조정·worker readiness 경로는 기존 내부 API와 동일하게 공개 OpenAPI에서 제외한다. 이는 문서 노출 범위만 조정하며 라우팅과 인증 동작은 유지한다.
+
 FE는 신규 접수 시 capability가 허용하면 v5를 선택한다. 재진입·이력 조회는 저장된 현재 profile을 조회하고 해당 parser/endpoint로 연결한다. routing/capability API가 없는 구 Backend의 404에만 v4 호환 경로를 사용한다. 인증·5xx·형식 오류로 다른 profile을 선택하지 않는다. archive 상태는 사용자 완료 조건이나 UI에 포함하지 않는다.
 
 ## 설정과 배포

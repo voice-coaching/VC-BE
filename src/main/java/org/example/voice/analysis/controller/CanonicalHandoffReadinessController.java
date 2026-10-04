@@ -1,5 +1,6 @@
 package org.example.voice.analysis.controller;
 
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import jakarta.servlet.http.HttpServletRequest;
 import org.example.voice.analysis.infrastructure.canonical.*;
@@ -14,6 +15,7 @@ public class CanonicalHandoffReadinessController {
     private final CanonicalHandoffReadiness readiness;
     private final CanonicalBackendReadiness v4;
     private final RunPodInternalAuthentication authentication;
+    @Hidden
     @GetMapping("/api/internal/ai/worker-readiness/handoff")
     public ResponseEntity<Map<String,Object>> internal(HttpServletRequest request){
         var tokens=Collections.list(request.getHeaders("Authorization"));if(tokens.size()!=1)throw new RunPodContractException(401,"UNAUTHENTICATED");authentication.verify(tokens.getFirst());

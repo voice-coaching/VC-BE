@@ -1,5 +1,6 @@
 package org.example.voice.analysis.controller;
 
+import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.infrastructure.canonical.*;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.util.*;
 
+@Hidden
 @RestController @RequiredArgsConstructor
 @RequestMapping("/api/internal/ai/analyses/{analysisId}/handoffs")
 public class CanonicalHandoffController {

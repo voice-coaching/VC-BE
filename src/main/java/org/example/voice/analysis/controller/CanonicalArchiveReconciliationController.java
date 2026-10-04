@@ -1,5 +1,6 @@
 package org.example.voice.analysis.controller;
 
+import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.analysis.infrastructure.canonical.*;
@@ -11,6 +12,7 @@ import java.security.MessageDigest;
 import java.util.*;
 
 /** Operations-only token, distinct from the Pod callback token; never permits an arbitrary key or PUT. */
+@Hidden
 @RestController @RequiredArgsConstructor
 public class CanonicalArchiveReconciliationController {
     private final CanonicalArchiveWorker archive;
