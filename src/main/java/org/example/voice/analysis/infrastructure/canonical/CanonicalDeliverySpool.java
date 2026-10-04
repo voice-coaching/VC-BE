@@ -61,7 +61,7 @@ public final class CanonicalDeliverySpool {
                 var entry=new Entry(doc,p);reserved+=doc.reservedBytes();
                 if(Files.exists(p.resolve("received")))entry.receivedAt=Instant.parse(new String(read(p.resolve("received"),100),java.nio.charset.StandardCharsets.UTF_8));
                 entry.rejected=Files.exists(p.resolve("rejected"));
-                entries.put(id,entry); // Reverify originals under the current verifier after every restart.
+                entries.put(id,entry); // Recheck current execution ownership after every restart.
             }
         }
         ready=true;

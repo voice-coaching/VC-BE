@@ -17,6 +17,11 @@ public class CanonicalHandoffController {
     private final RunPodInternalAuthentication authentication;
     private final RunPodContract contract;
     private final org.example.voice.analysis.application.CanonicalHandoffService store;
+    @PostMapping("/result") public ResponseEntity<Map<String,Object>> publish(@PathVariable long analysisId,HttpServletRequest request)throws IOException {
+        var worker=authenticate(request);
+        var doc=CanonicalCallbackDocument.parse(RunPodRequestBody.readJson(request,1024*1024),contract);
+        return ResponseEntity.accepted().header("Cache-Control","no-store").body(store.publish(analysisId,worker,doc));
+    }
     @PostMapping public ResponseEntity<CanonicalHandoffStore.Snapshot> receive(@PathVariable long analysisId,HttpServletRequest request)throws IOException {
         var worker=authenticate(request);
         var doc=CanonicalHandoffDocument.parse(RunPodRequestBody.readJson(request,2*1024*1024),contract);
