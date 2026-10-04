@@ -8,4 +8,4 @@ if [[ ! "$RELEASE_ID" =~ ^[0-9a-f]{40}$ || ! "$JAR_SHA" =~ ^[0-9a-f]{64}$ ]]; th
   exit 2
 fi
 readonly SCRIPT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-exec python3 "$SCRIPT_ROOT/deployment/release.py" deploy "$RELEASE_ID" "$JAR_SHA"
+exec python3 -B "$SCRIPT_ROOT/deployment/release.py" deploy "$RELEASE_ID" "$JAR_SHA"

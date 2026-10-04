@@ -36,7 +36,7 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
     @Override
     @Transactional
     public void publish(AnalysisWorkerRequest request) {
-        persist(request, AnalysisExecutionProfile.LEGACY);
+        persist(request, AnalysisExecutionProfile.CANONICAL_HANDOFF);
     }
 
     @Override
@@ -49,7 +49,9 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
         if (!properties.isConfigured()) {
             throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
         }
-        boolean canonical = profile != AnalysisExecutionProfile.LEGACY;
+        if (profile != AnalysisExecutionProfile.CANONICAL_HANDOFF)
+            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+        boolean canonical = true;
         AnalysisResult analysisResult = (canonical ? analysisResultRepository.findForIngestion(request.analysisId())
                 : analysisResultRepository.findById(request.analysisId()))
                 .orElseThrow(() -> new IllegalStateException("analysis result disappeared before outbox write"));

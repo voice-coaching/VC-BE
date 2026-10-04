@@ -1,3 +1,5 @@
+> Current analysis API: [v5-only migration](../canonical-v5-only-migration-20261004.md). Earlier v4 entries below are legacy documentation.
+
 # API Specification - voice
 
 Canonical D1 rollout (2026-10-02 KST): the additive [canonical view](canonical-analysis-view-v1.md)

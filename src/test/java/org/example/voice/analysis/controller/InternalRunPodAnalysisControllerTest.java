@@ -3,7 +3,6 @@ package org.example.voice.analysis.controller;
 import org.example.voice.analysis.application.AnalysisRunPodCallbackService;
 import org.example.voice.analysis.application.CanonicalCallbackService;
 import org.example.voice.analysis.domain.model.AnalysisRunPodControlData;
-import org.example.voice.analysis.domain.type.AnalysisResultIngestionDisposition;
 import org.example.voice.analysis.infrastructure.canonical.CanonicalBackendReadiness;
 import org.example.voice.analysis.infrastructure.runpod.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +57,7 @@ class InternalRunPodAnalysisControllerTest {
     }
 
     @Test
-    void claimAndHeartbeatReturnFlatLeaseAndResultReturnsCommittedAck() throws Exception {
+    void claimAndHeartbeatReturnFlatLeaseAndRetiredResultRequiresHandoff() throws Exception {
         var data = new AnalysisRunPodControlData(1L, REQUEST, EXECUTION, WORKER.toString(),
                 RunPodContract.timestamp(OffsetDateTime.now()), RunPodContract.timestamp(OffsetDateTime.now().plusSeconds(90)), true);
         when(service.claim(eq(1L), any())).thenReturn(data);
@@ -72,15 +71,17 @@ class InternalRunPodAnalysisControllerTest {
         var heartbeat = mvc.perform(post(base+"/analyses/1/heartbeat").header("Authorization", "Bearer "+token)
                 .contentType("application/json").content("{"+identities+"}")).andExpect(status().isOk()).andReturn();
         contract.parse(heartbeat.getResponse().getContentAsByteArray(), "leaseResponse");
-        when(service.ingestResult(eq(1L), any())).thenReturn(AnalysisResultIngestionDisposition.APPLIED, AnalysisResultIngestionDisposition.IGNORED_DUPLICATE);
         String raw = result(UUID.randomUUID());
-        for (String expected : new String[]{"APPLIED", "DUPLICATE"}) {
-            var ack = mvc.perform(post(base+"/analyses/1/result").header("Authorization", "Bearer "+token)
-                    .contentType("application/json").content(raw)).andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value(expected)).andReturn();
-            contract.parse(ack.getResponse().getContentAsByteArray(), "resultAck");
-            fixture("resultAck", ack.getResponse().getContentAsByteArray());
+        for (String endpoint : new String[]{"/result", "/result/ack"}) {
+            mvc.perform(post(base+"/analyses/1"+endpoint).contentType("application/json").content(raw))
+                    .andExpect(status().isUnauthorized());
+            mvc.perform(post(base+"/analyses/1"+endpoint).header("Authorization", "Bearer "+token)
+                    .contentType("application/json").content(raw)).andExpect(status().isGone())
+                    .andExpect(jsonPath("$.reasonCode").value("HANDOFF_REQUIRED"))
+                    .andExpect(jsonPath("$.retryable").value(false));
         }
+        verify(service, never()).ingestResult(anyLong(), any());
+        verifyNoInteractions(canonicalCallbacks);
     }
 
     @Test
@@ -101,9 +102,10 @@ class InternalRunPodAnalysisControllerTest {
 
     @Test
     void databaseFailureIsRetryableAndDoesNotExposeInternalDetails() throws Exception {
-        when(service.ingestResult(anyLong(), any())).thenThrow(new org.springframework.dao.DataAccessResourceFailureException("private credentials"));
-        var response = mvc.perform(post(base+"/analyses/1/result").header("Authorization", "Bearer "+token)
-                .contentType("application/json").content(result(UUID.randomUUID())))
+        when(service.heartbeat(anyLong(), any())).thenThrow(new org.springframework.dao.DataAccessResourceFailureException("private credentials"));
+        String raw = "{\"requestId\":\""+REQUEST+"\",\"executionId\":\""+EXECUTION+"\",\"workerInstanceId\":\""+WORKER+"\"}";
+        var response = mvc.perform(post(base+"/analyses/1/heartbeat").header("Authorization", "Bearer "+token)
+                .contentType("application/json").content(raw))
                 .andExpect(status().isServiceUnavailable()).andExpect(header().string("Retry-After","1")).andReturn();
         contract.parse(response.getResponse().getContentAsByteArray(), "error");
         fixture("error", response.getResponse().getContentAsByteArray());

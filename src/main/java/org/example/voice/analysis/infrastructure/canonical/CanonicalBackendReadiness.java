@@ -57,7 +57,7 @@ public final class CanonicalBackendReadiness {
         this.callbackWorker=callbackWorker;this.applyWorker=applyWorker;this.effectsWorker=effectsWorker;
         this.jdbc=jdbc;this.legacy=legacy;this.pod=pod;this.contract=contract;this.environment=environment;
     }
-    @PostConstruct public void start(){lane.scheduleWithFixedDelay(this::probe,1,15,TimeUnit.SECONDS);}
+    @PostConstruct public void start(){/* v4 retired; v5 owns deployment readiness. */}
     private boolean configured() {
         return settings.configured() && settings.semanticConfigured() && settings.registrationEnabled()
             && settings.verifierEnabled() && settings.callbackEnabled() && settings.callbackVerifierEnabled()

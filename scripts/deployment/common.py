@@ -70,7 +70,7 @@ def fetch(url, token=None, *, limit=131072):
 
 def schemas(doc):
     rows = doc['schemaDigests']
-    mapped = {r['file']: r['sha256'] for r in rows}
+    mapped = rows if isinstance(rows, dict) else {r['file']: r['sha256'] for r in rows}
     require(len(rows) == len(mapped) == 9, 'SCHEMA_SET_INVALID')
     return mapped
 

@@ -13,7 +13,7 @@ import java.net.http.*;
 /** Independent v5 readiness; B2 availability does not gate result verification. */
 @Component
 public final class CanonicalHandoffReadiness {
-    public static final List<String> SCHEMAS=List.of("runpod_analysis_request_v3.schema.json","runpod_result_v5.schema.json","runpod_canonical_handoff_v1.schema.json");
+    public static final List<String> SCHEMAS=List.of("runpod_http_control_v1.schema.json","runpod_http_control_v1_2.schema.json","runpod_canonical_parent.schema.json","runpod_canonical_input.schema.json","runpod_canonical_output.schema.json","runpod_canonical_journal_v1.schema.json","runpod_analysis_request_v3.schema.json","runpod_result_v5.schema.json","runpod_canonical_handoff_v1.schema.json");
     private final CanonicalHandoffSettings settings;private final CanonicalEvidenceSettings evidence;
     private final CanonicalSemanticVerifier verifier;private final CanonicalHandoffWorker worker;
     private final CanonicalArchiveWorker archive;private final CanonicalArchiveWriter writer;
@@ -25,7 +25,7 @@ public final class CanonicalHandoffReadiness {
         CanonicalHandoffWorker worker,CanonicalArchiveWorker archive,CanonicalArchiveWriter writer,CanonicalResultEffectsWorker effects,RunPodContract contract,RunPodAnalysisProperties pod){
         this.settings=settings;this.evidence=evidence;this.verifier=verifier;this.worker=worker;this.archive=archive;this.writer=writer;this.effects=effects;this.contract=contract;this.pod=pod;
     }
-    public Map<String,String> digests(){var result=new LinkedHashMap<String,String>();for(var file:java.util.stream.Stream.concat(CanonicalBackendReadiness.SCHEMAS.stream(),SCHEMAS.stream()).toList())result.put(file,contract.schemaSha256(file));return result;}
+    public Map<String,String> digests(){var result=new LinkedHashMap<String,String>();for(var file:SCHEMAS)result.put(file,contract.schemaSha256(file));return result;}
     public boolean supported(){return System.nanoTime()<installedUntil && settings.workerEnabled() && worker.operational() && effects.operational();}
     public boolean admission(){try{return supported() && settings.admissionEnabled() && settings.archiveEnabled() && writer.configured() && archive.operational() && System.nanoTime()<podUntil && settings.used()+CanonicalHandoffSettings.RESERVATION<=settings.budget();}catch(Exception e){return false;}}
     @PostConstruct public void start(){lane.scheduleWithFixedDelay(this::probe,2,15,TimeUnit.SECONDS);}

@@ -108,7 +108,7 @@ def run(args):
             verifier = probes.verifier(doc, effective)
             probes.frontend(doc)
         target = Path('/opt/alpha/releases') / (args.release + '.jar')
-        incoming = Path('/tmp') / ('alpha-' + args.release + '.jar')
+        incoming = Path('/var/tmp') / ('alpha-' + args.release + '.jar')
         source = target if target.exists() else incoming
         if args.phase not in ('abort', 'rollback'): check_jar(source, args.jar_sha, doc)
         if args.phase == 'check':
