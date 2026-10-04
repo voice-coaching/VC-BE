@@ -30,6 +30,19 @@ public class CanonicalCallbackCommitter {
             return AnalysisResultIngestionDisposition.IGNORED_DUPLICATE;
         var id=doc.identity();
         inbox.requireVerifiedForCommit(doc);
+        return commitResult(doc,null);
+    }
+
+    /** Caller holds the handoff claim and visibility fence in this same transaction. */
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public AnalysisResultIngestionDisposition commitHandoff(CanonicalCallbackDocument doc,java.util.UUID handoff) {
+        if(!RunPodContract.RESULT_V5.equals(doc.schemaVersion()))throw new RunPodContractException(422,"VALIDATION_FAILED");
+        jdbc.execute("SET LOCAL synchronous_commit = on");
+        return commitResult(doc,handoff);
+    }
+
+    private AnalysisResultIngestionDisposition commitResult(CanonicalCallbackDocument doc,java.util.UUID handoff) {
+        var id=doc.identity();
         var result=results.findForIngestion(id.analysisId())
                 .orElseThrow(()->new RunPodContractException(404,"TARGET_NOT_FOUND"));
         if(result.getLastResultEventId()!=null)throw new RunPodContractException(409,"RESULT_ALREADY_FINALIZED");
@@ -45,14 +58,14 @@ public class CanonicalCallbackCommitter {
                     (event_id,execution_id,request_id,analysis_id,recording_id,content_id,worker_instance_id,
                      schema_version,analysis_profile,status,payload_sha256,raw_sha256,callback_bytes,callback_document,
                      evidence_receipt_id,core_sha256,canonical_analysis_id,representation,decision_status,
-                     decision_reason_code,decision_stage,core_status,adapter_status,generation_status)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,CAST(? AS json),?,?,?,?,?,?,?,?,?,?)
+                     decision_reason_code,decision_stage,core_status,adapter_status,generation_status,handoff_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,CAST(? AS json),?,?,?,?,?,?,?,?,?,?,?)
                 """,id.eventId(),id.executionId(),id.requestId(),id.analysisId(),id.recordingId(),id.contentId(),id.workerId(),
-                RunPodContract.RESULT_V4,"CANONICAL_FROZEN_20260928_V4",doc.status().name(),doc.payloadSha256(),doc.rawSha256(),
+                doc.schemaVersion(),doc.analysisProfile(),doc.status().name(),doc.payloadSha256(),doc.rawSha256(),
                 doc.bytes(),doc.storageJson(),doc.retention()==null?null:doc.retention().receiptId(),doc.source().coreSha256(),
                 doc.source().canonicalAnalysisId(),doc.representation(),decision==null?null:decision.status().name(),
                 decision==null?null:decision.reasonCode(),decision==null?null:decision.stage(),doc.coreStatus(),
-                doc.adapterStatus(),doc.generationStatus());
+                doc.adapterStatus(),doc.generationStatus(),handoff);
         var completion=new CanonicalResultCompletion(id.eventId(),id.requestId(),id.executionId(),doc.payloadSha256(),
                 doc.status(),doc.source().audioSha256(),doc.workerRevision(),doc.pipelineRevision(),summary(doc),
                 doc.failure()==null?null:doc.failure().code(),doc.failure()==null?null:failureReason(),doc.overallScore());
@@ -61,8 +74,13 @@ public class CanonicalCallbackCommitter {
         var session=result.getRecording().getTrainingSession();
         jdbc.update("INSERT INTO analysis_canonical_result_effects(event_id,analysis_id,user_id,session_id) VALUES (?,?,?,?)",
                 id.eventId(),id.analysisId(),session.getUserId(),session.getId());
-        inbox.markApplied(id.eventId());
-        journal.recordAppliedAck(doc);
+        if(handoff==null) {
+            inbox.markApplied(id.eventId());
+            journal.recordAppliedAck(doc);
+        } else {
+            jdbc.update("INSERT INTO analysis_canonical_archive_jobs(handoff_id) VALUES (?)",handoff);
+            jdbc.update("INSERT INTO analysis_canonical_archive_artifacts(handoff_id,kind) SELECT handoff_id,kind FROM analysis_canonical_handoff_artifacts WHERE handoff_id=?",handoff);
+        }
         return AnalysisResultIngestionDisposition.APPLIED;
     }
     private static String summary(CanonicalCallbackDocument doc) {

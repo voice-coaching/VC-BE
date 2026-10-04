@@ -30,6 +30,7 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
     private final RunPodAnalysisPayloadCodec codec;
     private final RunPodAnalysisProperties properties;
     private final CanonicalExecutionRegistry canonicalExecutions;
+    private final org.example.voice.analysis.infrastructure.canonical.CanonicalHandoffSettings handoffSettings;
     private final org.example.voice.analysis.infrastructure.canonical.CanonicalRequestScope canonicalScope;
 
     @Override
@@ -48,19 +49,21 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
         if (!properties.isConfigured()) {
             throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
         }
-        boolean canonical = profile == AnalysisExecutionProfile.CANONICAL;
+        boolean canonical = profile != AnalysisExecutionProfile.LEGACY;
         AnalysisResult analysisResult = (canonical ? analysisResultRepository.findForIngestion(request.analysisId())
                 : analysisResultRepository.findById(request.analysisId()))
                 .orElseThrow(() -> new IllegalStateException("analysis result disappeared before outbox write"));
         if (!analysisResult.isForActiveRequest(request.eventId())) {
             throw new IllegalStateException("analysis request event does not match active analysis request");
         }
+        if (profile == AnalysisExecutionProfile.CANONICAL_HANDOFF) handoffSettings.reserveAdmissionBudget(org.example.voice.analysis.infrastructure.canonical.CanonicalHandoffSettings.RESERVATION);
         if (canonical) assertCanonicalScope(analysisResult, request);
         UUID executionId = UUID.randomUUID();
         OffsetDateTime deadline = OffsetDateTime.now(ZoneOffset.UTC).plus(properties.getExecutionTimeout())
                 .truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
         analysisResult.assignExecution(executionId, deadline);
-        if (canonical) analysisResult.assignCanonicalProfile();
+        if (profile == AnalysisExecutionProfile.CANONICAL_HANDOFF) analysisResult.assignHandoffProfile();
+        else if (canonical) analysisResult.assignCanonicalProfile();
         RunPodAnalysisJobRequest runPodRequest = canonical
                 ? RunPodAnalysisJobRequest.canonicalFrom(request, executionId, analysisResult.getRecording().getId(), deadline)
                 : RunPodAnalysisJobRequest.from(
@@ -69,6 +72,7 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
                 analysisResult.getRecording().getId(),
                 deadline
         );
+        if (profile == AnalysisExecutionProfile.CANONICAL_HANDOFF) runPodRequest=runPodRequest.asHandoff();
         String payload = codec.encodeRequest(runPodRequest);
         if (codec.payloadBytes(payload) > properties.getMaximumPayloadBytes()) {
             throw new IllegalStateException("runpod_analysis_request_payload_size_invalid");

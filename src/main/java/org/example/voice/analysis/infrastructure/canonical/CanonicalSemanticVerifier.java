@@ -24,7 +24,11 @@ public final class CanonicalSemanticVerifier {
     public CanonicalSemanticVerifier(CanonicalEvidenceSettings settings){this.settings=settings;}
 
     /** Installation/pins only: no job, fixture, model inference or external network. */
-    public void assertInstalled() {
+    public void assertInstalled() { assertInstalled(false); }
+
+    public void assertHandoffInstalled() { assertInstalled(true); }
+
+    private void assertInstalled(boolean handoffRequired) {
         if(!settings.semanticConfigured())unavailable();
         Process child=null;
         try {
@@ -42,6 +46,7 @@ public final class CanonicalSemanticVerifier {
             if(raw.length>4096 || child.exitValue()!=0)unavailable();
             var response=mapper.readTree(raw);
             validateInstallation(response);
+            if(handoffRequired)validateHandoffInstallation(response);
         } catch(InterruptedException error){Thread.currentThread().interrupt();unavailable();}
         catch(Exception error){unavailable();}
         finally {if(child!=null && child.isAlive())child.destroyForcibly();}
@@ -67,6 +72,15 @@ public final class CanonicalSemanticVerifier {
         }
     }
 
+    static void validateHandoffInstallation(JsonNode response) {
+        validateInstallation(response);
+        if (!"voice-coaching.canonical-handoff.v1".equals(response.path("handoffContractVersion").asText()))
+            unavailable();
+    }
+
+    public void verifyHandoff(byte[] request,byte[] metadata,List<byte[]> originals,byte[] projection,Duration budget) {
+        verify("VERIFY_HANDOFF",request,metadata,originals,null,projection,budget);
+    }
     public void verifyEvidence(byte[] request,byte[] manifest,List<byte[]> originals,Duration budget) {
         verify("VERIFY_EVIDENCE",request,manifest,originals,null,null,budget);
     }
@@ -101,7 +115,7 @@ public final class CanonicalSemanticVerifier {
                         frame(out,request,65536);
                         if(manifest!=null) {
                             frame(out,manifest,65536);
-                            if(originals.size()<4 || originals.size()>5)throw new IllegalArgumentException("ARTIFACT_COUNT");
+                            if((!mode.equals("VERIFY_HANDOFF") && originals.size()<4) || originals.size()>5)throw new IllegalArgumentException("ARTIFACT_COUNT");
                             for(byte[] raw:originals)frame(out,raw,16*1024*1024);
                         }
                         if(callback!=null)frame(out,callback,1024*1024);

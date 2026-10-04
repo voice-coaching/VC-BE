@@ -1,0 +1,16 @@
+# Install the new verifier bundle and V39 first. This file does not activate v5.
+analysis.canonical.handoff.admission-enabled=false
+analysis.canonical.handoff.worker-enabled=false
+analysis.canonical.handoff.archive-enabled=false
+# Explicitly provision storage/WAL/backups before increasing this budget.
+analysis.canonical.handoff.spool-budget-bytes=0
+analysis.canonical.handoff.retention=INDEFINITE
+analysis.canonical.handoff.b2.endpoint=
+analysis.canonical.handoff.b2.region=
+analysis.canonical.handoff.b2.bucket=
+analysis.canonical.handoff.b2.prefix=
+# Inject separate writer credentials through the private runtime environment.
+analysis.canonical.handoff.b2.writer-key-id=
+analysis.canonical.handoff.b2.writer-application-key=
+# Optional recovery endpoint; disabled until a distinct operations token is set.
+analysis.canonical.handoff.reconciliation-token=

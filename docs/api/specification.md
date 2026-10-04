@@ -1998,3 +1998,8 @@ Content-Type: application/json
 | 409 | `ANALYSIS_SCORE_UNAVAILABLE` | 분석은 완료됐지만 승급 채점용 점수 없음 |
 | 409 | `TITLE_EXAM_ALREADY_GRADED` | 이미 채점된 시험 |
 | 503 | `TITLE_EXAM_CONTENT_UNAVAILABLE` | 운영 DB에 시험용 게시 콘텐츠가 준비되지 않음 |
+
+
+## Canonical v5 handoff (2026-10-04)
+
+[Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.

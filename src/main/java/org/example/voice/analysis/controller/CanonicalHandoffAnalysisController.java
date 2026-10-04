@@ -13,18 +13,18 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @Hidden
-@RequestMapping("/api/v2/analyses")
-public class CanonicalAnalysisController {
+@RequestMapping("/api/v3/analyses")
+public class CanonicalHandoffAnalysisController {
     private final CanonicalAnalysisQueryService queries;
 
     @GetMapping("/{analysisId}")
     public ResponseEntity<ApiResponse<CanonicalAnalysisView>> get(@PathVariable Long analysisId,
             @AuthenticationPrincipal LoginUser user) {
         return ResponseEntity.ok().header("Cache-Control","no-store")
-                .body(ApiResponse.success("분석 상태와 근거를 조회했습니다.",v4(queries.get(analysisId,user.id()))));
+                .body(ApiResponse.success("분석 상태와 근거를 조회했습니다.",v5(queries.get(analysisId,user.id()))));
     }
-    private static CanonicalAnalysisView v4(CanonicalAnalysisView view) {
-        if(!CanonicalAnalysisView.PROFILE.equals(view.analysisProfile()))throw new org.example.voice.analysis.exception.CanonicalAnalysisViewException(org.example.voice.analysis.exception.CanonicalAnalysisViewException.Reason.CANONICAL_ANALYSIS_NOT_FOUND);
+    private static CanonicalAnalysisView v5(CanonicalAnalysisView view) {
+        if(!org.example.voice.analysis.infrastructure.runpod.RunPodContract.HANDOFF_PROFILE.equals(view.analysisProfile()))throw new org.example.voice.analysis.exception.CanonicalAnalysisViewException(org.example.voice.analysis.exception.CanonicalAnalysisViewException.Reason.CANONICAL_ANALYSIS_NOT_FOUND);
         return view;
     }
 }

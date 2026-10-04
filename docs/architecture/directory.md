@@ -203,3 +203,8 @@ docs
 - 공통 코드가 실제로 여러 모듈에서 공유되는가?
 - 새 설정이나 비밀값 파일이 `.gitignore` 규칙을 따르는가?
 - 구조 변경이 있으면 README와 `docs/architecture/*` 문서를 함께 갱신했는가?
+
+
+## Canonical v5 handoff (2026-10-04)
+
+[Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.

@@ -59,7 +59,7 @@ public class CanonicalExecutionRegistryImpl implements CanonicalExecutionRegistr
         var analysis = results.findForIngestion(analysisId)
                 .orElseThrow(() -> failure(Reason.INACTIVE_EXECUTION));
         if (!analysis.isForActiveRequest(requestId) || !analysis.isForActiveExecution(executionId)
-                || !analysis.isCanonicalExecution() || !RunPodContract.RESULT_V4.equals(analysis.getExpectedResultSchemaVersion())
+                || !analysis.isCanonicalExecution() || !java.util.Set.of(RunPodContract.RESULT_V4,RunPodContract.RESULT_V5).contains(analysis.getExpectedResultSchemaVersion())
                 || (analysis.getStatus() != AnalysisStatus.PENDING && analysis.getStatus() != AnalysisStatus.PROCESSING)
                 || !Boolean.TRUE.equals(jdbc.queryForObject(
                         "SELECT EXISTS (SELECT 1 FROM analysis_results a " + VISIBLE_RELATION
@@ -80,7 +80,7 @@ public class CanonicalExecutionRegistryImpl implements CanonicalExecutionRegistr
         CanonicalExecutionBinding binding;
         try {
             var json = contract.parse(payload.getBytes(StandardCharsets.UTF_8), "analysisRequest");
-            if (!RunPodContract.REQUEST_V2.equals(json.path("schemaVersion").asText())
+            if (!java.util.Set.of(RunPodContract.REQUEST_V2,RunPodContract.REQUEST_V3).contains(json.path("schemaVersion").asText())
                     || !requestId.toString().equals(json.path("requestId").asText())
                     || !executionId.toString().equals(json.path("executionId").asText())
                     || analysisId.longValue() != json.path("analysisId").longValue()

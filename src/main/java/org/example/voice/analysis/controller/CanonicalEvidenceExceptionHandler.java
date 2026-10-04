@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** New evidence-only error contract; legacy claim/heartbeat/result errors stay unchanged. */
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes={CanonicalEvidenceController.class,CanonicalJournalController.class})
+@RestControllerAdvice(assignableTypes={CanonicalEvidenceController.class,CanonicalJournalController.class,CanonicalHandoffController.class,CanonicalHandoffReadinessController.class,CanonicalArchiveReconciliationController.class})
 public class CanonicalEvidenceExceptionHandler {
     @ExceptionHandler(RunPodContractException.class)
     public ResponseEntity<Failure> protocol(RunPodContractException error){return response(error.status(),error.reason());}

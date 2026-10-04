@@ -79,6 +79,7 @@ public class InternalRunPodAnalysisController {
             return canonicalCallbacks.acknowledgement(analysisId,document,
                     disposition==AnalysisResultIngestionDisposition.IGNORED_DUPLICATE?"DUPLICATE":"APPLIED");
         }
+        if(RunPodContract.RESULT_V5.equals(json.path("schemaVersion").asText()))throw new RunPodContractException(422,"HANDOFF_REQUIRED");
         var dto = contract.convert(json, RunPodAnalysisResultCallbackRequestDto.class);
         var disposition = callbackService.ingestResult(analysisId, dto.toCommand(contract.digest(json)));
         return new RunPodAnalysisResultCallbackResponseDto(dto.eventId(), analysisId, dto.requestId(), dto.executionId(),

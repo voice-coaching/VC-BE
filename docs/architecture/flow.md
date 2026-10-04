@@ -584,3 +584,8 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
   - `home`, `training`, `analysis`, `user`
 - Related DB tables:
   - `training_sessions`, `voice_recordings`, `analysis_results`, `analysis_segments`
+
+
+## Canonical v5 handoff (2026-10-04)
+
+[Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.

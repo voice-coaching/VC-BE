@@ -6,6 +6,18 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class CanonicalSemanticVerifierInstallationTest {
+    @Test void handoffCapabilityIsRequiredOnlyForV5Admission() {
+        var installed = scoredInstallation();
+        assertThatCode(() -> CanonicalSemanticVerifier.validateInstallation(installed)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> CanonicalSemanticVerifier.validateHandoffInstallation(installed))
+                .isInstanceOf(EvidenceFailure.class);
+        installed.put("handoffContractVersion", "voice-coaching.canonical-handoff.v1");
+        assertThatCode(() -> CanonicalSemanticVerifier.validateHandoffInstallation(installed)).doesNotThrowAnyException();
+        installed.put("handoffContractVersion", "unknown");
+        assertThatThrownBy(() -> CanonicalSemanticVerifier.validateHandoffInstallation(installed))
+                .isInstanceOf(EvidenceFailure.class);
+    }
+
     static ObjectNode scoredInstallation() {
         return new ObjectMapper().createObjectNode()
                 .put("protocol", "voice-coaching.canonical-offline-verification.v1")

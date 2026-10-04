@@ -122,6 +122,17 @@ public class CanonicalEvidenceRegistrationService {
         lockVisible(analysisId,request,execution,worker);
     }
 
+    /** Backend ownership ignores the old Pod heartbeat, never the original deadline or current attempt. */
+    public void requireBackendOwned(long analysisId,UUID request,UUID execution,UUID worker) {
+        if(!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())
+            throw new IllegalStateException("VERIFICATION_TRANSACTION_REQUIRED");
+        var live=lockVisible(analysisId,request,execution,worker);
+        var now=java.time.Instant.now();
+        if(!instant(live.get("deadline_at")).isAfter(now) || !instant(live.get("execution_deadline_at")).isAfter(now))fail(409,"DEADLINE_EXCEEDED");
+        if(!java.util.Set.of("PENDING","PROCESSING").contains(live.get("status")))fail(409,"ANALYSIS_TERMINAL");
+        if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM analysis_canonical_handoffs WHERE execution_id=? AND received_at IS NOT NULL AND state IN ('RECEIVED','VERIFYING'))",Boolean.class,execution)))fail(409,"HANDOFF_REQUIRED");
+    }
+
     private void validateManifest(JsonNode manifest, java.util.Map<String,Object> live, long analysisId, UUID execution) {
         var association = manifest.get("association");
         if (association.get("recordingId").longValue() != ((Number)live.get("recording_id")).longValue()

@@ -142,6 +142,9 @@ public class AnalysisResult {
     @Column(name = "claim_expires_at")
     private OffsetDateTime claimExpiresAt;
 
+    @jakarta.persistence.Column(name="handoff_received_at")
+    private OffsetDateTime handoffReceivedAt;
+
     @Column(name = "last_heartbeat_at")
     private OffsetDateTime lastHeartbeatAt;
 
@@ -267,6 +270,7 @@ public class AnalysisResult {
         this.activeExecutionId = executionId.toString();
         this.workerInstanceId = null;
         this.claimExpiresAt = null;
+        this.handoffReceivedAt = null;
         this.lastHeartbeatAt = null;
         this.lastResultEventId = null;
         this.lastResultPayloadSha256 = null;
@@ -284,12 +288,17 @@ public class AnalysisResult {
         expectedResultSchemaVersion="voice-coaching.runpod-analysis-result.v4";
     }
 
-    public boolean isCanonicalExecution() { return "CANONICAL_FROZEN_20260928_V4".equals(analysisProfile); }
+    public void assignHandoffProfile() {
+        assignCanonicalProfile();
+        analysisProfile="CANONICAL_HANDOFF_20261004_V5";
+        expectedResultSchemaVersion="voice-coaching.runpod-analysis-result.v5";
+    }
+    public boolean isCanonicalExecution() { return java.util.Set.of("CANONICAL_FROZEN_20260928_V4","CANONICAL_HANDOFF_20261004_V5").contains(analysisProfile); }
 
     /** Clears legacy score/selected-phone/coaching fields, without fabricating a legacy result. */
     public boolean finishCanonical(org.example.voice.analysis.domain.model.CanonicalResultCompletion result) {
         if(!isCanonicalExecution() || !isForActiveRequest(result.requestId()) || !isForActiveExecution(result.executionId())
-                || !"voice-coaching.runpod-analysis-result.v4".equals(expectedResultSchemaVersion))
+                || !java.util.Set.of("voice-coaching.runpod-analysis-result.v4","voice-coaching.runpod-analysis-result.v5").contains(expectedResultSchemaVersion))
             throw new IllegalArgumentException("CANONICAL_EXECUTION_MISMATCH");
         if(isCompletedOrFailed())return false;
         if(recording==null || !Objects.equals(recording.getAudioSha256(),result.audioSha256()))
@@ -301,7 +310,7 @@ public class AnalysisResult {
         failureCode=result.failureCode();failureReason=result.failureReason();
         audioSha256=result.audioSha256();workerRevision=result.workerRevision();pipelineRevision=result.pipelineRevision();
         canonicalResultEventId=result.eventId();
-        committedResultSchemaVersion="voice-coaching.runpod-analysis-result.v4";
+        committedResultSchemaVersion=expectedResultSchemaVersion;
         rememberResultEvent(result.eventId(),result.payloadSha256());
         analyzedAt=OffsetDateTime.now(SEOUL_ZONE_ID);
         return true;

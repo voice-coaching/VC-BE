@@ -11,7 +11,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 /** New route only. Never expose/log private parser, database or evidence diagnostics. */
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes=CanonicalAnalysisController.class)
+@RestControllerAdvice(assignableTypes={CanonicalAnalysisController.class,CanonicalHandoffAnalysisController.class,CanonicalResultContractController.class})
 public class CanonicalAnalysisExceptionHandler {
     @ExceptionHandler(CanonicalAnalysisViewException.class)
     public ResponseEntity<ApiResponse<Void>> expected(CanonicalAnalysisViewException exception) { return reply(exception.reason()); }

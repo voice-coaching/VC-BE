@@ -169,6 +169,8 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/reference-audios/{audioId}/playback-url", "학습 콘텐츠", "예시 음성 재생 URL 발급", "예시 음성을 제한된 시간 동안 재생할 수 있는 URL을 발급합니다.", false);
 
         add(map, PathItem.HttpMethod.GET, "/api/analysis-capabilities", "학습 세션", "녹음·분석 지원 조건 조회", "인증된 사용자가 업로드 형식·크기·길이 한도, 음성·영상 각각의 동의 정책과 업로드·분석 연결 설정 여부를 조회합니다. 실시간 인프라 상태 확인은 수행하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/analysis-capabilities/canonical", "학습 세션", "Canonical 분석 접수 버전 조회", "로그인한 사용자에게 현재 신규 접수가 가능한 분석 결과 스키마 목록을 반환합니다. 준비 상태와 접수 설정에 따라 목록이 비어 있을 수 있습니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/analyses/{analysisId}/result-contract", "분석 결과", "현재 분석 결과 계약 조회", "본인 소유 분석의 현재 요청·실행 식별자와 분석 프로필·결과 스키마 버전을 조회합니다. 저장소 주소나 보존 작업 상태는 반환하지 않습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/training-sessions", "학습 세션", "학습 세션 생성", "학습할 콘텐츠와 학습 초점을 선택해 새로운 녹음·분석 세션을 시작합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/training-sessions/{sessionId}", "학습 세션", "학습 세션 상세 조회", "학습 세션의 콘텐츠, 진행 상태, 시간과 선택된 녹음 정보를 조회합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/complete", "학습 세션", "학습 세션 완료", "분석이 끝난 학습 세션을 완료 처리하고 실제 학습 시간을 저장합니다.", false);
