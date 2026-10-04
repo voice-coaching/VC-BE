@@ -103,6 +103,12 @@ public final class CanonicalCallbackDocument {
     public Failure failure() { return failure; }
     public Source source() { return source; }
     public Retention retention() { return retention; }
+
+    /** Eligibility calls this only after CanonicalCommittedResultReader verifies the stored proof. */
+    public boolean hasRequiredStorageEvidence() {
+        return RunPodContract.RESULT_V5.equals(schemaVersion) ? retention == null
+                : RunPodContract.RESULT_V4.equals(schemaVersion) && retention != null;
+    }
     public String representation() { return representation; }
     public String coreStatus() { return coreStatus; }
     public boolean feedbackDeliveryAllowed() { return feedbackDeliveryAllowed; }

@@ -98,4 +98,24 @@ public class RunPodAnalysisClient {
 
     private record RunPodAnalysisCancelRequest(UUID executionId) {
     }
+
+    public record JobStatus(UUID requestId, UUID executionId, UUID workerInstanceId, String status, String reasonCode) {}
+
+    /** Read-only reconciliation; unknown, stale and transport errors are never terminal evidence. */
+    public JobStatus status(UUID requestId, UUID executionId) {
+        if (!properties.isConfigured()) return null;
+        try {
+            return restClientBuilder.build().get()
+                    .uri(properties.normalizedEndpointUrl() + "/v1/analysis-jobs/" + requestId + "?executionId=" + executionId)
+                    .header("Authorization", "Bearer " + properties.getApiToken())
+                    .exchange((request, response) -> {
+                        if (response.getStatusCode().value() != 200) return null;
+                        var json = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "jobStatus");
+                        var status = contract.convert(json, JobStatus.class);
+                        return requestId.equals(status.requestId()) && executionId.equals(status.executionId()) ? status : null;
+                    });
+        } catch (RestClientException | RunPodContractException error) {
+            return null;
+        }
+    }
 }

@@ -21,7 +21,7 @@ public final class CanonicalCompletionEligibility {
         if (document.status()!=AnalysisStatus.COMPLETED || document.decision()==null
                 || document.decision().status()!=CanonicalCallbackDocument.DecisionStatus.ACCEPT
                 || !"INLINE".equals(document.representation()) || !document.feedbackDeliveryAllowed()
-                || document.retention()==null || document.failure()!=null) return false;
+                || !document.hasRequiredStorageEvidence() || document.failure()!=null) return false;
         return ("READY".equals(document.adapterStatus())
                 && ("SCHEMA_AND_STRUCTURAL_SEMANTICS_VALID".equals(document.generationStatus())
                     || "DETERMINISTIC_FALLBACK".equals(document.generationStatus())))

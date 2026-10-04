@@ -14,6 +14,7 @@ import java.util.*;
 public class CanonicalHandoffReadinessController {
     private final CanonicalHandoffReadiness readiness;
     private final RunPodInternalAuthentication authentication;
+    private final org.example.voice.analysis.application.CanonicalCapabilitiesService capabilities;
     @Hidden
     @GetMapping("/api/internal/ai/worker-readiness/handoff")
     public ResponseEntity<Map<String,Object>> internal(HttpServletRequest request){
@@ -21,8 +22,7 @@ public class CanonicalHandoffReadinessController {
         return ResponseEntity.ok().header("Cache-Control","no-store").body(Map.of("contractVersion","voice-coaching.canonical-handoff.v1","supported",readiness.supported(),"admissionEnabled",readiness.admission(),"schemaDigests",readiness.digests()));
     }
     @GetMapping("/api/analysis-capabilities/canonical")
-    public ResponseEntity<ApiResponse<Map<String,Object>>> publicCapabilities(){
-        var schemas=new ArrayList<String>();if(readiness.admission())schemas.add(RunPodContract.RESULT_V5);
-        return ResponseEntity.ok().header("Cache-Control","no-store").body(ApiResponse.success("Analysis contracts",Map.of("resultSchemas",schemas)));
+    public ResponseEntity<ApiResponse<org.example.voice.analysis.domain.model.CanonicalCapabilitiesData>> publicCapabilities(){
+        return ResponseEntity.ok().header("Cache-Control","no-store").body(ApiResponse.success("Analysis contracts",capabilities.read()));
     }
 }
