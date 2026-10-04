@@ -118,7 +118,7 @@ public final class CanonicalDeliverySpool {
         try{for(var meta:e.document.metadata().get("artifacts")){
             var raw=read(e.directory.resolve(meta.path("kind").asText()),16*1024*1024);
             CanonicalHandoffDocument.checkBytes(meta,raw);bytes.add(raw);
-        }}catch(Exception error){throw unavailable();}return bytes;
+        }}catch(RunPodContractException error){throw error;}catch(Exception error){throw unavailable();}return bytes;
     }
     public CanonicalHandoffDocument withOriginals(Entry e){
         var raw=originals(e);var inline=new LinkedHashMap<String,byte[]>();int i=0;

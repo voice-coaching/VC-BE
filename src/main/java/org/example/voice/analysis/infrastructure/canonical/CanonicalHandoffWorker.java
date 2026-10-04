@@ -73,7 +73,8 @@ public final class CanonicalHandoffWorker {
             if(job!=null)try {
                 var failed=job;
                 boolean revoked=error instanceof RunPodContractException e && e.status()==409;
-                boolean invalid=error instanceof EvidenceFailure e && !e.retryable();
+                boolean invalid=(error instanceof EvidenceFailure e && !e.retryable())
+                    || (error instanceof RunPodContractException contractError && contractError.status()==422);
                 tx.executeWithoutResult(t->{
                     jdbc.queryForList("SELECT id FROM analysis_results WHERE id=? FOR UPDATE",failed.get("analysis_id"));
                     int changed=jdbc.update("""
