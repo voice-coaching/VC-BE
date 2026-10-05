@@ -2006,6 +2006,8 @@ Content-Type: application/json
 
 ## Canonical v5 handoff (2026-10-04)
 
+Native 전체 음소 채점: `score.rubricRevision=phone-rubric-native-v1`, 기존 9개 `criteria`와 `overallScore`를 그대로 전달한다. 전체 음소 근거가 불확실하면 `UNSCORABLE/SCORING_FAILED`이며 임의 점수로 대체하지 않는다. raw logits는 비공개 CORE artifact에만 보존한다. [반영 범위·활성화 조건](../canonical-native-scoring-20261004.md)을 따른다.
+
 [Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.
 
 
@@ -2037,3 +2039,7 @@ FE는 지원 범위를 녹음/업로드 전에 확인하고, 위 필드가 빠�
 - 저장 조회는 한 번에 최대 120초, 요청별 15초, 5초 간격으로 제한한다. 지연 후 사용자가 조회만 다시 시작할 수 있고 자동 analyze/retry 제출은 없다.
 - complete 요청의 totalLearningSeconds는 새 페이지 recorder의 0초가 아닌 현재 선택된 서버 녹음 durationMs로 계산한다. duration이 없으면 임의의 1초를 만들지 않는다.
 - 실행 상태 조회로 확인한 RunPod INTERNAL_ERROR/DEPENDENCY_UNAVAILABLE terminal FAILED는 Backend failure_code=runpod_execution_failed, 공개 serviceFailure={origin:RUNPOD, code:CANONICAL_EXECUTION_FAILED, stage:EXECUTION}으로 구분한다. UNKNOWN/404/409/5xx만으로 terminal 실패를 만들지 않는다.
+
+## Direct history v1 (2026-10-05, 기본 OFF)
+
+직접 RunPod 분석의 결과 표시 이후 별도 이력 이벤트를 수신한다. 접수·분석·결과 표시를 위해 Backend를 호출하지 않는다. 기존 callback 서버 인증으로 이벤트를 받고, 기존 로그인으로 결과 소유 계정을 연결한다. 새 사용자 토큰 발급이나 RunPod 인증 게이트는 없다. 별도 V40 테이블로 독립 연습 이력을 저장하며 기존 과정/시험 완료를 생성하지 않는다. [직접 이력 계약](../contracts/direct_analysis_history_v1.md)을 따른다.

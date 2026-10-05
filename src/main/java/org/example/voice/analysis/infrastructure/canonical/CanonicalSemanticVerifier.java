@@ -74,8 +74,28 @@ public final class CanonicalSemanticVerifier {
 
     static void validateHandoffInstallation(JsonNode response) {
         validateInstallation(response);
+        // Additive source registration is separate from RunPod execution approval.
+        // Existing installations may omit the entire Native tuple while rolling out.
+        if (response.has("nativeCoreManifestSha256") || response.has("nativeManifestSha256")
+                || response.has("nativeLockSha256")) {
+            boolean nativeV1 = matchesNativeIdentity(response,
+                    "9e2a2107db7d30fe8910c8984687974d85b95120760e2bcce53d57640a5d5a32",
+                    "358365399f7445ab0a77797ce46619979955503c4faac8185724e2225aa5205c",
+                    "798b47b6f5355b120141a7fa730350739298082549036233ea5804226dbad80c");
+            boolean nativeV2 = matchesNativeIdentity(response,
+                    "68cda53df72be9dace15f3829a840c27f40efbbfee1a561f8e58d314b4991aad",
+                    "7dfc26fb088300165b4a564847d0a489092b0ab830ef591943a40f31ecb85747",
+                    "93ccb06cafb9128f4ae02f111ca4bfb599305f84ecce01e41971e69822ba1ec6");
+            if (!nativeV1 && !nativeV2) unavailable();
+        }
         if (!"voice-coaching.canonical-handoff.v1".equals(response.path("handoffContractVersion").asText()))
             unavailable();
+    }
+
+    private static boolean matchesNativeIdentity(JsonNode response, String core, String llm, String lock) {
+        return core.equals(response.path("nativeCoreManifestSha256").asText())
+                && llm.equals(response.path("nativeManifestSha256").asText())
+                && lock.equals(response.path("nativeLockSha256").asText());
     }
 
     public void verifyHandoff(byte[] request,byte[] metadata,List<byte[]> originals,byte[] projection,Duration budget) {
