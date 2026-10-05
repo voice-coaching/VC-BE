@@ -69,11 +69,12 @@ def switch_jar(target):
     link.symlink_to(target)
     os.replace(link, LIVE)
 
-def set_verifier(root, effective):
+def set_verifier(root, effective, doc):
     trusted(ENV)
     require(ENV.stat().st_mode & 0o777 == 0o600, 'ENV_PERMISSIONS')
     old = ENV.read_bytes()
     replacements = {
+        'ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_PYTHON': probes.verifier_python(doc, effective),
         'ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_SCRIPT': str(root / 'app/deploy/runpod/canonical_verify.py'),
         'ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_CORE_ROOT': str(root / 'frozen/core'),
         'ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_LLM_ROOT': str(root / 'frozen/llm'),
@@ -148,7 +149,7 @@ def run(args):
             require(LIVE.resolve().as_posix() == state['previousJar'] and digest(LIVE) == state['previousJarSha256'],
                     'LIVE_RELEASE_CHANGED')
             wait_drained(effective)
-            old_env, new_env = set_verifier(verifier, effective)
+            old_env, new_env = set_verifier(verifier, effective, doc)
             # Private backups never go into the release manifest/artifact.
             atomic(directory / 'backend-runtime.env.backup', old_env)
             if not target.exists():
