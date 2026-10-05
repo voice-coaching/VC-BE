@@ -74,6 +74,14 @@ public final class CanonicalSemanticVerifier {
 
     static void validateHandoffInstallation(JsonNode response) {
         validateInstallation(response);
+        // Additive source registration is separate from RunPod execution approval.
+        // Existing installations may omit the entire Native tuple while rolling out.
+        if (response.has("nativeCoreManifestSha256") || response.has("nativeManifestSha256")
+                || response.has("nativeLockSha256")) {
+            if (!"9e2a2107db7d30fe8910c8984687974d85b95120760e2bcce53d57640a5d5a32".equals(response.path("nativeCoreManifestSha256").asText())
+                    || !"358365399f7445ab0a77797ce46619979955503c4faac8185724e2225aa5205c".equals(response.path("nativeManifestSha256").asText())
+                    || !"798b47b6f5355b120141a7fa730350739298082549036233ea5804226dbad80c".equals(response.path("nativeLockSha256").asText())) unavailable();
+        }
         if (!"voice-coaching.canonical-handoff.v1".equals(response.path("handoffContractVersion").asText()))
             unavailable();
     }

@@ -502,3 +502,7 @@ Owner: canonical analysis infrastructure. All originals are INDEFINITE, no casca
 | `analysis_canonical_archive_artifacts` | Composite PK handoff/kind and FK to original. PENDING default, same archive states. Nullable object_key/version_id; definitive_rejection boolean defaults false and permits retry only after an explicit rejected PUT response; known version cannot be replaced and ARCHIVED is terminal. |
 
 Execution registry checks expand to exact v2/v4 and v3/v5 request/result/profile tuples. They do not reclassify historical executions. The v4 result event FK is replaced with an origin trigger because v5 events belong to the handoff table; v4 still must reference a VERIFIED inbox row at insertion. No historical bytes are updated.
+
+## V40: independent direct analysis history
+
+Additive, not yet applied to production. `direct_analysis_history` stores UUID job/execution, claim and result digests, result/script/content reference and nullable archive JSON/timestamps. `direct_analysis_history_links` stores (user_id, job_id) primary key and claim digest; user_id references users with ON DELETE CASCADE. A matching claim joins the account to the event even when linking arrives before receipt. Existing training sessions, scores and course progress tables are unchanged. Inbox/archive data are not deleted by deleting a link; production retention/deletion orchestration must account for them. See [contract](../contracts/direct_analysis_history_v1.md).

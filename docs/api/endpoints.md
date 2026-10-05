@@ -204,6 +204,8 @@ This document summarizes the API list exported from the local API spec directory
 
 ## Canonical v5 handoff
 
+2026-10-04 Native 채점 계약: 기존 URL·인증·소유권·실패 상태를 유지하고 v5 결과의 `score.rubricRevision`에 `phone-rubric-native-v1`을 추가한다. [Native 계약 반영](../canonical-native-scoring-20261004.md). 새 endpoint 또는 동기 DB 저장 대기는 추가하지 않는다.
+
 | Method | Path | Authentication | Purpose |
 |---|---|---|---|
 | GET | `/health/handoff` (RunPod) | API Bearer | Executor configuration and schema digests |
@@ -216,3 +218,14 @@ This document summarizes the API list exported from the local API spec directory
 | GET | `/api/analysis-capabilities/canonical` | User login | Available submission contracts and supported analysis scopes |
 | GET | `/api/analyses/{id}/result-contract` | User login + ownership | Current attempt contract |
 | GET | `/api/v3/analyses/{id}` | User login + ownership | Committed v5 public result |
+
+## Direct analysis background history (default OFF)
+
+[Contract](../contracts/direct_analysis_history_v1.md). These endpoints never gate RunPod result display.
+
+| Method | Path | Authentication | Purpose |
+|---|---|---|---|
+| POST | `/api/internal/ai/direct-analysis-history` | Callback bearer | Idempotent background result/archive receipt |
+| POST | `/api/direct-analysis-history/{jobId}/link` | Existing user login | Attach received result to the account |
+| GET | `/api/direct-analysis-history/{jobId}` | Existing user login | History storage state |
+| GET | `/api/direct-analysis-history` | Existing user login | Independent voice analysis history |
