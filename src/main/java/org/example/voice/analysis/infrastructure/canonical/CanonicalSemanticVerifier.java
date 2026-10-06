@@ -98,7 +98,11 @@ public final class CanonicalSemanticVerifier {
                     "818a3c16cba39dfcfa9f1083865db7f122a3eba40bc332d85256da94d1d6fb1e",
                     "f90440b764f78f32c989dc0785f41262397cc22e1d1ca48c40361189b81f86d5",
                     "74784bf0c7ba99628ed2ff8db19157c63d22a2a1cd66c58000ad2e811dc93160");
-            if (!nativeV1 && !nativeV2 && !nativeV4 && !seungunGpt && !seungunGop) unavailable();
+            boolean dlpcGop = matchesNativeIdentity(response,
+                    "b634e1304f0710a719d4e64eb265c06e99cc36ccd175bc6cd002009780f2ed97",
+                    "b74328de0b00cdf229c50810730c95d57d5a0e1bf73c7257b40310f8a0e57b02",
+                    "16e5b9fae8e837111183b7509fe985559d49f82d34c4db416b1f3abe4ae359a5");
+            if (!nativeV1 && !nativeV2 && !nativeV4 && !seungunGpt && !seungunGop && !dlpcGop) unavailable();
         }
         if (!"voice-coaching.canonical-handoff.v1".equals(response.path("handoffContractVersion").asText()))
             unavailable();
