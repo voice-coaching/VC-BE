@@ -85,6 +85,7 @@ public class CanonicalCallbackCommitter {
     }
     private static String summary(CanonicalCallbackDocument doc) {
         if(doc.status()==AnalysisStatus.FAILED)return failureReason();
+        if ("READY".equals(doc.adapterStatus()) && doc.feedback()!=null) return doc.feedback();
         // This commit path follows independent semantic verification. H5's
         // actions already satisfy max3, single-sentence and UTF-16 140 limits.
         if(doc.decision().status()==CanonicalCallbackDocument.DecisionStatus.ACCEPT
