@@ -15,9 +15,11 @@ def profile(path):
     require(doc['version'] == 2 and re.fullmatch('[0-9a-f]{40}', doc['aiGitRevision']), 'PROFILE_VERSION')
     for key in ('runpodBundleSha256', 'verifierBundleSha256'):
         require(SHA.fullmatch(doc[key]), 'PROFILE_DIGEST')
-    require(set(doc['pins']) == {'coreManifestSha256', 'llmManifestSha256', 'llmLockSha256',
+    baseline = {'coreManifestSha256', 'llmManifestSha256', 'llmLockSha256',
                                 'h5ManifestSha256', 'h5LockSha256', 'scoredCoreManifestSha256',
-                                'scoredManifestSha256', 'scoredLockSha256'}, 'PROFILE_PINS')
+                                'scoredManifestSha256', 'scoredLockSha256'}
+    native = {'nativeCoreManifestSha256', 'nativeManifestSha256', 'nativeLockSha256'}
+    require(set(doc['pins']) in (baseline, baseline | native), 'PROFILE_PINS')
     require(all(SHA.fullmatch(v) for v in doc['pins'].values()), 'PROFILE_PIN_DIGEST')
     require(len(doc['schemaDigests']) == 9 and all(re.fullmatch('runpod_[a-z0-9_]+\\.schema\\.json', k)
                 and SHA.fullmatch(v) for k, v in doc['schemaDigests'].items()), 'PROFILE_SCHEMAS')
@@ -30,6 +32,12 @@ def profile(path):
                 for p, h in fe['assets'].items()), 'PROFILE_FRONTEND_ASSETS')
     return doc
 
+def verifier_python(doc, env):
+    if 'nativeCoreManifestSha256' in doc['pins']:
+        return '/opt/alpha-canonical/venvs/py312-jsonschema4251-rfc014-numpy246-native/bin/python'
+    return env['ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_PYTHON']
+
+
 def verifier(doc, env):
     root = trusted(Path('/opt/alpha-canonical/releases') / doc['verifierBundleSha256'])
     raw = (root / 'deployment.json').read_bytes()
@@ -38,7 +46,7 @@ def verifier(doc, env):
         p = root / name
         require(p.resolve().is_relative_to(root) and not p.is_symlink() and digest(p) == sha, 'VERIFIER_FILE_HASH')
     account = pwd.getpwnam('ec2-user')
-    result = json.loads(command([env['ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_PYTHON'], '-I',
+    result = json.loads(command([verifier_python(doc, env), '-I',
         str(root / 'app/deploy/runpod/canonical_verify.py'), '--core-root', str(root / 'frozen/core'),
         '--llm-root', str(root / 'frozen/llm'), '--recordings-prefix',
         env['ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_RECORDINGS_PREFIX'], '--check-installation'],
@@ -69,8 +77,9 @@ def pod_identity(doc, env):
     require(state.get('protocol') == 'canonical-deployment-v1' and not state.get('stopping'), 'POD_DEPLOYMENT_UNAVAILABLE')
     require(state.get('sourceGitRevision') == doc['aiGitRevision'] and
             state.get('bundleSha256') == doc['runpodBundleSha256'], 'POD_APP_MISMATCH')
-    for key, pin in [('coreManifestSha256', 'scoredCoreManifestSha256'),
-                     ('llmManifestSha256', 'scoredManifestSha256'), ('llmLockSha256', 'scoredLockSha256')]:
+    prefix = 'native' if 'nativeCoreManifestSha256' in doc['pins'] else 'scored'
+    for key, pin in [('coreManifestSha256', prefix + 'CoreManifestSha256'),
+                     ('llmManifestSha256', prefix + 'ManifestSha256'), ('llmLockSha256', prefix + 'LockSha256')]:
         require(state.get(key) == doc['pins'][pin], 'POD_HARNESS_MISMATCH')
     require(schemas(state) == doc['schemaDigests'], 'POD_SCHEMA_MISMATCH')
     return state

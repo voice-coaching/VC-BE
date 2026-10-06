@@ -52,7 +52,8 @@ public final class CanonicalPublicProjection {
                 }
                 yield new ReadyCoaching(version,adapter,generation,List.copyOf(items),attempts,
                         node.get("fallbackReason").isNull()?null:text(node,"fallbackReason"),
-                        node.get("naturalLanguageSemanticsFullyVerified").booleanValue(),node.get("visualCorrectiveClaimsAllowed").booleanValue());
+                        node.get("naturalLanguageSemanticsFullyVerified").booleanValue(),node.get("visualCorrectiveClaimsAllowed").booleanValue(),
+                        node.hasNonNull("feedback")?text(node,"feedback"):null);
             }
             case "GLOBAL_REJECT","GLOBAL_INCONCLUSIVE","GLOBAL_SYSTEM_FAILURE","NO_PERMITTED_COACHING_CONTENT" ->
                     new EmptyCoaching(version,adapter,generation,List.of(),attempts);

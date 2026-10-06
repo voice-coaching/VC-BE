@@ -52,7 +52,15 @@ public record CanonicalAnalysisView(
     public record ReadyCoaching(String schemaVersion, String adapterStatus, String generationStatus,
                                 List<CoachingItem> items, int dispatchAttempts, String fallbackReason,
                                 boolean naturalLanguageSemanticsFullyVerified,
-                                boolean visualCorrectiveClaimsAllowed) implements Coaching {}
+                                boolean visualCorrectiveClaimsAllowed,
+                                @JsonInclude(JsonInclude.Include.NON_NULL) String feedback) implements Coaching {
+        public ReadyCoaching(String schemaVersion, String adapterStatus, String generationStatus,
+                             List<CoachingItem> items, int dispatchAttempts, String fallbackReason,
+                             boolean naturalLanguageSemanticsFullyVerified, boolean visualCorrectiveClaimsAllowed) {
+            this(schemaVersion, adapterStatus, generationStatus, items, dispatchAttempts, fallbackReason,
+                    naturalLanguageSemanticsFullyVerified, visualCorrectiveClaimsAllowed, null);
+        }
+    }
     public record EmptyCoaching(String schemaVersion, String adapterStatus, String generationStatus,
                                 List<CoachingItem> items, int dispatchAttempts) implements Coaching {}
     public record FailedCoaching(String schemaVersion, String adapterStatus, String generationStatus,

@@ -43,6 +43,7 @@ public final class CanonicalCallbackDocument {
     private final String representation, coreStatus, adapterStatus, generationStatus;
     private final boolean feedbackDeliveryAllowed;
     private final List<String> coachingActions;
+    private final String feedback;
     private final java.math.BigDecimal overallScore;
 
     private CanonicalCallbackDocument(byte[] raw, JsonNode node, String digest) {
@@ -80,6 +81,7 @@ public final class CanonicalCallbackDocument {
             }
         }
         coachingActions = List.copyOf(actions);
+        feedback = nullable(node.get("coaching"), "feedback");
         overallScore = "RUBRIC_COMPUTED".equals(node.path("score").path("validity").asText())
                 ? node.get("score").get("overallScore").decimalValue() : null;
     }
@@ -113,6 +115,7 @@ public final class CanonicalCallbackDocument {
     public String coreStatus() { return coreStatus; }
     public boolean feedbackDeliveryAllowed() { return feedbackDeliveryAllowed; }
     public List<String> coachingActions() { return coachingActions; }
+    public String feedback() { return feedback; }
     public java.math.BigDecimal overallScore() { return overallScore; }
     public String adapterStatus() { return adapterStatus; }
     public String generationStatus() { return generationStatus; }
