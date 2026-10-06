@@ -86,7 +86,16 @@ public final class CanonicalSemanticVerifier {
                     "68cda53df72be9dace15f3829a840c27f40efbbfee1a561f8e58d314b4991aad",
                     "7dfc26fb088300165b4a564847d0a489092b0ab830ef591943a40f31ecb85747",
                     "93ccb06cafb9128f4ae02f111ca4bfb599305f84ecce01e41971e69822ba1ec6");
-            if (!nativeV1 && !nativeV2) unavailable();
+            // Preserve the currently deployed RunPod identity during migration.
+            boolean nativeV4 = matchesNativeIdentity(response,
+                    "f1009fcdbf75515ddc13e915dcbbf19dfac751ce39779e404749c4f51dd74841",
+                    "efc705b042cb1b18d4babff4f5949f37622154e979b1c07b33afdc36eeb89428",
+                    "1b8cb378b889817e14bf06be5065b04016589f6b74dcd5501776dde758f38259");
+            boolean dlpcCudaV2 = matchesNativeIdentity(response,
+                    "4d29ddf6da45d43de6ceb0b07b70cecaf291ae5bc92b700ece6b320a8e6c423d",
+                    "de8f66aa7688404f2f59fc17e67dd2c250cf746d58f9697bebd8fee87095f5f9",
+                    "fc48fc935df8c4fb90c0a9345651c047a320da220fe46c12e6e00d395a6c556d");
+            if (!nativeV1 && !nativeV2 && !nativeV4 && !dlpcCudaV2) unavailable();
         }
         if (!"voice-coaching.canonical-handoff.v1".equals(response.path("handoffContractVersion").asText()))
             unavailable();
