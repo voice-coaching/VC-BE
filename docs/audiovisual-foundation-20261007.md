@@ -15,15 +15,15 @@
 
 ## 공개 API
 
-기존 POST `/api/training-sessions/{sessionId}/analyze` 및 retry URL/body 유지. 영상은 `X-Analysis-Result-Schema: voice-coaching.runpod-analysis-result.v6`, 음성은 기존 v5. GET `/api/v3/analyses/{analysisId}`는 저장 profile에 따라 view v2 또는 v3를 반환한다. 영상 상세 최대 128개와 생략 수, null 점수와 coverage, 자음 MFA 구간, 제한된 관찰만 노출한다. 음성 점수와 입술 점수는 합산하지 않는다.
+기존 POST `/api/training-sessions/{sessionId}/analyze` 및 retry URL/body 유지. 영상은 `X-Analysis-Result-Schema: voice-coaching.runpod-analysis-result.v6`, 음성은 기존 v5. GET `/api/v3/analyses/{analysisId}`는 저장 profile에 따라 view v2 또는 v3를 반환한다. 영상 상세 최대 128개/256KiB와 생략 수, null 점수와 coverage, 자음·모음 MFA 구간, 제한된 관찰만 노출한다. 음성 점수와 입술 점수는 합산하지 않는다.
 
 ## 기본값 및 미완료 조건
 
-`analysis.canonical.audiovisual.worker-enabled=false`, `analysis.canonical.audiovisual.admission-enabled=false`. verifier는 AI PR #35의 확장 소스 closure와 새 H5가 필요하다. Backend PR #114는 기존 PR #113 변경을 포함한다.
+`analysis.canonical.audiovisual.worker-enabled=false`, `analysis.canonical.audiovisual.admission-enabled=false`. verifier는 AI PR #35의 확장 소스 closure와 새 v2 core/H5가 필요하다. 이번 추가 변경은 Backend PR #115에 통합한다. 기반 PR #113·#114는 병합됐다.
 
-AI 후보 H5: `d2a30ff826f275e4c678cb2b50f113371220f47d9145041aadf826745e4f2739`; lock: `8126e24d7ed1d0a6cfd0cab20eceff570f8b7fa04767d44471f435a38425c242`.
+AI 후보 core: `4cc0cbacd41b5c6f2ac20e6e4840bc5406f4c7ab79ecf53702586eeb5874ecbc`; H5: `d70372926d3406842b95c370b5ceb152480e7f0af83ba840028ec8d9ace2dc50`; lock: `934729ee467a2eb030c244584c6fa5c3575ca9ed0a43348a59a486199c0f55e9`. 설치 검사는 세 pin을 모두 확인한다.
 
-참조/보정 catalog는 비어 있어 관찰 전용이며 실제 MFA 자음 위치만 지원한다. 지정 영상 추출·전문가 구간 확인·별도 보정 자료, 개발자 실제 QA, migration 검증과 운영 설치/전환이 남았다. 구 v5-only Backend로 데이터가 있는 DB를 되돌리지 않는다.
+`alignmentScope=CANONICAL_MFA_DETECTOR_PHONES_V1`은 기존 detector metadata index의 실제 자음·모음 MFA 위치다. GOP full metadata index와 혼용하지 않는다. 시간 대응이 확정되지 않은 모음은 unresolved로 남는다. 참조/보정 catalog는 비어 있어 관찰 전용이다. AI는 실제 추출·전문가 검수 편입 도구와 원본 SHA 기반 자기 비교 차단을 추가했다. 지정 영상 추출·전문가 구간 확인·별도 보정 자료, 개발자 실제 QA, migration 검증과 운영 설치/전환이 남았다. 구 v5-only Backend로 데이터가 있는 DB를 되돌리지 않는다.
 
 ## 확인
 

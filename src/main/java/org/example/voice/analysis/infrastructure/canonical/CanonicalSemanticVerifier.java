@@ -50,8 +50,9 @@ public final class CanonicalSemanticVerifier {
             var response=mapper.readTree(raw);
             validateInstallation(response);
             if(handoffRequired)validateHandoffInstallation(response);
-            if(audiovisualRequired && (!"d2a30ff826f275e4c678cb2b50f113371220f47d9145041aadf826745e4f2739".equals(response.path("audiovisualManifestSha256").asText())
-                || !"8126e24d7ed1d0a6cfd0cab20eceff570f8b7fa04767d44471f435a38425c242".equals(response.path("audiovisualLockSha256").asText()))) unavailable();
+            if(audiovisualRequired && (!"4cc0cbacd41b5c6f2ac20e6e4840bc5406f4c7ab79ecf53702586eeb5874ecbc".equals(response.path("audiovisualCoreManifestSha256").asText())
+                || !"d70372926d3406842b95c370b5ceb152480e7f0af83ba840028ec8d9ace2dc50".equals(response.path("audiovisualManifestSha256").asText())
+                || !"934729ee467a2eb030c244584c6fa5c3575ca9ed0a43348a59a486199c0f55e9".equals(response.path("audiovisualLockSha256").asText()))) unavailable();
         } catch(InterruptedException error){Thread.currentThread().interrupt();unavailable();}
         catch(Exception error){unavailable();}
         finally {if(child!=null && child.isAlive())child.destroyForcibly();}
