@@ -22,7 +22,7 @@ public final class CanonicalRerecordEligibility {
 
     private static boolean recoverable(CanonicalCallbackDocument document) {
         if (document.status() != AnalysisStatus.COMPLETED || document.decision() == null
-                || !"INLINE".equals(document.representation()) || document.retention() == null
+                || !"INLINE".equals(document.representation()) || !document.hasRequiredStorageEvidence()
                 || document.failure() != null || !"NOT_DISPATCHED".equals(document.generationStatus())) return false;
         return switch (document.decision().status()) {
             case REJECT -> "GLOBAL_REJECT".equals(document.adapterStatus());

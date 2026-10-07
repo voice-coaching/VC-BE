@@ -10,12 +10,14 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Schema-checked PRIVATE envelope, not proof of frozen semantics or a public DTO.
  * Operational fields are typed. Full frozen inputValidation/selection/coaching and
  * MFA decimals remain in the exact bytes, never a legacy worker-result conversion.
- * Only the offline verifier can promote this document to a committable inbox entry.
+ * The authenticated v5 delivery path trusts RunPod preflight; AWS still fences current ownership.
  */
 @JsonIgnoreType
 public final class CanonicalCallbackDocument {
@@ -30,6 +32,7 @@ public final class CanonicalCallbackDocument {
     public record Retention(UUID receiptId, String manifestSha256) {}
 
     private final byte[] raw;
+    private final String schemaVersion, analysisProfile;
     private final String rawSha256, payloadSha256, workerRevision, pipelineRevision;
     private final Identity identity;
     private final AnalysisStatus status;
@@ -39,9 +42,13 @@ public final class CanonicalCallbackDocument {
     private final Retention retention;
     private final String representation, coreStatus, adapterStatus, generationStatus;
     private final boolean feedbackDeliveryAllowed;
+    private final List<String> coachingActions;
+    private final String feedback;
+    private final java.math.BigDecimal overallScore;
 
     private CanonicalCallbackDocument(byte[] raw, JsonNode node, String digest) {
         this.raw = raw.clone();
+        schemaVersion=node.path("schemaVersion").asText(); analysisProfile=node.path("analysisProfile").asText();
         rawSha256 = sha256(raw);
         payloadSha256 = digest;
         identity = new Identity(uuid(node,"eventId"),uuid(node,"requestId"),uuid(node,"executionId"),
@@ -63,19 +70,31 @@ public final class CanonicalCallbackDocument {
         source = new Source(s.get("scriptSha256").asText(),s.get("audioSha256").asText(),nullable(s,"preparedWavSha256"),
                 nullable(s,"canonicalAnalysisId"),nullable(s,"coreSha256"),s.get("parentManifestSha256").asText(),
                 s.get("llmManifestSha256").asText(),s.get("llmDependencyLockSha256").asText(),s.get("promptSha256").asText());
-        var r = node.get("retainedEvidence");
-        retention = r.isNull() ? null : new Retention(uuid(r,"evidenceReceiptId"),r.get("manifestSha256").asText());
+        var r = node.path("retainedEvidence");
+        retention = (r.isNull() || r.isMissingNode()) ? null : new Retention(uuid(r,"evidenceReceiptId"),r.get("manifestSha256").asText());
         adapterStatus = nullable(node.get("coaching"),"adapterStatus");
         generationStatus = nullable(node.get("coaching"),"generationStatus");
+        var actions = new ArrayList<String>();
+        if ("READY".equals(adapterStatus)) {
+            for (var item : node.get("coaching").get("items")) {
+                actions.add(item.get("expression").get("action").textValue());
+            }
+        }
+        coachingActions = List.copyOf(actions);
+        feedback = nullable(node.get("coaching"), "feedback");
+        overallScore = "RUBRIC_COMPUTED".equals(node.path("score").path("validity").asText())
+                ? node.get("score").get("overallScore").decimalValue() : null;
     }
 
     public static CanonicalCallbackDocument parse(byte[] raw, RunPodContract contract) {
         var node = contract.parse(raw,"result");
-        if (!RunPodContract.RESULT_V4.equals(node.path("schemaVersion").asText()))
+        if (!java.util.Set.of(RunPodContract.RESULT_V4,RunPodContract.RESULT_V5,RunPodContract.RESULT_V6).contains(node.path("schemaVersion").asText()))
             throw new RunPodContractException(422,"VALIDATION_FAILED");
         return new CanonicalCallbackDocument(raw,node,contract.digest(new String(raw,StandardCharsets.UTF_8)));
     }
 
+    public String schemaVersion(){return schemaVersion;}
+    public String analysisProfile(){return analysisProfile;}
     public byte[] bytes() { return raw.clone(); }
     public String storageJson() { return new String(raw,StandardCharsets.UTF_8); }
     public String rawSha256() { return rawSha256; }
@@ -86,9 +105,18 @@ public final class CanonicalCallbackDocument {
     public Failure failure() { return failure; }
     public Source source() { return source; }
     public Retention retention() { return retention; }
+
+    /** Eligibility calls this only after CanonicalCommittedResultReader verifies the stored proof. */
+    public boolean hasRequiredStorageEvidence() {
+        return RunPodContract.handoffResult(schemaVersion) ? retention == null
+                : RunPodContract.RESULT_V4.equals(schemaVersion) && retention != null;
+    }
     public String representation() { return representation; }
     public String coreStatus() { return coreStatus; }
     public boolean feedbackDeliveryAllowed() { return feedbackDeliveryAllowed; }
+    public List<String> coachingActions() { return coachingActions; }
+    public String feedback() { return feedback; }
+    public java.math.BigDecimal overallScore() { return overallScore; }
     public String adapterStatus() { return adapterStatus; }
     public String generationStatus() { return generationStatus; }
     public String workerRevision() { return workerRevision; }

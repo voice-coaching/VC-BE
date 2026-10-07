@@ -34,6 +34,53 @@ class ContentCatalogPostgresMigrationTest {
             }finally{db.setSchema("public");sql.execute("drop schema if exists "+schema+" cascade");}
         }
     }
+    @Test void titleExamAndIntonationSeedsPublishRequiredContent() throws Exception {
+        String url=System.getenv("VC_BE_TEST_POSTGRES_URL"),user=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER","postgres"),password=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_PASSWORD","");
+        String schema="title_intonation_seed_test_"+UUID.randomUUID().toString().replace("-","");
+        try(var db=DriverManager.getConnection(url,user,password);var sql=db.createStatement()){
+            try {
+                migrate(url,user,password,schema,"37");db.setSchema(schema);
+                try(var rows=sql.executeQuery("""
+                        select count(*) from title_policies policy
+                        join practice_contents content on content.id=policy.practice_content_id
+                        where content.owner_id is null and content.content_type='SENTENCE'
+                          and content.learning_focus='PRONUNCIATION'
+                          and content.category='TITLE_EXAM'
+                          and content.status='PUBLISHED'
+                        """)) {
+                    assertThat(rows.next()).isTrue();assertThat(rows.getInt(1)).isEqualTo(4);
+                }
+                try(var rows=sql.executeQuery("""
+                        select difficulty,count(*) from practice_contents
+                        where owner_id is null and content_type='CLASS_PRACTICE'
+                          and learning_focus='INTONATION'
+                          and category='INTONATION_CLASS'
+                          and status='PUBLISHED'
+                        group by difficulty
+                        """)) {
+                    java.util.Map<String,Integer> counts=new java.util.HashMap<>();
+                    while(rows.next()) counts.put(rows.getString(1),rows.getInt(2));
+                    assertThat(counts).containsEntry("BEGINNER",1).containsEntry("INTERMEDIATE",1).containsEntry("ADVANCED",1);
+                }
+                try(var rows=sql.executeQuery("""
+                        select count(*) from courses
+                        where course_type='INTONATION' and status='PUBLISHED'
+                          and title in ('억양 기초 클래스','억양 흐름 클래스','발표 억양 클래스')
+                        """)) {
+                    assertThat(rows.next()).isTrue();assertThat(rows.getInt(1)).isEqualTo(3);
+                }
+                try(var rows=sql.executeQuery("""
+                        select count(*) from course_steps step
+                        join courses course on course.id=step.course_id
+                        join course_step_revisions revision on revision.step_id=step.id and revision.revision=1
+                        where course.course_type='INTONATION'
+                          and course.title in ('억양 기초 클래스','억양 흐름 클래스','발표 억양 클래스')
+                        """)) {
+                    assertThat(rows.next()).isTrue();assertThat(rows.getInt(1)).isEqualTo(6);
+                }
+            }finally{db.setSchema("public");sql.execute("drop schema if exists "+schema+" cascade");}
+        }
+    }
     private void verify(boolean upgrade) throws Exception {
         String url=System.getenv("VC_BE_TEST_POSTGRES_URL"),user=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER","postgres"),password=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_PASSWORD","");
         String schema="catalog_test_"+UUID.randomUUID().toString().replace("-","");

@@ -132,6 +132,19 @@ public class AnalysisRequestOutbox {
         this.lastErrorCode = null;
     }
 
+    @Column(name = "busy_count", nullable = false)
+    private int busyCount;
+
+    /** Capacity is scheduling pressure, not a failed inference/delivery attempt. */
+    public OffsetDateTime deferCapacity(int retryAfterSeconds) {
+        busyCount = Math.min(Integer.MAX_VALUE - 1, busyCount) + 1;
+        lastErrorCode = "runpod_capacity_busy";
+        long delay = Math.max(retryAfterSeconds, Math.min(5, 1L << Math.min(busyCount - 1, 3)));
+        nextAttemptAt = OffsetDateTime.now(ZoneOffset.UTC).plusSeconds(delay)
+                .plusNanos(java.util.concurrent.ThreadLocalRandom.current().nextLong(250_000_001));
+        return nextAttemptAt;
+    }
+
     /** Short database reservation; no lock or transaction is held across the worker HTTP call. */
     public void reserveDeliveryUntil(OffsetDateTime until) {
         this.nextAttemptAt = until;

@@ -72,7 +72,12 @@ class OpenApiDocumentIntegrationTest {
                 assertThat(field.getValue().path("tags").get(0).asText()).containsPattern("[가-힣]");
             }
         }
-        assertThat(operationCount).isEqualTo(80);
+        assertThat(operationCount).isEqualTo(82);
+        paths.fieldNames().forEachRemaining(path -> assertThat(path).doesNotStartWith("/api/internal/"));
+        assertThat(paths.path("/api/analysis-capabilities/canonical").path("get").path("summary").asText())
+                .isEqualTo("Canonical 분석 접수 버전 조회");
+        assertThat(paths.path("/api/analyses/{analysisId}/result-contract").path("get").path("summary").asText())
+                .isEqualTo("현재 분석 결과 계약 조회");
         assertThat(paths.path("/api/analysis-capabilities").path("get").path("summary").asText())
                 .isEqualTo("녹음·분석 지원 조건 조회");
     }

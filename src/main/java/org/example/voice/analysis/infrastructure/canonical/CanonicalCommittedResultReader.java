@@ -43,14 +43,22 @@ public final class CanonicalCommittedResultReader {
                     AND e.recording_id=d.recording_id AND e.content_id=d.content_id
                     AND e.result_schema_version=d.schema_version AND e.analysis_profile=d.analysis_profile
                     AND e.audio_sha256=r.audio_sha256
-                JOIN analysis_canonical_callback_inbox i ON i.event_id=d.event_id AND i.status='APPLIED'
+                LEFT JOIN analysis_canonical_callback_inbox i ON i.event_id=d.event_id AND i.status='APPLIED'
                     AND i.verified_at IS NOT NULL AND i.execution_id=d.execution_id AND i.request_id=d.request_id
                     AND i.analysis_id=d.analysis_id AND i.worker_instance_id=d.worker_instance_id
                     AND i.raw_sha256=d.raw_sha256 AND i.payload_sha256=d.payload_sha256
                     AND i.evidence_receipt_id IS NOT DISTINCT FROM d.evidence_receipt_id
+                LEFT JOIN analysis_canonical_handoffs h ON h.handoff_id=d.handoff_id AND h.state='COMMITTED'
+                    AND h.verified_at IS NOT NULL AND h.event_id=d.event_id AND h.execution_id=d.execution_id
+                    AND h.request_id=d.request_id AND h.analysis_id=d.analysis_id AND h.worker_instance_id=d.worker_instance_id
+                    AND h.projection_bytes=d.callback_bytes
                 LEFT JOIN analysis_evidence_receipts q ON q.receipt_id=d.evidence_receipt_id
                 WHERE a.id=? AND u.id=? AND a.canonical_result_event_id=?
                     AND a.expected_result_schema_version=d.schema_version
+                    AND ((d.schema_version='voice-coaching.runpod-analysis-result.v4'
+                          AND d.handoff_id IS NULL AND i.event_id IS NOT NULL)
+                      OR (d.schema_version IN ('voice-coaching.runpod-analysis-result.v5','voice-coaching.runpod-analysis-result.v6')
+                          AND d.handoff_id IS NOT NULL AND h.handoff_id IS NOT NULL))
                     AND d.worker_instance_id::text=a.worker_instance_id
                     AND r.deleted_at IS NULL AND r.is_selected=TRUE AND c.custom_deleted_at IS NULL
                     AND u.status='ACTIVE' AND u.deleted_at IS NULL AND s.status<>'CANCELED'
@@ -79,8 +87,8 @@ public final class CanonicalCommittedResultReader {
                 || !identity.workerId().toString().equals(result.getWorkerInstanceId())
                 || identity.analysisId()!=result.getId() || identity.recordingId()!=recording.getId()
                 || identity.contentId()!=session.getContent().getId() || document.status()!=result.getStatus()
-                || !RunPodContract.RESULT_V4.equals(result.getExpectedResultSchemaVersion())
-                || !RunPodContract.RESULT_V4.equals(result.getCommittedResultSchemaVersion())
+                || !document.schemaVersion().equals(result.getExpectedResultSchemaVersion())
+                || !document.schemaVersion().equals(result.getCommittedResultSchemaVersion())
                 || !Objects.equals(document.source().audioSha256(),recording.getAudioSha256())
                 || !Objects.equals(document.retention()==null?null:document.retention().receiptId(),stored.receiptId())
                 || !Objects.equals(document.retention()==null?null:document.retention().manifestSha256(),stored.manifestSha())) {

@@ -23,18 +23,30 @@ class RunPodDispatchTest {
         protected void doRollback(DefaultTransactionStatus status) {}
     }
 
+    private static RunPodAnalysisProperties configuredProperties() {
+        var properties = new RunPodAnalysisProperties();
+        properties.setEndpointUrl("https://worker.example.invalid");
+        properties.setApiToken("test-api-token");
+        properties.setCallbackToken("test-callback-token");
+        properties.setCallbackBaseUrl("https://backend.example.invalid");
+        return properties;
+    }
+
     @Test
     void httpRunsOutsideTransactionAndLostAckDoesNotFailClaimedJob() {
         var requests = mock(AnalysisRequestOutboxJpaRepository.class);
         var results = mock(AnalysisResultJpaRepository.class);
         var client = mock(RunPodAnalysisClient.class);
+        var gate = mock(RunPodDispatchGate.class);
+        var gateClaim = new RunPodDispatchGate.Claim("test-endpoint", UUID.randomUUID());
+        when(gate.acquire("https://worker.example.invalid")).thenReturn(gateClaim);
         var recording = mock(VoiceRecording.class);
         var result = AnalysisResult.pending(recording, REQUEST);
         ReflectionTestUtils.setField(result, "id", 1L);
         result.assignExecution(EXECUTION);
         var event = AnalysisRequestOutbox.pendingHttp(REQUEST, EXECUTION, result, payload(OffsetDateTime.now().plusMinutes(5)));
         ReflectionTestUtils.setField(event, "id", 4L);
-        when(requests.findFirstByTransportAndStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(any(), any(), any()))
+        when(requests.findFirstByTransportAndStatusOrderByIdAsc("RUNPOD_HTTP", AnalysisRequestOutboxStatus.PENDING))
                 .thenReturn(Optional.of(event), Optional.empty());
         when(requests.findForDeliveryUpdate(4L)).thenReturn(Optional.of(event));
         when(results.findForIngestion(1L)).thenReturn(Optional.of(result));
@@ -44,7 +56,9 @@ class RunPodDispatchTest {
             throw new RunPodAnalysisDeliveryException("runpod_http_io_error", true, null);
         });
         new RunPodAnalysisRequestOutboxDispatcher(requests, results, client, new RunPodAnalysisPayloadCodec(),
-                new RunPodAnalysisProperties(), new Transactions()).dispatchPending();
+                configuredProperties(), new Transactions(), gate).dispatchPending();
+        verify(client).submit(any());
+        verify(gate).release(eq(gateClaim), any());
         assertThat(event.getStatus()).isEqualTo(AnalysisRequestOutboxStatus.PUBLISHED);
         assertThat(result.getStatus()).isEqualTo(AnalysisStatus.PROCESSING);
         assertThat(result.getFailureCode()).isNull();

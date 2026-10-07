@@ -32,6 +32,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final RefreshTokenReader refreshTokenReader;
     private final ObjectMapper objectMapper;
 
+    // Async result delivery revalidates the same login session when the response resumes.
+    @Override protected boolean shouldNotFilterAsyncDispatch() { return false; }
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();

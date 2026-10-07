@@ -1,4 +1,8 @@
+> Current analysis API: [v5-only migration](../canonical-v5-only-migration-20261004.md). Earlier v4 entries below are legacy documentation.
+
 # API Specification - voice
+
+Optional result-first v5: status adds `resultAvailable`; view v2 adds optional `persistenceStatus`. SAVING/RETRYING exposes verified results before DB writes complete and disables completion actions. See [contract and activation order](../canonical-result-first-20261004.md). Default OFF.
 
 Canonical D1 rollout (2026-10-02 KST): the additive [canonical view](canonical-analysis-view-v1.md)
 and [internal journal](../contracts/runpod_canonical_journal_v1.md) are installed with V33-V36.
@@ -422,8 +426,8 @@ Content-Type: application/json
 ```
 - 이 API는 파일을 직접 받지 않는다.
 - 선택된 recording이 audio media에서 등록된 경우 Backend는 RunPod에 audio-only HTTP 분석 요청을 보낸다.
-- 선택된 recording이 video media에서 등록된 경우 Backend는 영상에서 파생한 canonical WAV와 canonical MP4를 함께 담아 RunPod에 HTTP 분석 요청을 보낸다.
-- 분석 결과는 RunPod이 Backend internal callback API로 전달한다.
+- 현재 canonical v5 접수는 음성만 지원한다. 영상 recording은 영상에서 추출한 WAV가 있어도 `422 ANALYSIS_MEDIA_PROFILE_UNSUPPORTED`로 거절한다. 내부 DTO의 video 필드 존재는 운영 영상 지원을 의미하지 않는다.
+- 결과는 설정된 AI upstream의 canonical handoff 경로로 전달한다. 신규 v6 request schema 파일은 준비 단계이며 HTTP 접수에서 아직 허용하지 않는다.
 - 클라이언트는 analyze 요청에서 audio/video 구분을 다시 보내지 않는다.
 - Response body:
 ```json
@@ -439,6 +443,8 @@ Content-Type: application/json
 ```
 - Status codes: 200 OK
 - Error cases: See common error codes
+
+영상 미지원 오류는 analyze와 analysis/retry에 동일하게 적용한다. retry도 선택 녹음의 음질 PASS를 다시 검사한다. 기존 인증·소유·중복·readiness 오류는 유지한다.
 
 ### PUT /api/onboarding/me
 - Description: 온보딩 저장 및 완료 - 온보딩 전체 응답을 저장하고 completedAt을 기록. 최초 완료와 재저장 모두 지원
@@ -1998,3 +2004,44 @@ Content-Type: application/json
 | 409 | `ANALYSIS_SCORE_UNAVAILABLE` | 분석은 완료됐지만 승급 채점용 점수 없음 |
 | 409 | `TITLE_EXAM_ALREADY_GRADED` | 이미 채점된 시험 |
 | 503 | `TITLE_EXAM_CONTENT_UNAVAILABLE` | 운영 DB에 시험용 게시 콘텐츠가 준비되지 않음 |
+
+
+## Canonical v5 handoff (2026-10-04)
+
+Native 전체 음소 채점: `score.rubricRevision=phone-rubric-native-v1`, 기존 9개 `criteria`와 `overallScore`를 그대로 전달한다. 전체 음소 근거가 불확실하면 `UNSCORABLE/SCORING_FAILED`이며 임의 점수로 대체하지 않는다. raw logits는 비공개 CORE artifact에만 보존한다. [반영 범위·활성화 조건](../canonical-native-scoring-20261004.md)을 따른다.
+
+[Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.
+
+
+## Canonical capability와 결과 처리 보완 (2026-10-04)
+
+### GET /api/analysis-capabilities/canonical
+
+사용자 로그인 Bearer 인증, 요청 body/path/query 없음. 200은 표준 ApiResponse envelope의 data이며 Cache-Control은 no-store다. 미인증은 기존 인증 계층의 401/403이다. 설정/점검 중에도 조회 자체는 200이고 admissionEnabled=false, resultSchemas=[]로 표현한다. 기존 /api/analysis-capabilities의 CONFIGURED는 설정 존재 의미를 유지한다.
+
+| 필드 | 타입/필수/null | 의미 |
+|---|---|---|
+| capabilityVersion | string/필수/non-null | voice-coaching.analysis-capabilities.v1 |
+| analysisProfile | string/필수/non-null | CANONICAL_HANDOFF_20261004_V5 |
+| resultSchemas | string[]/필수/non-null | 접수 가능 시 voice-coaching.runpod-analysis-result.v5 하나, 불가 시 빈 배열 |
+| admissionEnabled | boolean/필수/non-null | worker/readiness/용량/maintenance 접수 조건. 개별 사용자 권한을 대신하지 않음 |
+| scopes | object/필수/non-null | STANDALONE_AUDIO, COURSE, TITLE_EXAM, VIDEO 네 키 |
+| scopes.*.supported | boolean/필수/non-null | 해당 목적의 구현 지원 여부. 단독 음성과 승급시험 음성은 true, 영상은 audiovisual readiness에 따름 |
+| scopes.*.reasonCode | string/필수/nullable | 지원 목적은 null. 클래스는 COURSE_ANALYSIS_UNSUPPORTED, 영상 미지원 시 VIDEO_ANALYSIS_UNSUPPORTED |
+
+FE는 지원 범위를 녹음/업로드 전에 확인하고, 위 필드가 빠진 과거 응답은 전체 지원으로 추정하지 않는다. 구버전 응답은 클라이언트 ANALYSIS_CAPABILITIES_UNAVAILABLE(503)로 안내한다. 미지원 목적은 반환 reasonCode로 안내하고, 접수 불가는 ANALYSIS_INTEGRATION_UNAVAILABLE로 안내한다. 이들은 FE의 로컬 오류 분류이며 capability GET의 HTTP 200을 서버 409/503으로 바꾼 것은 아니다. 실제 analyze/retry의 소유·선택·동의·용량·접수 검사는 계속 Backend가 수행한다.
+
+### 기존 GET /api/v3/analyses/{analysisId} 및 complete/upload-url
+
+- request/profile/result/view 버전은 v3/v5/v5/view-v2 그대로다. JSON schema 9개 바이트는 변경하지 않는다.
+- v5 COMMITTED handoff의 검증과 현재 request/execution/녹음/소유/원본 hash가 일치한 결과를 학습 완료·재녹음의 저장 증명으로 사용한다. v5에 retainedEvidence를 요구하지 않는다. v4 보관 자료는 기존 receipt 증명을 유지한다.
+- 학습 완료는 ACCEPT/INLINE/feedbackDeliveryAllowed와 기존 adapter/generation 조건이 필요하다. REJECT/INCONCLUSIVE는 적격 결과의 재녹음만 허용한다. 미검증/SAVING/다른 실행은 완료 불가다. B2 archive는 독립 처리다.
+- 결과 표시 권한과 actions.canComplete는 별개다. canComplete=false인 유효 ACCEPT 결과를 일반 AI 실패로 표시하지 않는다. FAILED, REJECT, INCONCLUSIVE의 안내를 구분한다.
+- 선공개 뒤 서버 재시작으로 동일 attempt가 일시 PROCESSING/NONE이 되어도 FE는 잠정 결과를 읽기 전용으로 보존하며 상태를 다시 조회한다. 전체 identity가 바뀌거나 인증/소유가 무효면 보존하지 않는다.
+- 저장 조회는 한 번에 최대 120초, 요청별 15초, 5초 간격으로 제한한다. 지연 후 사용자가 조회만 다시 시작할 수 있고 자동 analyze/retry 제출은 없다.
+- complete 요청의 totalLearningSeconds는 새 페이지 recorder의 0초가 아닌 현재 선택된 서버 녹음 durationMs로 계산한다. duration이 없으면 임의의 1초를 만들지 않는다.
+- 실행 상태 조회로 확인한 RunPod INTERNAL_ERROR/DEPENDENCY_UNAVAILABLE terminal FAILED는 Backend failure_code=runpod_execution_failed, 공개 serviceFailure={origin:RUNPOD, code:CANONICAL_EXECUTION_FAILED, stage:EXECUTION}으로 구분한다. UNKNOWN/404/409/5xx만으로 terminal 실패를 만들지 않는다.
+
+## Direct history v1 (2026-10-05, 기본 OFF)
+
+직접 RunPod 분석의 결과 표시 이후 별도 이력 이벤트를 수신한다. 접수·분석·결과 표시를 위해 Backend를 호출하지 않는다. 기존 callback 서버 인증으로 이벤트를 받고, 기존 로그인으로 결과 소유 계정을 연결한다. 새 사용자 토큰 발급이나 RunPod 인증 게이트는 없다. 별도 V40 테이블로 독립 연습 이력을 저장하며 기존 과정/시험 완료를 생성하지 않는다. [직접 이력 계약](../contracts/direct_analysis_history_v1.md)을 따른다.

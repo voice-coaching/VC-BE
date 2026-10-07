@@ -14,7 +14,12 @@ import java.util.UUID;
 public record CanonicalAnalysisView(
         String schemaVersion, long analysisId, long recordingId, UUID requestId, UUID executionId,
         AnalysisStatus jobStatus, String analysisProfile, Canonical canonicalAnalysis,
-        ServiceFailure serviceFailure, Actions actions) {
+        ServiceFailure serviceFailure, Actions actions, @JsonInclude(JsonInclude.Include.NON_NULL) String persistenceStatus) {
+    public CanonicalAnalysisView(String schemaVersion,long analysisId,long recordingId,UUID requestId,UUID executionId,
+            AnalysisStatus jobStatus,String analysisProfile,Canonical canonicalAnalysis,ServiceFailure serviceFailure,Actions actions){
+        this(schemaVersion,analysisId,recordingId,requestId,executionId,jobStatus,analysisProfile,canonicalAnalysis,serviceFailure,actions,
+                null);
+    }
     public static final String SCHEMA_VERSION = "voice-coaching.canonical-analysis-view.v1";
     public static final String PROFILE = "CANONICAL_FROZEN_20260928_V4";
 
@@ -47,14 +52,46 @@ public record CanonicalAnalysisView(
     public record ReadyCoaching(String schemaVersion, String adapterStatus, String generationStatus,
                                 List<CoachingItem> items, int dispatchAttempts, String fallbackReason,
                                 boolean naturalLanguageSemanticsFullyVerified,
-                                boolean visualCorrectiveClaimsAllowed) implements Coaching {}
+                                boolean visualCorrectiveClaimsAllowed,
+                                @JsonInclude(JsonInclude.Include.NON_NULL) String feedback) implements Coaching {
+        public ReadyCoaching(String schemaVersion, String adapterStatus, String generationStatus,
+                             List<CoachingItem> items, int dispatchAttempts, String fallbackReason,
+                             boolean naturalLanguageSemanticsFullyVerified, boolean visualCorrectiveClaimsAllowed) {
+            this(schemaVersion, adapterStatus, generationStatus, items, dispatchAttempts, fallbackReason,
+                    naturalLanguageSemanticsFullyVerified, visualCorrectiveClaimsAllowed, null);
+        }
+    }
     public record EmptyCoaching(String schemaVersion, String adapterStatus, String generationStatus,
                                 List<CoachingItem> items, int dispatchAttempts) implements Coaching {}
     public record FailedCoaching(String schemaVersion, String adapterStatus, String generationStatus,
                                  List<CoachingItem> items, int dispatchAttempts, String errorCode) implements Coaching {}
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Score(BigDecimal overallScore, String validity, String reason) {}
-    public record Visual(String status, boolean correctiveClaimsAllowed) {}
+    public record Score(BigDecimal overallScore, String validity, String reason,
+                        @JsonInclude(JsonInclude.Include.NON_NULL)
+                        String rubricRevision,
+                        @JsonInclude(JsonInclude.Include.NON_NULL)
+                        List<ScoreCriterion> criteria) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record ScoreCriterion(String criterionId, Integer level) {}
+    public sealed interface Visual permits AudioVisual, LipVisual {
+        String status();
+        boolean correctiveClaimsAllowed();
+    }
+    public record AudioVisual(String status, boolean correctiveClaimsAllowed) implements Visual {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record LipVisual(String status, boolean correctiveClaimsAllowed, BigDecimal score, String scoreKind,
+            LipCoverage coverage, List<LipPhone> phoneAssessments, List<String> reasonCodes,
+            String alignmentScope, List<Long> unresolvedExpectedIndices, int omittedPhoneAssessmentCount) implements Visual {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record LipCoverage(long targetCount, long visuallyEligibleCount, long observedCount,
+                              long scoredCount, BigDecimal coverage) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record LipPhone(long expectedIndex, String expectedPhone, String role, String status,
+            BigDecimal score, String scoreKind, BigDecimal referenceDistance, List<String> referenceIds,
+            String calibrationRevision, BigDecimal audioStartSeconds, BigDecimal audioEndSeconds,
+            BigDecimal videoStartSeconds, BigDecimal videoEndSeconds, int frameCount,
+            List<String> reasonCodes, List<LipObservation> observations, List<String> allowedActionIds) {}
+    public record LipObservation(String observationId, String code, BigDecimal minimum, BigDecimal maximum, String unit) {}
     public record Actions(boolean canRetry, boolean canRerecord, boolean canComplete, boolean canRegenerate,
                           UnavailableReasons unavailableReasonCodes) {}
     public record UnavailableReasons(List<String> retry, List<String> rerecord,

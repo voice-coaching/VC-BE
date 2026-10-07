@@ -8,6 +8,8 @@ import org.example.voice.analysis.infrastructure.runpod.RunPodContract;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -19,6 +21,8 @@ import java.util.concurrent.*;
 /** Server readiness, independent of FE tests and of user-provided request headers. */
 @Component
 public final class CanonicalBackendReadiness {
+    private static final Logger log=LoggerFactory.getLogger(CanonicalBackendReadiness.class);
+    private String lastDiagnostic;
     public static final List<String> SCHEMAS=List.of(
         "runpod_http_control_v1.schema.json","runpod_result_v1.schema.json",
         "runpod_analysis_request_v2.schema.json","runpod_http_control_v1_2.schema.json",
@@ -53,7 +57,7 @@ public final class CanonicalBackendReadiness {
         this.callbackWorker=callbackWorker;this.applyWorker=applyWorker;this.effectsWorker=effectsWorker;
         this.jdbc=jdbc;this.legacy=legacy;this.pod=pod;this.contract=contract;this.environment=environment;
     }
-    @PostConstruct public void start(){lane.scheduleWithFixedDelay(this::probe,1,15,TimeUnit.SECONDS);}
+    @PostConstruct public void start(){/* v4 retired; v5 owns deployment readiness. */}
     private boolean configured() {
         return settings.configured() && settings.semanticConfigured() && settings.registrationEnabled()
             && settings.verifierEnabled() && settings.callbackEnabled() && settings.callbackVerifierEnabled()
@@ -70,10 +74,19 @@ public final class CanonicalBackendReadiness {
             && "true".equals(environment.getProperty("analysis.canonical.admission-enabled"));
     }
     public String reason(){return admissionEnabled()?null:reason;}
+    private void diagnostic(String stage) {
+        if(!stage.equals(lastDiagnostic)) {
+            // Fixed labels only: never log verifier output, URLs, tokens or evidence.
+            log.info("canonical_readiness stage={}",stage);
+            lastDiagnostic=stage;
+        }
+    }
     private void probe() {
-        if(!configured()){infrastructureUntil=workerUntil=0;reason="CONFIGURATION_NOT_READY";return;}
+        if(!configured()){infrastructureUntil=workerUntil=0;reason="CONFIGURATION_NOT_READY";diagnostic("CONFIGURATION");return;}
+        String stage="LEGACY_READINESS";
         try {
             if(!legacy.isReady())throw new IllegalStateException();
+            stage="JOURNAL_SCHEMA";
             for(String table:List.of("analysis_canonical_executions","analysis_evidence_receipts",
                     "analysis_canonical_callback_inbox","analysis_canonical_results",
                     "analysis_canonical_journals",
@@ -81,14 +94,16 @@ public final class CanonicalBackendReadiness {
                     "analysis_canonical_callback_apply","analysis_canonical_result_effects")) {
                 jdbc.queryForList("SELECT * FROM "+table+" WHERE false");
             }
+            stage="JOURNAL_CAPACITY";
             Long bytes=jdbc.queryForObject("SELECT COALESCE(SUM(byte_size),0) FROM analysis_canonical_upload_journal",Long.class);
             // Reserve headroom for a complete five-artifact set, not a partial PUT.
             if(bytes==null || bytes+5L*16*1024*1024>settings.journalStagingBudgetBytes())throw new IllegalStateException();
-            reader.assertPrivate();
-            verifier.assertInstalled();
+            stage="EVIDENCE_STORAGE";reader.assertPrivate();
+            stage="SEMANTIC_VERIFIER";verifier.assertInstalled();
             infrastructureUntil=System.nanoTime()+Duration.ofSeconds(90).toNanos();
-        } catch(Exception error){infrastructureUntil=workerUntil=0;reason="INFRASTRUCTURE_NOT_READY";return;}
+        } catch(Exception error){infrastructureUntil=workerUntil=0;reason="INFRASTRUCTURE_NOT_READY";diagnostic(stage);return;}
         try {
+            stage="RUNPOD_CONNECTION";
             URI uri=URI.create(pod.normalizedEndpointUrl()+"/health/canonical");
             if(!"https".equals(uri.getScheme()) || uri.getUserInfo()!=null)throw new IllegalStateException();
             var request=HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(8))
@@ -97,8 +112,11 @@ public final class CanonicalBackendReadiness {
             try(var body=response.body()) {
                 if(response.statusCode()!=200 || !"identity".equals(response.headers().firstValue("content-encoding").orElse("identity")))
                     throw new IllegalStateException();
+                stage="RUNPOD_RESPONSE";
                 var doc=contract.parse(body.readNBytes(65537),"canonicalExecutorReadiness");
+                stage="RUNPOD_EXECUTOR";
                 if(!doc.path("executorConfigured").asBoolean())throw new IllegalStateException();
+                stage="RUNPOD_SCHEMA";
                 var digests=doc.path("schemaDigests");
                 if(digests.size()!=SCHEMAS.size())throw new IllegalStateException();
                 for(String file:SCHEMAS) {
@@ -110,8 +128,9 @@ public final class CanonicalBackendReadiness {
             }
             workerUntil=System.nanoTime()+Duration.ofSeconds(45).toNanos();
             reason="true".equals(environment.getProperty("analysis.canonical.admission-enabled"))?null:"ADMISSION_DISABLED";
-        } catch(InterruptedException error){Thread.currentThread().interrupt();workerUntil=0;reason="WORKER_NOT_READY";}
-        catch(Exception error){workerUntil=0;reason="WORKER_NOT_READY";}
+            diagnostic(reason==null?"READY":"ADMISSION_DISABLED");
+        } catch(InterruptedException error){Thread.currentThread().interrupt();workerUntil=0;reason="WORKER_NOT_READY";diagnostic("INTERRUPTED");}
+        catch(Exception error){workerUntil=0;reason="WORKER_NOT_READY";diagnostic(stage);}
     }
     @PreDestroy public void close(){infrastructureUntil=workerUntil=0;lane.shutdownNow();http.close();}
 }

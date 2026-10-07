@@ -30,7 +30,9 @@ public final class CanonicalPublicProjection {
             if (selection!=null) checkBrowserNumbers(selection);
             return new Canonical(document.representation(),new Decision(decision.status().name(),decision.reasonCode(),decision.stage()),
                     document.coreStatus(),document.feedbackDeliveryAllowed(),text(root.get("canonical"),"pronunciationFeedbackSource"),
-                    selection,coaching(root.get("coaching")),read(root.get("score"),Score.class),read(root.get("visual"),Visual.class));
+                    selection,coaching(root.get("coaching")),read(root.get("score"),Score.class),
+                    RunPodContract.RESULT_V6.equals(document.schemaVersion())
+                            ? read(root.get("visual"),LipVisual.class) : read(root.get("visual"),AudioVisual.class));
         } catch (Exception ignored) {
             // Never retain or expose rejected JSON/Jackson diagnostics.
             throw new CanonicalAnalysisViewException(CANONICAL_RESULT_UNAVAILABLE);
@@ -52,7 +54,8 @@ public final class CanonicalPublicProjection {
                 }
                 yield new ReadyCoaching(version,adapter,generation,List.copyOf(items),attempts,
                         node.get("fallbackReason").isNull()?null:text(node,"fallbackReason"),
-                        node.get("naturalLanguageSemanticsFullyVerified").booleanValue(),node.get("visualCorrectiveClaimsAllowed").booleanValue());
+                        node.get("naturalLanguageSemanticsFullyVerified").booleanValue(),node.get("visualCorrectiveClaimsAllowed").booleanValue(),
+                        node.hasNonNull("feedback")?text(node,"feedback"):null);
             }
             case "GLOBAL_REJECT","GLOBAL_INCONCLUSIVE","GLOBAL_SYSTEM_FAILURE","NO_PERMITTED_COACHING_CONTENT" ->
                     new EmptyCoaching(version,adapter,generation,List.of(),attempts);

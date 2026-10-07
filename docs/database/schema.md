@@ -1,5 +1,49 @@
 # DB Schema - voice
 
+## V41/V42 미디어 준비와 실행 snapshot (미배포)
+
+`recording_media_preparations`는 Backend normalizer가 생성한 receipt를 recording과 같은 transaction에 저장한다. 과거 recording은 backfill하지 않는다. entity/public DTO에 receipt를 노출하지 않는다.
+
+| column | type | 제약/용도 |
+| --- | --- | --- |
+| recording_id | BIGINT | PK, voice_recordings FK; 자동 cascade 없음 |
+| schema_version | VARCHAR(100) | NOT NULL, media-preparation.v1 고정 |
+| receipt_bytes | BYTEA | NOT NULL, 1–16384 bytes, JCS 원문 |
+| receipt_sha256 | VARCHAR(64) | NOT NULL, 소문자 SHA-256 |
+| created_at | TIMESTAMPTZ | NOT NULL, CURRENT_TIMESTAMP |
+
+receipt에는 source/PCM/video digest, normalizer revision, probe의 audio/video start/time base를 저장한다. 영상 syncStatus는 UNVERIFIED이며 이 값으로 임의 시간 offset을 만들지 않는다. UPDATE trigger가 내용 교체를 막는다. 현재 recording은 soft delete하며 FK는 기존 물리 삭제 정책을 자동 확대하지 않는다.
+
+`analysis_execution_media`는 실행 등록 transaction에서 해당 receipt의 원문을 복사한다. owner는 analysis infrastructure다. PK 외 추가 조회 인덱스는 없고, soft delete 필드는 없다. UPDATE/DELETE/TRUNCATE는 기존 canonical immutable trigger로 금지된다.
+
+| column | type | 제약/용도 |
+| --- | --- | --- |
+| execution_id | UUID | PK, analysis_canonical_executions FK |
+| recording_id | BIGINT | NOT NULL, immutable 실행 snapshot의 ID |
+| media_type | VARCHAR(16) | NOT NULL, AUDIO_ONLY 또는 AUDIO_VISUAL |
+| audio_sha256 | VARCHAR(64) | NOT NULL, 소문자 SHA-256 |
+| video_sha256 | VARCHAR(64) | AUDIO_VISUAL이면 SHA-256 필수, AUDIO_ONLY이면 null |
+| receipt_sha256 | VARCHAR(64) | NOT NULL, 원문 digest |
+| receipt_bytes | BYTEA | NOT NULL, 1–16384 bytes |
+| created_at | TIMESTAMPTZ | NOT NULL, CURRENT_TIMESTAMP |
+
+기존 audio recording에 receipt가 없으면 snapshot 없이 기존 계약으로 접수한다. 새 recording은 digest binding을 검사한 뒤 snapshot을 생성한다. 동일 execution 재등록은 원문까지 같아야 한다. migration은 정적 작성·Java 컴파일만 확인했으며 DB 적용/rollback QA는 미수행이다.
+
+## V38 RunPod capacity 대기
+
+`V38__analysis_dispatch_capacity.sql`은 outbox에 `busy_count INTEGER NOT NULL DEFAULT 0 CHECK (busy_count >= 0)`을 추가한다. 기존 `attempt_count`는 실제 전송 실패 횟수다. `analysis_dispatch_gates`는 endpoint SHA-256 기본키, UUID claim, claim 만료 시각, 다음 시도 시각을 보관한다. 신규 DB 적용·운영 검증 전이며 행 삭제·기존 결과 변환은 없다. [처리 계약과 배포 선행조건](../canonical-latency-20261004.md)을 따른다.
+
+## V37 승급시험 문제 및 억양 클래스 seed
+
+`V37__seed_title_exam_and_intonation_courses.sql`은 공개 운영 데이터 seed다. 새 테이블을 만들지 않고 기존 `practice_contents`, `content_categories`, `title_policies`, `courses`, `course_steps`, `course_step_revisions`를 사용한다.
+
+- `SENTENCE / TITLE_EXAM`: 승급시험 정책별 `practice_content_id`에 연결되는 공개 시험 문장 4개
+- `CLASS_PRACTICE / INTONATION_CLASS`: 억양 클래스의 연습 단계에서 사용하는 공개 연습 콘텐츠 3개
+- `INTONATION` course 3개: 초급/중급/고급 억양 클래스
+- 각 억양 클래스는 `THEORY` 1개와 `PRACTICE` 1개 step을 가지며, step별 `course_step_revisions` revision 1을 함께 생성한다.
+
+상세 확인 방법은 [승급시험 문제 및 억양 클래스 Seed](../api/title-exam-intonation-content-seed.md)를 기준으로 한다.
+
 ## V29 코칭 문서 추가
 
 `analysis_results.coaching_document`: nullable JSONB. 기존 row는 null로 유지한다. `ck_analysis_coaching_document`는 비 null 값이 객체이며 schemaVersion이 `voice-coaching.coaching-result.v1`인지 확인한다. 항목별 의미 검증은 애플리케이션에서 수행한다. [API 및 이행](../api/evidence-based-coaching.md).
@@ -466,3 +510,28 @@
 - 별도의 `roles`, `sessions`, `tokens`, `audit` 테이블은 현재 덤프에 존재하지 않는다.
 - 권한은 `users.role` 컬럼의 CHECK 제약(`USER`, `ADMIN`)으로 관리한다.
 - 소셜 로그인 제공자는 `social_accounts.provider` 컬럼의 CHECK 제약(`GOOGLE`, `KAKAO`, `NAVER`, `APPLE`)으로 관리한다.
+
+
+## Canonical v5 handoff (2026-10-04)
+
+[Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.
+
+
+### V39 durable ownership and archive storage
+
+Owner: canonical analysis infrastructure. All originals are INDEFINITE, no cascade or automatic TTL. Exact SQL column types/defaults/checks and immutable triggers are in `src/main/resources/db/migration/V39__canonical_handoff_archive.sql`.
+
+| Table / column | Keys, required fields and state |
+|---|---|
+| `analysis_results.handoff_received_at` | Nullable timestamptz, set atomically at RECEIVED; reset on a new execution. Heartbeat timeout excludes this attempt; overall deadline still applies. |
+| `analysis_canonical_handoffs` | PK handoff UUID; unique execution/event; execution FK. Required request/analysis/worker IDs, metadata/projection BYTEA, JCS handoff SHA, reserved bytes. STAGING default; RECEIVED/VERIFYING/COMMITTED/REJECTED/REVOKED. Nullable received/verified/committed timestamps and claim ID/until; attempts default 0; next_attempt/created timestamps default now; nullable fixed reason code. Pending index on next_attempt. |
+| `analysis_canonical_handoff_artifacts` | Composite PK handoff/kind, handoff FK. Required schema version, SHA, byte_size 1..16MiB; raw BYTEA initially null then write-once. Up to five contract-defined kinds. |
+| `analysis_canonical_results.handoff_id` | Nullable FK, required exclusively for v5. v4 still requires a verified callback origin and receipt for core evidence; v5 requires the claimed matching handoff and no receipt. Result originals remain immutable. |
+| `analysis_canonical_archive_jobs` | PK/FK handoff. PENDING default, UPLOADING/VERIFYING/ARCHIVED/RETRY_WAIT/RECONCILE_REQUIRED. Nullable claim ID/until, reason, archived_at; attempts 0; next_attempt default now. Created atomically with result/cache effects. |
+| `analysis_canonical_archive_artifacts` | Composite PK handoff/kind and FK to original. PENDING default, same archive states. Nullable object_key/version_id; definitive_rejection boolean defaults false and permits retry only after an explicit rejected PUT response; known version cannot be replaced and ARCHIVED is terminal. |
+
+Execution registry checks expand to exact v2/v4 and v3/v5 request/result/profile tuples. They do not reclassify historical executions. The v4 result event FK is replaced with an origin trigger because v5 events belong to the handoff table; v4 still must reference a VERIFIED inbox row at insertion. No historical bytes are updated.
+
+## V40: independent direct analysis history
+
+Additive, not yet applied to production. `direct_analysis_history` stores UUID job/execution, claim and result digests, result/script/content reference and nullable archive JSON/timestamps. `direct_analysis_history_links` stores (user_id, job_id) primary key and claim digest; user_id references users with ON DELETE CASCADE. A matching claim joins the account to the event even when linking arrives before receipt. Existing training sessions, scores and course progress tables are unchanged. Inbox/archive data are not deleted by deleting a link; production retention/deletion orchestration must account for them. See [contract](../contracts/direct_analysis_history_v1.md).

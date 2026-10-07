@@ -23,7 +23,7 @@ public class CanonicalJournalController {
     private final RunPodContract contract;
     private final org.example.voice.analysis.application.CanonicalCallbackService callbacks;
 
-    @GetMapping("/callback/ack")
+    /* Retired v4 route: @GetMapping("/callback/ack") */
     public ResponseEntity<org.example.voice.analysis.controller.dto.RunPodAnalysisResultCallbackResponseDto> recoverAck(
             @PathVariable long analysisId,@PathVariable UUID executionId,HttpServletRequest request) {
         return ResponseEntity.ok().header("Cache-Control","no-store").body(
@@ -42,7 +42,7 @@ public class CanonicalJournalController {
     public ResponseEntity<byte[]> status(@PathVariable long analysisId,@PathVariable UUID executionId,HttpServletRequest request) {
         return snapshotResponse(journal.status(analysisId,executionId,authenticate(request)));
     }
-    @PostMapping("/prepare")
+    /* Retired v4 route: @PostMapping("/prepare") */
     public ResponseEntity<Void> prepare(@PathVariable long analysisId,@PathVariable UUID executionId,HttpServletRequest request) throws IOException {
         UUID worker=authenticate(request);
         journal.prepare(analysisId,executionId,worker,RunPodRequestBody.readJson(request,RunPodContract.CONTROL_LIMIT));return done();
@@ -51,23 +51,23 @@ public class CanonicalJournalController {
     public ResponseEntity<Void> start(@PathVariable long analysisId,@PathVariable UUID executionId,HttpServletRequest request) throws IOException {
         UUID worker=authenticate(request);empty(request);journal.startProducer(analysisId,executionId,worker);return done();
     }
-    @PutMapping("/artifacts/{kind}/stage")
+    /* Retired v4 route: @PutMapping("/artifacts/{kind}/stage") */
     public ResponseEntity<Void> stage(@PathVariable long analysisId,@PathVariable UUID executionId,@PathVariable String kind,HttpServletRequest request) throws IOException {
         UUID worker=authenticate(request);
         byte[] raw=RunPodRequestBody.readBinary(request,CanonicalBackendJournal.ARTIFACT_LIMIT);
         journal.stage(analysisId,executionId,worker,kind,raw);return done();
     }
-    @PostMapping("/artifacts/{kind}/begin")
+    /* Retired v4 route: @PostMapping("/artifacts/{kind}/begin") */
     public ResponseEntity<Void> begin(@PathVariable long analysisId,@PathVariable UUID executionId,@PathVariable String kind,HttpServletRequest request) throws IOException {
         UUID worker=authenticate(request);empty(request);journal.beginUpload(analysisId,executionId,worker,kind);return done();
     }
-    @PostMapping("/artifacts/{kind}/{checkpoint:uploaded|readback}")
+    /* Retired v4 route: @PostMapping("/artifacts/{kind}/{checkpoint:uploaded|readback}") */
     public ResponseEntity<Void> checkpoint(@PathVariable long analysisId,@PathVariable UUID executionId,@PathVariable String kind,
                                            @PathVariable String checkpoint,HttpServletRequest request) throws IOException {
         UUID worker=authenticate(request);
         journal.checkpoint(analysisId,executionId,worker,kind,RunPodRequestBody.readJson(request,8192),checkpoint.equals("readback"));return done();
     }
-    @PostMapping("/manifest")
+    /* Retired v4 route: @PostMapping("/manifest") */
     public ResponseEntity<Void> manifest(@PathVariable long analysisId,@PathVariable UUID executionId,HttpServletRequest request) throws IOException {
         UUID worker=authenticate(request);
         journal.manifest(analysisId,executionId,worker,RunPodRequestBody.readJson(request,RunPodContract.CONTROL_LIMIT));return done();

@@ -11,8 +11,13 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 /** New route only. Never expose/log private parser, database or evidence diagnostics. */
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes=CanonicalAnalysisController.class)
+@RestControllerAdvice(assignableTypes={CanonicalAnalysisController.class,CanonicalHandoffAnalysisController.class,CanonicalResultContractController.class})
 public class CanonicalAnalysisExceptionHandler {
+    @ExceptionHandler(org.example.voice.analysis.infrastructure.runpod.RunPodContractException.class)
+    public ResponseEntity<ApiResponse<Void>> waitFailure(org.example.voice.analysis.infrastructure.runpod.RunPodContractException error) {
+        return ResponseEntity.status(error.status()).header("Cache-Control","no-store")
+            .body(ApiResponse.error("분석 결과 대기 요청을 처리하지 못했습니다.",error.reason()));
+    }
     @ExceptionHandler(CanonicalAnalysisViewException.class)
     public ResponseEntity<ApiResponse<Void>> expected(CanonicalAnalysisViewException exception) { return reply(exception.reason()); }
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

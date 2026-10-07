@@ -1,5 +1,9 @@
 # Canonical result adapter boundary (local implementation and design history)
 
+2026-10-04 local change: [latency implementation and resident identity prerequisites](../canonical-latency-20261004.md). Bounded artifact reads and exact verified spool reuse retain independent semantic verification. Result publication still requires the v4 receipt; asynchronous post-result archiving is not implemented.
+
+2026-10-03: [전체 음소 채점 연동](../canonical-scoring-20261003.md). 오프라인 검산된 새 하네스 점수만 기존 overall_score에 저장한다. 수치 판정은 AI 계산기/동결 verifier 책임이며 Controller·Entity·공개 DTO에서 재계산하지 않는다. 과거 null-only 기록은 유지한다.
+
 D1 observed deployment (2026-10-01 15:24 UTC): JAR SHA
 `86c2aa795348c716ff0319b9d014089620ae11505db703b55ee2890c63ea9f65`,
 V33-V36 applied, service active and legacy readiness ready. Canonical v2 readiness

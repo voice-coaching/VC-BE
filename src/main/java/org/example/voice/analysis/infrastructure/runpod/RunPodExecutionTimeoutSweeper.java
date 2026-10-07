@@ -24,13 +24,20 @@ public class RunPodExecutionTimeoutSweeper {
     private final AnalysisRequestOutboxJpaRepository outboxes;
     private final AnalysisCancellationSignal cancellations;
     private final RunPodAnalysisProperties properties;
+    private final org.example.voice.analysis.infrastructure.canonical.CanonicalDeliverySpool delivery;
 
     @Transactional
     @Scheduled(fixedDelayString = "${analysis.runpod.timeout-sweep-interval:PT15S}")
     public void expire() {
         var now = OffsetDateTime.now(ZoneOffset.UTC);
-        for (var result : results.findExpiredHttpForUpdate(List.of(AnalysisStatus.PENDING, AnalysisStatus.PROCESSING),
-                now, PageRequest.of(0, properties.getBatchSize()))) {
+        var statuses=List.of(AnalysisStatus.PENDING, AnalysisStatus.PROCESSING);
+        var page=PageRequest.of(0, properties.getBatchSize());
+        var received=delivery.enabled()?delivery.entries().stream().filter(e->e.receivedAt!=null && !e.rejected)
+                .map(e->e.document.projection().identity().executionId().toString()).toList():List.<String>of();
+        var expired=received.isEmpty()?results.findExpiredHttpForUpdate(statuses,now,page)
+                :results.findExpiredHttpExcludingReceivedForUpdate(statuses,now,received,page);
+        for (var result : expired) {
+            if(delivery.current(result)!=null)continue; // Durable receipt moved responsibility to Backend.
             result.fail("analysis_execution_timeout", "분석 실행 시간이 만료되었습니다. 다시 시도해 주세요.", null, null);
             outboxes.findByAnalysisResultIdAndStatus(result.getId(), AnalysisRequestOutboxStatus.PENDING)
                     .forEach(o -> o.cancelPending("analysis_execution_timeout"));

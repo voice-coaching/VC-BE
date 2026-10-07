@@ -29,6 +29,7 @@ public class FeedbackRegenerationService {
     private final AnalysisResultReader reader;
     private final AnalysisResultWriter writer;
     private final AiFeedbackProvider provider;
+    private final org.example.voice.analysis.domain.port.AnalysisSubmissionAdmission submissions;
 
     @Transactional
     @CacheEvict(
@@ -36,6 +37,7 @@ public class FeedbackRegenerationService {
             key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).owned(#p1, #p0)"
     )
     public AnalysisResult regenerate(Long analysisId, Long userId, FeedbackStyle style) {
+        submissions.assertOpen();
         AnalysisResult result = reader.findOwnedForUpdate(analysisId, userId).orElseThrow(AnalysisNotFoundException::new);
         if (!result.isCompleted()) throw new AnalysisNotCompletedException();
         if (result.isCanonicalExecution()) throw new FeedbackEvidenceUnavailableException();

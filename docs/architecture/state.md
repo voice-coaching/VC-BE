@@ -167,3 +167,8 @@
 - 조회 API의 empty state와 error state가 명확한가?
 - 프론트엔드가 문자열 enum 값을 그대로 사용해도 되는가?
 - 테스트 데이터와 fixture의 enum 값이 갱신되었는가?
+
+
+## Canonical v5 handoff (2026-10-04)
+
+[Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.

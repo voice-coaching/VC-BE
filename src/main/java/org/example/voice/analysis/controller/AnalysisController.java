@@ -27,8 +27,11 @@ public class AnalysisController {
     private final FeedbackRegenerationService feedbackService;
 
     @GetMapping("/{analysisId}")
-    public ApiResponse<AnalysisResultResponseDto> getResult(@PathVariable Long analysisId, @AuthenticationPrincipal LoginUser user) {
-        return ApiResponse.success("종합 분석 결과를 조회했습니다.", AnalysisResultResponseDto.from(analysisService.getCompleted(analysisId, user.id())));
+    public ApiResponse<Object> getResult(@PathVariable Long analysisId, @AuthenticationPrincipal LoginUser user) {
+        return ApiResponse.success(
+                "종합 분석 결과를 조회했습니다.",
+                AnalysisResultResponseDto.from(analysisService.getCompleted(analysisId, user.id())).toResponseBody()
+        );
     }
 
     @GetMapping("/{analysisId}/segments")

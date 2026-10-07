@@ -241,3 +241,8 @@ Domain Entity / Domain Model
 | 2026-08-12 | API DTO는 `controller/dto`, 조회/집계 모델은 `domain/model`에 둔다. | 외부 API 계약과 내부 도메인 데이터를 분리하기 위해서이다. | Entity를 API 응답으로 직접 노출하지 않고 DTO 변환을 명시한다. |
 | 2026-08-12 | 저장소와 외부 연동은 domain port와 infrastructure 구현으로 분리한다. | application layer가 DB/JPA/외부 provider 세부사항에 강하게 결합되는 것을 줄이기 위해서이다. | Reader/Writer/Provider port와 `*Impl`, `*JpaRepository` 구현을 사용한다. |
 | 2026-08-20 | Redis Cache는 infrastructure reader 경계에서 적용한다. | 조회 성능을 개선하면서 Controller와 application service가 Redis 세부사항에 의존하지 않도록 하기 위해서이다. | 공통 캐시 설정은 `common`, 기능별 캐시 이름과 key/TTL 규칙은 각 기능의 `infrastructure/cache`에 둔다. |
+
+
+## Canonical v5 handoff (2026-10-04)
+
+[Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.

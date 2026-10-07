@@ -292,3 +292,8 @@ HomeController
 - `common`에 올리는 코드가 특정 기능 규칙을 포함하지 않는가?
 - public API 변경이 있다면 `docs/api` 문서와 DTO가 함께 갱신되었는가?
 - entity 또는 repository 변경이 있다면 DB 문서와 migration 필요 여부를 확인했는가?
+
+
+## Canonical v5 handoff (2026-10-04)
+
+[Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.

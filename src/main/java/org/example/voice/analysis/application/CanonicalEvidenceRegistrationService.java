@@ -22,6 +22,7 @@ public class CanonicalEvidenceRegistrationService {
     private final JdbcTemplate jdbc;
     private final RunPodContract contract;
     private final CanonicalEvidenceSettings settings;
+    private final org.example.voice.analysis.infrastructure.canonical.CanonicalDeliverySpool delivery;
 
     public record Receipt(String contractVersion, UUID receiptId, JsonNode association,
                           UUID workerInstanceId, String manifestSha256, String status,
@@ -120,6 +121,24 @@ public class CanonicalEvidenceRegistrationService {
         if(!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())
             throw new IllegalStateException("CALLBACK_TRANSACTION_REQUIRED");
         lockVisible(analysisId,request,execution,worker);
+    }
+
+    /** Accepted disk delivery outlives the old Pod deadline; current attempt/visibility fences remain. */
+    public void requireBackendOwned(long analysisId,UUID request,UUID execution,UUID worker) {
+        if(!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())
+            throw new IllegalStateException("VERIFICATION_TRANSACTION_REQUIRED");
+        var live=lockVisible(analysisId,request,execution,worker);
+        var now=java.time.Instant.now();
+        if(!delivery.owns(analysisId,execution) && (!instant(live.get("deadline_at")).isAfter(now) || !instant(live.get("execution_deadline_at")).isAfter(now)))fail(409,"DEADLINE_EXCEEDED");
+        if(!java.util.Set.of("PENDING","PROCESSING").contains(live.get("status")))fail(409,"ANALYSIS_TERMINAL");
+        if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM analysis_canonical_handoffs WHERE execution_id=? AND received_at IS NOT NULL AND state IN ('RECEIVED','VERIFYING'))",Boolean.class,execution)))fail(409,"HANDOFF_REQUIRED");
+    }
+
+    /** Verified disk ownership outlives the Pod lease; current user/recording/attempt fences remain. */
+    public void requireDeliveryOwned(long analysisId,UUID request,UUID execution,UUID worker){
+        if(!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())throw new IllegalStateException("VERIFICATION_TRANSACTION_REQUIRED");
+        var live=lockVisible(analysisId,request,execution,worker);
+        if(!delivery.owns(analysisId,execution) || !java.util.Set.of("PENDING","PROCESSING").contains(live.get("status")))fail(409,"EXECUTION_INACTIVE");
     }
 
     private void validateManifest(JsonNode manifest, java.util.Map<String,Object> live, long analysisId, UUID execution) {

@@ -87,7 +87,7 @@ public class TrainingAnalysisRequestService {
         );
         trainingSessionWriter.startAnalysis(sessionId);
         AnalysisRequestData result = trainingAnalysisWriter.createPending(source.recordingId(), requestEventId);
-        analysisJobPublisher.publish(toWorkerRequest(
+        publish(toWorkerRequest(
                 result.analysisId(), requestEventId, userId, sessionId, source,
                 consent.policyRevision(), consentReceipt.receiptSha256()
         ), profile);
@@ -122,6 +122,9 @@ public class TrainingAnalysisRequestService {
         validateSupportedFocus(source);
         AnalysisProgressData failed = trainingAnalysisReader.findLatestFailedBySelectedRecording(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FAILED));
+        if (source.qualityStatus() != RecordingQualityStatus.PASS) {
+            throw new BaseException(ErrorCode.AUDIO_QUALITY_NOT_ACCEPTABLE);
+        }
 
         UUID requestEventId = UUID.randomUUID();
         ProcessingConsentReceipt consentReceipt = processingConsentLedger.grantVoiceAnalysis(
@@ -137,11 +140,19 @@ public class TrainingAnalysisRequestService {
                 failed.analysisId(),
                 requestEventId
         );
-        analysisJobPublisher.publish(toWorkerRequest(
+        publish(toWorkerRequest(
                 result.analysisId(), requestEventId, userId, sessionId, source,
                 consent.policyRevision(), consentReceipt.receiptSha256()
         ), profile);
         return result;
+    }
+
+    private void publish(AnalysisWorkerRequest request, AnalysisExecutionProfile profile) {
+        if (profile == AnalysisExecutionProfile.LEGACY) {
+            analysisJobPublisher.publish(request);
+            return;
+        }
+        analysisJobPublisher.publish(request, profile);
     }
 
     private AnalysisWorkerRequest toWorkerRequest(

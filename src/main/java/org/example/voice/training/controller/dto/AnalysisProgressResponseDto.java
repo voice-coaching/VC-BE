@@ -10,7 +10,10 @@ public record AnalysisProgressResponseDto(
         String stage,
         Integer progressPercent,
         String failureReason,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        OffsetDateTime deadlineAt,
+        OffsetDateTime serverTime,
+        boolean resultAvailable
 ) {
 
     public static AnalysisProgressResponseDto from(AnalysisProgressData data) {
@@ -20,7 +23,10 @@ public record AnalysisProgressResponseDto(
                 data.stage(),
                 data.progressPercent(),
                 data.failureReason(),
-                data.updatedAt()
+                data.updatedAt(),
+                data.deadlineAt(),
+                data.serverTime(),
+                data.resultAvailable()
         );
     }
 }

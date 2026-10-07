@@ -43,7 +43,13 @@ public class RunPodAnalysisClient {
                     .exchange((httpRequest, response) -> {
                         int status = response.getStatusCode().value();
                         if (status != 200 && status != 202) {
-                            throw new RunPodAnalysisDeliveryException("runpod_http_" + status, status == 429 || status >= 500, null);
+                            String code = "runpod_http_" + status;
+                            if (status == 429) {
+                                var error = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "error");
+                                if ("CAPACITY_EXCEEDED".equals(error.path("reasonCode").asText())) code = "runpod_capacity_busy";
+                            }
+                            throw new RunPodAnalysisDeliveryException(code, status == 429 || status >= 500, null)
+                                    .retryAfter(response.getHeaders().getFirst("Retry-After"));
                         }
                         var json = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "jobAccepted");
                         return contract.convert(json, RunPodAnalysisJobAccepted.class);
@@ -91,5 +97,25 @@ public class RunPodAnalysisClient {
     }
 
     private record RunPodAnalysisCancelRequest(UUID executionId) {
+    }
+
+    public record JobStatus(UUID requestId, UUID executionId, UUID workerInstanceId, String status, String reasonCode) {}
+
+    /** Read-only reconciliation; unknown, stale and transport errors are never terminal evidence. */
+    public JobStatus status(UUID requestId, UUID executionId) {
+        if (!properties.isConfigured()) return null;
+        try {
+            return restClientBuilder.build().get()
+                    .uri(properties.normalizedEndpointUrl() + "/v1/analysis-jobs/" + requestId + "?executionId=" + executionId)
+                    .header("Authorization", "Bearer " + properties.getApiToken())
+                    .exchange((request, response) -> {
+                        if (response.getStatusCode().value() != 200) return null;
+                        var json = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "jobStatus");
+                        var status = contract.convert(json, JobStatus.class);
+                        return requestId.equals(status.requestId()) && executionId.equals(status.executionId()) ? status : null;
+                    });
+        } catch (RestClientException | RunPodContractException error) {
+            return null;
+        }
     }
 }

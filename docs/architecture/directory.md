@@ -1,6 +1,12 @@
 # 디렉토리 문서 - voice
 
 이 문서는 voice 프로젝트의 현재 디렉토리 구조와 각 경로의 책임을 설명한다.
+
+- `training/domain/model/MediaPreparationData.java`: 서버 미디어 identity 모델.
+- `training/domain/port/RecordingMediaPreparationStore.java`: private receipt 저장/조회 경계.
+- `training/infrastructure/RecordingMediaPreparationStoreImpl.java`: JCS 원문·digest 검증과 JDBC 저장.
+- `analysis/infrastructure/canonical/CanonicalExecutionMediaStore.java`: admission transaction의 immutable 미디어 snapshot.
+- `src/main/resources/db/migration/V41__recording_media_preparations.sql`, `V42__analysis_execution_media.sql`: 신규 additive 테이블. 실행 적용은 별도다.
 새 파일이나 패키지를 추가할 때는 이 문서와 `docs/architecture/architecture.md`, `docs/architecture/component.md`를 함께 참고한다.
 
 ## 작성 기준
@@ -203,3 +209,8 @@ docs
 - 공통 코드가 실제로 여러 모듈에서 공유되는가?
 - 새 설정이나 비밀값 파일이 `.gitignore` 규칙을 따르는가?
 - 구조 변경이 있으면 README와 `docs/architecture/*` 문서를 함께 갱신했는가?
+
+
+## Canonical v5 handoff (2026-10-04)
+
+[Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.
