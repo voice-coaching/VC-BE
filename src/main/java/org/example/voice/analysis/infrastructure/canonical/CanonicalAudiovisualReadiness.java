@@ -17,7 +17,7 @@ import java.util.concurrent.*;
 /** Additive, default-closed v6 readiness. No live inference or reference fabrication. */
 @Component
 public final class CanonicalAudiovisualReadiness {
-    public static final String H5="ea7e573f0212802b2f6d09043873de31aad870403fab4b4618d4fcc8ae80a1e2";
+    public static final String H5="d2a30ff826f275e4c678cb2b50f113371220f47d9145041aadf826745e4f2739";
     public static final List<String> SCHEMAS=List.of("runpod_analysis_request_v4.schema.json",
         "runpod_result_v6.schema.json","runpod_canonical_handoff_v2.schema.json",
         "runpod_media_preparation_v1.schema.json","runpod_visual_coaching_input_v1.schema.json");

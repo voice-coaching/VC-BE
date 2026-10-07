@@ -19,9 +19,9 @@
 
 ## 기본값 및 미완료 조건
 
-`analysis.canonical.audiovisual.worker-enabled=false`, `analysis.canonical.audiovisual.admission-enabled=false`. verifier는 AI PR #34의 확장 소스 closure와 새 H5가 필요하다. Backend PR #114는 기존 PR #113 변경을 포함한다.
+`analysis.canonical.audiovisual.worker-enabled=false`, `analysis.canonical.audiovisual.admission-enabled=false`. verifier는 AI PR #35의 확장 소스 closure와 새 H5가 필요하다. Backend PR #114는 기존 PR #113 변경을 포함한다.
 
-AI 후보 H5: `ea7e573f0212802b2f6d09043873de31aad870403fab4b4618d4fcc8ae80a1e2`; lock: `3de3db047604a68b23427281e724b67fd602e241cca46fce36dc17f84fc6bcfa`.
+AI 후보 H5: `d2a30ff826f275e4c678cb2b50f113371220f47d9145041aadf826745e4f2739`; lock: `8126e24d7ed1d0a6cfd0cab20eceff570f8b7fa04767d44471f435a38425c242`.
 
 참조/보정 catalog는 비어 있어 관찰 전용이며 실제 MFA 자음 위치만 지원한다. 지정 영상 추출·전문가 구간 확인·별도 보정 자료, 개발자 실제 QA, migration 검증과 운영 설치/전환이 남았다. 구 v5-only Backend로 데이터가 있는 DB를 되돌리지 않는다.
 
