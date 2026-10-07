@@ -11,8 +11,10 @@ import java.util.UUID;
 public class CanonicalExecutionMediaStore {
     private final JdbcTemplate jdbc;
     private final RecordingMediaPreparationStore preparations;
-    public CanonicalExecutionMediaStore(JdbcTemplate jdbc, RecordingMediaPreparationStore preparations) {
-        this.jdbc = jdbc; this.preparations = preparations;
+    private final org.example.voice.analysis.infrastructure.runpod.RunPodContract contract;
+    public CanonicalExecutionMediaStore(JdbcTemplate jdbc, RecordingMediaPreparationStore preparations,
+            org.example.voice.analysis.infrastructure.runpod.RunPodContract contract) {
+        this.jdbc = jdbc; this.preparations = preparations; this.contract = contract;
     }
 
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
@@ -47,5 +49,33 @@ public class CanonicalExecutionMediaStore {
     private String receiptSha(long recording) {
         return jdbc.queryForObject("SELECT receipt_sha256 FROM recording_media_preparations WHERE recording_id=?",
                 String.class, recording);
+    }
+
+    public void requireRequest(UUID execution, com.fasterxml.jackson.databind.JsonNode request) {
+        var media = request.path("mediaPreparation");
+        String sha = contract.digest(media.path("receipt"));
+        if (!sha.equals(media.path("receiptSha256").asText())) invalid();
+        requireSnapshot(execution, request.path("recordingId").asLong(), request.path("audio").path("sha256").asText(),
+                request.path("video").path("sha256").asText(), sha);
+    }
+
+    public void requireResult(CanonicalCallbackDocument document) {
+        var node = contract.parse(document.bytes(), "result").path("mediaBinding");
+        requireSnapshot(document.identity().executionId(), document.identity().recordingId(),
+                document.source().audioSha256(), node.path("videoSha256").asText(), node.path("mediaReceiptSha256").asText());
+    }
+
+    private void requireSnapshot(UUID execution, long recording, String audio, String video, String receipt) {
+        if (!Boolean.TRUE.equals(jdbc.queryForObject("""
+            SELECT EXISTS(SELECT 1 FROM analysis_execution_media m
+              JOIN voice_recordings r ON r.id=m.recording_id
+              WHERE m.execution_id=? AND m.recording_id=? AND m.audio_sha256=? AND m.video_sha256=?
+                AND m.receipt_sha256=? AND m.media_type='AUDIO_VISUAL'
+                AND r.audio_sha256=m.audio_sha256 AND r.visual_sha256=m.video_sha256)
+            """, Boolean.class, execution, recording, audio, video, receipt))) invalid();
+    }
+
+    private static void invalid() {
+        throw new org.example.voice.analysis.infrastructure.runpod.RunPodContractException(422,"MEDIA_BINDING_INVALID");
     }
 }

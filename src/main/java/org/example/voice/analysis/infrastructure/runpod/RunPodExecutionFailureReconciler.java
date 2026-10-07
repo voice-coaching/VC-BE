@@ -51,7 +51,7 @@ public class RunPodExecutionFailureReconciler {
     private void reconcileBatch() {
         var attempts=jdbc.query("""
                 SELECT id,active_request_event_id,active_execution_id,worker_instance_id FROM analysis_results
-                WHERE id>? AND analysis_profile='CANONICAL_HANDOFF_20261004_V5'
+                WHERE id>? AND analysis_profile IN ('CANONICAL_HANDOFF_20261004_V5','CANONICAL_AUDIOVISUAL_20261007_V6')
                   AND status IN ('PENDING','PROCESSING') AND worker_instance_id IS NOT NULL
                   AND active_request_event_id IS NOT NULL AND active_execution_id IS NOT NULL
                   AND handoff_received_at IS NULL ORDER BY id LIMIT 8

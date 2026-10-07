@@ -22,9 +22,17 @@ record RunPodAnalysisJobRequest(
         @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "UTC")
         OffsetDateTime deadlineAt,
         @JsonInclude(JsonInclude.Include.NON_NULL) String resultSchemaVersion,
-        @JsonInclude(JsonInclude.Include.NON_NULL) String analysisProfile
+        @JsonInclude(JsonInclude.Include.NON_NULL) String analysisProfile,
+        @JsonInclude(JsonInclude.Include.NON_NULL) MediaPreparationInput mediaPreparation
 ) {
     static final String SCHEMA_VERSION = RunPodContract.REQUEST_V1;
+    RunPodAnalysisJobRequest(String schemaVersion, UUID requestId, UUID executionId, Long analysisId,
+                             Long recordingId, Long contentId, String learningFocus, String promptRevision,
+                             String scriptText, String scriptSha256, MediaInput audio, MediaInput video,
+                             OffsetDateTime deadlineAt, String resultSchemaVersion, String analysisProfile) {
+        this(schemaVersion,requestId,executionId,analysisId,recordingId,contentId,learningFocus,promptRevision,
+                scriptText,scriptSha256,audio,video,deadlineAt,resultSchemaVersion,analysisProfile,null);
+    }
 
     // Preserve the legacy constructor and serialized field order; v1 has no routing fields.
     RunPodAnalysisJobRequest(String schemaVersion, UUID requestId, UUID executionId, Long analysisId,
@@ -80,6 +88,14 @@ record RunPodAnalysisJobRequest(
     RunPodAnalysisJobRequest asHandoff() {
         return new RunPodAnalysisJobRequest(RunPodContract.REQUEST_V3,requestId,executionId,analysisId,recordingId,contentId,learningFocus,promptRevision,scriptText,scriptSha256,audio,video,deadlineAt,RunPodContract.RESULT_V5,RunPodContract.HANDOFF_PROFILE);
     }
+
+    RunPodAnalysisJobRequest asAudiovisual(MediaPreparationInput preparation) {
+        return new RunPodAnalysisJobRequest(RunPodContract.REQUEST_V4,requestId,executionId,analysisId,recordingId,
+                contentId,learningFocus,promptRevision,scriptText,scriptSha256,audio,video,deadlineAt,
+                RunPodContract.RESULT_V6,RunPodContract.AUDIOVISUAL_PROFILE,preparation);
+    }
+
+    record MediaPreparationInput(org.example.voice.training.domain.model.MediaPreparationData receipt, String receiptSha256) {}
 
     record MediaInput(
             String objectKey,

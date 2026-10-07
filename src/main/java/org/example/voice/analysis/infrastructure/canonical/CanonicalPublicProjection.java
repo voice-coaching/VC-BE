@@ -30,7 +30,9 @@ public final class CanonicalPublicProjection {
             if (selection!=null) checkBrowserNumbers(selection);
             return new Canonical(document.representation(),new Decision(decision.status().name(),decision.reasonCode(),decision.stage()),
                     document.coreStatus(),document.feedbackDeliveryAllowed(),text(root.get("canonical"),"pronunciationFeedbackSource"),
-                    selection,coaching(root.get("coaching")),read(root.get("score"),Score.class),read(root.get("visual"),Visual.class));
+                    selection,coaching(root.get("coaching")),read(root.get("score"),Score.class),
+                    RunPodContract.RESULT_V6.equals(document.schemaVersion())
+                            ? read(root.get("visual"),LipVisual.class) : read(root.get("visual"),AudioVisual.class));
         } catch (Exception ignored) {
             // Never retain or expose rejected JSON/Jackson diagnostics.
             throw new CanonicalAnalysisViewException(CANONICAL_RESULT_UNAVAILABLE);

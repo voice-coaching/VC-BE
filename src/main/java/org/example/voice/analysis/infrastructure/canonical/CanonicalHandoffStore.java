@@ -42,7 +42,7 @@ public class CanonicalHandoffStore {
             else executions.requireActiveForVerification(analysis,id.requestId(),id.executionId(),worker);
             var registry=jdbc.queryForMap("SELECT * FROM analysis_canonical_executions WHERE execution_id=?",id.executionId());
             var journal=jdbc.queryForMap("SELECT * FROM analysis_canonical_journals WHERE execution_id=?",id.executionId());
-            if(!RunPodContract.RESULT_V5.equals(registry.get("result_schema_version"))
+            if(!doc.projection().schemaVersion().equals(registry.get("result_schema_version"))
                 || ((Number)registry.get("recording_id")).longValue()!=id.recordingId()
                 || ((Number)registry.get("content_id")).longValue()!=id.contentId()
                 || !registry.get("request_payload_sha256").equals(doc.metadata().path("requestSha256").asText())

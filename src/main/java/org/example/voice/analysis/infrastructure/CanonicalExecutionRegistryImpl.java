@@ -60,7 +60,7 @@ public class CanonicalExecutionRegistryImpl implements CanonicalExecutionRegistr
         var analysis = results.findForIngestion(analysisId)
                 .orElseThrow(() -> failure(Reason.INACTIVE_EXECUTION));
         if (!analysis.isForActiveRequest(requestId) || !analysis.isForActiveExecution(executionId)
-                || !analysis.isCanonicalExecution() || !java.util.Set.of(RunPodContract.RESULT_V4,RunPodContract.RESULT_V5).contains(analysis.getExpectedResultSchemaVersion())
+                || !analysis.isCanonicalExecution() || !java.util.Set.of(RunPodContract.RESULT_V4,RunPodContract.RESULT_V5,RunPodContract.RESULT_V6).contains(analysis.getExpectedResultSchemaVersion())
                 || (analysis.getStatus() != AnalysisStatus.PENDING && analysis.getStatus() != AnalysisStatus.PROCESSING)
                 || !Boolean.TRUE.equals(jdbc.queryForObject(
                         "SELECT EXISTS (SELECT 1 FROM analysis_results a " + VISIBLE_RELATION
@@ -81,7 +81,7 @@ public class CanonicalExecutionRegistryImpl implements CanonicalExecutionRegistr
         CanonicalExecutionBinding binding;
         try {
             var json = contract.parse(payload.getBytes(StandardCharsets.UTF_8), "analysisRequest");
-            if (!java.util.Set.of(RunPodContract.REQUEST_V2,RunPodContract.REQUEST_V3).contains(json.path("schemaVersion").asText())
+            if (!java.util.Set.of(RunPodContract.REQUEST_V2,RunPodContract.REQUEST_V3,RunPodContract.REQUEST_V4).contains(json.path("schemaVersion").asText())
                     || !requestId.toString().equals(json.path("requestId").asText())
                     || !executionId.toString().equals(json.path("executionId").asText())
                     || analysisId.longValue() != json.path("analysisId").longValue()
@@ -121,6 +121,9 @@ public class CanonicalExecutionRegistryImpl implements CanonicalExecutionRegistr
         if (!binding.equals(stored)) throw failure(Reason.IMMUTABLE_BINDING_CONFLICT);
         executionMedia.snapshot(executionId, analysis.getRecording().getId(),
                 analysis.getRecording().getAudioSha256(), analysis.getRecording().getVisualSha256());
+        if (RunPodContract.RESULT_V6.equals(binding.resultSchemaVersion())) {
+            executionMedia.requireRequest(executionId, contract.parse(payload.getBytes(StandardCharsets.UTF_8), "analysisRequest"));
+        }
         return stored;
     }
 

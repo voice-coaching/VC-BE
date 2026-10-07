@@ -54,7 +54,7 @@ public final class CanonicalDeliveryWorker {
               AND e.deadline_at>=? AND a.execution_deadline_at>=? AND a.claim_expires_at>=?
             """,id.analysisId(),id.executionId(),id.requestId(),id.workerId().toString(),id.recordingId(),id.contentId(),
             d.metadata().path("requestSha256").asText(),id.eventId(),id.workerId(),d.projection().workerRevision(),d.projection().pipelineRevision(),
-            RunPodContract.RESULT_V5,entry.receivedAt.atOffset(ZoneOffset.UTC),entry.receivedAt.atOffset(ZoneOffset.UTC),entry.receivedAt.atOffset(ZoneOffset.UTC));
+            d.projection().schemaVersion(),entry.receivedAt.atOffset(ZoneOffset.UTC),entry.receivedAt.atOffset(ZoneOffset.UTC),entry.receivedAt.atOffset(ZoneOffset.UTC));
         if(rows.size()!=1)throw new RunPodContractException(409,"EXECUTION_INACTIVE");
         return (byte[])rows.getFirst().get("request_bytes");
     }
@@ -66,7 +66,12 @@ public final class CanonicalDeliveryWorker {
             long started=System.nanoTime();
             try{
                 if(settled(e))return; // Recover a commit that completed immediately before restart.
-                context(e); // Transport hashes were checked at receive/seal; no duplicate Python preflight.
+                byte[] request=context(e);
+                if (RunPodContract.RESULT_V6.equals(e.document.projection().schemaVersion())) {
+                    verifier.verifyHandoff(request,e.document.metadataBytes(),spool.originals(e),
+                        e.document.projection().bytes(),Duration.ofSeconds(90));
+                    context(e); // Recheck current ownership/generation after offline verification.
+                }
                 e.verified=true;e.retryAt=0;
                 published.signal(e.document.projection().identity().analysisId());
                 log("AVAILABLE",e,started);

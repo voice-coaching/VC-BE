@@ -13,8 +13,12 @@ import org.springframework.stereotype.Component;
 public final class CanonicalRequestScope {
     private final JdbcTemplate jdbc;
     public boolean eligible(AnalysisResult result) {
+        return eligible(result, org.example.voice.analysis.infrastructure.runpod.RunPodContract.AUDIOVISUAL_PROFILE.equals(result.getAnalysisProfile()));
+    }
+    public boolean eligible(AnalysisResult result, boolean audiovisual) {
         var recording=result.getRecording();var session=recording.getTrainingSession();
-        return recording.getVisualObjectKey()==null && recording.getQualityStatus()==RecordingQualityStatus.PASS
+        return (audiovisual ? recording.getVisualObjectKey()!=null : recording.getVisualObjectKey()==null)
+                && recording.getQualityStatus()==RecordingQualityStatus.PASS
                 && session.getCourseStepId()==null && session.getCourseEducationRevisionId()==null
                 && session.getLearningFocus()==LearningFocus.PRONUNCIATION
                 && !Boolean.TRUE.equals(jdbc.queryForObject(
