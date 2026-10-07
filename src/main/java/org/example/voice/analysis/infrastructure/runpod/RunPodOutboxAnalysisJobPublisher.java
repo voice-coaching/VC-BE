@@ -94,8 +94,13 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
     }
 
     private void assertCanonicalScope(AnalysisResult result, AnalysisWorkerRequest request) {
+        // A permanent profile mismatch must not look like a transient AI outage.
+        // v6 stays closed until its verifier, lifecycle and reader are installed.
+        if (request.visualInput() != null || result.getRecording().getVisualObjectKey() != null) {
+            throw new BaseException(ErrorCode.ANALYSIS_MEDIA_PROFILE_UNSUPPORTED);
+        }
         if (result.getStatus() != AnalysisStatus.PENDING || result.getActiveExecutionId() != null
-                || request.visualInput() != null || !canonicalScope.eligible(result)
+                || !canonicalScope.eligible(result)
                 || request.learningFocus() != org.example.voice.practicecontent.domain.type.LearningFocus.PRONUNCIATION
                 ) {
             // Initial rollout is standalone audio practice, not lip/course/title grading.

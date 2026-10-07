@@ -139,6 +139,8 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             Files.setPosixFilePermissions(source, READ_ONLY_FILE_PERMISSIONS);
             requireRestrictedRegularFile(source, declaredFileSizeBytes, media.getMaximumInputBytes());
             ProbeDocument probe = probe(source);
+            String sourceDigest = sha256(source);
+            ProbeDocument extractionProbe = probe;
             long probedDurationMs = validateProbe(probe, declaredMimeType);
             Path audioSource = source;
             NormalizedVisualData visual = null;
@@ -147,6 +149,7 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                 Files.setPosixFilePermissions(canonicalVisual, READ_ONLY_FILE_PERMISSIONS);
                 requireRestrictedRegularFile(canonicalVisual, null, media.getMaximumInputBytes());
                 ProbeDocument canonicalProbe = probe(canonicalVisual);
+                extractionProbe = canonicalProbe;
                 long canonicalDurationMs = validateProbe(canonicalProbe, NormalizedVisualData.CANONICAL_MIME_TYPE);
                 if (Math.abs(canonicalDurationMs - probedDurationMs) > 1_500) {
                     throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
@@ -201,7 +204,8 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                     quality.status(),
                     quality.volumeScore(),
                     null,
-                    visual
+                    visual,
+                    preparation(sourceDigest, digest, visual, extractionProbe)
             );
         } catch (BaseException error) {
             failure = error;
@@ -346,7 +350,7 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                 "-v", "error",
                 "-protocol_whitelist", "file,pipe",
                 "-show_entries",
-                "format=format_name,duration:stream=codec_type,codec_name,sample_rate,channels",
+                "format=format_name,duration:stream=codec_type,codec_name,sample_rate,channels,start_time,time_base",
                 "-of", "json",
                 sandboxPath(source)
         );
@@ -800,6 +804,31 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
     }
 
+    private static org.example.voice.training.domain.model.MediaPreparationData preparation(
+            String sourceDigest, String pcmDigest, NormalizedVisualData visual, ProbeDocument probe) {
+        var audio = probe.streams().stream().filter(s -> "audio".equals(s.codecType())).findFirst().orElseThrow();
+        var video = probe.streams().stream().filter(s -> "video".equals(s.codecType())).findFirst().orElse(null);
+        return new org.example.voice.training.domain.model.MediaPreparationData(
+                org.example.voice.training.domain.model.MediaPreparationData.SCHEMA,
+                sourceDigest, pcmDigest, visual == null ? null : visual.visualSha256(),
+                org.example.voice.training.domain.model.MediaPreparationData.REVISION,
+                optionalTime(audio.startTime()), video == null ? null : optionalTime(video.startTime()),
+                optionalTimeBase(audio.timeBase()), video == null ? null : optionalTimeBase(video.timeBase()),
+                visual == null ? "NOT_APPLICABLE" : "UNVERIFIED");
+    }
+
+    private static BigDecimal optionalTime(String value) {
+        if (value == null || "N/A".equals(value)) return null;
+        try {
+            var seconds = new BigDecimal(value);
+            return seconds.abs().compareTo(BigDecimal.valueOf(86400)) <= 0 && seconds.scale() <= 12 ? seconds : null;
+        } catch (NumberFormatException ignored) { return null; }
+    }
+
+    private static String optionalTimeBase(String value) {
+        return value != null && value.matches("[1-9][0-9]{0,9}/[1-9][0-9]{0,9}") ? value : null;
+    }
+
     private static String ascii(byte[] value, int offset, int length) {
         return new String(value, offset, length, java.nio.charset.StandardCharsets.US_ASCII);
     }
@@ -842,7 +871,9 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             @JsonProperty("codec_type") String codecType,
             @JsonProperty("codec_name") String codecName,
             @JsonProperty("sample_rate") String sampleRate,
-            Integer channels
+            Integer channels,
+            @JsonProperty("start_time") String startTime,
+            @JsonProperty("time_base") String timeBase
     ) {
     }
 

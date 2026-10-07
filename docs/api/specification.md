@@ -426,8 +426,8 @@ Content-Type: application/json
 ```
 - 이 API는 파일을 직접 받지 않는다.
 - 선택된 recording이 audio media에서 등록된 경우 Backend는 RunPod에 audio-only HTTP 분석 요청을 보낸다.
-- 선택된 recording이 video media에서 등록된 경우 Backend는 영상에서 파생한 canonical WAV와 canonical MP4를 함께 담아 RunPod에 HTTP 분석 요청을 보낸다.
-- 분석 결과는 RunPod이 Backend internal callback API로 전달한다.
+- 현재 canonical v5 접수는 음성만 지원한다. 영상 recording은 영상에서 추출한 WAV가 있어도 `422 ANALYSIS_MEDIA_PROFILE_UNSUPPORTED`로 거절한다. 내부 DTO의 video 필드 존재는 운영 영상 지원을 의미하지 않는다.
+- 결과는 설정된 AI upstream의 canonical handoff 경로로 전달한다. 신규 v6 request schema 파일은 준비 단계이며 HTTP 접수에서 아직 허용하지 않는다.
 - 클라이언트는 analyze 요청에서 audio/video 구분을 다시 보내지 않는다.
 - Response body:
 ```json
@@ -443,6 +443,8 @@ Content-Type: application/json
 ```
 - Status codes: 200 OK
 - Error cases: See common error codes
+
+영상 미지원 오류는 analyze와 analysis/retry에 동일하게 적용한다. retry도 선택 녹음의 음질 PASS를 다시 검사한다. 기존 인증·소유·중복·readiness 오류는 유지한다.
 
 ### PUT /api/onboarding/me
 - Description: 온보딩 저장 및 완료 - 온보딩 전체 응답을 저장하고 completedAt을 기록. 최초 완료와 재저장 모두 지원
