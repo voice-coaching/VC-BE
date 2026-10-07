@@ -122,6 +122,9 @@ public class TrainingAnalysisRequestService {
         validateSupportedFocus(source);
         AnalysisProgressData failed = trainingAnalysisReader.findLatestFailedBySelectedRecording(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FAILED));
+        if (source.qualityStatus() != RecordingQualityStatus.PASS) {
+            throw new BaseException(ErrorCode.AUDIO_QUALITY_NOT_ACCEPTABLE);
+        }
 
         UUID requestEventId = UUID.randomUUID();
         ProcessingConsentReceipt consentReceipt = processingConsentLedger.grantVoiceAnalysis(

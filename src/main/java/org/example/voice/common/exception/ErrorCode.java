@@ -74,6 +74,7 @@ public enum ErrorCode {
     ANALYSIS_NOT_FAILED(HttpStatus.CONFLICT, "실패한 분석만 재시도할 수 있습니다."),
     MAX_RETRY_EXCEEDED(HttpStatus.CONFLICT, "분석 재시도 가능 횟수를 초과했습니다."),
     ANALYSIS_INTEGRATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "현재 분석 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."),
+    ANALYSIS_MEDIA_PROFILE_UNSUPPORTED(HttpStatus.UNPROCESSABLE_ENTITY, "현재 분석 계약은 영상 녹음을 지원하지 않습니다."),
     ANALYSIS_INTERNAL_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "AI 내부 연동 인증 정보가 유효하지 않습니다."),
     ANALYSIS_INTERNAL_CONTRACT_INVALID(HttpStatus.BAD_REQUEST, "AI 내부 연동 요청 형식이 올바르지 않습니다."),
     ANALYSIS_INTERNAL_STALE_EXECUTION(HttpStatus.CONFLICT, "현재 분석 실행 세대와 일치하지 않는 요청입니다."),

@@ -1,5 +1,34 @@
 # DB Schema - voice
 
+## V41/V42 미디어 준비와 실행 snapshot (미배포)
+
+`recording_media_preparations`는 Backend normalizer가 생성한 receipt를 recording과 같은 transaction에 저장한다. 과거 recording은 backfill하지 않는다. entity/public DTO에 receipt를 노출하지 않는다.
+
+| column | type | 제약/용도 |
+| --- | --- | --- |
+| recording_id | BIGINT | PK, voice_recordings FK; 자동 cascade 없음 |
+| schema_version | VARCHAR(100) | NOT NULL, media-preparation.v1 고정 |
+| receipt_bytes | BYTEA | NOT NULL, 1–16384 bytes, JCS 원문 |
+| receipt_sha256 | VARCHAR(64) | NOT NULL, 소문자 SHA-256 |
+| created_at | TIMESTAMPTZ | NOT NULL, CURRENT_TIMESTAMP |
+
+receipt에는 source/PCM/video digest, normalizer revision, probe의 audio/video start/time base를 저장한다. 영상 syncStatus는 UNVERIFIED이며 이 값으로 임의 시간 offset을 만들지 않는다. UPDATE trigger가 내용 교체를 막는다. 현재 recording은 soft delete하며 FK는 기존 물리 삭제 정책을 자동 확대하지 않는다.
+
+`analysis_execution_media`는 실행 등록 transaction에서 해당 receipt의 원문을 복사한다. owner는 analysis infrastructure다. PK 외 추가 조회 인덱스는 없고, soft delete 필드는 없다. UPDATE/DELETE/TRUNCATE는 기존 canonical immutable trigger로 금지된다.
+
+| column | type | 제약/용도 |
+| --- | --- | --- |
+| execution_id | UUID | PK, analysis_canonical_executions FK |
+| recording_id | BIGINT | NOT NULL, immutable 실행 snapshot의 ID |
+| media_type | VARCHAR(16) | NOT NULL, AUDIO_ONLY 또는 AUDIO_VISUAL |
+| audio_sha256 | VARCHAR(64) | NOT NULL, 소문자 SHA-256 |
+| video_sha256 | VARCHAR(64) | AUDIO_VISUAL이면 SHA-256 필수, AUDIO_ONLY이면 null |
+| receipt_sha256 | VARCHAR(64) | NOT NULL, 원문 digest |
+| receipt_bytes | BYTEA | NOT NULL, 1–16384 bytes |
+| created_at | TIMESTAMPTZ | NOT NULL, CURRENT_TIMESTAMP |
+
+기존 audio recording에 receipt가 없으면 snapshot 없이 기존 계약으로 접수한다. 새 recording은 digest binding을 검사한 뒤 snapshot을 생성한다. 동일 execution 재등록은 원문까지 같아야 한다. migration은 정적 작성·Java 컴파일만 확인했으며 DB 적용/rollback QA는 미수행이다.
+
 ## V38 RunPod capacity 대기
 
 `V38__analysis_dispatch_capacity.sql`은 outbox에 `busy_count INTEGER NOT NULL DEFAULT 0 CHECK (busy_count >= 0)`을 추가한다. 기존 `attempt_count`는 실제 전송 실패 횟수다. `analysis_dispatch_gates`는 endpoint SHA-256 기본키, UUID claim, claim 만료 시각, 다음 시도 시각을 보관한다. 신규 DB 적용·운영 검증 전이며 행 삭제·기존 결과 변환은 없다. [처리 계약과 배포 선행조건](../canonical-latency-20261004.md)을 따른다.

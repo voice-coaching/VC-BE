@@ -14,9 +14,17 @@ public record NormalizedRecordingData(
         RecordingQualityStatus qualityStatus,
         BigDecimal volumeScore,
         BigDecimal noiseScore,
-        NormalizedVisualData visual
+        NormalizedVisualData visual,
+        MediaPreparationData preparation
 ) {
     public static final String CANONICAL_MIME_TYPE = "audio/wav";
+
+    public NormalizedRecordingData(String objectKey, String mimeType, Long fileSizeBytes,
+            Integer durationMs, String audioSha256, RecordingQualityStatus qualityStatus,
+            BigDecimal volumeScore, BigDecimal noiseScore, NormalizedVisualData visual) {
+        this(objectKey, mimeType, fileSizeBytes, durationMs, audioSha256, qualityStatus,
+                volumeScore, noiseScore, visual, null);
+    }
 
     public NormalizedRecordingData(
             String objectKey,
@@ -33,6 +41,9 @@ public record NormalizedRecordingData(
     }
 
     public NormalizedRecordingData {
+        if (preparation != null && !preparation.binds(audioSha256, visual == null ? null : visual.visualSha256())) {
+            throw new IllegalArgumentException("normalized preparation does not bind media");
+        }
         if (objectKey == null || objectKey.isBlank() || objectKey.length() > 1_000) {
             throw new IllegalArgumentException("normalized object key is invalid");
         }

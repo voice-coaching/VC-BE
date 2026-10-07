@@ -24,6 +24,7 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
     private final TrainingSessionJpaRepository trainingSessionJpaRepository;
     private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;
     private final RecordingDeletionScheduler recordingDeletionScheduler;
+    private final org.example.voice.training.domain.port.RecordingMediaPreparationStore mediaPreparations;
 
     @Override
     @Transactional
@@ -53,6 +54,10 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
                         normalized.noiseScore()
                 )
         );
+        if (normalized.preparation() != null) {
+            voiceRecordingJpaRepository.flush();
+            mediaPreparations.register(recording.getId(), normalized.preparation());
+        }
         return new VoiceRecordingRegisteredData(
                 recording.getId(),
                 recording.getAttemptNo(),

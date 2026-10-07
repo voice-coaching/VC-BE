@@ -48,6 +48,7 @@ public class CanonicalExecutionRegistryImpl implements CanonicalExecutionRegistr
     private final AnalysisRequestOutboxJpaRepository outboxes;
     private final JdbcTemplate jdbc;
     private final RunPodContract contract;
+    private final org.example.voice.analysis.infrastructure.canonical.CanonicalExecutionMediaStore executionMedia;
 
     @Override
     @Transactional
@@ -118,6 +119,8 @@ public class CanonicalExecutionRegistryImpl implements CanonicalExecutionRegistr
                         MAPPER, executionId).stream().findFirst()
                 .orElseThrow(() -> failure(Reason.IMMUTABLE_BINDING_CONFLICT));
         if (!binding.equals(stored)) throw failure(Reason.IMMUTABLE_BINDING_CONFLICT);
+        executionMedia.snapshot(executionId, analysis.getRecording().getId(),
+                analysis.getRecording().getAudioSha256(), analysis.getRecording().getVisualSha256());
         return stored;
     }
 

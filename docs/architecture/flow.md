@@ -1,6 +1,10 @@
 # 흐름 문서 - voice
 
 이 문서는 voice 백엔드의 주요 기능 흐름을 단계별로 기록한다.
+
+### 2026-10-07 미디어 준비 근거 추가
+
+기존 normalizer가 source/PCM/MP4 해시와 ffprobe start/time base를 `MediaPreparationData`로 반환한다. `VoiceRecordingWriterImpl`은 recording flush 후 `RecordingMediaPreparationStore`를 통해 같은 transaction에 receipt를 저장한다. 실패하면 기존 미디어 rollback 정리가 실행된다. `CanonicalExecutionRegistryImpl`은 검증된 receipt를 실행 등록 transaction의 immutable snapshot으로 보존한다. 과거 자료의 근거를 추정해 생성하지 않는다. 공개 analyze는 여전히 v5 음성 전용이며 영상은 명시적 422로 거절한다.
 API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임은 `docs/architecture/component.md`를 함께 참고한다.
 
 ## 흐름 작성 기준
