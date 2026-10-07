@@ -57,7 +57,7 @@ public final class CanonicalCommittedResultReader {
                     AND a.expected_result_schema_version=d.schema_version
                     AND ((d.schema_version='voice-coaching.runpod-analysis-result.v4'
                           AND d.handoff_id IS NULL AND i.event_id IS NOT NULL)
-                      OR (d.schema_version='voice-coaching.runpod-analysis-result.v5'
+                      OR (d.schema_version IN ('voice-coaching.runpod-analysis-result.v5','voice-coaching.runpod-analysis-result.v6')
                           AND d.handoff_id IS NOT NULL AND h.handoff_id IS NOT NULL))
                     AND d.worker_instance_id::text=a.worker_instance_id
                     AND r.deleted_at IS NULL AND r.is_selected=TRUE AND c.custom_deleted_at IS NULL

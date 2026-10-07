@@ -35,7 +35,7 @@ public class CanonicalBackendJournal {
         if(!settings.journalEnabled() || settings.journalStagingBudgetBytes()==0)fail(503,"NOT_READY");
         revision(workerRevision);revision(pipelineRevision);
         var request=contract.parse(raw,"analysisRequest");
-        if(!RunPodContract.REQUEST_V3.equals(request.path("schemaVersion").asText())
+        if(!java.util.Set.of(RunPodContract.REQUEST_V3,RunPodContract.REQUEST_V4).contains(request.path("schemaVersion").asText())
                 || analysis!=request.path("analysisId").asLong()
                 || !execution.toString().equals(request.path("executionId").asText()))fail(422,"VALIDATION_FAILED");
         UUID requestId=UUID.fromString(request.path("requestId").asText());

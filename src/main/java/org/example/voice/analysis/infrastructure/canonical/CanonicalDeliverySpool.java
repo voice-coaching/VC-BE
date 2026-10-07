@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /** Single-owner persistent disk queue. No SQL and no inference in the HTTP receive path. */
 @Component
 public final class CanonicalDeliverySpool {
-    public static final Set<String> KINDS=Set.of("CORE","BRIDGE_RESULT","SELECTION_PROJECTION","BINDING","ASSOCIATION");
+    public static final Set<String> KINDS=Set.of("CORE","BRIDGE_RESULT","SELECTION_PROJECTION","BINDING","ASSOCIATION","MEDIA_RECEIPT","VISUAL_EVIDENCE");
     public static final class Entry {
         public final CanonicalHandoffDocument document;
         public final Path directory;
@@ -41,7 +41,8 @@ public final class CanonicalDeliverySpool {
     public boolean enabled(){return env.getProperty("analysis.canonical.delivery.enabled",Boolean.class,false);}
     public boolean operational(){return !enabled() || ready;}
     public long budget(){return env.getProperty("analysis.canonical.delivery.budget-bytes",Long.class,536870912L);}
-    public synchronized boolean headroom(){return operational() && (!enabled() || (reserved+85065728L<=budget() && free()>=85065728L));}
+    public synchronized boolean headroom(){return headroom(CanonicalHandoffSettings.RESERVATION);}
+    public synchronized boolean headroom(long bytes){return bytes>0 && operational() && (!enabled() || (reserved+bytes<=budget() && free()>=bytes));}
     private long free(){try{return Files.getFileStore(root).getUsableSpace();}catch(Exception e){return 0;}}
     @PostConstruct public synchronized void start() throws Exception {
         if(!enabled())return;

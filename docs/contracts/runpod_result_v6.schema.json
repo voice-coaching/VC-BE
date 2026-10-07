@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:voice-coaching:runpod-analysis-result:v4",
-  "title": "Private canonical HTTP result v4 preflight contract",
+  "$id": "voice-coaching.runpod-analysis-result.v6",
+  "title": "Canonical audio and visual handoff result v6",
   "$comment": "NOT ACTIVATED. Service validation additionally requires original bytes, frozen prepare equality, full binding/association and authenticated Backend VERIFIED receipt. Max raw UTF-8 callback 1 MiB; byte hashes are not JCS hashes. Imported frozen inputValidation/candidate/coverage/output subtrees are unchanged. Frozen arbitrary diagnostic evidence remains arbitrary only where its pinned schema explicitly allows it; never infer a typed MFA receipt from that schema.",
   "$ref": "#/$defs/result",
   "$defs": {
@@ -1256,7 +1256,15 @@
           ]
         },
         "visualStatus": {
-          "const": "NOT_CONNECTED"
+          "enum": [
+            "NOT_PROVIDED",
+            "OBSERVED",
+            "REFERENCE_ONLY",
+            "SCORED",
+            "UNSCORABLE",
+            "FAILED",
+            "TIMEOUT"
+          ]
         },
         "visualCorrectiveClaimsAllowed": {
           "const": false
@@ -1270,6 +1278,15 @@
               "type": "null"
             }
           ]
+        },
+        "videoSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mediaReceiptSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "visualEvidenceSha256": {
+          "$ref": "#/$defs/sha256"
         }
       },
       "required": [
@@ -1288,7 +1305,10 @@
         "preparedWavSha256",
         "preparedAudio",
         "visualStatus",
-        "visualCorrectiveClaimsAllowed"
+        "visualCorrectiveClaimsAllowed",
+        "videoSha256",
+        "mediaReceiptSha256",
+        "visualEvidenceSha256"
       ],
       "oneOf": [
         {
@@ -1480,15 +1500,413 @@
       "additionalProperties": false,
       "properties": {
         "status": {
-          "const": "NOT_CONNECTED"
+          "enum": [
+            "NOT_PROVIDED",
+            "OBSERVED",
+            "REFERENCE_ONLY",
+            "SCORED",
+            "UNSCORABLE",
+            "FAILED",
+            "TIMEOUT"
+          ]
         },
         "correctiveClaimsAllowed": {
           "const": false
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scoreKind": {
+          "enum": [
+            "NONE",
+            "CALIBRATED"
+          ]
+        },
+        "coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "targetCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2048
+            },
+            "visuallyEligibleCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2048
+            },
+            "observedCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2048
+            },
+            "scoredCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2048
+            },
+            "coverage": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "targetCount",
+            "visuallyEligibleCount",
+            "observedCount",
+            "scoredCount",
+            "coverage"
+          ]
+        },
+        "phoneAssessments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "expectedIndex": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "expectedPhone": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 20
+              },
+              "role": {
+                "enum": [
+                  "onset",
+                  "nucleus",
+                  "coda"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "OBSERVED",
+                  "REFERENCE_ONLY",
+                  "SCORED",
+                  "UNSCORABLE"
+                ]
+              },
+              "score": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "scoreKind": {
+                "enum": [
+                  "NONE",
+                  "REFERENCE_SIMILARITY",
+                  "CALIBRATED"
+                ]
+              },
+              "audioStartSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 120
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "audioEndSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 120
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "observations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "observationId": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}:phone-[0-9]+:LIP_(APERTURE|WIDTH|AREA)_RANGE$"
+                    },
+                    "code": {
+                      "enum": [
+                        "LIP_APERTURE_RANGE",
+                        "LIP_WIDTH_RANGE",
+                        "LIP_AREA_RANGE"
+                      ]
+                    },
+                    "minimum": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "maximum": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "unit": {
+                      "enum": [
+                        "FACE_SCALE_NORMALIZED"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "observationId",
+                    "code",
+                    "minimum",
+                    "maximum",
+                    "unit"
+                  ]
+                },
+                "maxItems": 3
+              },
+              "allowedActionIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 0
+              },
+              "reasonCodes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]{0,79}$"
+                },
+                "maxItems": 32
+              },
+              "referenceDistance": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "referenceIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "maxItems": 32
+              },
+              "calibrationRevision": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "videoStartSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": -86400,
+                    "maximum": 86400
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "videoEndSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": -86400,
+                    "maximum": 86400
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "frameCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3600
+              }
+            },
+            "required": [
+              "expectedIndex",
+              "expectedPhone",
+              "role",
+              "status",
+              "score",
+              "scoreKind",
+              "audioStartSeconds",
+              "audioEndSeconds",
+              "observations",
+              "allowedActionIds",
+              "reasonCodes",
+              "referenceDistance",
+              "referenceIds",
+              "calibrationRevision",
+              "videoStartSeconds",
+              "videoEndSeconds",
+              "frameCount"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "scoreKind": {
+                      "const": "NONE"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "score": {
+                      "const": null
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "SCORED"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "scoreKind": {
+                      "const": "CALIBRATED"
+                    },
+                    "score": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "maxItems": 128
+        },
+        "reasonCodes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{0,79}$"
+          },
+          "maxItems": 32
+        },
+        "alignmentScope": {
+          "const": "CANONICAL_MFA_DETECTOR_PHONES_V1"
+        },
+        "unresolvedExpectedIndices": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "maxItems": 2048
+        },
+        "omittedPhoneAssessmentCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2048
         }
       },
       "required": [
         "status",
-        "correctiveClaimsAllowed"
+        "correctiveClaimsAllowed",
+        "score",
+        "scoreKind",
+        "coverage",
+        "phoneAssessments",
+        "reasonCodes",
+        "alignmentScope",
+        "unresolvedExpectedIndices",
+        "omittedPhoneAssessmentCount"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "scoreKind": {
+                "const": "NONE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "const": null
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "SCORED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "scoreKind": {
+                "const": "CALIBRATED"
+              },
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
+          }
+        }
       ]
     },
     "failure": {
@@ -1723,31 +2141,6 @@
             }
           }
         }
-      ]
-    },
-    "retainedEvidence": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "evidenceReceiptId": {
-          "$ref": "#/$defs/uuid"
-        },
-        "manifestSha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "artifacts": {
-          "type": "array",
-          "minItems": 4,
-          "maxItems": 5,
-          "items": {
-            "$ref": "#/$defs/artifact"
-          }
-        }
-      },
-      "required": [
-        "evidenceReceiptId",
-        "manifestSha256",
-        "artifacts"
       ]
     },
     "coaching": {
@@ -2511,7 +2904,7 @@
       "additionalProperties": false,
       "properties": {
         "schemaVersion": {
-          "const": "voice-coaching.runpod-analysis-result.v4"
+          "const": "voice-coaching.runpod-analysis-result.v6"
         },
         "eventId": {
           "$ref": "#/$defs/uuid"
@@ -2557,7 +2950,7 @@
           "$ref": "#/$defs/revision"
         },
         "analysisProfile": {
-          "const": "CANONICAL_FROZEN_20260928_V4"
+          "const": "CANONICAL_AUDIOVISUAL_20261007_V6"
         },
         "sourceIdentity": {
           "$ref": "#/$defs/sourceIdentity"
@@ -2610,14 +3003,31 @@
         "score": {
           "$ref": "#/$defs/score"
         },
-        "retainedEvidence": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/retainedEvidence"
+        "mediaBinding": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "videoSha256": {
+              "$ref": "#/$defs/sha256"
             },
-            {
-              "type": "null"
+            "mediaReceiptSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "visualEvidenceSha256": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
+          },
+          "required": [
+            "videoSha256",
+            "mediaReceiptSha256",
+            "visualEvidenceSha256"
           ]
         }
       },
@@ -2642,7 +3052,7 @@
         "visual",
         "prosodyPolicy",
         "score",
-        "retainedEvidence"
+        "mediaBinding"
       ],
       "oneOf": [
         {
@@ -2674,9 +3084,6 @@
             },
             "coaching": {
               "$ref": "#/$defs/coaching"
-            },
-            "retainedEvidence": {
-              "$ref": "#/$defs/retainedEvidence"
             }
           }
         },
@@ -2714,9 +3121,6 @@
               "const": null
             },
             "coaching": {
-              "const": null
-            },
-            "retainedEvidence": {
               "const": null
             },
             "sourceIdentity": {
@@ -2779,9 +3183,6 @@
             },
             "coaching": {
               "const": null
-            },
-            "retainedEvidence": {
-              "$ref": "#/$defs/retainedEvidence"
             }
           }
         },
@@ -2824,9 +3225,6 @@
                   ]
                 }
               ]
-            },
-            "retainedEvidence": {
-              "$ref": "#/$defs/retainedEvidence"
             }
           }
         }

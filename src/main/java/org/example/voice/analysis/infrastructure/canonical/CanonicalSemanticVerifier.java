@@ -28,7 +28,10 @@ public final class CanonicalSemanticVerifier {
 
     public void assertHandoffInstalled() { assertInstalled(true); }
 
-    private void assertInstalled(boolean handoffRequired) {
+    public void assertAudiovisualInstalled() { assertInstalled(true, true); }
+
+    private void assertInstalled(boolean handoffRequired) { assertInstalled(handoffRequired, false); }
+    private void assertInstalled(boolean handoffRequired, boolean audiovisualRequired) {
         if(!settings.semanticConfigured())unavailable();
         Process child=null;
         try {
@@ -47,6 +50,9 @@ public final class CanonicalSemanticVerifier {
             var response=mapper.readTree(raw);
             validateInstallation(response);
             if(handoffRequired)validateHandoffInstallation(response);
+            if(audiovisualRequired && (!"4cc0cbacd41b5c6f2ac20e6e4840bc5406f4c7ab79ecf53702586eeb5874ecbc".equals(response.path("audiovisualCoreManifestSha256").asText())
+                || !"d70372926d3406842b95c370b5ceb152480e7f0af83ba840028ec8d9ace2dc50".equals(response.path("audiovisualManifestSha256").asText())
+                || !"934729ee467a2eb030c244584c6fa5c3575ca9ed0a43348a59a486199c0f55e9".equals(response.path("audiovisualLockSha256").asText()))) unavailable();
         } catch(InterruptedException error){Thread.currentThread().interrupt();unavailable();}
         catch(Exception error){unavailable();}
         finally {if(child!=null && child.isAlive())child.destroyForcibly();}

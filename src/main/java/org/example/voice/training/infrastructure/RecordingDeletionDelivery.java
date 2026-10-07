@@ -21,6 +21,7 @@ public class RecordingDeletionDelivery {
     private final RecordingDeletionOutboxJpaRepository repository;
     private final RecordingObjectStoragePort objectStorage;
     private final RecordingDeletionMetrics metrics;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void deliver(Long id) {
@@ -32,6 +33,19 @@ public class RecordingDeletionDelivery {
             return;
         }
         try {
+            // A cancelled/retried worker may still be unwinding its owned
+            // process. Keep both MP4 and PCM until every v6 execution deadline
+            // has passed; public visibility was already revoked by deletion.
+            var inUseUntil = jdbc.queryForObject("""
+                SELECT MAX(e.deadline_at) FROM analysis_canonical_executions e
+                JOIN voice_recordings r ON r.id=e.recording_id
+                WHERE e.analysis_profile='CANONICAL_AUDIOVISUAL_20261007_V6'
+                  AND (r.audio_url=? OR r.visual_object_key=?) AND e.deadline_at>CURRENT_TIMESTAMP
+                """, OffsetDateTime.class, deletion.getObjectKey(), deletion.getObjectKey());
+            if (inUseUntil != null) {
+                deletion.deferUntil(inUseUntil.plusSeconds(30));
+                return;
+            }
             objectStorage.deleteObject(
                     deletion.getUserId(),
                     deletion.getTrainingSessionId(),

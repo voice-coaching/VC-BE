@@ -36,7 +36,7 @@ public final class CanonicalActionPolicy {
         if (result.getRetryCount()>=AnalysisRetryPolicy.MAX_RETRY_COUNT) retry.add("MAX_RETRY_EXCEEDED");
         if (!session.allowsAnalysisRetry()) retry.add("INVALID_SESSION_STATE");
         if (!scope.eligible(result)) retry.add("CANONICAL_SCOPE_UNAVAILABLE");
-        try { admission.assertAvailable(TrainingAnalysisSchemaAdmissionService.CANONICAL_RESULT_SCHEMA); }
+        try { admission.assertAvailable(result.getExpectedResultSchemaVersion()); }
         catch(AnalysisSchemaAdmissionException error) { retry.add(error.getErrorCode().name()); }
         if (!runpod.isConfigured() && !retry.contains("ANALYSIS_INTEGRATION_UNAVAILABLE")) retry.add("ANALYSIS_INTEGRATION_UNAVAILABLE");
         if (results.countByRecordingTrainingSessionUserIdAndStatusIn(session.getUserId(),
