@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:voice-coaching:runpod-analysis-result:v4",
-  "title": "Private canonical HTTP result v4 preflight contract",
+  "$id": "voice-coaching.runpod-analysis-result.v6",
+  "title": "Canonical audio and visual handoff result v6",
   "$comment": "NOT ACTIVATED. Service validation additionally requires original bytes, frozen prepare equality, full binding/association and authenticated Backend VERIFIED receipt. Max raw UTF-8 callback 1 MiB; byte hashes are not JCS hashes. Imported frozen inputValidation/candidate/coverage/output subtrees are unchanged. Frozen arbitrary diagnostic evidence remains arbitrary only where its pinned schema explicitly allows it; never infer a typed MFA receipt from that schema.",
   "$ref": "#/$defs/result",
   "$defs": {
@@ -1218,8 +1218,7 @@
             "f90440b764f78f32c989dc0785f41262397cc22e1d1ca48c40361189b81f86d5",
             "1612539f82a0b6e2c5c0b3551440b8094ca979bd8ab5d898386713bd0d1f54b7",
             "def65f68a849a2452b0e4dde600f0ef85d99beaa97123d30d97262653ebf8e77",
-            "d70372926d3406842b95c370b5ceb152480e7f0af83ba840028ec8d9ace2dc50",
-            "3e430635a4d714ead5d8e08352e41ff9a2b06c893d73af7f018fb43b4c37f61c"
+            "d70372926d3406842b95c370b5ceb152480e7f0af83ba840028ec8d9ace2dc50"
           ]
         },
         "llmDependencyLockSha256": {
@@ -1237,8 +1236,7 @@
             "74784bf0c7ba99628ed2ff8db19157c63d22a2a1cd66c58000ad2e811dc93160",
             "3e2e81b43b1c1298266df428bc01ef0761d37f413073824cae2000623ea2eb3c",
             "b605c3b9ba06bbf18fc126770b18de3d2da0d3f70c08e04873f17bc735b948bc",
-            "934729ee467a2eb030c244584c6fa5c3575ca9ed0a43348a59a486199c0f55e9",
-            "58c26086546abb8b94eb6998671101d67633af426adf373cceb42862ccaf0ec4"
+            "934729ee467a2eb030c244584c6fa5c3575ca9ed0a43348a59a486199c0f55e9"
           ]
         },
         "scriptSha256": {
@@ -1258,7 +1256,15 @@
           ]
         },
         "visualStatus": {
-          "const": "NOT_CONNECTED"
+          "enum": [
+            "NOT_PROVIDED",
+            "OBSERVED",
+            "REFERENCE_ONLY",
+            "SCORED",
+            "UNSCORABLE",
+            "FAILED",
+            "TIMEOUT"
+          ]
         },
         "visualCorrectiveClaimsAllowed": {
           "const": false
@@ -1272,6 +1278,15 @@
               "type": "null"
             }
           ]
+        },
+        "videoSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mediaReceiptSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "visualEvidenceSha256": {
+          "$ref": "#/$defs/sha256"
         }
       },
       "required": [
@@ -1290,7 +1305,10 @@
         "preparedWavSha256",
         "preparedAudio",
         "visualStatus",
-        "visualCorrectiveClaimsAllowed"
+        "visualCorrectiveClaimsAllowed",
+        "videoSha256",
+        "mediaReceiptSha256",
+        "visualEvidenceSha256"
       ],
       "oneOf": [
         {
@@ -1474,19 +1492,6 @@
               "const": "934729ee467a2eb030c244584c6fa5c3575ca9ed0a43348a59a486199c0f55e9"
             }
           }
-        },
-        {
-          "properties": {
-            "parentManifestSha256": {
-              "const": "f6d56e1decc160f0ca38cc8d52303f3de20945f872d714bf6a2e743ed94c0391"
-            },
-            "llmManifestSha256": {
-              "const": "3e430635a4d714ead5d8e08352e41ff9a2b06c893d73af7f018fb43b4c37f61c"
-            },
-            "llmDependencyLockSha256": {
-              "const": "58c26086546abb8b94eb6998671101d67633af426adf373cceb42862ccaf0ec4"
-            }
-          }
         }
       ]
     },
@@ -1495,15 +1500,413 @@
       "additionalProperties": false,
       "properties": {
         "status": {
-          "const": "NOT_CONNECTED"
+          "enum": [
+            "NOT_PROVIDED",
+            "OBSERVED",
+            "REFERENCE_ONLY",
+            "SCORED",
+            "UNSCORABLE",
+            "FAILED",
+            "TIMEOUT"
+          ]
         },
         "correctiveClaimsAllowed": {
           "const": false
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scoreKind": {
+          "enum": [
+            "NONE",
+            "CALIBRATED"
+          ]
+        },
+        "coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "targetCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2048
+            },
+            "visuallyEligibleCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2048
+            },
+            "observedCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2048
+            },
+            "scoredCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2048
+            },
+            "coverage": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "targetCount",
+            "visuallyEligibleCount",
+            "observedCount",
+            "scoredCount",
+            "coverage"
+          ]
+        },
+        "phoneAssessments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "expectedIndex": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "expectedPhone": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 20
+              },
+              "role": {
+                "enum": [
+                  "onset",
+                  "nucleus",
+                  "coda"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "OBSERVED",
+                  "REFERENCE_ONLY",
+                  "SCORED",
+                  "UNSCORABLE"
+                ]
+              },
+              "score": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "scoreKind": {
+                "enum": [
+                  "NONE",
+                  "REFERENCE_SIMILARITY",
+                  "CALIBRATED"
+                ]
+              },
+              "audioStartSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 120
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "audioEndSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 120
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "observations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "observationId": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}:phone-[0-9]+:LIP_(APERTURE|WIDTH|AREA)_RANGE$"
+                    },
+                    "code": {
+                      "enum": [
+                        "LIP_APERTURE_RANGE",
+                        "LIP_WIDTH_RANGE",
+                        "LIP_AREA_RANGE"
+                      ]
+                    },
+                    "minimum": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "maximum": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "unit": {
+                      "enum": [
+                        "FACE_SCALE_NORMALIZED"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "observationId",
+                    "code",
+                    "minimum",
+                    "maximum",
+                    "unit"
+                  ]
+                },
+                "maxItems": 3
+              },
+              "allowedActionIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 0
+              },
+              "reasonCodes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]{0,79}$"
+                },
+                "maxItems": 32
+              },
+              "referenceDistance": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "referenceIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "maxItems": 32
+              },
+              "calibrationRevision": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "videoStartSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": -86400,
+                    "maximum": 86400
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "videoEndSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": -86400,
+                    "maximum": 86400
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "frameCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3600
+              }
+            },
+            "required": [
+              "expectedIndex",
+              "expectedPhone",
+              "role",
+              "status",
+              "score",
+              "scoreKind",
+              "audioStartSeconds",
+              "audioEndSeconds",
+              "observations",
+              "allowedActionIds",
+              "reasonCodes",
+              "referenceDistance",
+              "referenceIds",
+              "calibrationRevision",
+              "videoStartSeconds",
+              "videoEndSeconds",
+              "frameCount"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "scoreKind": {
+                      "const": "NONE"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "score": {
+                      "const": null
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "SCORED"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "scoreKind": {
+                      "const": "CALIBRATED"
+                    },
+                    "score": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "maxItems": 128
+        },
+        "reasonCodes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{0,79}$"
+          },
+          "maxItems": 32
+        },
+        "alignmentScope": {
+          "const": "CANONICAL_MFA_DETECTOR_PHONES_V1"
+        },
+        "unresolvedExpectedIndices": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "maxItems": 2048
+        },
+        "omittedPhoneAssessmentCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2048
         }
       },
       "required": [
         "status",
-        "correctiveClaimsAllowed"
+        "correctiveClaimsAllowed",
+        "score",
+        "scoreKind",
+        "coverage",
+        "phoneAssessments",
+        "reasonCodes",
+        "alignmentScope",
+        "unresolvedExpectedIndices",
+        "omittedPhoneAssessmentCount"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "scoreKind": {
+                "const": "NONE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "const": null
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "SCORED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "scoreKind": {
+                "const": "CALIBRATED"
+              },
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
+          }
+        }
       ]
     },
     "failure": {
@@ -1738,31 +2141,6 @@
             }
           }
         }
-      ]
-    },
-    "retainedEvidence": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "evidenceReceiptId": {
-          "$ref": "#/$defs/uuid"
-        },
-        "manifestSha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "artifacts": {
-          "type": "array",
-          "minItems": 4,
-          "maxItems": 5,
-          "items": {
-            "$ref": "#/$defs/artifact"
-          }
-        }
-      },
-      "required": [
-        "evidenceReceiptId",
-        "manifestSha256",
-        "artifacts"
       ]
     },
     "coaching": {
@@ -2238,8 +2616,7 @@
             "f90440b764f78f32c989dc0785f41262397cc22e1d1ca48c40361189b81f86d5",
             "1612539f82a0b6e2c5c0b3551440b8094ca979bd8ab5d898386713bd0d1f54b7",
             "def65f68a849a2452b0e4dde600f0ef85d99beaa97123d30d97262653ebf8e77",
-            "d70372926d3406842b95c370b5ceb152480e7f0af83ba840028ec8d9ace2dc50",
-            "3e430635a4d714ead5d8e08352e41ff9a2b06c893d73af7f018fb43b4c37f61c"
+            "d70372926d3406842b95c370b5ceb152480e7f0af83ba840028ec8d9ace2dc50"
           ]
         },
         "llmDependencyLockSha256": {
@@ -2257,8 +2634,7 @@
             "74784bf0c7ba99628ed2ff8db19157c63d22a2a1cd66c58000ad2e811dc93160",
             "3e2e81b43b1c1298266df428bc01ef0761d37f413073824cae2000623ea2eb3c",
             "b605c3b9ba06bbf18fc126770b18de3d2da0d3f70c08e04873f17bc735b948bc",
-            "934729ee467a2eb030c244584c6fa5c3575ca9ed0a43348a59a486199c0f55e9",
-            "58c26086546abb8b94eb6998671101d67633af426adf373cceb42862ccaf0ec4"
+            "934729ee467a2eb030c244584c6fa5c3575ca9ed0a43348a59a486199c0f55e9"
           ]
         },
         "promptSha256": {
@@ -2268,8 +2644,7 @@
             "883e1d43faaf26541efbd37b897ead7f4fca556b3bd8cf03608f43870382f127",
             "5f3ec5aa81f54fdb3afe28869db2c5791a2133e8a44a23ead52187e9be542ff8",
             "977c49744e7af9fc60fdc2eb13c23985692cb00dd71789d8b3c43c3813e3f1b5",
-            "c727910b9e30c1648adb120cbb5f8ef2178c806285331dfd095fcc39c5aedfee",
-            "ad59ba9124fbe26b9451bcb1a04a5eb1afcb3c819c539d5a25d3ac09a1dc281d"
+            "c727910b9e30c1648adb120cbb5f8ef2178c806285331dfd095fcc39c5aedfee"
           ]
         }
       },
@@ -2508,22 +2883,6 @@
               "const": "c727910b9e30c1648adb120cbb5f8ef2178c806285331dfd095fcc39c5aedfee"
             }
           }
-        },
-        {
-          "properties": {
-            "parentManifestSha256": {
-              "const": "f6d56e1decc160f0ca38cc8d52303f3de20945f872d714bf6a2e743ed94c0391"
-            },
-            "llmManifestSha256": {
-              "const": "3e430635a4d714ead5d8e08352e41ff9a2b06c893d73af7f018fb43b4c37f61c"
-            },
-            "llmDependencyLockSha256": {
-              "const": "58c26086546abb8b94eb6998671101d67633af426adf373cceb42862ccaf0ec4"
-            },
-            "promptSha256": {
-              "const": "ad59ba9124fbe26b9451bcb1a04a5eb1afcb3c819c539d5a25d3ac09a1dc281d"
-            }
-          }
         }
       ]
     },
@@ -2545,7 +2904,7 @@
       "additionalProperties": false,
       "properties": {
         "schemaVersion": {
-          "const": "voice-coaching.runpod-analysis-result.v4"
+          "const": "voice-coaching.runpod-analysis-result.v6"
         },
         "eventId": {
           "$ref": "#/$defs/uuid"
@@ -2591,7 +2950,7 @@
           "$ref": "#/$defs/revision"
         },
         "analysisProfile": {
-          "const": "CANONICAL_FROZEN_20260928_V4"
+          "const": "CANONICAL_AUDIOVISUAL_20261007_V6"
         },
         "sourceIdentity": {
           "$ref": "#/$defs/sourceIdentity"
@@ -2644,14 +3003,31 @@
         "score": {
           "$ref": "#/$defs/score"
         },
-        "retainedEvidence": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/retainedEvidence"
+        "mediaBinding": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "videoSha256": {
+              "$ref": "#/$defs/sha256"
             },
-            {
-              "type": "null"
+            "mediaReceiptSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "visualEvidenceSha256": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
+          },
+          "required": [
+            "videoSha256",
+            "mediaReceiptSha256",
+            "visualEvidenceSha256"
           ]
         }
       },
@@ -2676,7 +3052,7 @@
         "visual",
         "prosodyPolicy",
         "score",
-        "retainedEvidence"
+        "mediaBinding"
       ],
       "oneOf": [
         {
@@ -2708,9 +3084,6 @@
             },
             "coaching": {
               "$ref": "#/$defs/coaching"
-            },
-            "retainedEvidence": {
-              "$ref": "#/$defs/retainedEvidence"
             }
           }
         },
@@ -2748,9 +3121,6 @@
               "const": null
             },
             "coaching": {
-              "const": null
-            },
-            "retainedEvidence": {
               "const": null
             },
             "sourceIdentity": {
@@ -2813,9 +3183,6 @@
             },
             "coaching": {
               "const": null
-            },
-            "retainedEvidence": {
-              "$ref": "#/$defs/retainedEvidence"
             }
           }
         },
@@ -2858,9 +3225,6 @@
                   ]
                 }
               ]
-            },
-            "retainedEvidence": {
-              "$ref": "#/$defs/retainedEvidence"
             }
           }
         }
