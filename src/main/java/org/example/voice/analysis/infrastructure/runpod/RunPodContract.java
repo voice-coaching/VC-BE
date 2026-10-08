@@ -27,6 +27,17 @@ public class RunPodContract {
     public static final String REQUEST_V1 = "voice-coaching.runpod-analysis-request.v1";
     public static final String REQUEST_V2 = "voice-coaching.runpod-analysis-request.v2";
     public static final String REQUEST_V3 = "voice-coaching.runpod-analysis-request.v3";
+    public static final String REQUEST_V4 = "voice-coaching.runpod-analysis-request.v4";
+    public static final String RESULT_V6 = "voice-coaching.runpod-analysis-result.v6";
+    public static final String AUDIOVISUAL_PROFILE = "CANONICAL_AUDIOVISUAL_20261007_V6";
+    public static boolean handoffResult(String schema) { return java.util.Set.of(RESULT_V5, RESULT_V6).contains(schema); }
+    public static boolean handoffProfile(String profile) { return java.util.Set.of(HANDOFF_PROFILE, AUDIOVISUAL_PROFILE).contains(profile); }
+    public static boolean matchesHandoffTuple(String profile, String request, String result) {
+        return (HANDOFF_PROFILE.equals(profile) && REQUEST_V3.equals(request) && RESULT_V5.equals(result))
+                || (AUDIOVISUAL_PROFILE.equals(profile) && REQUEST_V4.equals(request) && RESULT_V6.equals(result));
+    }
+    public static String viewSchema(String profile) { return AUDIOVISUAL_PROFILE.equals(profile)
+        ? "voice-coaching.canonical-analysis-view.v3" : "voice-coaching.canonical-analysis-view.v2"; }
     public static final String RESULT_V5 = "voice-coaching.runpod-analysis-result.v5";
     public static final String HANDOFF_PROFILE = "CANONICAL_HANDOFF_20261004_V5";
     public static final String RESULT_V4 = "voice-coaching.runpod-analysis-result.v4";
@@ -65,7 +76,7 @@ public class RunPodContract {
             // Frozen MFA seconds must not round-trip through binary floating point.
             // The legacy mapper and legacy wire semantics remain unchanged.
             if ("result".equals(kind) && node != null
-                    && java.util.Set.of(RESULT_V4,RESULT_V5).contains(node.path("schemaVersion").asText())) {
+                    && java.util.Set.of(RESULT_V4,RESULT_V5,RESULT_V6).contains(node.path("schemaVersion").asText())) {
                 node = canonicalMapper.readTree(raw);
             }
             // Parse with Jackson's nesting limits before recursive canonicalization.
@@ -88,6 +99,9 @@ public class RunPodContract {
     }
 
     private String schemaKind(JsonNode node, String kind) {
+        if ("handoff".equals(kind) && node != null && "voice-coaching.canonical-handoff.v2".equals(node.path("metadata").path("schemaVersion").asText())) return "handoffV2";
+        if ("handoffMetadata".equals(kind) && node != null && "voice-coaching.canonical-handoff.v2".equals(node.path("schemaVersion").asText())) return "handoffMetadataV2";
+        if ("result".equals(kind) && node != null && RESULT_V6.equals(node.path("schemaVersion").asText())) return "canonicalResultV6";
         if ("result".equals(kind) && node != null && RESULT_V5.equals(node.path("schemaVersion").asText())) return "canonicalResultV5";
         if ("result".equals(kind) && node != null
                 && RESULT_V4.equals(node.path("schemaVersion").asText())) return RESULT_V4_KIND;
@@ -97,6 +111,7 @@ public class RunPodContract {
             case REQUEST_V1 -> "analysisRequest";
             case REQUEST_V2 -> REQUEST_V2_KIND;
             case REQUEST_V3 -> "analysisRequestV3";
+            case REQUEST_V4 -> "analysisRequestV4";
             default -> throw new RunPodContractException(422, "VALIDATION_FAILED");
         };
     }
@@ -140,6 +155,9 @@ public class RunPodContract {
                     "canonicalExecutorReadiness" -> "runpod_http_control_v1_2.schema.json";
             case "result" -> "runpod_result_v1.schema.json";
             case "handoff", "handoffMetadata", "archiveReconciliation" -> "runpod_canonical_handoff_v1.schema.json";
+            case "handoffV2", "handoffMetadataV2" -> "runpod_canonical_handoff_v2.schema.json";
+            case "canonicalResultV6" -> "runpod_result_v6.schema.json";
+            case "analysisRequestV4" -> "runpod_analysis_request_v4.schema.json";
             case "canonicalResultV5" -> "runpod_result_v5.schema.json";
             case "analysisRequestV3" -> "runpod_analysis_request_v3.schema.json";
             case RESULT_V4_KIND -> "runpod_result_v4.schema.json";
@@ -156,15 +174,24 @@ public class RunPodContract {
         } catch (IOException error) { throw new IllegalStateException("RunPod contract unreadable", error); }
     }
 
+    private static String definitionName(String kind) {
+        return switch (kind) {
+            case RESULT_V4_KIND, "canonicalResultV5", "canonicalResultV6" -> "result";
+            case "handoffV2" -> "handoff";
+            case "handoffMetadataV2" -> "handoffMetadata";
+            default -> kind;
+        };
+    }
+
     private JsonNode definition(String kind) {
-        return (REQUEST_V2_KIND.equals(kind) || "analysisRequestV3".equals(kind)) ? root(kind)
-                : root(kind).path("$defs").path((RESULT_V4_KIND.equals(kind) || "canonicalResultV5".equals(kind)) ? "result" : kind);
+        return (REQUEST_V2_KIND.equals(kind) || ("analysisRequestV3".equals(kind) || "analysisRequestV4".equals(kind))) ? root(kind)
+                : root(kind).path("$defs").path(definitionName(kind));
     }
 
     private JsonSchema schema(String kind) {
         ObjectNode root = ((ObjectNode) root(kind)).deepCopy();
         // v2 is a standalone schema: retain its own root and local reference scope.
-        if (!(REQUEST_V2_KIND.equals(kind) || "analysisRequestV3".equals(kind))) root.put("$ref", "#/$defs/" + ((RESULT_V4_KIND.equals(kind) || "canonicalResultV5".equals(kind)) ? "result" : kind));
+        if (!(REQUEST_V2_KIND.equals(kind) || ("analysisRequestV3".equals(kind) || "analysisRequestV4".equals(kind)))) root.put("$ref", "#/$defs/" + definitionName(kind));
         SchemaValidatorsConfig config = new SchemaValidatorsConfig();
         config.setFormatAssertionsEnabled(true);
         return JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012).getSchema(root, config);

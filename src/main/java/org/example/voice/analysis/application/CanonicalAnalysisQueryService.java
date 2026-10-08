@@ -31,6 +31,22 @@ public class CanonicalAnalysisQueryService {
     private final CanonicalPublishedResults published;
 
     @Transactional(readOnly=true,isolation=Isolation.READ_COMMITTED,timeout=10)
+    public org.example.voice.analysis.domain.model.CanonicalResultContract contract(Long analysisId, Long userId) {
+        // Apply the same ownership, visibility and current-generation fences as
+        // detail reads, including verified previews. Then read the stored tuple.
+        var view = get(analysisId, userId);
+        var binding = executions.findCurrentForOwner(analysisId, userId)
+                .orElseThrow(() -> error(CANONICAL_RESULT_UNAVAILABLE));
+        if (!view.requestId().equals(binding.requestId()) || !view.executionId().equals(binding.executionId())
+                || view.recordingId() != binding.recordingId()) {
+            throw error(CANONICAL_ANALYSIS_CHANGED);
+        }
+        return new org.example.voice.analysis.domain.model.CanonicalResultContract(
+                view.analysisId(), binding.recordingId(), binding.requestId(), binding.executionId(),
+                view.analysisProfile(), binding.resultSchemaVersion());
+    }
+
+    @Transactional(readOnly=true,isolation=Isolation.READ_COMMITTED,timeout=10)
     public CanonicalAnalysisView get(Long analysisId,Long userId) {
         if(analysisId==null || analysisId<1 || analysisId>9007199254740991L)throw error(INVALID_ANALYSIS_ID);
         var direct=published.current(analysisId,userId);
@@ -51,7 +67,7 @@ public class CanonicalAnalysisQueryService {
                 throw error(CANONICAL_RESULT_UNAVAILABLE);
             throw error(CANONICAL_ANALYSIS_NOT_FOUND);
         }
-        if (!RunPodContract.HANDOFF_PROFILE.equals(result.getAnalysisProfile()))
+        if (!RunPodContract.handoffProfile(result.getAnalysisProfile()))
             throw error(CANONICAL_ANALYSIS_NOT_FOUND);
         var binding=executions.findCurrentForOwner(analysisId,userId).orElse(null);
         if(binding==null) {
@@ -63,8 +79,7 @@ public class CanonicalAnalysisQueryService {
                 || !result.getRecording().getTrainingSession().getContent().getId().equals(binding.contentId())
                 || !Objects.equals(result.getRecording().getAudioSha256(),binding.audioSha256())
                 || !binding.resultSchemaVersion().equals(result.getExpectedResultSchemaVersion())
-                || !RunPodContract.RESULT_V5.equals(binding.resultSchemaVersion())
-                || !RunPodContract.REQUEST_V3.equals(binding.requestSchemaVersion())) {
+                || !RunPodContract.matchesHandoffTuple(binding.analysisProfile(), binding.requestSchemaVersion(), binding.resultSchemaVersion())) {
             stable(result,userId);
             throw error(CANONICAL_RESULT_UNAVAILABLE);
         }
@@ -74,7 +89,7 @@ public class CanonicalAnalysisQueryService {
             var d=preview.document.projection();var f=d.failure();
             var reason=java.util.List.of("RESULT_PERSISTENCE_PENDING");
             var unavailable=new CanonicalAnalysisView.UnavailableReasons(reason,reason,reason,reason);
-            var view=new CanonicalAnalysisView("voice-coaching.canonical-analysis-view.v2",analysisId,binding.recordingId(),
+            var view=new CanonicalAnalysisView(RunPodContract.viewSchema(result.getAnalysisProfile()),analysisId,binding.recordingId(),
                 binding.requestId(),binding.executionId(),d.status(),result.getAnalysisProfile(),projection.project(d),
                 f==null?null:new ServiceFailure(f.origin(),f.code(),f.stage()),
                 new CanonicalAnalysisView.Actions(false,false,false,false,unavailable),preview.attempts>0?"RETRYING":"SAVING");
@@ -101,7 +116,7 @@ public class CanonicalAnalysisQueryService {
                 failure=new ServiceFailure(f.origin(),f.code(),f.stage());
             }
         }
-        var view=new CanonicalAnalysisView(RunPodContract.RESULT_V5.equals(binding.resultSchemaVersion())?"voice-coaching.canonical-analysis-view.v2":CanonicalAnalysisView.SCHEMA_VERSION,analysisId,binding.recordingId(),
+        var view=new CanonicalAnalysisView(RunPodContract.viewSchema(result.getAnalysisProfile()),analysisId,binding.recordingId(),
                 binding.requestId(),binding.executionId(),result.getStatus(),result.getAnalysisProfile(),
                 canonical,failure,actions.current(result),delivery.enabled()?(document==null?"NONE":"SAVED"):null);
         stable(result,userId);

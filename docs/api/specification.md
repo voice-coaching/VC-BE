@@ -2026,8 +2026,8 @@ Native 전체 음소 채점: `score.rubricRevision=phone-rubric-native-v1`, 기�
 | resultSchemas | string[]/필수/non-null | 접수 가능 시 voice-coaching.runpod-analysis-result.v5 하나, 불가 시 빈 배열 |
 | admissionEnabled | boolean/필수/non-null | worker/readiness/용량/maintenance 접수 조건. 개별 사용자 권한을 대신하지 않음 |
 | scopes | object/필수/non-null | STANDALONE_AUDIO, COURSE, TITLE_EXAM, VIDEO 네 키 |
-| scopes.*.supported | boolean/필수/non-null | 해당 목적의 구현 지원 여부. 현재 단독 음성만 true |
-| scopes.*.reasonCode | string/필수/nullable | 단독 음성은 null, 미지원은 각각 COURSE_ANALYSIS_UNSUPPORTED, TITLE_EXAM_ANALYSIS_UNSUPPORTED, VIDEO_ANALYSIS_UNSUPPORTED |
+| scopes.*.supported | boolean/필수/non-null | 해당 목적의 구현 지원 여부. 단독 음성과 승급시험 음성은 true, 영상은 audiovisual readiness에 따름 |
+| scopes.*.reasonCode | string/필수/nullable | 지원 목적은 null. 클래스는 COURSE_ANALYSIS_UNSUPPORTED, 영상 미지원 시 VIDEO_ANALYSIS_UNSUPPORTED |
 
 FE는 지원 범위를 녹음/업로드 전에 확인하고, 위 필드가 빠진 과거 응답은 전체 지원으로 추정하지 않는다. 구버전 응답은 클라이언트 ANALYSIS_CAPABILITIES_UNAVAILABLE(503)로 안내한다. 미지원 목적은 반환 reasonCode로 안내하고, 접수 불가는 ANALYSIS_INTEGRATION_UNAVAILABLE로 안내한다. 이들은 FE의 로컬 오류 분류이며 capability GET의 HTTP 200을 서버 409/503으로 바꾼 것은 아니다. 실제 analyze/retry의 소유·선택·동의·용량·접수 검사는 계속 Backend가 수행한다.
 

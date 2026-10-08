@@ -11,7 +11,7 @@ public record CanonicalHandoffDocument(JsonNode metadata, byte[] metadataBytes,
     public static CanonicalHandoffDocument parse(byte[] raw, RunPodContract contract) {
         var node=contract.parse(raw,"handoff"); var meta=node.get("metadata");
         var projection=CanonicalCallbackDocument.parse(bytes(node.get("projection")),contract);
-        if(!RunPodContract.RESULT_V5.equals(projection.schemaVersion()))invalid();
+        if(!RunPodContract.handoffResult(projection.schemaVersion()))invalid();
         var id=projection.identity();
         if(!id.eventId().equals(uuid(meta,"eventId")) || !id.requestId().equals(uuid(meta,"requestId"))
             || !id.executionId().equals(uuid(meta,"executionId")) || !id.workerId().equals(uuid(meta,"workerInstanceId"))
@@ -21,7 +21,10 @@ public record CanonicalHandoffDocument(JsonNode metadata, byte[] metadataBytes,
             || !contract.digest(meta).equals(node.path("handoffSha256").asText()))invalid();
         var kinds=new HashSet<String>();
         for(var item:meta.get("artifacts"))if(!kinds.add(item.path("kind").asText()))invalid();
-        var required=Set.of("CORE","BRIDGE_RESULT","BINDING","ASSOCIATION");
+        if (RunPodContract.RESULT_V6.equals(projection.schemaVersion()) != "voice-coaching.canonical-handoff.v2".equals(meta.path("schemaVersion").asText())) invalid();
+        var required=RunPodContract.RESULT_V6.equals(projection.schemaVersion())
+            ? Set.of("CORE","BRIDGE_RESULT","BINDING","ASSOCIATION","MEDIA_RECEIPT","VISUAL_EVIDENCE")
+            : Set.of("CORE","BRIDGE_RESULT","BINDING","ASSOCIATION");
         if(projection.decision()==null ? !kinds.isEmpty() : !kinds.containsAll(required))invalid();
         var inline=new HashMap<String,byte[]>();
         node.get("inlineArtifacts").fields().forEachRemaining(e -> {

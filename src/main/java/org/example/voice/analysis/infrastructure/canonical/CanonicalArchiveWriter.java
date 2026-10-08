@@ -45,7 +45,7 @@ public final class CanonicalArchiveWriter {
         return client;
     }
     public String key(long analysis,UUID execution,String kind,String sha){
-        if(!configured() || analysis<1 || execution==null || !Set.of("CORE","BRIDGE_RESULT","BINDING","ASSOCIATION","SELECTION_PROJECTION").contains(kind) || !sha.matches("[0-9a-f]{64}"))throw new EvidenceFailure(false);
+        if(!configured() || analysis<1 || execution==null || !Set.of("CORE","BRIDGE_RESULT","BINDING","ASSOCIATION","SELECTION_PROJECTION","MEDIA_RECEIPT","VISUAL_EVIDENCE").contains(kind) || !sha.matches("[0-9a-f]{64}"))throw new EvidenceFailure(false);
         return value("prefix")+analysis+"/"+execution+"/"+kind+"/"+sha+".json";
     }
     public void assertPrivate(){

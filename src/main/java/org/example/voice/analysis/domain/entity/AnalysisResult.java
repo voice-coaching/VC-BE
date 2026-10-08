@@ -293,12 +293,17 @@ public class AnalysisResult {
         analysisProfile="CANONICAL_HANDOFF_20261004_V5";
         expectedResultSchemaVersion="voice-coaching.runpod-analysis-result.v5";
     }
-    public boolean isCanonicalExecution() { return java.util.Set.of("CANONICAL_FROZEN_20260928_V4","CANONICAL_HANDOFF_20261004_V5").contains(analysisProfile); }
+    public void assignAudiovisualProfile() {
+        assignHandoffProfile();
+        analysisProfile="CANONICAL_AUDIOVISUAL_20261007_V6";
+        expectedResultSchemaVersion="voice-coaching.runpod-analysis-result.v6";
+    }
+    public boolean isCanonicalExecution() { return java.util.Set.of("CANONICAL_FROZEN_20260928_V4","CANONICAL_HANDOFF_20261004_V5","CANONICAL_AUDIOVISUAL_20261007_V6").contains(analysisProfile); }
 
     /** Clears legacy score/selected-phone/coaching fields, without fabricating a legacy result. */
     public boolean finishCanonical(org.example.voice.analysis.domain.model.CanonicalResultCompletion result) {
         if(!isCanonicalExecution() || !isForActiveRequest(result.requestId()) || !isForActiveExecution(result.executionId())
-                || !java.util.Set.of("voice-coaching.runpod-analysis-result.v4","voice-coaching.runpod-analysis-result.v5").contains(expectedResultSchemaVersion))
+                || !java.util.Set.of("voice-coaching.runpod-analysis-result.v4","voice-coaching.runpod-analysis-result.v5","voice-coaching.runpod-analysis-result.v6").contains(expectedResultSchemaVersion))
             throw new IllegalArgumentException("CANONICAL_EXECUTION_MISMATCH");
         if(isCompletedOrFailed())return false;
         if(recording==null || !Objects.equals(recording.getAudioSha256(),result.audioSha256()))

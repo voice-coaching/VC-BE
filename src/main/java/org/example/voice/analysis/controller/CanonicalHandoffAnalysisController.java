@@ -23,7 +23,7 @@ public class CanonicalHandoffAnalysisController {
                 .body(ApiResponse.success("분석 상태와 근거를 조회했습니다.",v5(view))));
     }
     private static CanonicalAnalysisView v5(CanonicalAnalysisView view) {
-        if(!org.example.voice.analysis.infrastructure.runpod.RunPodContract.HANDOFF_PROFILE.equals(view.analysisProfile()))throw new org.example.voice.analysis.exception.CanonicalAnalysisViewException(org.example.voice.analysis.exception.CanonicalAnalysisViewException.Reason.CANONICAL_ANALYSIS_NOT_FOUND);
+        if(!org.example.voice.analysis.infrastructure.runpod.RunPodContract.handoffProfile(view.analysisProfile()))throw new org.example.voice.analysis.exception.CanonicalAnalysisViewException(org.example.voice.analysis.exception.CanonicalAnalysisViewException.Reason.CANONICAL_ANALYSIS_NOT_FOUND);
         return view;
     }
 }

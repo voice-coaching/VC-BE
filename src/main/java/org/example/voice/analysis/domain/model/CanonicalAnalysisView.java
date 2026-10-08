@@ -73,7 +73,25 @@ public record CanonicalAnalysisView(
                         List<ScoreCriterion> criteria) {}
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record ScoreCriterion(String criterionId, Integer level) {}
-    public record Visual(String status, boolean correctiveClaimsAllowed) {}
+    public sealed interface Visual permits AudioVisual, LipVisual {
+        String status();
+        boolean correctiveClaimsAllowed();
+    }
+    public record AudioVisual(String status, boolean correctiveClaimsAllowed) implements Visual {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record LipVisual(String status, boolean correctiveClaimsAllowed, BigDecimal score, String scoreKind,
+            LipCoverage coverage, List<LipPhone> phoneAssessments, List<String> reasonCodes,
+            String alignmentScope, List<Long> unresolvedExpectedIndices, int omittedPhoneAssessmentCount) implements Visual {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record LipCoverage(long targetCount, long visuallyEligibleCount, long observedCount,
+                              long scoredCount, BigDecimal coverage) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record LipPhone(long expectedIndex, String expectedPhone, String role, String status,
+            BigDecimal score, String scoreKind, BigDecimal referenceDistance, List<String> referenceIds,
+            String calibrationRevision, BigDecimal audioStartSeconds, BigDecimal audioEndSeconds,
+            BigDecimal videoStartSeconds, BigDecimal videoEndSeconds, int frameCount,
+            List<String> reasonCodes, List<LipObservation> observations, List<String> allowedActionIds) {}
+    public record LipObservation(String observationId, String code, BigDecimal minimum, BigDecimal maximum, String unit) {}
     public record Actions(boolean canRetry, boolean canRerecord, boolean canComplete, boolean canRegenerate,
                           UnavailableReasons unavailableReasonCodes) {}
     public record UnavailableReasons(List<String> retry, List<String> rerecord,

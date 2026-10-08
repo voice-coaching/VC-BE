@@ -54,11 +54,11 @@ public final class CanonicalHandoffWorker {
                 CanonicalHandoffDocument.checkBytes(item,bytes);raw.add(bytes);
             }
             long started=System.nanoTime();
-            if(!delivery.enabled()){
+            if(!delivery.enabled() || "voice-coaching.canonical-handoff.v2".equals(metadata.path("schemaVersion").asText())){
                 byte[] request=jdbc.queryForObject("SELECT request_bytes FROM analysis_canonical_journals WHERE execution_id=?",byte[].class,job.get("execution_id"));
                 var deadline=jdbc.queryForObject("SELECT deadline_at FROM analysis_canonical_executions WHERE execution_id=?",java.time.OffsetDateTime.class,job.get("execution_id"));
                 verifier.verifyHandoff(request,(byte[])job.get("metadata_bytes"),raw,(byte[])job.get("projection_bytes"),
-                    Duration.between(java.time.Instant.now(),deadline.toInstant()));
+                    "voice-coaching.canonical-handoff.v2".equals(metadata.path("schemaVersion").asText()) ? Duration.ofSeconds(90) : Duration.between(java.time.Instant.now(),deadline.toInstant()));
             }
             org.slf4j.LoggerFactory.getLogger(getClass()).info("canonical_handoff_verify analysisId={} executionId={} elapsedMs={}",job.get("analysis_id"),job.get("execution_id"),TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));
             var doc=CanonicalCallbackDocument.parse((byte[])job.get("projection_bytes"),contract);

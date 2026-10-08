@@ -4,5 +4,6 @@ package org.example.voice.analysis.domain.type;
 public enum AnalysisExecutionProfile {
     LEGACY,
     CANONICAL,
-    CANONICAL_HANDOFF
+    CANONICAL_HANDOFF,
+    CANONICAL_AUDIOVISUAL
 }

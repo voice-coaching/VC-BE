@@ -23,6 +23,7 @@ public class CanonicalCallbackCommitter {
     private final AnalysisResultWriter writer;
     private final JdbcTemplate jdbc;
     private final org.example.voice.analysis.infrastructure.canonical.CanonicalBackendJournal journal;
+    private final org.example.voice.analysis.infrastructure.canonical.CanonicalExecutionMediaStore executionMedia;
 
     @Transactional(timeout=5)
     public AnalysisResultIngestionDisposition commit(CanonicalCallbackDocument doc) {
@@ -36,7 +37,7 @@ public class CanonicalCallbackCommitter {
     /** Caller holds the handoff claim and visibility fence in this same transaction. */
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
     public AnalysisResultIngestionDisposition commitHandoff(CanonicalCallbackDocument doc,java.util.UUID handoff) {
-        if(!RunPodContract.RESULT_V5.equals(doc.schemaVersion()))throw new RunPodContractException(422,"VALIDATION_FAILED");
+        if(!RunPodContract.handoffResult(doc.schemaVersion()))throw new RunPodContractException(422,"VALIDATION_FAILED");
         jdbc.execute("SET LOCAL synchronous_commit = on");
         return commitResult(doc,handoff);
     }
@@ -46,10 +47,10 @@ public class CanonicalCallbackCommitter {
         var result=results.findForIngestion(id.analysisId())
                 .orElseThrow(()->new RunPodContractException(404,"TARGET_NOT_FOUND"));
         if(result.getLastResultEventId()!=null)throw new RunPodContractException(409,"RESULT_ALREADY_FINALIZED");
-        // Temporary explicit blocker, not a substitute media-retention policy.
-        // The deletion-outbox hook was denied by safety review and awaits user approval.
-        // Do not silently skip cleanup, erase old segments, or acknowledge these attempts.
-        if(result.getRecording().getVisualObjectKey()!=null || Boolean.TRUE.equals(jdbc.queryForObject(
+        if (RunPodContract.RESULT_V6.equals(doc.schemaVersion())) executionMedia.requireResult(doc);
+        // Video uses its existing recording deletion outbox. Canonical commit
+        // never deletes MP4s or translates old segments into new visual evidence.
+        if((result.getRecording().getVisualObjectKey()!=null && !RunPodContract.RESULT_V6.equals(doc.schemaVersion())) || Boolean.TRUE.equals(jdbc.queryForObject(
                 "SELECT EXISTS(SELECT 1 FROM analysis_segments WHERE analysis_result_id=?)",Boolean.class,id.analysisId())))
             throw new RunPodContractException(503,"NOT_READY");
         var decision=doc.decision();

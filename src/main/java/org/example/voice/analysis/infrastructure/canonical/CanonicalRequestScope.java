@@ -7,17 +7,21 @@ import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-/** Shared initial rollout source scope; not admission readiness or authorization. */
+/** Audio practice and title exams; audiovisual exams and courses remain unsupported. */
 @Component
 @RequiredArgsConstructor
 public final class CanonicalRequestScope {
     private final JdbcTemplate jdbc;
     public boolean eligible(AnalysisResult result) {
+        return eligible(result, org.example.voice.analysis.infrastructure.runpod.RunPodContract.AUDIOVISUAL_PROFILE.equals(result.getAnalysisProfile()));
+    }
+    public boolean eligible(AnalysisResult result, boolean audiovisual) {
         var recording=result.getRecording();var session=recording.getTrainingSession();
-        return recording.getVisualObjectKey()==null && recording.getQualityStatus()==RecordingQualityStatus.PASS
+        return (audiovisual ? recording.getVisualObjectKey()!=null : recording.getVisualObjectKey()==null)
+                && recording.getQualityStatus()==RecordingQualityStatus.PASS
                 && session.getCourseStepId()==null && session.getCourseEducationRevisionId()==null
                 && session.getLearningFocus()==LearningFocus.PRONUNCIATION
-                && !Boolean.TRUE.equals(jdbc.queryForObject(
-                    "SELECT EXISTS(SELECT 1 FROM title_exams WHERE training_session_id=?)",Boolean.class,session.getId()));
+                && (!audiovisual || !Boolean.TRUE.equals(jdbc.queryForObject(
+                    "SELECT EXISTS(SELECT 1 FROM title_exams WHERE training_session_id=?)",Boolean.class,session.getId())));
     }
 }

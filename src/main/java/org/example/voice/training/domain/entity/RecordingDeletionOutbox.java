@@ -91,6 +91,14 @@ public class RecordingDeletionOutbox {
         lastErrorCode = null;
     }
 
+    /** A live reader is not a failed storage deletion and must not exhaust retries. */
+    public void deferUntil(OffsetDateTime until) {
+        if (status != RecordingDeletionStatus.PENDING || until == null) {
+            throw new IllegalStateException("DELETION_NOT_PENDING");
+        }
+        if (until.isAfter(nextAttemptAt)) nextAttemptAt = until;
+    }
+
     public boolean recordFailure(String errorCode, int maxAttempts) {
         attemptCount += 1;
         lastErrorCode = errorCode;
