@@ -70,13 +70,16 @@ class PracticeExampleIntegrationTest {
         });
     }
     private void seed(int revision) {
+        seed(revision, 5);
+    }
+    private void seed(int revision, int exampleCount) {
         var now = OffsetDateTime.now(ZoneOffset.UTC).minusHours(1);
         var education = construct(CourseStepRevision.class);
         fields(education, Map.of("stepId", step, "revision", revision, "title", "교육 " + revision, "stepOrder", 1,
                 "stepType", CourseStepType.PRACTICE, "blocksJson", "[{\"type\":\"TEXT\",\"body\":\"교육 설명\"}]")); em.persist(education);
         var set = construct(PracticeExampleSet.class);
         fields(set, Map.of("stepId", step, "revision", revision, "educationRevisionId", education.getId(), "publishedAt", now)); em.persist(set);
-        for (int i = 1; i <= 5; i++) {
+        for (int i = 1; i <= exampleCount; i++) {
             var content = construct(PracticeContent.class);
             fields(content, Map.of("contentType", ContentType.CLASS_PRACTICE, "learningFocus", LearningFocus.BOTH,
                     "title", "개정 " + revision + " 예문 " + i, "scriptText", "테스트용 개정 " + revision + "의 문장 " + i + "입니다.",
@@ -85,6 +88,12 @@ class PracticeExampleIntegrationTest {
             fields(example, Map.of("id", id, "set", set, "content", content, "order", i, "hint", "테스트 안내", "locale", "ko-KR")); em.persist(example);
             if (revision == 1 && i == 1) { firstId = id; firstContent = content.getId(); }
         }
+    }
+    @Test void returnsEveryItemWhenPublishedRevisionContainsTenExamples() {
+        tx.executeWithoutResult(s -> seed(2, 10));
+        var list = examples.list(user, course, step, null);
+        assertThat(list.items()).hasSize(10);
+        assertThat(list.items()).extracting(Item::order).containsExactly(1,2,3,4,5,6,7,8,9,10);
     }
     @Test void returnsExactlyFiveOrderedItemsAndPinsSessionTextAndRevision() {
         var list = examples.list(user, course, step, null);

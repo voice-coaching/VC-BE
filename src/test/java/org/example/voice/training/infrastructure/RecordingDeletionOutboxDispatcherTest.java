@@ -96,7 +96,12 @@ class RecordingDeletionOutboxDispatcherTest {
         RecordingDeletionMetrics metrics = new RecordingDeletionMetrics(registry);
         when(repository.findForDeliveryById(11L)).thenReturn(Optional.of(deletion));
 
-        new RecordingDeletionDelivery(repository, storage, metrics).deliver(11L);
+        new RecordingDeletionDelivery(
+                repository,
+                storage,
+                metrics,
+                mock(org.springframework.jdbc.core.JdbcTemplate.class)
+        ).deliver(11L);
 
         verify(storage).deleteObject(9L, 7L, deletion.getObjectKey());
         assertThat(deletion.getStatus()).isEqualTo(RecordingDeletionStatus.DELETED);
@@ -116,7 +121,12 @@ class RecordingDeletionOutboxDispatcherTest {
         doThrow(new IllegalStateException("unavailable"))
                 .when(storage).deleteObject(9L, 7L, deletion.getObjectKey());
 
-        new RecordingDeletionDelivery(repository, storage, metrics).deliver(11L);
+        new RecordingDeletionDelivery(
+                repository,
+                storage,
+                metrics,
+                mock(org.springframework.jdbc.core.JdbcTemplate.class)
+        ).deliver(11L);
 
         assertThat(deletion.getStatus()).isEqualTo(RecordingDeletionStatus.PENDING);
         assertThat(deletion.getAttemptCount()).isEqualTo(1);
