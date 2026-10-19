@@ -12,8 +12,9 @@ def profile(path):
     doc = json.loads(trusted(path).read_bytes())
     required = {'version', 'aiGitRevision', 'runpodBundleSha256', 'verifierBundleSha256', 'pins'}
     optional = {'schemaDigests', 'frontend'}
-    require(set(doc) in {required, required | {'schemaDigests'}, required | {'frontend'},
-                         required | optional}, 'PROFILE_FIELDS')
+    allowed_fields = (required, required | {'schemaDigests'}, required | {'frontend'},
+                      required | optional)
+    require(set(doc) in allowed_fields, 'PROFILE_FIELDS')
     require(doc['version'] == 2 and re.fullmatch('[0-9a-f]{40}', doc['aiGitRevision']), 'PROFILE_VERSION')
     for key in ('runpodBundleSha256', 'verifierBundleSha256'):
         require(SHA.fullmatch(doc[key]), 'PROFILE_DIGEST')
