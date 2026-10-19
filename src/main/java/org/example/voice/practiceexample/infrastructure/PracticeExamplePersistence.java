@@ -14,6 +14,9 @@ import java.util.List;
 
 @Repository @RequiredArgsConstructor
 public class PracticeExamplePersistence implements PracticeExampleReader {
+    private static final int MIN_EXAMPLE_COUNT = 5;
+    private static final int MAX_EXAMPLE_COUNT = 10;
+
     private final EntityManager em;
     private final Clock clock;
     public Examples examples(Long userId, Long courseId, Long stepId, Long sessionId) {
@@ -56,8 +59,10 @@ public class PracticeExamplePersistence implements PracticeExampleReader {
         if (set.getPublishedAt().isAfter(OffsetDateTime.now(clock))) throw PracticeExampleException.missing();
         var entries = em.createQuery("select e from PracticeExample e join fetch e.content where e.set.id=:set order by e.order", PracticeExample.class)
                 .setParameter("set", set.getId()).getResultList();
-        if (entries.size() != 5) throw new PracticeExampleException(503, "PRACTICE_EXAMPLES_UNAVAILABLE");
-        for (int i = 0; i < 5; i++) {
+        if (entries.size() < MIN_EXAMPLE_COUNT || entries.size() > MAX_EXAMPLE_COUNT) {
+            throw new PracticeExampleException(503, "PRACTICE_EXAMPLES_UNAVAILABLE");
+        }
+        for (int i = 0; i < entries.size(); i++) {
             var e = entries.get(i); var c = e.getContent();
             if (e.getOrder() != i + 1 || !"ko-KR".equals(e.getLocale()) || c.getOwnerId() != null || c.getStatus() != PublishStatus.PUBLISHED
                     || (c.getPublishedAt() != null && c.getPublishedAt().isAfter(OffsetDateTime.now(clock)))

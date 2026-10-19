@@ -268,29 +268,76 @@ WHERE NOT EXISTS (
       AND existing.title = source.title
 );
 
-WITH class_steps(course_title, practice_title, step_order, step_title) AS (
+WITH example_sets(course_title) AS (
     VALUES
-        ('억양 기초 클래스', '억양 초급 연습 2 - 짧은 질문', 3, '짧은 질문 억양 녹음하기'),
-        ('억양 기초 클래스', '억양 초급 연습 3 - 평서문 마무리', 4, '평서문 마무리 녹음하기'),
-        ('억양 기초 클래스', '억양 초급 연습 4 - 두 문장 비교', 5, '질문과 대답 비교 녹음하기'),
-        ('억양 기초 클래스', '억양 초급 연습 5 - 감탄 표현', 6, '감탄 표현 녹음하기'),
-
-        ('억양 흐름 클래스', '억양 중급 연습 2 - 원인과 결과', 3, '원인과 결과 억양 녹음하기'),
-        ('억양 흐름 클래스', '억양 중급 연습 3 - 대조 표현', 4, '대조 표현 녹음하기'),
-        ('억양 흐름 클래스', '억양 중급 연습 4 - 나열 문장', 5, '나열 문장 녹음하기'),
-        ('억양 흐름 클래스', '억양 중급 연습 5 - 조건과 요청', 6, '조건과 요청 녹음하기'),
-
-        ('발표 억양 클래스', '억양 고급 연습 2 - 핵심 가치 강조', 3, '핵심 가치 강조 녹음하기'),
-        ('발표 억양 클래스', '억양 고급 연습 3 - 문제와 대안', 4, '문제와 대안 녹음하기'),
-        ('발표 억양 클래스', '억양 고급 연습 4 - 설득형 질문', 5, '설득형 질문 녹음하기'),
-        ('발표 억양 클래스', '억양 고급 연습 5 - 발표 마무리', 6, '발표 마무리 녹음하기')
+        ('억양 기초 클래스'),
+        ('억양 흐름 클래스'),
+        ('발표 억양 클래스')
 )
-INSERT INTO course_steps(course_id, practice_content_id, step_type, step_order, title, body, required)
-SELECT course.id, content.id, 'PRACTICE', source.step_order, source.step_title, NULL, TRUE
-FROM class_steps source
+INSERT INTO practice_example_sets(step_id, revision, education_revision_id, published_at)
+SELECT step.id, 1, revision.id, now()
+FROM example_sets source
 JOIN courses course
   ON course.course_type = 'INTONATION'
  AND course.title = source.course_title
+JOIN course_steps step
+  ON step.course_id = course.id
+ AND step.step_type = 'PRACTICE'
+ AND step.step_order = 2
+JOIN course_step_revisions revision
+  ON revision.step_id = step.id
+ AND revision.revision = 1
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM practice_example_sets existing
+    WHERE existing.step_id = step.id
+      AND existing.revision = 1
+);
+
+WITH example_items(course_title, example_order, practice_title, hint) AS (
+    VALUES
+        ('억양 기초 클래스', 1, '억양 초급 연습 - 문장 끝 올림과 내림', '평서문과 질문의 끝 억양을 구분해 보세요.'),
+        ('억양 기초 클래스', 2, '억양 초급 연습 2 - 짧은 질문', '질문의 마지막 음절을 자연스럽게 올려 보세요.'),
+        ('억양 기초 클래스', 3, '억양 초급 연습 3 - 평서문 마무리', '안내 문장의 끝을 안정적으로 내려 보세요.'),
+        ('억양 기초 클래스', 4, '억양 초급 연습 4 - 두 문장 비교', '질문과 대답의 끝 억양 차이를 살려 보세요.'),
+        ('억양 기초 클래스', 5, '억양 초급 연습 5 - 감탄 표현', '감탄을 살리면서 마지막 안내는 차분히 마무리하세요.'),
+
+        ('억양 흐름 클래스', 1, '억양 중급 연습 - 의미 단위 끊어 읽기', '의미 단위 사이에 짧은 쉼을 넣어 보세요.'),
+        ('억양 흐름 클래스', 2, '억양 중급 연습 2 - 원인과 결과', '원인과 결과가 구분되도록 흐름을 바꿔 보세요.'),
+        ('억양 흐름 클래스', 3, '억양 중급 연습 3 - 대조 표현', '대조되는 두 내용을 다른 높낮이로 전달해 보세요.'),
+        ('억양 흐름 클래스', 4, '억양 중급 연습 4 - 나열 문장', '나열은 이어 읽고 마지막 결론은 내려 마무리하세요.'),
+        ('억양 흐름 클래스', 5, '억양 중급 연습 5 - 조건과 요청', '조건절 뒤에 쉬고 요청의 끝을 자연스럽게 올려 보세요.'),
+
+        ('발표 억양 클래스', 1, '억양 고급 연습 - 강조와 설득', '핵심 단어를 강조하면서 발표 흐름을 유지하세요.'),
+        ('발표 억양 클래스', 2, '억양 고급 연습 2 - 핵심 가치 강조', '핵심 가치에 힘을 주되 속도는 일정하게 유지하세요.'),
+        ('발표 억양 클래스', 3, '억양 고급 연습 3 - 문제와 대안', '문제 제기와 대안 제시의 흐름을 구분하세요.'),
+        ('발표 억양 클래스', 4, '억양 고급 연습 4 - 설득형 질문', '질문으로 주의를 끈 뒤 결론을 분명하게 강조하세요.'),
+        ('발표 억양 클래스', 5, '억양 고급 연습 5 - 발표 마무리', '결론을 안정된 속도와 하강 억양으로 마치세요.')
+)
+INSERT INTO practice_examples(id, set_id, content_id, example_order, hint, focus, locale)
+SELECT
+    CASE source.course_title
+        WHEN '억양 기초 클래스' THEN 'intonation-beginner-r1-' || source.example_order
+        WHEN '억양 흐름 클래스' THEN 'intonation-intermediate-r1-' || source.example_order
+        WHEN '발표 억양 클래스' THEN 'intonation-advanced-r1-' || source.example_order
+    END,
+    example_set.id,
+    content.id,
+    source.example_order,
+    source.hint,
+    'INTONATION',
+    'ko-KR'
+FROM example_items source
+JOIN courses course
+  ON course.course_type = 'INTONATION'
+ AND course.title = source.course_title
+JOIN course_steps step
+  ON step.course_id = course.id
+ AND step.step_type = 'PRACTICE'
+ AND step.step_order = 2
+JOIN practice_example_sets example_set
+  ON example_set.step_id = step.id
+ AND example_set.revision = 1
 JOIN practice_contents content
   ON content.owner_id IS NULL
  AND content.content_type = 'CLASS_PRACTICE'
@@ -299,32 +346,10 @@ JOIN practice_contents content
  AND content.status = 'PUBLISHED'
 WHERE NOT EXISTS (
     SELECT 1
-    FROM course_steps existing
-    WHERE existing.course_id = course.id
-      AND existing.step_order = source.step_order
+    FROM practice_examples existing
+    WHERE existing.set_id = example_set.id
+      AND existing.example_order = source.example_order
 );
-
-INSERT INTO course_step_revisions(step_id, revision, title, subtitle, step_order, step_type, blocks_json)
-SELECT
-    step.id,
-    1,
-    step.title,
-    '녹음 연습',
-    step.step_order,
-    step.step_type,
-    jsonb_build_array(jsonb_build_object('type', 'PRACTICE_PROMPT', 'practiceContentId', step.practice_content_id))::text
-FROM course_steps step
-JOIN courses course ON course.id = step.course_id
-WHERE course.course_type = 'INTONATION'
-  AND course.title IN ('억양 기초 클래스', '억양 흐름 클래스', '발표 억양 클래스')
-  AND step.step_type = 'PRACTICE'
-  AND step.step_order BETWEEN 3 AND 6
-  AND NOT EXISTS (
-      SELECT 1
-      FROM course_step_revisions revision
-      WHERE revision.step_id = step.id
-        AND revision.revision = 1
-  );
 
 UPDATE courses
 SET estimated_minutes = CASE title

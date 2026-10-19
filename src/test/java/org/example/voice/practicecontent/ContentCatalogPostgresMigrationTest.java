@@ -81,7 +81,7 @@ class ContentCatalogPostgresMigrationTest {
             }finally{db.setSchema("public");sql.execute("drop schema if exists "+schema+" cascade");}
         }
     }
-    @Test void expandedCatalogProvidesDensePracticeSetsAndFiveProblemsPerIntonationCourse() throws Exception {
+    @Test void expandedCatalogProvidesDensePracticeSetsAndFiveOrderedExamplesPerIntonationCourse() throws Exception {
         String url=System.getenv("VC_BE_TEST_POSTGRES_URL"),user=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER","postgres"),password=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_PASSWORD","");
         String schema="expanded_catalog_test_"+UUID.randomUUID().toString().replace("-","");
         try(var db=DriverManager.getConnection(url,user,password);var sql=db.createStatement()){
@@ -118,12 +118,15 @@ class ContentCatalogPostgresMigrationTest {
                     assertThat(counts).containsEntry("BEGINNER",5).containsEntry("INTERMEDIATE",5).containsEntry("ADVANCED",5);
                 }
                 try(var rows=sql.executeQuery("""
-                        select course.title,count(*) from course_steps step
+                        select course.title,count(*) from practice_examples example
+                        join practice_example_sets example_set on example_set.id=example.set_id
+                        join course_steps step on step.id=example_set.step_id
                         join courses course on course.id=step.course_id
                         join course_step_revisions revision on revision.step_id=step.id and revision.revision=1
                         where course.course_type='INTONATION' and course.status='PUBLISHED'
                           and course.title in ('억양 기초 클래스','억양 흐름 클래스','발표 억양 클래스')
-                          and step.step_type='PRACTICE'
+                          and step.step_type='PRACTICE' and step.step_order=2
+                          and example_set.revision=1
                         group by course.title
                         """)) {
                     java.util.Map<String,Integer> counts=new java.util.HashMap<>();
@@ -131,6 +134,54 @@ class ContentCatalogPostgresMigrationTest {
                     assertThat(counts).containsEntry("억양 기초 클래스",5)
                             .containsEntry("억양 흐름 클래스",5)
                             .containsEntry("발표 억양 클래스",5);
+                }
+                try(var rows=sql.executeQuery("""
+                        select course.title,count(*) from course_steps step
+                        join courses course on course.id=step.course_id
+                        where course.course_type='INTONATION' and course.status='PUBLISHED'
+                          and course.title in ('억양 기초 클래스','억양 흐름 클래스','발표 억양 클래스')
+                          and step.step_type='PRACTICE'
+                        group by course.title
+                        """)) {
+                    java.util.Map<String,Integer> counts=new java.util.HashMap<>();
+                    while(rows.next()) counts.put(rows.getString(1),rows.getInt(2));
+                    assertThat(counts).containsEntry("억양 기초 클래스",1)
+                            .containsEntry("억양 흐름 클래스",1)
+                            .containsEntry("발표 억양 클래스",1);
+                }
+            }finally{db.setSchema("public");sql.execute("drop schema if exists "+schema+" cascade");}
+        }
+    }
+    @Test void pronunciationCourseSeedProvidesThreeCoursesWithFiveOrderedExamples() throws Exception {
+        String url=System.getenv("VC_BE_TEST_POSTGRES_URL"),user=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER","postgres"),password=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_PASSWORD","");
+        String schema="pronunciation_course_seed_test_"+UUID.randomUUID().toString().replace("-","");
+        try(var db=DriverManager.getConnection(url,user,password);var sql=db.createStatement()){
+            try {
+                migrate(url,user,password,schema,"46");db.setSchema(schema);
+                try(var rows=sql.executeQuery("""
+                        select course.title,count(*) from practice_examples example
+                        join practice_example_sets example_set on example_set.id=example.set_id
+                        join course_steps step on step.id=example_set.step_id
+                        join courses course on course.id=step.course_id
+                        where course.course_type='PRONUNCIATION' and course.status='PUBLISHED'
+                          and course.title in ('발음 기초 클래스','발음 연결 클래스','발음 발표 클래스')
+                          and step.step_type='PRACTICE' and step.step_order=2
+                          and example_set.revision=1
+                        group by course.title
+                        """)) {
+                    java.util.Map<String,Integer> counts=new java.util.HashMap<>();
+                    while(rows.next()) counts.put(rows.getString(1),rows.getInt(2));
+                    assertThat(counts).containsEntry("발음 기초 클래스",5)
+                            .containsEntry("발음 연결 클래스",5)
+                            .containsEntry("발음 발표 클래스",5);
+                }
+                try(var rows=sql.executeQuery("""
+                        select count(*) from practice_contents
+                        where owner_id is null and content_type='CLASS_PRACTICE'
+                          and learning_focus='PRONUNCIATION' and category='PRONUNCIATION_CLASS'
+                          and status='PUBLISHED'
+                        """)) {
+                    assertThat(rows.next()).isTrue();assertThat(rows.getInt(1)).isEqualTo(15);
                 }
             }finally{db.setSchema("public");sql.execute("drop schema if exists "+schema+" cascade");}
         }

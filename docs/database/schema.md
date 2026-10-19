@@ -11,17 +11,20 @@
 
 기존 5개 세트와 학습 세션은 그대로 유효하다. 세트와 예문의 불변 정책, 교육 revision 연결 검증도 유지한다.
 
-## V44 학습 콘텐츠 및 클래스 문제 확장
+## V44/V46 학습 콘텐츠 및 클래스 문제 확장
 
-`V44__expand_practice_content_catalog.sql`은 기존 테이블과 API 계약을 변경하지 않고 공개 연습 콘텐츠 62개를 추가한다.
+`V44__expand_practice_content_catalog.sql`과 `V46__seed_pronunciation_courses.sql`은 기존 테이블과 API 계약을 변경하지 않고 공개 연습 콘텐츠 77개를 추가한다.
 
 - `NEWS`: 학습용 창작 사회 뉴스 10개, 경제 뉴스 10개
 - `SENTENCE / EXAMPLE_QUESTION`: 난이도별 5개씩 추가해 기존 seed와 합계 10개씩 유지
 - `ANNOUNCER / ANNOUNCER_PRACTICE`: 난이도별 5개
 - `CLASS_PRACTICE / INTONATION_CLASS`: 12개 추가
 - V37의 억양 클래스 3개: 클래스별 기존 `PRACTICE` step 1개와 revision 1을 유지하고, step마다 `practice_example_sets` revision 1 및 순서가 고정된 `practice_examples` 5개 게시
+- `CLASS_PRACTICE / PRONUNCIATION_CLASS`: 발음 클래스별 예문 5개씩 15개 추가
+- `PRONUNCIATION` course 3개: 발음 기초/연결/발표 클래스
+- 각 발음 클래스는 `THEORY` 1개와 `PRACTICE` 1개 step, revision 1, 순서가 고정된 공개 예문 5개를 가진다.
 
-현재 `training_sessions`는 콘텐츠 한 건을 참조한다. 사용자 화면에서는 API가 반환한 예문 전체를 하나의 교정 세션으로 연속 표시하지만, 서버에서는 각 문제를 독립된 학습 세션과 분석 결과로 실행한다. V44 seed는 클래스마다 5개를 게시하며 V45 이후 세트별로 5~10개를 허용한다. 상세 범위와 검증 기준은 [학습 콘텐츠 및 클래스 문제 확장](../api/practice-content-expansion-20261019.md)에 기록한다.
+현재 `training_sessions`는 콘텐츠 한 건을 참조한다. 사용자 화면에서는 API가 반환한 예문 전체를 하나의 교정 세션으로 연속 표시하지만, 서버에서는 각 문제를 독립된 학습 세션과 분석 결과로 실행한다. V44/V46 seed는 클래스마다 5개를 게시하며 V45 이후 세트별로 5~10개를 허용한다. 상세 범위와 검증 기준은 [학습 콘텐츠 및 클래스 문제 확장](../api/practice-content-expansion-20261019.md)에 기록한다.
 
 ## V41/V42 미디어 준비와 실행 snapshot (미배포)
 
