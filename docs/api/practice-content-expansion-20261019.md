@@ -1,6 +1,6 @@
 # 학습 콘텐츠 및 클래스 문제 확장
 
-- 적용 migration: `V44__expand_practice_content_catalog.sql`, `V46__seed_pronunciation_courses.sql`
+- 적용 migration: `V44__expand_practice_content_catalog.sql`, `V46__seed_pronunciation_courses.sql`, `V48__reset_announcer_read_along_order.sql`
 - 작성일: 2026-10-19
 - 목적: 뉴스·문장·아나운서 목록의 빈 화면을 줄이고, 클래스별 교정 문제를 5개로 확장한다.
 
@@ -11,11 +11,11 @@
 | `NEWS` | `SOCIETY` | 10 | 학습용 창작 사회 뉴스 10개 추가 |
 | `NEWS` | `ECONOMY` | 10 | 학습용 창작 경제 뉴스 10개 추가 |
 | `SENTENCE` | `EXAMPLE_QUESTION` | 15 | 기존 문장과 합쳐 난이도별 10개 |
-| `ANNOUNCER` | `ANNOUNCER_PRACTICE` | 15 | 난이도별 5개 |
+| `ANNOUNCER` | `ANNOUNCER_PRACTICE` | 10 | 따라 읽기 1~10 순서의 전문 아나운서 원고 |
 | `CLASS_PRACTICE` | `INTONATION_CLASS` | 12 | 억양 클래스별 순차 예문 5개 |
 | `CLASS_PRACTICE` | `PRONUNCIATION_CLASS` | 15 | 발음 클래스별 순차 예문 5개 |
 
-총 77개의 공개 연습 콘텐츠를 추가한다. 모든 원고는 이번 작업에서 작성한 학습용 창작 원고이며, 외부 뉴스나 타 서비스 원문을 복제하지 않는다.
+총 72개의 공개 연습 콘텐츠를 유지한다. 모든 원고는 이번 작업에서 작성한 학습용 창작 원고이며, 외부 뉴스나 타 서비스 원문을 복제하지 않는다.
 
 ## 교정 세션 해석
 
@@ -54,7 +54,7 @@ V37에서 생성한 억양 클래스와 V46에서 생성한 발음 클래스는 
 
 - `SENTENCE / EXAMPLE_QUESTION`이 난이도별 10개
 - 창작 뉴스가 `SOCIETY`, `ECONOMY` 각각 10개
-- `ANNOUNCER / ANNOUNCER_PRACTICE`가 난이도별 5개
+- `ANNOUNCER / ANNOUNCER_PRACTICE`가 따라 읽기 1~10 순서로 10개
 - 세 억양 클래스와 세 발음 클래스의 `PRACTICE` 단계가 각각 1개
 - 각 `PRACTICE` 단계 revision에 연결된 공개 예문이 순서대로 5개
 
