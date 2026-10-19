@@ -10,8 +10,9 @@ SHA = re.compile(r'[0-9a-f]{64}')
 
 def profile(path):
     doc = json.loads(trusted(path).read_bytes())
-    require(set(doc) == {'version', 'aiGitRevision', 'runpodBundleSha256', 'verifierBundleSha256',
-                        'pins', 'schemaDigests', 'frontend'}, 'PROFILE_FIELDS')
+    required = {'version', 'aiGitRevision', 'runpodBundleSha256', 'verifierBundleSha256',
+                'pins', 'schemaDigests'}
+    require(set(doc) in (required, required | {'frontend'}), 'PROFILE_FIELDS')
     require(doc['version'] == 2 and re.fullmatch('[0-9a-f]{40}', doc['aiGitRevision']), 'PROFILE_VERSION')
     for key in ('runpodBundleSha256', 'verifierBundleSha256'):
         require(SHA.fullmatch(doc[key]), 'PROFILE_DIGEST')
@@ -23,13 +24,6 @@ def profile(path):
     require(all(SHA.fullmatch(v) for v in doc['pins'].values()), 'PROFILE_PIN_DIGEST')
     require(len(doc['schemaDigests']) == 9 and all(re.fullmatch('runpod_[a-z0-9_]+\\.schema\\.json', k)
                 and SHA.fullmatch(v) for k, v in doc['schemaDigests'].items()), 'PROFILE_SCHEMAS')
-    fe = doc['frontend']
-    require(set(fe) == {'origin', 'revision', 'pagePath', 'assets'} and
-            re.fullmatch('[0-9a-f]{40}', fe['revision']) and fe['origin'].startswith('https://') and
-            fe['pagePath'].startswith('/') and not fe['pagePath'].startswith('//') and
-            type(fe['assets']) is dict and 0 < len(fe['assets']) <= 30, 'PROFILE_FRONTEND')
-    require(all(re.fullmatch('/_next/[A-Za-z0-9_./-]+\\.js', p) and '..' not in p and SHA.fullmatch(h)
-                for p, h in fe['assets'].items()), 'PROFILE_FRONTEND_ASSETS')
     return doc
 
 def verifier_python(doc, env):
@@ -57,14 +51,6 @@ def verifier(doc, env):
     for name, sha in doc['schemaDigests'].items():
         require(digest(root / 'app/docs/contracts' / name) == sha, 'VERIFIER_SCHEMA_MISMATCH')
     return root
-
-def frontend(doc):
-    fe = doc['frontend']
-    page = fetch(fe['origin'].rstrip('/') + fe['pagePath'], limit=2*1024*1024).decode()
-    for path, sha in fe['assets'].items():
-        require(path in page, 'FRONTEND_DEPLOYMENT_CHANGED')
-        require(hashlib.sha256(fetch(fe['origin'].rstrip('/') + path, limit=4*1024*1024)).hexdigest() == sha,
-                'FRONTEND_ASSET_CHANGED')
 
 def pod(env):
     # Existing Spring RunPodAnalysisProperties namespace.

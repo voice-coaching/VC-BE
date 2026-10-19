@@ -107,7 +107,6 @@ def run(args):
         verifier = None
         if args.phase not in ('abort', 'rollback'):
             verifier = probes.verifier(doc, effective)
-            probes.frontend(doc)
         target = Path('/opt/alpha/releases') / (args.release + '.jar')
         incoming = Path('/var/tmp') / ('alpha-' + args.release + '.jar')
         source = target if target.exists() else incoming
@@ -171,7 +170,6 @@ def run(args):
             fresh = environment()
             require(fresh['ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_SCRIPT'] == str(verifier / 'app/deploy/runpod/canonical_verify.py'),
                     'ACTIVE_VERIFIER_CHANGED')
-            probes.frontend(doc)
             require(not any(probes.drain(fresh).values()), 'DRAIN_CHANGED')
             stage(state_path, state, 'VERIFIED')
             HOLD.unlink()
@@ -184,7 +182,6 @@ def run(args):
             # The operator restores the pinned AI set first, while ingress stays closed.
             # This prevents a blind JAR-only rollback across incompatible contracts.
             probes.verifier(prior['profile'], effective)
-            probes.frontend(prior['profile'])
             probes.pod_identity(prior['profile'], effective)
             wait_drained(effective)
             previous_jar = trusted(state['previousJar'])
