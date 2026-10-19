@@ -39,8 +39,11 @@ public class ReferenceAudio {
     @Column(name = "speaker_type")
     private SpeakerType speakerType;
 
-    @Column(name = "audio_url", nullable = false)
+    @Column(name = "audio_url")
     private String audioUrl;
+
+    @Column(name = "object_key", length = 512)
+    private String objectKey;
 
     @Column(name = "duration_ms")
     private Integer durationMs;

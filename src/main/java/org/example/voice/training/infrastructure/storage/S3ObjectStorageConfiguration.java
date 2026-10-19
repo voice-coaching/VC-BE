@@ -50,6 +50,7 @@ public class S3ObjectStorageConfiguration {
         if (!hasText(properties.getBucket())
                 || !hasText(properties.getRegion())
                 || !hasText(prefix)
+                || !validPrefix(properties.getReferenceAudiosPrefix())
                 || prefix.startsWith("/")
                 || prefix.contains("\\")
                 || prefix.contains("//")
@@ -73,5 +74,15 @@ public class S3ObjectStorageConfiguration {
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private static boolean validPrefix(String prefix) {
+        return hasText(prefix)
+                && !prefix.startsWith("/")
+                && !prefix.contains("\\")
+                && !prefix.contains("//")
+                && prefix.endsWith("/")
+                && java.util.Arrays.stream(prefix.split("/"))
+                .allMatch(segment -> !segment.isBlank() && !segment.equals(".") && !segment.equals(".."));
     }
 }

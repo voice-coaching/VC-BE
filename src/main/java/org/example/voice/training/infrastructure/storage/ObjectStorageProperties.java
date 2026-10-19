@@ -16,4 +16,5 @@ public class ObjectStorageProperties {
     private String endpoint;
     private boolean pathStyleAccess;
     private String recordingsPrefix = "recordings/";
+    private String referenceAudiosPrefix = "reference-audios/";
 }
