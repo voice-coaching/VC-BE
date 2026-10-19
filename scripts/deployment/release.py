@@ -116,7 +116,6 @@ def run(args):
                 shutil.copyfile(incoming, temporary); temporary.chmod(0o644)
                 check_jar(temporary, args.jar_sha); os.replace(temporary, target)
             stage(state_path, state, 'ACTIVATING')
-            atomic(ENV, new_env)
             switch_jar(target)
             command(['systemctl', 'restart', SERVICE], timeout=60)
             stage(state_path, state, 'ACTIVATED')
