@@ -2,9 +2,9 @@
 
 ## 목적
 
-`V47__seed_announcer_read_along_reference_audio.sql`은 `정상발음` 폴더의 10개 대본을 `ANNOUNCER / ANNOUNCER_PRACTICE` 콘텐츠로 등록하고, 각 콘텐츠에 전문 아나운서의 실제 음성을 기준 음성으로 연결한다.
+`V47__seed_announcer_read_along_reference_audio.sql`은 `정상발음` 폴더의 10개 대본을 처음 등록한다. `V48__reset_announcer_read_along_order.sql`은 기존 초급·중급·고급 아나운서 연습 시드를 제거하고, 따라 읽기 1~10을 사용자가 지정한 순서의 대본과 기준 음성으로 재연결한다.
 
-파일명에서 마지막 `.m4a`만 제거한 문자열이 `practice_contents.script_text`와 같아야 한다. 원본 파일명은 변경하지 않고 S3에 업로드한다.
+각 콘텐츠의 `practice_contents.script_text`는 아나운서가 읽는 3문장 원고 전체를 저장한다. S3 object key는 실제 음성 파일의 원본 파일명을 유지하며, 파일명이 짧아 원고 전체와 달라도 콘텐츠 번호별 매핑으로 연결한다.
 
 ## S3 경로
 

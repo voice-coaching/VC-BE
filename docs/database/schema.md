@@ -182,7 +182,7 @@ receipt에는 source/PCM/video digest, normalizer revision, probe의 audio/video
 | is_primary | boolean | Y | - | - | - | 대표 음성 여부 |
 | created_at | timestamptz | Y | now() | - | - | 생성 시각 |
 
-`V47__seed_announcer_read_along_reference_audio.sql`은 파일명과 동일한 대본의 `ANNOUNCER` 콘텐츠 10개를 추가하고, `reference-audios/announcer/` private S3 객체를 대표 기준 음성으로 연결한다. 해당 콘텐츠에는 TTS job을 생성하지 않으며, 재생 시 기준 음성 전용 presigned URL을 발급한다.
+`V47__seed_announcer_read_along_reference_audio.sql`은 `ANNOUNCER` 콘텐츠 10개와 기준 음성을 추가한다. `V48__reset_announcer_read_along_order.sql`은 기존 초급·중급·고급 아나운서 연습 시드를 정리하고, 따라 읽기 1~10을 3문장 원고와 실제 파일명 기반의 private S3 객체로 지정된 순서에 맞게 재연결한다. 해당 콘텐츠에는 TTS job을 생성하지 않으며, 재생 시 기준 음성 전용 presigned URL을 발급한다.
 
 ### courses
 - 목적: 커리큘럼 단위의 학습 코스를 저장한다.
