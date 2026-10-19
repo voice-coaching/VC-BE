@@ -209,6 +209,10 @@ if __name__ == '__main__':
     parser.add_argument('release'); parser.add_argument('jar_sha')
     try: run(parser.parse_args())
     except Exception as error:
-        code = str(error) if re.fullmatch('[A-Z_]+', str(error)) else type(error).__name__
-        print(json.dumps({'stage': 'STOPPED', 'reason': code, 'maintenanceMayRemain': True}), flush=True)
+        detail = str(error)
+        code = detail if re.fullmatch('[A-Z_]+', detail) else type(error).__name__
+        payload = {'stage': 'STOPPED', 'reason': code, 'maintenanceMayRemain': True}
+        if detail and detail != code:
+            payload['detail'] = detail[:240]
+        print(json.dumps(payload), flush=True)
         raise SystemExit(1)
