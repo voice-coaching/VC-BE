@@ -1,5 +1,16 @@
 # DB Schema - voice
 
+## V45 가변 클래스 예문 수
+
+`V45__allow_variable_practice_example_count.sql`은 `practice_example_sets` 하나에 5~10개의 예문을 허용한다.
+
+- `practice_examples.example_order`: 1~10
+- 세트의 게시 예문 수: 5~10
+- 순서: 1부터 실제 예문 수까지 중복과 누락 없이 연속
+- 프론트 전체 문제 수: API 응답의 `items.length`
+
+기존 5개 세트와 학습 세션은 그대로 유효하다. 세트와 예문의 불변 정책, 교육 revision 연결 검증도 유지한다.
+
 ## V44 학습 콘텐츠 및 클래스 문제 확장
 
 `V44__expand_practice_content_catalog.sql`은 기존 테이블과 API 계약을 변경하지 않고 공개 연습 콘텐츠 62개를 추가한다.
@@ -8,9 +19,9 @@
 - `SENTENCE / EXAMPLE_QUESTION`: 난이도별 5개씩 추가해 기존 seed와 합계 10개씩 유지
 - `ANNOUNCER / ANNOUNCER_PRACTICE`: 난이도별 5개
 - `CLASS_PRACTICE / INTONATION_CLASS`: 12개 추가
-- V37의 억양 클래스 3개: 기존 1개를 포함해 클래스별 `PRACTICE` step 5개와 각 revision 1 유지
+- V37의 억양 클래스 3개: 클래스별 기존 `PRACTICE` step 1개와 revision 1을 유지하고, step마다 `practice_example_sets` revision 1 및 순서가 고정된 `practice_examples` 5개 게시
 
-현재 `training_sessions`는 콘텐츠 한 건을 참조하므로 한 분석 세션에서 여러 문제를 처리하도록 변경하지 않는다. 클래스의 각 문제는 독립된 학습 세션으로 실행한다. 상세 범위와 검증 기준은 [학습 콘텐츠 및 클래스 문제 확장](../api/practice-content-expansion-20261019.md)에 기록한다.
+현재 `training_sessions`는 콘텐츠 한 건을 참조한다. 사용자 화면에서는 API가 반환한 예문 전체를 하나의 교정 세션으로 연속 표시하지만, 서버에서는 각 문제를 독립된 학습 세션과 분석 결과로 실행한다. V44 seed는 클래스마다 5개를 게시하며 V45 이후 세트별로 5~10개를 허용한다. 상세 범위와 검증 기준은 [학습 콘텐츠 및 클래스 문제 확장](../api/practice-content-expansion-20261019.md)에 기록한다.
 
 ## V41/V42 미디어 준비와 실행 snapshot (미배포)
 
