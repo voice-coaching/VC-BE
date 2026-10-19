@@ -25,6 +25,34 @@ DELETE FROM reference_audios audio
 USING legacy
 WHERE audio.content_id = legacy.id;
 
+WITH legacy AS (
+    SELECT id
+    FROM practice_contents
+    WHERE owner_id IS NULL
+      AND content_type = 'ANNOUNCER'
+      AND category = 'ANNOUNCER_PRACTICE'
+      AND title LIKE '아나운서 연습 %'
+), jobs AS (
+    SELECT job.id
+    FROM example_tts_jobs job
+    JOIN legacy ON legacy.id = job.content_id
+)
+DELETE FROM example_audio_approvals approval
+USING jobs
+WHERE approval.job_id = jobs.id;
+
+WITH legacy AS (
+    SELECT id
+    FROM practice_contents
+    WHERE owner_id IS NULL
+      AND content_type = 'ANNOUNCER'
+      AND category = 'ANNOUNCER_PRACTICE'
+      AND title LIKE '아나운서 연습 %'
+)
+DELETE FROM example_tts_jobs job
+USING legacy
+WHERE job.content_id = legacy.id;
+
 UPDATE practice_contents content
 SET status = 'HIDDEN',
     updated_at = now()
