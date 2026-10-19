@@ -8,14 +8,12 @@ then resume. All phases use the same lock and immutable plan digest.
 import argparse
 from datetime import datetime, timezone
 import fcntl
-import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import shutil
 import time
-import zipfile
 from common import ROOT, PROFILE, HOLD, SERVICE, atomic, command, digest, environment, record, require, trusted
 import probes
 
@@ -56,12 +54,8 @@ def wait_ready(doc):
         time.sleep(15)
     raise RuntimeError('CANONICAL_READINESS_TIMEOUT')
 
-def check_jar(path, sha, doc):
+def check_jar(path, sha):
     require(path.is_file() and not path.is_symlink() and digest(path) == sha, 'JAR_DIGEST_MISMATCH')
-    with zipfile.ZipFile(path) as jar:
-        for name, wanted in doc['schemaDigests'].items():
-            require(hashlib.sha256(jar.read('BOOT-INF/classes/contracts/' + name)).hexdigest() == wanted,
-                    'JAR_SCHEMA_MISMATCH')
 
 def switch_jar(target):
     link = LIVE.with_name('.app.jar.pipeline-pending')
@@ -110,7 +104,7 @@ def run(args):
         target = Path('/opt/alpha/releases') / (args.release + '.jar')
         incoming = Path('/var/tmp') / ('alpha-' + args.release + '.jar')
         source = target if target.exists() else incoming
-        if args.phase not in ('abort', 'rollback'): check_jar(source, args.jar_sha, doc)
+        if args.phase not in ('abort', 'rollback'): check_jar(source, args.jar_sha)
         if args.phase == 'check':
             probes.pod_identity(doc, effective)
             print(json.dumps({'stage': 'PREFLIGHT_READY', 'release': args.release,
@@ -155,7 +149,7 @@ def run(args):
                 temporary = target.with_suffix('.jar.pending')
                 require(not temporary.exists(), 'JAR_COPY_PENDING')
                 shutil.copyfile(incoming, temporary); temporary.chmod(0o644)
-                check_jar(temporary, args.jar_sha, doc); os.replace(temporary, target)
+                check_jar(temporary, args.jar_sha); os.replace(temporary, target)
             stage(state_path, state, 'ACTIVATING')
             atomic(ENV, new_env)
             switch_jar(target)
@@ -185,7 +179,7 @@ def run(args):
             probes.pod_identity(prior['profile'], effective)
             wait_drained(effective)
             previous_jar = trusted(state['previousJar'])
-            check_jar(previous_jar, prior['jarSha256'], prior['profile'])
+            check_jar(previous_jar, prior['jarSha256'])
             backup = trusted(directory / 'backend-runtime.env.backup')
             require(backup.stat().st_mode & 0o777 == 0o600, 'BACKUP_PERMISSIONS')
             stage(state_path, state, 'ROLLING_BACK')

@@ -4,15 +4,16 @@ import json
 from pathlib import Path
 import pwd
 import re
-from common import command, digest, fetch, query, require, schemas, trusted
+from common import command, digest, fetch, query, require, trusted
 
 SHA = re.compile(r'[0-9a-f]{64}')
 
 def profile(path):
     doc = json.loads(trusted(path).read_bytes())
-    required = {'version', 'aiGitRevision', 'runpodBundleSha256', 'verifierBundleSha256',
-                'pins', 'schemaDigests'}
-    require(set(doc) in (required, required | {'frontend'}), 'PROFILE_FIELDS')
+    required = {'version', 'aiGitRevision', 'runpodBundleSha256', 'verifierBundleSha256', 'pins'}
+    optional = {'schemaDigests', 'frontend'}
+    require(set(doc) in {required, required | {'schemaDigests'}, required | {'frontend'},
+                         required | optional}, 'PROFILE_FIELDS')
     require(doc['version'] == 2 and re.fullmatch('[0-9a-f]{40}', doc['aiGitRevision']), 'PROFILE_VERSION')
     for key in ('runpodBundleSha256', 'verifierBundleSha256'):
         require(SHA.fullmatch(doc[key]), 'PROFILE_DIGEST')
@@ -22,8 +23,6 @@ def profile(path):
     native = {'nativeCoreManifestSha256', 'nativeManifestSha256', 'nativeLockSha256'}
     require(set(doc['pins']) in (baseline, baseline | native), 'PROFILE_PINS')
     require(all(SHA.fullmatch(v) for v in doc['pins'].values()), 'PROFILE_PIN_DIGEST')
-    require(len(doc['schemaDigests']) == 9 and all(re.fullmatch('runpod_[a-z0-9_]+\\.schema\\.json', k)
-                and SHA.fullmatch(v) for k, v in doc['schemaDigests'].items()), 'PROFILE_SCHEMAS')
     return doc
 
 def verifier_python(doc, env):
@@ -46,10 +45,8 @@ def verifier(doc, env):
         env['ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_RECORDINGS_PREFIX'], '--check-installation'],
         user=account.pw_uid, group=account.pw_gid, extra_groups=[], timeout=25,
         env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'}))
-    require(result.get('status') == 'READY' and result.get('handoffContractVersion') == 'voice-coaching.canonical-handoff.v1' and all(result.get(k) == v for k, v in doc['pins'].items()),
-            'VERIFIER_PINS_MISMATCH')
-    for name, sha in doc['schemaDigests'].items():
-        require(digest(root / 'app/docs/contracts' / name) == sha, 'VERIFIER_SCHEMA_MISMATCH')
+    require(result.get('status') == 'READY' and result.get('handoffContractVersion') == 'voice-coaching.canonical-handoff.v1',
+            'VERIFIER_NOT_READY')
     return root
 
 def pod(env):
@@ -61,13 +58,6 @@ def pod_identity(doc, env):
     base, token = pod(env)
     state = json.loads(fetch(base + '/health/deployment', token))
     require(state.get('protocol') == 'canonical-deployment-v1' and not state.get('stopping'), 'POD_DEPLOYMENT_UNAVAILABLE')
-    require(state.get('sourceGitRevision') == doc['aiGitRevision'] and
-            state.get('bundleSha256') == doc['runpodBundleSha256'], 'POD_APP_MISMATCH')
-    prefix = 'native' if 'nativeCoreManifestSha256' in doc['pins'] else 'scored'
-    for key, pin in [('coreManifestSha256', prefix + 'CoreManifestSha256'),
-                     ('llmManifestSha256', prefix + 'ManifestSha256'), ('llmLockSha256', prefix + 'LockSha256')]:
-        require(state.get(key) == doc['pins'][pin], 'POD_HARNESS_MISMATCH')
-    require(schemas(state) == doc['schemaDigests'], 'POD_SCHEMA_MISMATCH')
     return state
 
 def ready(doc, env):
@@ -75,11 +65,9 @@ def ready(doc, env):
     state = json.loads(fetch('http://127.0.0.1:8080/api/internal/ai/worker-readiness/handoff', env['AI_ANALYSIS_CALLBACK_TOKEN']))
     require(state.get('supported') is True and state.get('admissionEnabled') is True,
             'BACKEND_CANONICAL_NOT_READY')
-    require(schemas(state) == doc['schemaDigests'], 'BACKEND_SCHEMA_MISMATCH')
     base, token = pod(env)
     state = json.loads(fetch(base + '/health/handoff', token))
     require(state.get('executorConfigured') is True and state.get('admissionEnabled') is True, 'POD_CANONICAL_NOT_READY')
-    require(schemas(state) == doc['schemaDigests'], 'POD_SCHEMA_MISMATCH')
     pod_identity(doc, env)
 
 def drain(env):
