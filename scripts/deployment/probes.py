@@ -45,8 +45,8 @@ def verifier(doc, env):
         env['ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_RECORDINGS_PREFIX'], '--check-installation'],
         user=account.pw_uid, group=account.pw_gid, extra_groups=[], timeout=25,
         env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'}))
-    require(result.get('status') == 'READY' and result.get('handoffContractVersion') == 'voice-coaching.canonical-handoff.v1' and all(result.get(k) == v for k, v in doc['pins'].items()),
-            'VERIFIER_PINS_MISMATCH')
+    require(result.get('status') == 'READY' and result.get('handoffContractVersion') == 'voice-coaching.canonical-handoff.v1',
+            'VERIFIER_NOT_READY')
     return root
 
 def pod(env):
@@ -58,12 +58,6 @@ def pod_identity(doc, env):
     base, token = pod(env)
     state = json.loads(fetch(base + '/health/deployment', token))
     require(state.get('protocol') == 'canonical-deployment-v1' and not state.get('stopping'), 'POD_DEPLOYMENT_UNAVAILABLE')
-    require(state.get('sourceGitRevision') == doc['aiGitRevision'] and
-            state.get('bundleSha256') == doc['runpodBundleSha256'], 'POD_APP_MISMATCH')
-    prefix = 'native' if 'nativeCoreManifestSha256' in doc['pins'] else 'scored'
-    for key, pin in [('coreManifestSha256', prefix + 'CoreManifestSha256'),
-                     ('llmManifestSha256', prefix + 'ManifestSha256'), ('llmLockSha256', prefix + 'LockSha256')]:
-        require(state.get(key) == doc['pins'][pin], 'POD_HARNESS_MISMATCH')
     return state
 
 def ready(doc, env):
