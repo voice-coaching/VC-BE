@@ -1,5 +1,17 @@
 # DB Schema - voice
 
+## V44 학습 콘텐츠 및 클래스 문제 확장
+
+`V44__expand_practice_content_catalog.sql`은 기존 테이블과 API 계약을 변경하지 않고 공개 연습 콘텐츠 62개를 추가한다.
+
+- `NEWS`: 학습용 창작 사회 뉴스 10개, 경제 뉴스 10개
+- `SENTENCE / EXAMPLE_QUESTION`: 난이도별 5개씩 추가해 기존 seed와 합계 10개씩 유지
+- `ANNOUNCER / ANNOUNCER_PRACTICE`: 난이도별 5개
+- `CLASS_PRACTICE / INTONATION_CLASS`: 12개 추가
+- V37의 억양 클래스 3개: 기존 1개를 포함해 클래스별 `PRACTICE` step 5개와 각 revision 1 유지
+
+현재 `training_sessions`는 콘텐츠 한 건을 참조하므로 한 분석 세션에서 여러 문제를 처리하도록 변경하지 않는다. 클래스의 각 문제는 독립된 학습 세션으로 실행한다. 상세 범위와 검증 기준은 [학습 콘텐츠 및 클래스 문제 확장](../api/practice-content-expansion-20261019.md)에 기록한다.
+
 ## V41/V42 미디어 준비와 실행 snapshot (미배포)
 
 `recording_media_preparations`는 Backend normalizer가 생성한 receipt를 recording과 같은 transaction에 저장한다. 과거 recording은 backfill하지 않는다. entity/public DTO에 receipt를 노출하지 않는다.

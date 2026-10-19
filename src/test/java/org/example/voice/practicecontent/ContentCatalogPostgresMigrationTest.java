@@ -81,6 +81,60 @@ class ContentCatalogPostgresMigrationTest {
             }finally{db.setSchema("public");sql.execute("drop schema if exists "+schema+" cascade");}
         }
     }
+    @Test void expandedCatalogProvidesDensePracticeSetsAndFiveProblemsPerIntonationCourse() throws Exception {
+        String url=System.getenv("VC_BE_TEST_POSTGRES_URL"),user=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER","postgres"),password=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_PASSWORD","");
+        String schema="expanded_catalog_test_"+UUID.randomUUID().toString().replace("-","");
+        try(var db=DriverManager.getConnection(url,user,password);var sql=db.createStatement()){
+            try {
+                migrate(url,user,password,schema,"44");db.setSchema(schema);
+                try(var rows=sql.executeQuery("""
+                        select difficulty,count(*) from practice_contents
+                        where owner_id is null and content_type='SENTENCE'
+                          and category='EXAMPLE_QUESTION' and status='PUBLISHED'
+                        group by difficulty
+                        """)) {
+                    java.util.Map<String,Integer> counts=new java.util.HashMap<>();
+                    while(rows.next()) counts.put(rows.getString(1),rows.getInt(2));
+                    assertThat(counts).containsEntry("BEGINNER",10).containsEntry("INTERMEDIATE",10).containsEntry("ADVANCED",10);
+                }
+                try(var rows=sql.executeQuery("""
+                        select category,count(*) from practice_contents
+                        where owner_id is null and content_type='NEWS' and status='PUBLISHED'
+                          and title like '%뉴스 연습%'
+                        group by category
+                        """)) {
+                    java.util.Map<String,Integer> counts=new java.util.HashMap<>();
+                    while(rows.next()) counts.put(rows.getString(1),rows.getInt(2));
+                    assertThat(counts).containsEntry("SOCIETY",10).containsEntry("ECONOMY",10);
+                }
+                try(var rows=sql.executeQuery("""
+                        select difficulty,count(*) from practice_contents
+                        where owner_id is null and content_type='ANNOUNCER'
+                          and category='ANNOUNCER_PRACTICE' and status='PUBLISHED'
+                        group by difficulty
+                        """)) {
+                    java.util.Map<String,Integer> counts=new java.util.HashMap<>();
+                    while(rows.next()) counts.put(rows.getString(1),rows.getInt(2));
+                    assertThat(counts).containsEntry("BEGINNER",5).containsEntry("INTERMEDIATE",5).containsEntry("ADVANCED",5);
+                }
+                try(var rows=sql.executeQuery("""
+                        select course.title,count(*) from course_steps step
+                        join courses course on course.id=step.course_id
+                        join course_step_revisions revision on revision.step_id=step.id and revision.revision=1
+                        where course.course_type='INTONATION' and course.status='PUBLISHED'
+                          and course.title in ('억양 기초 클래스','억양 흐름 클래스','발표 억양 클래스')
+                          and step.step_type='PRACTICE'
+                        group by course.title
+                        """)) {
+                    java.util.Map<String,Integer> counts=new java.util.HashMap<>();
+                    while(rows.next()) counts.put(rows.getString(1),rows.getInt(2));
+                    assertThat(counts).containsEntry("억양 기초 클래스",5)
+                            .containsEntry("억양 흐름 클래스",5)
+                            .containsEntry("발표 억양 클래스",5);
+                }
+            }finally{db.setSchema("public");sql.execute("drop schema if exists "+schema+" cascade");}
+        }
+    }
     private void verify(boolean upgrade) throws Exception {
         String url=System.getenv("VC_BE_TEST_POSTGRES_URL"),user=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER","postgres"),password=System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_PASSWORD","");
         String schema="catalog_test_"+UUID.randomUUID().toString().replace("-","");
