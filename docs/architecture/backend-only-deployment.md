@@ -13,6 +13,10 @@ The release flow is:
    `UP`.
 5. Recheck the database drain state and mark the release complete.
 
+The drain covers active backend work and locks only. Historical canonical
+results that are missing an acknowledgement are retained for their own
+reconciliation flow and do not block a healthy backend release indefinitely.
+
 If startup or local health fails, the existing release state and rollback path
 remain available. RunPod endpoint URLs, AI tokens, external worker readiness,
 and frontend/schema asset pins are not deployment prerequisites.

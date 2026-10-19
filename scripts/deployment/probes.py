@@ -25,9 +25,7 @@ def drain(env):
       'leases',(SELECT count(*) FROM analysis_results WHERE claim_expires_at>CURRENT_TIMESTAMP),
       'transactions',(SELECT count(DISTINCT pid) FROM pg_locks
           WHERE relation='analysis_results'::regclass AND pid<>pg_backend_pid()
-          AND mode IN ('RowShareLock','RowExclusiveLock')),
-      'ack',(SELECT count(*) FROM analysis_canonical_results r WHERE NOT EXISTS
-            (SELECT 1 FROM analysis_canonical_ack_journal a WHERE a.event_id=r.event_id))
+          AND mode IN ('RowShareLock','RowExclusiveLock'))
     )''')
     require(all(type(v) is int and v >= 0 for v in counts.values()), 'DRAIN_INVALID')
     return counts
