@@ -176,10 +176,13 @@ receipt에는 source/PCM/video digest, normalizer revision, probe의 audio/video
 | content_id | bigint | Y | - | FK | - | 연습 콘텐츠 ID |
 | speaker_name | varchar(100) | N | - | - | - | 화자 이름 |
 | speaker_type | varchar(30) | N | - | CHECK | - | 화자 유형 |
-| audio_url | varchar(1000) | Y | - | - | - | 음성 파일 URL |
+| audio_url | varchar(1000) | N | - | - | - | 외부 음성 URL 또는 기존 TTS 참조값. `object_key`와 둘 중 하나 필수 |
+| object_key | varchar(512) | N | - | - | - | private S3 기준 음성 object key. `reference-audios/` prefix만 허용 |
 | duration_ms | integer | N | - | - | - | 재생 길이(ms) |
 | is_primary | boolean | Y | - | - | - | 대표 음성 여부 |
 | created_at | timestamptz | Y | now() | - | - | 생성 시각 |
+
+`V47__seed_announcer_read_along_reference_audio.sql`은 파일명과 동일한 대본의 `ANNOUNCER` 콘텐츠 10개를 추가하고, `reference-audios/announcer/` private S3 객체를 대표 기준 음성으로 연결한다. 해당 콘텐츠에는 TTS job을 생성하지 않으며, 재생 시 기준 음성 전용 presigned URL을 발급한다.
 
 ### courses
 - 목적: 커리큘럼 단위의 학습 코스를 저장한다.

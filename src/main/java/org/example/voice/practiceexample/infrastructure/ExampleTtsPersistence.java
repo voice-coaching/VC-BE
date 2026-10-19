@@ -27,6 +27,8 @@ public class ExampleTtsPersistence implements ExampleTtsStore {
             INSERT INTO example_tts_jobs(example_id,content_id,text_revision,profile_revision)
             SELECT e.id,c.id,c.tts_revision,? FROM practice_contents c LEFT JOIN practice_examples e ON e.content_id=c.id
             WHERE c.owner_id IS NULL AND c.status='PUBLISHED' AND length(trim(c.script_text))>0
+            AND NOT EXISTS (SELECT 1 FROM reference_audios a
+                            WHERE a.content_id=c.id AND a.speaker_type='ANNOUNCER' AND a.object_key IS NOT NULL)
             AND NOT EXISTS(SELECT 1 FROM example_tts_jobs j WHERE j.content_id=c.id AND j.text_revision=c.tts_revision AND j.profile_revision=?)
             ORDER BY c.id LIMIT 100 ON CONFLICT DO NOTHING
             """, revision, revision);

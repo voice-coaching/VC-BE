@@ -91,7 +91,8 @@ class ExampleTtsPostgresTest {
             db.update("INSERT INTO reference_audios(content_id,speaker_name,speaker_type,audio_url,duration_ms,is_primary,created_at) VALUES(900001,'placeholder','COACH','https://cdn.example.com/fake.mp3',1000,true,now())");
             var props=new org.example.voice.practiceexample.application.ExampleTtsProperties();props.setRevision("r1");
             var asset=org.mockito.Mockito.mock(org.example.voice.practiceexample.domain.port.ExampleTtsAssets.class);
-            var reader=new org.example.voice.practicecontent.infrastructure.ReferenceAudioReaderImpl(db,props,asset);
+            var referenceAssets=org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+            var reader=new org.example.voice.practicecontent.infrastructure.ReferenceAudioReaderImpl(db,props,asset,referenceAssets);
             assertThat(reader.findReferenceAudiosByContentId(900001L).items()).hasSize(1);
             assertThat(reader.findReferenceAudiosByContentId(900001L).items().getFirst().speakerType()).isEqualTo(org.example.voice.practicecontent.domain.type.SpeakerType.TTS);
             db.update("UPDATE practice_contents SET status='HIDDEN' WHERE id=900001");
