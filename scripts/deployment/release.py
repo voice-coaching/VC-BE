@@ -1,10 +1,4 @@
-"""Root-only release state machine. Errors retain maintenance; no blind rollback.
-
-The root-owned runtime profile identifies a reviewed compatible AI/verifier/FE set.
-Ordinary CI can deploy only while that exact RunPod set is already installed.
-For a coordinated schema transition use hold, activate, external RunPod activation,
-then resume. All phases use the same lock and immutable plan digest.
-"""
+"""Root-only backend release state machine with local health and rollback."""
 import argparse
 from datetime import datetime, timezone
 import fcntl
@@ -14,11 +8,10 @@ from pathlib import Path
 import re
 import shutil
 import time
-from common import ROOT, PROFILE, HOLD, SERVICE, atomic, command, digest, environment, record, require, trusted
+from common import ROOT, HOLD, SERVICE, atomic, command, digest, environment, record, require, trusted
 import probes
 
 LIVE = Path('/opt/alpha/app.jar')
-ENV = Path('/etc/alpha-canonical-secrets/backend-runtime.env')
 
 def gate_configured():
     expected = Path(__file__).with_name('nginx-analysis-maintenance.conf').read_bytes()
@@ -40,11 +33,11 @@ def wait_drained(env):
         time.sleep(5)
     raise RuntimeError('DRAIN_TIMEOUT_KEEP_CURRENT_RELEASE')
 
-def wait_ready(doc):
+def wait_ready():
     deadline, consecutive, last = time.monotonic() + 300, 0, 'NOT_READY'
     while time.monotonic() < deadline:
         try:
-            probes.ready(doc, environment())
+            probes.backend_health()
             consecutive += 1
             if consecutive == 3: return
         except Exception as error:
@@ -63,23 +56,6 @@ def switch_jar(target):
     link.symlink_to(target)
     os.replace(link, LIVE)
 
-def set_verifier(root, effective, doc):
-    trusted(ENV)
-    require(ENV.stat().st_mode & 0o777 == 0o600, 'ENV_PERMISSIONS')
-    old = ENV.read_bytes()
-    replacements = {
-        'ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_PYTHON': probes.verifier_python(doc, effective),
-        'ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_SCRIPT': str(root / 'app/deploy/runpod/canonical_verify.py'),
-        'ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_CORE_ROOT': str(root / 'frozen/core'),
-        'ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_LLM_ROOT': str(root / 'frozen/llm'),
-    }
-    lines = old.decode().splitlines()
-    for key, value in replacements.items():
-        matches = [i for i, line in enumerate(lines) if line.startswith(key + '=')]
-        require(len(matches) == 1 and lines[matches[0]].split('=', 1)[1] == effective[key], 'EFFECTIVE_ENV_DRIFT')
-        lines[matches[0]] = key + '=' + value
-    return old, ('\n'.join(lines) + '\n').encode()
-
 def stage(state_path, state, name):
     state['stage'] = name
     state['updatedAt'] = datetime.now(timezone.utc).isoformat()
@@ -93,43 +69,35 @@ def run(args):
     require(ROOT.stat().st_mode & 0o777 == 0o755, 'MAINTENANCE_DIRECTORY_PERMISSIONS')
     with (ROOT / 'deployment.lock').open('a') as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        doc = probes.profile(PROFILE)
-        profile_sha = digest(PROFILE)
         directory = ROOT / 'releases' / args.release
         state_path = directory / 'state.json'
         effective = environment()
-        verifier = None
-        if args.phase not in ('abort', 'rollback'):
-            verifier = probes.verifier(doc, effective)
         target = Path('/opt/alpha/releases') / (args.release + '.jar')
         incoming = Path('/var/tmp') / ('alpha-' + args.release + '.jar')
         source = target if target.exists() else incoming
         if args.phase not in ('abort', 'rollback'): check_jar(source, args.jar_sha)
         if args.phase == 'check':
-            probes.pod_identity(doc, effective)
             print(json.dumps({'stage': 'PREFLIGHT_READY', 'release': args.release,
-                              'profileSha256': profile_sha, 'jarSha256': args.jar_sha})); return
+                              'jarSha256': args.jar_sha})); return
         state = json.loads(state_path.read_bytes()) if state_path.exists() else None
         if state:
-            require(state['profileSha256'] == profile_sha and state['jarSha256'] == args.jar_sha,
-                    'PENDING_RELEASE_CHANGED')
+            require(state['jarSha256'] == args.jar_sha, 'PENDING_RELEASE_CHANGED')
             if state['stage'] == 'COMPLETE':
                 require(not HOLD.exists() and LIVE.resolve() == target and digest(LIVE) == args.jar_sha,
                         'COMPLETE_RELEASE_DRIFT')
-                probes.ready(doc, effective)
+                probes.backend_health()
                 print(json.dumps({'stage': 'ALREADY_COMPLETE', 'release': args.release})); return
         if args.phase in ('deploy', 'hold'):
             require(state is None and not HOLD.exists(), 'DEPLOYMENT_ALREADY_PENDING_INSPECT')
             # CI may not initiate a cross-contract transition before AI is ready.
-            if args.phase == 'deploy': probes.pod_identity(doc, effective)
             gate_configured()
             directory.mkdir(parents=True, mode=0o700, exist_ok=False)
-            state = dict(releaseId=args.release, jarSha256=args.jar_sha, profileSha256=profile_sha,
+            state = dict(releaseId=args.release, jarSha256=args.jar_sha,
                          previousJar=str(LIVE.resolve()), previousJarSha256=digest(LIVE),
-                         profile=doc, stage='PREPARED')
+                         stage='PREPARED')
             previous = ROOT / 'current.json'
             prior = json.loads(trusted(previous).read_bytes()) if previous.exists() else None
-            state['previousRelease'] = {k: prior[k] for k in ('releaseId', 'jarSha256', 'profile')} if prior else None
+            state['previousRelease'] = {k: prior[k] for k in ('releaseId', 'jarSha256')} if prior else None
             record(state_path, state)
             atomic(HOLD, (args.release + '\n').encode(), mode=0o644)
             stage(state_path, state, 'HOLD')
@@ -142,9 +110,6 @@ def run(args):
             require(LIVE.resolve().as_posix() == state['previousJar'] and digest(LIVE) == state['previousJarSha256'],
                     'LIVE_RELEASE_CHANGED')
             wait_drained(effective)
-            old_env, new_env = set_verifier(verifier, effective, doc)
-            # Private backups never go into the release manifest/artifact.
-            atomic(directory / 'backend-runtime.env.backup', old_env)
             if not target.exists():
                 temporary = target.with_suffix('.jar.pending')
                 require(not temporary.exists(), 'JAR_COPY_PENDING')
@@ -159,12 +124,9 @@ def run(args):
         if args.phase in ('deploy', 'resume'):
             require(state['stage'] in ('ACTIVATED', 'VERIFIED') and LIVE.resolve() == target and digest(LIVE) == args.jar_sha,
                     'RESUME_STATE_INVALID')
-            wait_ready(doc)
+            wait_ready()
             # Fresh checks after readiness, before reopening. No inference or POST probe.
-            fresh = environment()
-            require(fresh['ANALYSIS_CANONICAL_EVIDENCE_SEMANTIC_SCRIPT'] == str(verifier / 'app/deploy/runpod/canonical_verify.py'),
-                    'ACTIVE_VERIFIER_CHANGED')
-            require(not any(probes.drain(fresh).values()), 'DRAIN_CHANGED')
+            require(not any(probes.drain(environment()).values()), 'DRAIN_CHANGED')
             stage(state_path, state, 'VERIFIED')
             HOLD.unlink()
             stage(state_path, state, 'COMPLETE')
@@ -172,21 +134,14 @@ def run(args):
             require(state['stage'] in ('ACTIVATING', 'ACTIVATED', 'VERIFIED'), 'ROLLBACK_STATE_INVALID')
             prior = state.get('previousRelease')
             require(prior is not None and prior['jarSha256'] == state['previousJarSha256'],
-                    'PREVIOUS_COMPATIBLE_MANIFEST_REQUIRED')
-            # The operator restores the pinned AI set first, while ingress stays closed.
-            # This prevents a blind JAR-only rollback across incompatible contracts.
-            probes.verifier(prior['profile'], effective)
-            probes.pod_identity(prior['profile'], effective)
+                    'PREVIOUS_RELEASE_REQUIRED')
             wait_drained(effective)
             previous_jar = trusted(state['previousJar'])
             check_jar(previous_jar, prior['jarSha256'])
-            backup = trusted(directory / 'backend-runtime.env.backup')
-            require(backup.stat().st_mode & 0o777 == 0o600, 'BACKUP_PERMISSIONS')
             stage(state_path, state, 'ROLLING_BACK')
-            atomic(ENV, backup.read_bytes())
             switch_jar(previous_jar)
             command(['systemctl', 'restart', SERVICE], timeout=60)
-            wait_ready(prior['profile'])
+            wait_ready()
             HOLD.unlink()
             stage(state_path, state, 'ROLLED_BACK')
             record(ROOT / 'current.json', prior)
@@ -195,9 +150,9 @@ def run(args):
             require(state['stage'] in ('HOLD', 'DRAINED') and digest(LIVE) == state['previousJarSha256'],
                     'ABORT_REQUIRES_UNCHANGED_RELEASE')
             previous = ROOT / 'current.json'
-            require(previous.is_file(), 'PREVIOUS_COMPATIBLE_MANIFEST_REQUIRED')
+            require(previous.is_file(), 'PREVIOUS_RELEASE_REQUIRED')
             prior = json.loads(trusted(previous).read_bytes())
-            probes.ready(prior['profile'], effective)
+            probes.backend_health()
             HOLD.unlink(); stage(state_path, state, 'ABORTED')
         else:
             require(args.phase == 'activate', 'PHASE_INVALID')
