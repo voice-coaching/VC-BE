@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SPEAK AI 테스트 결제</title>
+<style>body{font:17px system-ui;max-width:750px;margin:45px auto;padding:20px;background:#f5f7fb;color:#17243c}section{background:white;border-radius:16px;padding:24px;margin:20px 0}button,input{font:inherit;padding:12px;margin:6px 0}button{background:#315bdf;color:white;border:0;border-radius:9px;cursor:pointer}button:disabled{opacity:.45;cursor:default}label{display:block}pre{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#59677b}</style>
+<script src="https://cdn.portone.io/v2/browser-sdk.js"></script></head>
+<body><h1>SPEAK AI 테스트 결제</h1><p>월간 이용권 · 15,000원 · NHN KCP V2 테스트</p>
+<section><p>이 화면의 회원등급은 격리된 테스트 계정에만 반영됩니다. 자동 갱신은 신청되지 않습니다.</p>
+<label><input id="confirmed" type="checkbox"> 포트원 콘솔에서 해당 채널이 <strong>테스트</strong>인지 확인했습니다.</label>
+<label>결제창에 전달할 구매자 이름 <input id="buyer" autocomplete="off" value="결제테스트" maxlength="40"></label>
+<small>카드 정보는 포트원·PG 결제창에 직접 입력하세요.</small></section>
+<section><button id="create">1. 테스트 주문 만들기</button> <button id="pay" disabled>2. 결제창 열기</button>
+<button id="verify" disabled>3. 결제 상태 다시 확인</button><button id="profile">회원등급 확인</button>
+<pre id="status" role="status">준비 중…</pre><pre id="membership"></pre></section>
+<script>
+'use strict';
+const session = '__LOCAL_SESSION__';
+const el = id => document.getElementById(id);
+let order = null;
+let busy = false;
+async function call(path, headers={}) {
+  const response = await fetch(path, {method:'POST',headers:{'X-Local-Test-Session':session,...headers}});
+  const result = await response.json();
+  if (!response.ok || !result.result) throw new Error(result.code || 'REQUEST_FAILED');
+  return result.data;
+}
+function buttons() { el('create').disabled=busy; el('pay').disabled=busy || !order?.storeId || order.status==='PAID'; el('verify').disabled=busy || !order; }
+async function action(work) {
+  if (busy) return;
+  busy=true; buttons();
+  try { await work(); } catch (error) { el('status').textContent='확인 결과: '+error.message; }
+  finally { busy=false; buttons(); }
+}
+async function profile() {
+  const data = await call('/local/profile');
+  el('membership').textContent='현재 회원등급: '+data.membershipType+(data.membershipEnvironment ? ' ('+data.membershipEnvironment+')':'')+
+    (data.membershipExpiresAt ? '\n만료: '+data.membershipExpiresAt:'');
+}
+async function verify() {
+  if (!order) return;
+  order=await call('/local/verify/'+encodeURIComponent(order.orderId));
+  el('status').textContent='서버가 확인한 결제 상태: '+order.status;
+  await profile();
+}
+el('create').onclick=()=>action(async()=>{
+  if (!el('confirmed').checked) throw new Error('테스트 채널 확인 항목을 선택해 주세요.');
+  let key = sessionStorage.getItem('paymentTestKey');
+  if (!key) { key=crypto.randomUUID(); sessionStorage.setItem('paymentTestKey',key); }
+  order=await call('/local/orders',{'Idempotency-Key':key});
+  sessionStorage.setItem('paymentTestOrder',order.orderId);
+  el('status').textContent='주문 준비 완료: '+order.totalAmount+' '+order.currency+' / '+order.environment;
+});
+el('pay').onclick=()=>action(async()=>{
+  if (!el('confirmed').checked || !order || order.environment!=='TEST') throw new Error('테스트 주문을 확인해 주세요.');
+  if (!window.PortOne) throw new Error('포트원 SDK를 불러오지 못했습니다.');
+  const result=await PortOne.requestPayment({storeId:order.storeId,channelKey:order.channelKey,paymentId:order.orderId,
+    orderName:order.orderName,totalAmount:order.totalAmount,currency:'CURRENCY_KRW',payMethod:'CARD',
+    customer:{fullName:el('buyer').value},redirectUrl:location.origin+'/return'});
+  if (result && result.code) throw new Error('결제창 반환 코드: '+result.code);
+  await verify();
+});
+el('verify').onclick=()=>action(verify);
+el('profile').onclick=()=>action(profile);
+action(async()=>{
+  el('status').textContent='테스트 주문을 생성해 주세요.';
+  await profile();
+  const pending=sessionStorage.getItem('paymentTestOrder');
+  if (pending && /^test_[a-f0-9-]{36}$/.test(pending)) {
+    // Redirect parameters are deliberately not trusted. The server rechecks our saved order.
+    order={orderId:pending}; await verify();
+  }
+});
+</script></body></html>

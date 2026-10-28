@@ -38,6 +38,7 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable()).httpBasic(basic -> basic.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/payments/webhooks/portone").permitAll()
                         .requestMatchers("/api/auth/email-availability", "/api/auth/signup", "/api/auth/login",
                                 "/api/auth/social-login", "/api/auth/token/refresh", "/swagger-ui/**", "/v3/api-docs/**",
                                 "/api/internal/ai/**",

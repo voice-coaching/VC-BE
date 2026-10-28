@@ -1,0 +1,42 @@
+package org.example.voice.payment;
+
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import java.sql.*;
+import java.util.UUID;
+import static org.assertj.core.api.Assertions.*;
+
+@EnabledIfEnvironmentVariable(named = "VC_BE_TEST_POSTGRES_URL", matches = ".+")
+class PaymentPostgresMigrationTest {
+    @Test void freshSchemaAndExistingV48UpgradeEnforceFinancialInvariants() throws Exception {
+        for (boolean upgrade : new boolean[]{false, true}) {
+            var url = System.getenv("VC_BE_TEST_POSTGRES_URL");
+            var user = System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER", "postgres");
+            var password = System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_PASSWORD", "");
+            var schema = "payment_test_" + UUID.randomUUID().toString().replace("-", "");
+            try (var db = DriverManager.getConnection(url, user, password); var sql = db.createStatement()) {
+                try {
+                    var config = Flyway.configure().dataSource(url, user, password).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration");
+                    if (upgrade) config.target("48").load().migrate();
+                    config.target("49").load().migrate(); db.setSchema(schema);
+                    sql.execute("insert into users(nickname,status,terms_agreed_at,privacy_agreed_at,created_at,updated_at,role) values('test','ACTIVE',now(),now(),now(),now(),'USER')");
+                    String prefix = "insert into payment_test_orders(id,user_id,idempotency_key,product,amount,currency,status,created_at) values(";
+                    sql.execute(prefix + "'first',1,'unique','SPEAKAI_MONTHLY_TEST_V1',15000,'KRW','PENDING',now())");
+                    assertThatThrownBy(() -> sql.execute(prefix + "'duplicate',1,'unique','SPEAKAI_MONTHLY_TEST_V1',15000,'KRW','PENDING',now())"))
+                            .isInstanceOf(SQLException.class);
+                    assertThatThrownBy(() -> sql.execute(prefix + "'cheap',1,'other','SPEAKAI_MONTHLY_TEST_V1',1,'KRW','PENDING',now())"))
+                            .isInstanceOf(SQLException.class);
+                    assertThatThrownBy(() -> sql.execute("update payment_test_orders set status='PAID' where id='first'"))
+                            .isInstanceOf(SQLException.class);
+                    assertThatThrownBy(() -> sql.execute("update payment_test_orders set paid_at=now(),expires_at=now()-interval '1 day' where id='first'"))
+                            .isInstanceOf(SQLException.class);
+                    try (var rows = sql.executeQuery("select count(*) from payment_test_orders")) {
+                        assertThat(rows.next()).isTrue(); assertThat(rows.getInt(1)).isEqualTo(1);
+                    }
+                } finally { db.setSchema("public"); sql.execute("drop schema if exists " + schema + " cascade"); }
+            }
+        }
+    }
+}

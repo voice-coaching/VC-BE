@@ -29,7 +29,8 @@ public class OpenApiKoreanDocumentation {
                     tag("분석 결과", "완료된 음성 분석 점수, 구간별 피드백과 종합 피드백을 제공합니다."),
                     tag("클래스", "클래스 목록, 단계와 사용자별 학습 진도를 관리합니다."),
                     tag("마이페이지", "내 학습 기록, 통계, 강점·약점과 맞춤 추천을 제공합니다."),
-                    tag("고객 지원", "게시된 공지와 본인의 문의를 조회하고 접수합니다.")
+                    tag("고객 지원", "게시된 공지와 본인의 문의를 조회하고 접수합니다."),
+                    tag("테스트 결제", "격리된 테스트 환경에서 주문과 검증된 테스트 회원등급을 관리합니다.")
             ));
             DOCS.forEach((key, doc) -> {
                 PathItem pathItem = openApi.getPaths().get(key.path());
@@ -94,6 +95,9 @@ public class OpenApiKoreanDocumentation {
     private static void describeSchemas(io.swagger.v3.oas.models.OpenAPI openApi) {
         if (openApi.getComponents() == null || openApi.getComponents().getSchemas() == null) return;
         Map<String, String> descriptions = Map.ofEntries(
+                Map.entry("membershipType", "현재 회원등급 free 또는 paid. 테스트 결제의 paid는 허용된 격리 테스트 환경에만 적용됩니다."),
+                Map.entry("membershipExpiresAt", "유효한 이용 기간의 만료 시각. free이면 null입니다."),
+                Map.entry("membershipEnvironment", "테스트 이용권이면 TEST, 해당 이용권이 없으면 null입니다."),
                 Map.entry("email", "사용자 이메일 주소"), Map.entry("password", "영문, 숫자, 특수문자를 포함한 비밀번호"),
                 Map.entry("nickname", "서비스에서 표시할 사용자 닉네임"), Map.entry("termsAgreed", "서비스 이용약관 필수 동의 여부"),
                 Map.entry("privacyAgreed", "개인정보 처리방침 필수 동의 여부"), Map.entry("provider", "SNS 로그인 공급자(GOOGLE 또는 KAKAO)"),
@@ -231,6 +235,10 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.POST, "/api/notifications/read-all", "알림", "모든 알림 읽음 처리", "본인의 미읽음 알림만 갱신하고 갱신 건수를 반환합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/courses/{courseId}/steps/{stepId}/practice-examples", "클래스", "단계별 예문 조회", "게시된 개정의 예문 5~10개와 숫자 practiceContentId를 순서대로 제공합니다. 본인 sessionId로 고정된 과거 개정을 조회하며 미준비는 503입니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/practice-examples/{exampleId}/audio", "클래스", "Chirp 예문 음성 조회", "게시된 불변 예문만 Aoede 화자/속도 0.92로 합성합니다. 성공은 audio/mpeg와 private cache/ETag, 합성 실패는 JSON 503, 제한 초과는 429입니다. 임의 text query는 허용하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/payment-orders", "테스트 결제", "테스트 결제 주문 생성", "허용된 테스트 회원만 15,000 KRW 월간 테스트 주문을 생성합니다. 16~64자의 Idempotency-Key가 필수이며 동일 키는 동일 주문을 반환합니다. 자동 갱신과 실제 서비스 이용권 지급은 포함하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/payment-orders/{orderId}", "테스트 결제", "테스트 결제 주문 조회", "본인의 테스트 주문만 조회합니다. 다른 사용자의 주문은 404이며 조회만으로 포트원 결제 상태를 갱신하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/payment-orders/{orderId}/verify", "테스트 결제", "포트원 테스트 결제 검증", "포트원 서버에서 주문 ID, 상점, 테스트 채널, 금액, 통화와 상태를 확인합니다. 검증된 결제만 테스트 회원등급에 반영하며 중복 요청은 기간을 연장하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/payments/webhooks/portone", "테스트 결제", "포트원 웹훅 수신", "사용자 JWT 대신 webhook-id, webhook-signature, webhook-timestamp와 원문 본문으로 공식 SDK 서명을 검증합니다. 최대 64KiB이며 설정되지 않으면 503입니다. 포트원 재조회와 이벤트 중복 처리를 거쳐 본 시스템의 테스트 주문만 갱신합니다.", true);
         return Map.copyOf(map);
     }
 
