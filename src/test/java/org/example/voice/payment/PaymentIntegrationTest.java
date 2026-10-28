@@ -45,6 +45,29 @@ class PaymentIntegrationTest {
     @MockitoBean WebhookAuthentication webhook;
     Long userId;
 
+    @Test void existingMemberUsageGrantIsReturnedInProfileAndIsIndependentOfCancellation() throws Exception {
+        tx().executeWithoutResult(status -> em.persist(
+                org.example.voice.payment.domain.entity.TestMembershipGrant.create(userId, OffsetDateTime.now())));
+        mvc.perform(get("/api/users/me").with(as(userId)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.membershipType").value("admin"))
+                .andExpect(jsonPath("$.data.membershipEnvironment").value("TEST"))
+                .andExpect(jsonPath("$.data.membershipExpiresAt").isEmpty());
+        String role = tx().execute(status -> em.find(User.class, userId).getRole().name());
+        assertThat(role).isEqualTo("USER");
+        var order = transactions.create(userId, key());
+        transactions.apply(userId, order.getId(), snapshot(order, "PAID", 15000, 0), null, null);
+        transactions.apply(userId, order.getId(), snapshot(order, "CANCELLED", 15000, 15000), null, null);
+        assertThat(memberships.read(userId).type()).isEqualTo("admin");
+        Long newUser = tx().execute(status -> {
+            var user = User.createSocial(null, "new member", OffsetDateTime.now());
+            em.persist(user);
+            return user.getId();
+        });
+        assertThat(memberships.read(newUser).type()).isEqualTo("free");
+        tx().executeWithoutResult(status -> em.find(User.class, userId).withdraw(OffsetDateTime.now()));
+        assertThat(memberships.read(userId).type()).isEqualTo("free");
+    }
+
     @Test void refundRequestAndStatusReuseCancellationAndExposeOnlyOwnerData() throws Exception {
         var order = transactions.create(userId, key());
         var paid = snapshot(order, "PAID", 15000, 0);

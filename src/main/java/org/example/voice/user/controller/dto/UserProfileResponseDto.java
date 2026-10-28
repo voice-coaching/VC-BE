@@ -13,6 +13,7 @@ public record UserProfileResponseDto(
         boolean onboardingCompleted,
         OffsetDateTime createdAt,
         String profileImageUrl,
+        @io.swagger.v3.oas.annotations.media.Schema(allowableValues = {"free", "paid", "admin"})
         String membershipType,
         OffsetDateTime membershipExpiresAt,
         String membershipEnvironment

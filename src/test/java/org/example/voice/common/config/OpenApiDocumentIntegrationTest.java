@@ -104,6 +104,7 @@ class OpenApiDocumentIntegrationTest {
         assertThat(fields.has("membershipType")).isTrue();
         assertThat(fields.has("membershipExpiresAt")).isTrue();
         assertThat(fields.has("membershipEnvironment")).isTrue();
+        assertThat(fields.path("membershipType").path("enum").toString()).contains("free", "paid", "admin");
     }
     @Test
     void paymentHistoryDocumentsPaginationFieldsAndAuthentication() throws Exception {
