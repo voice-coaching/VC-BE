@@ -17,6 +17,7 @@ public class PaymentTransactions {
     private final UserReader users;
     private final PaymentPolicy policy;
     private final Clock clock;
+    private final org.example.voice.payment.domain.port.PaymentCancellationStore cancellations;
 
     @Transactional
     public PaymentOrder create(Long userId, String key) {
@@ -57,6 +58,10 @@ public class PaymentTransactions {
         var now = OffsetDateTime.now(clock);
         order.apply(snapshot, now);
         orders.save(order);
+        if ("CANCELLED".equals(snapshot.status()) && snapshot.cancelled() == snapshot.total()) {
+            cancellations.byOrder(id).ifPresent(request -> request.record(
+                    org.example.voice.payment.domain.type.PaymentCancellationStatus.SUCCEEDED, now));
+        }
         if (eventId != null) orders.receipt(eventId, hash, now);
         return order;
     }

@@ -7,6 +7,8 @@ import org.example.voice.common.security.LoginUser;
 import org.example.voice.payment.application.*;
 import org.example.voice.payment.domain.*;
 import org.example.voice.payment.controller.dto.PaymentHistoryResponse;
+import org.example.voice.payment.controller.dto.PaymentCancellationRequestDto;
+import org.example.voice.payment.controller.dto.PaymentCancellationResponseDto;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -23,6 +25,14 @@ public class PaymentController {
     private final PaymentService service;
     private final PaymentPolicy policy;
     private final PaymentHistoryService history;
+    private final PaymentCancellationService cancellations;
+
+    @PostMapping("/api/payment-orders/{orderId}/cancel")
+    public ApiResponse<PaymentCancellationResponseDto> cancel(@AuthenticationPrincipal LoginUser user,
+            @PathVariable String orderId, @RequestBody PaymentCancellationRequestDto request) {
+        return ApiResponse.success("테스트 결제 취소 요청을 확인했습니다.",
+                PaymentCancellationResponseDto.from(cancellations.cancel(user.id(), orderId, request.reason())));
+    }
 
     @GetMapping("/api/users/me/payment-orders")
     @ApiResponses({

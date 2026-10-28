@@ -38,5 +38,23 @@ class SettingsIsolationTest(unittest.TestCase):
         self.assertTrue(stop_needed(256, 511 * 1024 * 1024, False))
         self.assertTrue(stop_needed(256, 1024 * 1024 * 1024, True))
 
+    def test_cancel_route_is_allowlisted_only_with_exact_test_order_shape(self):
+        import re
+        config = Path(__file__).with_name('nginx-http.conf').read_text()
+        route = r'^POST:/payment-test/api/payment-orders/test[a-f0-9]{32}/cancel$'
+        self.assertIn(route, config)
+        self.assertIsNotNone(re.fullmatch(route, 'POST:/payment-test/api/payment-orders/test' + 'a' * 32 + '/cancel'))
+        for request in ['GET:/payment-test/api/payment-orders/test' + 'a' * 32 + '/cancel',
+                        'POST:/payment-test/api/payment-orders/live123/cancel',
+                        'POST:/api/payment-orders/test' + 'a' * 32 + '/cancel']:
+            self.assertIsNone(re.fullmatch(route, request))
+
+    def test_refund_status_is_get_only_and_request_ids_are_constrained(self):
+        config = Path(__file__).with_name('nginx-http.conf').read_text()
+        self.assertIn('POST:/payment-test/api/payment-orders/test[a-f0-9]{32}/refund-requests$', config)
+        self.assertIn('GET:/payment-test/api/refund-requests/[a-f0-9]{8}', config)
+        self.assertNotIn('POST:/payment-test/api/refund-requests/', config)
+        self.assertIn('/api/refund-requests/**', self.template)
+
 if __name__ == '__main__':
     unittest.main()

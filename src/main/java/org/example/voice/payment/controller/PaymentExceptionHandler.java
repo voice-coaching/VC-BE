@@ -7,11 +7,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @Order(-20)
-@RestControllerAdvice(assignableTypes = PaymentController.class)
+@RestControllerAdvice(assignableTypes = {PaymentController.class, PaymentRefundController.class})
 public class PaymentExceptionHandler {
     @ExceptionHandler(PaymentException.class)
     public ResponseEntity<ApiResponse<Void>> handle(PaymentException error) {
-        return ResponseEntity.status(error.status()).body(ApiResponse.error("결제 요청을 처리할 수 없습니다.", error.code()));
+        return ResponseEntity.status(error.status()).cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(ApiResponse.error("결제 요청을 처리할 수 없습니다.", error.code()));
     }
     @ExceptionHandler(org.springframework.web.bind.MissingRequestHeaderException.class)
     public ResponseEntity<ApiResponse<Void>> missingHeader() {

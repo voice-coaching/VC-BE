@@ -9,6 +9,40 @@ import static org.assertj.core.api.Assertions.*;
 
 @EnabledIfEnvironmentVariable(named = "VC_BE_TEST_POSTGRES_URL", matches = ".+")
 class PaymentPostgresMigrationTest {
+    @Test void cancellationMigrationPreservesOrdersAndEnforcesOneRequestPerOrder() throws Exception {
+        var url = System.getenv("VC_BE_TEST_POSTGRES_URL");
+        var user = System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER", "postgres");
+        var password = System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_PASSWORD", "");
+        for (boolean upgrade : new boolean[]{false, true}) {
+            var schema = "cancellation_" + UUID.randomUUID().toString().replace("-", "");
+            try (var db = DriverManager.getConnection(url, user, password); var sql = db.createStatement()) {
+                try {
+                    var config = Flyway.configure().dataSource(url, user, password).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration");
+                    if (upgrade) config.target("50").load().migrate();
+                    config.target("51").load().migrate();
+                    db.setSchema(schema);
+                    sql.execute("insert into users(nickname,status,terms_agreed_at,privacy_agreed_at,created_at,updated_at,role) values('test','ACTIVE',now(),now(),now(),now(),'USER')");
+                    sql.execute("insert into payment_test_orders(id,user_id,idempotency_key,product,amount,currency,status,created_at) values('original',1,'key','SPEAKAI_MONTHLY_TEST_V1',15000,'KRW','PENDING',now())");
+                    sql.execute("insert into payment_test_cancellations values('first','original','request','UNKNOWN',now(),now())");
+                    assertThatThrownBy(() -> sql.execute("insert into payment_test_cancellations values('second','original','request','UNKNOWN',now(),now())"))
+                            .isInstanceOf(SQLException.class);
+                    assertThatThrownBy(() -> sql.execute("update payment_test_cancellations set status='invalid'"))
+                            .isInstanceOf(SQLException.class);
+                    assertThatThrownBy(() -> sql.execute("update payment_test_cancellations set order_id='not-owned'"))
+                            .isInstanceOf(SQLException.class);
+                    try (var rows = sql.executeQuery("select status,amount from payment_test_orders where id='original'")) {
+                        assertThat(rows.next()).isTrue();
+                        assertThat(rows.getString(1)).isEqualTo("PENDING");
+                        assertThat(rows.getLong(2)).isEqualTo(15000);
+                    }
+                } finally {
+                    db.setSchema("public");
+                    sql.execute("drop schema if exists " + schema + " cascade");
+                }
+            }
+        }
+    }
     @Test void historyIndexSupportsFreshAndV49UpgradeWithoutChangingLedger() throws Exception {
         var url = System.getenv("VC_BE_TEST_POSTGRES_URL");
         var user = System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER", "postgres");
