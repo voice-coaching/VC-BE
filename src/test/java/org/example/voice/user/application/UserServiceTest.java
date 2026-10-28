@@ -65,7 +65,8 @@ class UserServiceTest {
                 analysisCancellation,
                 mock(org.example.voice.profileimage.domain.port.ProfileImageLifecycle.class),
                 mock(org.example.voice.practicecontent.domain.port.CustomContentLifecycle.class),
-                mock(org.example.voice.notification.domain.port.NotificationLifecycle.class)
+                mock(org.example.voice.notification.domain.port.NotificationLifecycle.class),
+                userId -> org.example.voice.payment.domain.Membership.free()
         );
     }
 

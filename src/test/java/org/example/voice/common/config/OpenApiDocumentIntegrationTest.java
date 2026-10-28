@@ -72,7 +72,7 @@ class OpenApiDocumentIntegrationTest {
                 assertThat(field.getValue().path("tags").get(0).asText()).containsPattern("[가-힣]");
             }
         }
-        assertThat(operationCount).isEqualTo(82);
+        assertThat(operationCount).isEqualTo(86);
         paths.fieldNames().forEachRemaining(path -> assertThat(path).doesNotStartWith("/api/internal/"));
         assertThat(paths.path("/api/analysis-capabilities/canonical").path("get").path("summary").asText())
                 .isEqualTo("Canonical 분석 접수 버전 조회");
@@ -80,5 +80,22 @@ class OpenApiDocumentIntegrationTest {
                 .isEqualTo("현재 분석 결과 계약 조회");
         assertThat(paths.path("/api/analysis-capabilities").path("get").path("summary").asText())
                 .isEqualTo("녹음·분석 지원 조건 조회");
+    }
+    @Test
+    void paymentContractRequiresJwtExceptForSignedWebhookAndExposesTestMembershipFields() throws Exception {
+        String body = mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var document = objectMapper.readTree(body);
+        var paths = document.path("paths");
+        var create = paths.path("/api/payment-orders").path("post");
+        assertThat(create.path("security").toString()).contains("bearerAuth");
+        assertThat(create.path("parameters").toString()).contains("Idempotency-Key", "\"required\":true");
+        assertThat(paths.path("/api/payment-orders/{orderId}").has("get")).isTrue();
+        assertThat(paths.path("/api/payment-orders/{orderId}/verify").has("post")).isTrue();
+        assertThat(paths.path("/api/payments/webhooks/portone").path("post").path("security").isEmpty()).isTrue();
+        var fields = document.path("components").path("schemas").path("UserProfileResponseDto").path("properties");
+        assertThat(fields.has("membershipType")).isTrue();
+        assertThat(fields.has("membershipExpiresAt")).isTrue();
+        assertThat(fields.has("membershipEnvironment")).isTrue();
     }
 }

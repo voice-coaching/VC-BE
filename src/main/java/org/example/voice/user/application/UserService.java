@@ -43,6 +43,7 @@ public class UserService {
     private final org.example.voice.profileimage.domain.port.ProfileImageLifecycle profileImages;
     private final org.example.voice.practicecontent.domain.port.CustomContentLifecycle customContents;
     private final org.example.voice.notification.domain.port.NotificationLifecycle notifications;
+    private final org.example.voice.payment.domain.MembershipReader memberships;
 
     @Transactional(readOnly = true)
     public UserProfile getMyProfile(Long userId) {
@@ -61,7 +62,8 @@ public class UserService {
                 List.copyOf(loginProviders),
                 onboardingProfileReader.findByUserId(userId).isPresent(),
                 user.getCreatedAt(),
-                user.getProfileImageUrl()
+                user.getProfileImageUrl(),
+                memberships.read(userId)
         );
     }
 

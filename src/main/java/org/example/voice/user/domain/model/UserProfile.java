@@ -13,6 +13,12 @@ public record UserProfile(
         List<String> loginProviders,
         boolean onboardingCompleted,
         OffsetDateTime createdAt,
-        String profileImageUrl
+        String profileImageUrl,
+        org.example.voice.payment.domain.Membership membership
 ) {
+    public UserProfile(Long id, String email, String nickname, UserStatus status, List<String> providers,
+                       boolean onboardingCompleted, OffsetDateTime createdAt, String profileImageUrl) {
+        this(id, email, nickname, status, providers, onboardingCompleted, createdAt, profileImageUrl,
+                org.example.voice.payment.domain.Membership.free());
+    }
 }

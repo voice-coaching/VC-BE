@@ -34,6 +34,10 @@ class ContentCatalogIntegrationTest {
     private static final OffsetDateTime CREATED=OffsetDateTime.parse("2025-12-01T00:00:00Z");
     Long user;
     @BeforeEach void setup(){
+        // Flyway now publishes real catalog seeds. Keep each rollback-only fixture independent
+        // of that catalog so counts, ordering and empty-state assertions still test their inputs.
+        em.createQuery("update PracticeContent c set c.status=:hidden")
+                .setParameter("hidden", PublishStatus.HIDDEN).executeUpdate();
         var owner=User.createLocal(UUID.randomUUID()+"@example.invalid","hash","catalog",CREATED);em.persist(owner);user=owner.getId();
         if(em.createQuery("select count(t) from ContentCategory t where t.contentType=:type and t.code='SOCIETY'",Long.class).setParameter("type",ContentType.NEWS).getSingleResult()==0){
             var category=construct(ContentCategory.class);
