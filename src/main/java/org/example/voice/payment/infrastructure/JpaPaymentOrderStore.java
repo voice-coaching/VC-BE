@@ -24,6 +24,17 @@ public class JpaPaymentOrderStore implements PaymentOrderStore {
         if (!em.contains(order)) em.persist(order);
         return order;
     }
+    @Override public PaymentHistory history(Long userId, int page, int size) {
+        long total = em.createQuery("select count(p) from PaymentOrder p where p.userId=:user", Long.class)
+                .setParameter("user", userId).getSingleResult();
+        long offset = (long) page * size;
+        if (offset >= total) return new PaymentHistory(List.of(), page, size, total);
+        var items = em.createQuery("select p from PaymentOrder p where p.userId=:user order by p.createdAt desc, p.id desc", PaymentOrder.class)
+                .setParameter("user", userId).setFirstResult(Math.toIntExact(offset)).setMaxResults(size)
+                .getResultStream().map(p -> new PaymentHistory.Item(p.getId(), p.getProduct(), p.getAmount(),
+                        p.getCurrency(), p.getStatus(), p.getCreatedAt(), p.getPaidAt(), p.getExpiresAt())).toList();
+        return new PaymentHistory(items, page, size, total);
+    }
     @Override public Optional<OffsetDateTime> activeUntil(Long userId, OffsetDateTime now) {
         return em.createQuery("select p.expiresAt from PaymentOrder p where p.userId=:user and p.status='PAID' and p.paidAt<=:now and p.expiresAt>:now order by p.expiresAt desc", OffsetDateTime.class)
                 .setParameter("user", userId).setParameter("now", now).setMaxResults(1).getResultStream().findFirst();

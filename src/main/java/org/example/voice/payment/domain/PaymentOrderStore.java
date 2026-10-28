@@ -9,6 +9,7 @@ public interface PaymentOrderStore {
     Optional<PaymentOrder> lock(String id);
     Optional<PaymentOrder> findByKey(Long userId, String key);
     PaymentOrder save(PaymentOrder order);
+    PaymentHistory history(Long userId, int page, int size);
     Optional<OffsetDateTime> activeUntil(Long userId, OffsetDateTime now);
     boolean hasReceipt(String eventId, String hash);
     void receipt(String eventId, String hash, OffsetDateTime now);

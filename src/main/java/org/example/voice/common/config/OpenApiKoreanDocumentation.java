@@ -237,6 +237,7 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/practice-examples/{exampleId}/audio", "클래스", "Chirp 예문 음성 조회", "게시된 불변 예문만 Aoede 화자/속도 0.92로 합성합니다. 성공은 audio/mpeg와 private cache/ETag, 합성 실패는 JSON 503, 제한 초과는 429입니다. 임의 text query는 허용하지 않습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/payment-orders", "테스트 결제", "테스트 결제 주문 생성", "허용된 테스트 회원만 15,000 KRW 월간 테스트 주문을 생성합니다. 16~64자의 Idempotency-Key가 필수이며 동일 키는 동일 주문을 반환합니다. 자동 갱신과 실제 서비스 이용권 지급은 포함하지 않습니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/payment-orders/{orderId}", "테스트 결제", "테스트 결제 주문 조회", "본인의 테스트 주문만 조회합니다. 다른 사용자의 주문은 404이며 조회만으로 포트원 결제 상태를 갱신하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/payment-orders", "테스트 결제", "내 결제 내역 조회", "본인의 TEST 주문을 생성 시각과 ID 내림차순으로 조회합니다. page는 0부터, size는 1~100(기본 20), page*size는 2147483647 이하입니다. PENDING/PAID/FAILED/CANCELLED를 포함하며 포트원을 호출하거나 회원등급을 갱신하지 않습니다. 결제 완료 시각 paidAt과 이용권 만료일 expiresAt은 해당 값이 없으면 null입니다. 테스트 결제 활성화 및 허용된 사용자만 접근할 수 있습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/payment-orders/{orderId}/verify", "테스트 결제", "포트원 테스트 결제 검증", "포트원 서버에서 주문 ID, 상점, 테스트 채널, 금액, 통화와 상태를 확인합니다. 검증된 결제만 테스트 회원등급에 반영하며 중복 요청은 기간을 연장하지 않습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/payments/webhooks/portone", "테스트 결제", "포트원 웹훅 수신", "사용자 JWT 대신 webhook-id, webhook-signature, webhook-timestamp와 원문 본문으로 공식 SDK 서명을 검증합니다. 최대 64KiB이며 설정되지 않으면 503입니다. 포트원 재조회와 이벤트 중복 처리를 거쳐 본 시스템의 테스트 주문만 갱신합니다.", true);
         return Map.copyOf(map);

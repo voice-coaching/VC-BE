@@ -17,4 +17,8 @@ public class PaymentExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> missingHeader() {
         return ResponseEntity.badRequest().body(ApiResponse.error("Idempotency-Key 헤더가 필요합니다.", "INVALID_IDEMPOTENCY_KEY"));
     }
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> invalidQueryType() {
+        return ResponseEntity.badRequest().body(ApiResponse.error("페이지 번호와 크기는 정수여야 합니다.", "VALIDATION_ERROR"));
+    }
 }
