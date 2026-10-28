@@ -239,6 +239,7 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/payment-orders/{orderId}", "테스트 결제", "테스트 결제 주문 조회", "본인의 테스트 주문만 조회합니다. 다른 사용자의 주문은 404이며 조회만으로 포트원 결제 상태를 갱신하지 않습니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/users/me/payment-orders", "테스트 결제", "내 결제 내역 조회", "본인의 TEST 주문을 생성 시각과 ID 내림차순으로 조회합니다. page는 0부터, size는 1~100(기본 20), page*size는 2147483647 이하입니다. PENDING/PAID/FAILED/CANCELLED를 포함하며 포트원을 호출하거나 회원등급을 갱신하지 않습니다. 결제 완료 시각 paidAt과 이용권 만료일 expiresAt은 해당 값이 없으면 null입니다. 테스트 결제 활성화 및 허용된 사용자만 접근할 수 있습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/payment-orders/{orderId}/verify", "테스트 결제", "포트원 테스트 결제 검증", "포트원 서버에서 주문 ID, 상점, 테스트 채널, 금액, 통화와 상태를 확인합니다. 검증된 결제만 테스트 회원등급에 반영하며 중복 요청은 기간을 연장하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/payment-orders/{orderId}/cancel", "테스트 결제", "테스트 결제 전액 취소", "본인의 TEST 결제를 서버 금액으로 전액 취소합니다. reason은 필수이며 1~200자입니다. 중복 요청은 같은 처리 기록을 반환합니다. SUCCEEDED만 전액 취소 확인 완료이며 UNKNOWN/PENDING은 검증·웹훅으로 확인해야 합니다. 부분 취소나 실결제는 지원하지 않습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/payments/webhooks/portone", "테스트 결제", "포트원 웹훅 수신", "사용자 JWT 대신 webhook-id, webhook-signature, webhook-timestamp와 원문 본문으로 공식 SDK 서명을 검증합니다. 최대 64KiB이며 설정되지 않으면 503입니다. 포트원 재조회와 이벤트 중복 처리를 거쳐 본 시스템의 테스트 주문만 갱신합니다.", true);
         return Map.copyOf(map);
     }

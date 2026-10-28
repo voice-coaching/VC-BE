@@ -18,6 +18,8 @@
 3. 주문 검증 또는 웹훅 반영 후 `GET /api/users/me`에서 TEST 등급 확인.
 4. `GET /api/users/me/payment-orders`로 내역 확인.
 
+추가 코드: `POST /api/payment-orders/{orderId}/cancel`은 [전액 취소 계약](../../docs/api/payment-cancellation-api.md)을 따른다. V51/JAR/Nginx 변경을 서버에 적용하기 전에는 공개 환경에서 사용할 수 없다. 주문과 요청 원장을 공유하며 실제 취소 승인 테스트는 별도다.
+
 금액·응답·오류 계약은 [테스트 결제 명세](../../docs/api/test-payments-api.md), [내역 명세](../../docs/api/payment-history-api.md)를 따릅니다. 자동 갱신 없는 테스트 월간 이용권입니다. 웹훅 호출 테스트 200은 수신 확인이며 실제 승인 건의 등급 반영까지 증명하지 않습니다.
 
 ## 격리와 자원 제한

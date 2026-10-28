@@ -13,6 +13,7 @@ import java.time.OffsetDateTime;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 @Component
@@ -50,6 +51,47 @@ public class PortOnePaymentGateway implements PaymentGateway {
             Thread.currentThread().interrupt(); throw new PaymentException(503, "PAYMENT_PROVIDER_UNAVAILABLE");
         } catch (Exception error) {
             // Never log the provider body, authorization header, URL or customer data.
+            throw new PaymentException(502, "PAYMENT_PROVIDER_UNAVAILABLE");
+        } finally { if (pending != null) pending.cancel(true); }
+    }
+
+    @Override
+    public String cancel(String paymentId, String requestId, String reason, long amount) {
+        if (!settings.enabled()) throw new PaymentException(403, "TEST_PAYMENT_DISABLED");
+        if (requestId == null || !requestId.matches("[a-f0-9-]{36}") || reason == null
+                || reason.isBlank() || reason.length() > 200 || amount != PaymentOrder.PRICE)
+            throw new PaymentException(400, "INVALID_CANCELLATION_REQUEST");
+        // Never send a money-moving request solely on the strength of local configuration.
+        var payment = get(paymentId);
+        settings.validate(payment);
+        if (!paymentId.equals(payment.id()) || payment.total() != amount || !"KRW".equals(payment.currency()))
+            throw new PaymentException(409, "PAYMENT_MISMATCH");
+        if ("CANCELLED".equals(payment.status()) && payment.cancelled() == amount) return "SUCCEEDED";
+        if (!"PAID".equals(payment.status()) || payment.cancelled() != 0)
+            throw new PaymentException(409, "PAYMENT_NOT_CANCELLABLE");
+        CompletableFuture<HttpResponse<byte[]>> pending = null;
+        try {
+            var body = mapper.writeValueAsBytes(Map.of("storeId", settings.checkout().storeId(),
+                    "amount", amount, "currentCancellableAmount", amount, "reason", reason, "requester", "CUSTOMER"));
+            var request = HttpRequest.newBuilder(base.resolve("payments/" + paymentId + "/cancel"))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Authorization", "PortOne " + settings.apiSecret())
+                    // PortOne follows RFC 8941: the idempotency value is a quoted string.
+                    .header("Idempotency-Key", "\"" + requestId + "\"")
+                    .header("Content-Type", "application/json").header("Accept", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(body)).build();
+            pending = client.sendAsync(request, ignored -> new LimitedBody());
+            var response = pending.get(10, TimeUnit.SECONDS);
+            if (response.statusCode() != 200) throw new PaymentException(502, "PAYMENT_PROVIDER_UNAVAILABLE");
+            var status = required(mapper.readTree(response.body()).path("cancellation"), "status");
+            if (!List.of("SUCCEEDED", "REQUESTED", "FAILED").contains(status))
+                throw new PaymentException(502, "PAYMENT_PROVIDER_INVALID_RESPONSE");
+            return status;
+        } catch (PaymentException error) { throw error; }
+        catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new PaymentException(503, "PAYMENT_PROVIDER_UNAVAILABLE");
+        } catch (Exception error) {
             throw new PaymentException(502, "PAYMENT_PROVIDER_UNAVAILABLE");
         } finally { if (pending != null) pending.cancel(true); }
     }

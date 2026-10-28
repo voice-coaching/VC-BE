@@ -72,7 +72,7 @@ class OpenApiDocumentIntegrationTest {
                 assertThat(field.getValue().path("tags").get(0).asText()).containsPattern("[가-힣]");
             }
         }
-        assertThat(operationCount).isEqualTo(87);
+        assertThat(operationCount).isEqualTo(88);
         paths.fieldNames().forEachRemaining(path -> assertThat(path).doesNotStartWith("/api/internal/"));
         assertThat(paths.path("/api/analysis-capabilities/canonical").path("get").path("summary").asText())
                 .isEqualTo("Canonical 분석 접수 버전 조회");
@@ -92,6 +92,9 @@ class OpenApiDocumentIntegrationTest {
         assertThat(create.path("parameters").toString()).contains("Idempotency-Key", "\"required\":true");
         assertThat(paths.path("/api/payment-orders/{orderId}").has("get")).isTrue();
         assertThat(paths.path("/api/payment-orders/{orderId}/verify").has("post")).isTrue();
+        var cancel = paths.path("/api/payment-orders/{orderId}/cancel").path("post");
+        assertThat(cancel.path("security").toString()).contains("bearerAuth");
+        assertThat(cancel.path("requestBody").path("required").asBoolean()).isTrue();
         assertThat(paths.path("/api/payments/webhooks/portone").path("post").path("security").isEmpty()).isTrue();
         var fields = document.path("components").path("schemas").path("UserProfileResponseDto").path("properties");
         assertThat(fields.has("membershipType")).isTrue();

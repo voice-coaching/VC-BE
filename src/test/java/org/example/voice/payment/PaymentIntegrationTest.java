@@ -36,12 +36,101 @@ class PaymentIntegrationTest {
     @Autowired PaymentTransactions transactions;
     @Autowired PaymentService payments;
     @Autowired PaymentRecoveryService recovery;
+    @Autowired PaymentCancellationService cancellations;
     @Autowired MembershipReader memberships;
     @Autowired EntityManager em;
     @Autowired PlatformTransactionManager transactionManager;
     @MockitoBean PaymentGateway gateway;
     @MockitoBean WebhookAuthentication webhook;
     Long userId;
+
+    @Test void withdrawnUserCannotSendCancellationToProvider() {
+        var order = transactions.create(userId, key());
+        tx().executeWithoutResult(status -> em.find(User.class, userId).withdraw(OffsetDateTime.now()));
+        assertThatThrownBy(() -> cancellations.cancel(userId, order.getId(), "request"))
+                .hasMessage("PAYMENT_USER_INACTIVE");
+        verifyNoInteractions(gateway);
+    }
+
+    @Test void concurrentFullCancellationCallsShareOneProviderCommand() throws Exception {
+        var order = transactions.create(userId, key());
+        var paid = snapshot(order, "PAID", 15000, 0);
+        when(gateway.get(order.getId())).thenReturn(paid);
+        when(gateway.cancel(eq(order.getId()), anyString(), anyString(), eq(15000L))).thenReturn("REQUESTED");
+        var pool = Executors.newFixedThreadPool(4);
+        try {
+            var jobs = new ArrayList<Future<String>>();
+            for (int i = 0; i < 4; i++) jobs.add(pool.submit(() -> cancellations.cancel(userId, order.getId(), "request").id()));
+            var requestIds = new HashSet<String>();
+            for (var job : jobs) requestIds.add(job.get(10, TimeUnit.SECONDS));
+            assertThat(requestIds).hasSize(1);
+        } finally { pool.shutdownNow(); }
+        verify(gateway, times(1)).cancel(eq(order.getId()), anyString(), anyString(), eq(15000L));
+        assertThat(transactions.owned(userId, order.getId()).getStatus()).isEqualTo("PAID");
+    }
+
+    @Test void fullCancellationIsOwnerScopedDurableAndNeverSentTwice() throws Exception {
+        var order = transactions.create(userId, key());
+        var paid = snapshot(order, "PAID", 15000, 0);
+        var cancelled = snapshot(order, "CANCELLED", 15000, 15000);
+        when(gateway.get(order.getId())).thenReturn(paid, cancelled);
+        when(gateway.cancel(eq(order.getId()), anyString(), eq("customer request"), eq(15000L)))
+                .thenAnswer(invocation -> {
+                    assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+                    var count = tx().execute(status -> em.createQuery(
+                            "select count(c) from PaymentCancellation c where c.orderId=:id", Long.class)
+                            .setParameter("id", order.getId()).getSingleResult());
+                    assertThat(count).isEqualTo(1);
+                    return "SUCCEEDED";
+                });
+        mvc.perform(post("/api/payment-orders/{id}/cancel", order.getId()).with(as(userId))
+                        .contentType("application/json").content("{\"reason\":\"customer request\",\"amount\":1}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("SUCCEEDED"));
+        assertThat(memberships.read(userId).type()).isEqualTo("free");
+        assertThat(transactions.owned(userId, order.getId()).getStatus()).isEqualTo("CANCELLED");
+        cancellations.cancel(userId, order.getId(), "customer request");
+        verify(gateway, times(1)).cancel(eq(order.getId()), anyString(), anyString(), eq(15000L));
+        assertThatThrownBy(() -> cancellations.cancel(userId + 999, order.getId(), "customer request"))
+                .hasMessage("PAYMENT_ORDER_NOT_FOUND");
+        mvc.perform(post("/api/payment-orders/{id}/cancel", order.getId()).contentType("application/json")
+                        .content("{\"reason\":\"customer request\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test void uncertainCancellationDoesNotResendAndWebhookCanReconcileIt() {
+        var order = transactions.create(userId, key());
+        var paid = snapshot(order, "PAID", 15000, 0);
+        when(gateway.get(order.getId())).thenReturn(paid);
+        when(gateway.cancel(eq(order.getId()), anyString(), anyString(), eq(15000L)))
+                .thenThrow(new PaymentException(502, "PAYMENT_PROVIDER_UNAVAILABLE"));
+        assertThatThrownBy(() -> cancellations.cancel(userId, order.getId(), "request"))
+                .hasMessage("PAYMENT_CANCELLATION_UNCONFIRMED");
+        assertThat(cancellations.cancel(userId, order.getId(), "request").status().name()).isEqualTo("UNKNOWN");
+        assertThatThrownBy(() -> cancellations.cancel(userId, order.getId(), "different request"))
+                .hasMessage("PAYMENT_CANCELLATION_CONFLICT");
+        verify(gateway, times(1)).cancel(eq(order.getId()), anyString(), anyString(), anyLong());
+        var cancelled = snapshot(order, "CANCELLED", 15000, 15000);
+        transactions.apply(userId, order.getId(), cancelled, "cancel-event", "digest");
+        when(gateway.get(order.getId())).thenReturn(cancelled);
+        assertThat(cancellations.cancel(userId, order.getId(), "request").status().name()).isEqualTo("SUCCEEDED");
+    }
+
+    @Test void cancellationRejectsPartialCancellationWrongProviderAndInvalidReason() {
+        var order = transactions.create(userId, key());
+        assertThatThrownBy(() -> cancellations.cancel(userId, order.getId(), " "))
+                .hasMessage("INVALID_CANCELLATION_REASON");
+        assertThatThrownBy(() -> cancellations.cancel(userId, order.getId(), "line\nbreak"))
+                .hasMessage("INVALID_CANCELLATION_REASON");
+        verifyNoInteractions(gateway);
+        when(gateway.get(order.getId())).thenReturn(new PaymentSnapshot(order.getId(), "store", "channel", "LIVE",
+                "PAID", 15000, 0, "KRW", order.getCreatedAt(), OffsetDateTime.now()));
+        assertThatThrownBy(() -> cancellations.cancel(userId, order.getId(), "request"))
+                .hasMessage("PAYMENT_CHANNEL_MISMATCH");
+        when(gateway.get(order.getId())).thenReturn(snapshot(order, "PARTIAL_CANCELLED", 15000, 100));
+        assertThatThrownBy(() -> cancellations.cancel(userId, order.getId(), "request"))
+                .hasMessage("PAYMENT_NOT_CANCELLABLE");
+        verify(gateway, never()).cancel(anyString(), anyString(), anyString(), anyLong());
+    }
     @BeforeEach void createUser() {
         userId = tx().execute(status -> {
             var user = User.createLocal(UUID.randomUUID() + "@example.invalid", "hash", "tester", OffsetDateTime.now());

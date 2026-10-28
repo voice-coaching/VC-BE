@@ -2,6 +2,10 @@
 
 # API Specification - voice
 
+## TEST 결제 계약
+
+주문 생성·조회·검증·웹훅과 프로필 회원등급 필드는 [테스트 결제 계약](test-payments-api.md), 결제 내역은 [내 결제 내역](payment-history-api.md), 전액 취소는 [전액 취소 계약](payment-cancellation-api.md)을 따른다. 전액 취소의 HTTP method/path/auth/request/response/status/error 상세는 해당 계약에 포함한다. 모두 TEST 전용이며 실제 구독 권한이나 실결제·부분 환불 API가 아니다.
+
 Optional result-first v5: status adds `resultAvailable`; view v2 adds optional `persistenceStatus`. SAVING/RETRYING exposes verified results before DB writes complete and disables completion actions. See [contract and activation order](../canonical-result-first-20261004.md). Default OFF.
 
 Canonical D1 rollout (2026-10-02 KST): the additive [canonical view](canonical-analysis-view-v1.md)
