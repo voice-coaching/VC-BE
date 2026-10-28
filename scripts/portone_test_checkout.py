@@ -207,7 +207,7 @@ def handler(sandbox):
             elif path == "/local/orders":
                 key = self.headers.get("Idempotency-Key", "")
                 status, result = sandbox.call("/api/payment-orders", "POST", headers={"Idempotency-Key": key})
-            elif re.fullmatch(r"/local/verify/test_[a-f0-9-]{36}", path):
+            elif re.fullmatch(r"/local/verify/test[a-f0-9]{32}", path):
                 order_id = path.rsplit("/", 1)[1]
                 status, result = sandbox.call(f"/api/payment-orders/{order_id}/verify", "POST")
             else:

@@ -16,7 +16,7 @@ class PortOnePaymentGatewayTest {
     private PortOnePaymentGateway gateway;
     private final AtomicInteger code = new AtomicInteger(200);
     private String body;
-    private final String id = "test_00000000-0000-4000-8000-000000000001";
+    private final String id = "test00000000000040008000000000000001";
     @BeforeEach void start() throws Exception {
         var env = new MockEnvironment(); env.setActiveProfiles("payment-test");
         var settings = new TestPaymentSettings(true, "1", "store", "channel", "test-only-secret", "", env);

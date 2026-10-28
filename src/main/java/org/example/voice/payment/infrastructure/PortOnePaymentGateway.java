@@ -33,7 +33,7 @@ public class PortOnePaymentGateway implements PaymentGateway {
     }
     @Override public PaymentSnapshot get(String paymentId) {
         if (!settings.enabled()) throw new PaymentException(403, "TEST_PAYMENT_DISABLED");
-        if (!paymentId.matches("test_[a-f0-9-]{36}")) throw new PaymentException(400, "INVALID_PAYMENT_ID");
+        if (!paymentId.matches("test[a-f0-9]{32}")) throw new PaymentException(400, "INVALID_PAYMENT_ID");
         var uri = base.resolve("payments/" + paymentId + "?storeId="
                 + URLEncoder.encode(settings.checkout().storeId(), StandardCharsets.UTF_8));
         CompletableFuture<HttpResponse<byte[]>> pending = null;

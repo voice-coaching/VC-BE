@@ -29,7 +29,8 @@ public class PaymentOrder {
 
     public static PaymentOrder create(Long userId, String key, OffsetDateTime now) {
         var order = new PaymentOrder();
-        order.id = "test_" + UUID.randomUUID();
+        // KCP allows at most 40 characters. ASCII alphanumeric, 36 characters total.
+        order.id = "test" + UUID.randomUUID().toString().replace("-", "");
         order.userId = userId; order.idempotencyKey = key; order.product = PRODUCT;
         order.amount = PRICE; order.currency = "KRW"; order.status = "PENDING"; order.createdAt = now;
         return order;

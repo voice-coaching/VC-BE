@@ -8,6 +8,9 @@ import static org.assertj.core.api.Assertions.*;
 class PaymentOrderTest {
     private final OffsetDateTime now = OffsetDateTime.parse("2026-01-31T12:00:00Z");
     private final PaymentOrder order = PaymentOrder.create(1L, "test-idempotency-0001", now);
+    @Test void generatedPaymentIdMeetsKcpLengthAndCharacterRestrictions() {
+        assertThat(order.getId()).hasSize(36).matches("test[a-f0-9]{32}");
+    }
     private PaymentSnapshot snapshot(String status, long total, long cancelled, OffsetDateTime updated) {
         return new PaymentSnapshot(order.getId(), "store", "channel", "TEST", status, total, cancelled, "KRW", now, updated);
     }

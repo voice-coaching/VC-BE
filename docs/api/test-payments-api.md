@@ -24,11 +24,11 @@
 | POST | `/api/payment-orders/{orderId}/verify` | 본인 주문 ID. Body 없음 | 포트원에서 실제 상태 재조회·검증 후 반영, 200. 미승인 주문은 409 |
 | POST | `/api/payments/webhooks/portone` | 원문 JSON ≤64KiB, `webhook-id`, `webhook-signature`, `webhook-timestamp` | JWT 대신 공식 SDK 서명·시각 검증, 결제 재조회, 200. 알 수 없는 주문/비거래 이벤트는 권한 생성 없이 무시 |
 
-주문 `data`:
+주문 ID는 KCP의 최대 40자 제한에 맞춰 `test` + 하이픈 없는 UUID 32자리(총 36자 영숫자)로 생성한다. 주문 `data`:
 
 ```json
 {
-  "orderId": "test_<서버가 생성한 UUID>",
+  "orderId": "test<하이픈 없는 서버 생성 UUID 32자리>",
   "product": "SPEAKAI_MONTHLY_TEST_V1",
   "orderName": "SPEAK AI 월간 이용권 (테스트)",
   "totalAmount": 15000,
@@ -92,4 +92,4 @@ free이면 만료·환경은 null이다. `UserRole` USER/ADMIN과 분리되며 J
 
 테스트 도구는 PC 브라우저 검증용이며 VC-FE의 상용 결제 UI를 변경하지 않는다. Next.js+Capacitor 통합 시 동일 API를 사용하고, 모바일 `redirectUrl`·양 플랫폼 앱 복귀·사용자 인증 세션 회복·중단 주문 재검증을 구현해야 한다. 리다이렉트 파라미터를 결제 확정 증거로 사용하지 않는다. iOS/Android 기기 결제는 이 작업의 로컬 검증으로 대체되지 않는다.
 
-공식 참고: [V2 인증 결제](https://developers.portone.io/opi/ko/integration/start/v2/checkout), [V2 웹훅](https://developers.portone.io/opi/ko/integration/webhook/readme-v2), [모바일 결제](https://developers.portone.io/opi/ko/extra/mobile-payment/readme-v2), [공식 JVM SDK](https://github.com/portone-io/server-sdk/tree/main/jvm).
+공식 참고: [V2 인증 결제](https://developers.portone.io/opi/ko/integration/start/v2/checkout), [NHN KCP 제약](https://developers.portone.io/opi/ko/integration/pg/v2/kcp-v2?v=v2), [V2 웹훅](https://developers.portone.io/opi/ko/integration/webhook/readme-v2), [모바일 결제](https://developers.portone.io/opi/ko/extra/mobile-payment/readme-v2), [공식 JVM SDK](https://github.com/portone-io/server-sdk/tree/main/jvm).

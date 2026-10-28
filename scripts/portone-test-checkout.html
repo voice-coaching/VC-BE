@@ -64,7 +64,7 @@ action(async()=>{
   el('status').textContent='테스트 주문을 생성해 주세요.';
   await profile();
   const pending=sessionStorage.getItem('paymentTestOrder');
-  if (pending && /^test_[a-f0-9-]{36}$/.test(pending)) {
+  if (pending && /^test[a-f0-9]{32}$/.test(pending)) {
     // Redirect parameters are deliberately not trusted. The server rechecks our saved order.
     order={orderId:pending}; await verify();
   }
