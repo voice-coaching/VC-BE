@@ -6,6 +6,10 @@ import org.example.voice.common.response.ApiResponse;
 import org.example.voice.common.security.LoginUser;
 import org.example.voice.payment.application.*;
 import org.example.voice.payment.domain.*;
+import org.example.voice.payment.controller.dto.PaymentHistoryResponse;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
@@ -18,6 +22,19 @@ public class PaymentController {
     private final PaymentTransactions transactions;
     private final PaymentService service;
     private final PaymentPolicy policy;
+    private final PaymentHistoryService history;
+
+    @GetMapping("/api/users/me/payment-orders")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "VALIDATION_ERROR: page는 0 이상, size는 1~100, page*size는 2147483647 이하의 정수"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED: 로그인 필요"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "TEST_PAYMENT_DISABLED: 테스트 결제 비활성 또는 비허용 사용자")
+    })
+    public ApiResponse<PaymentHistoryResponse> history(@AuthenticationPrincipal LoginUser user,
+            @Parameter(schema = @Schema(type = "integer", format = "int32", minimum = "0", defaultValue = "0")) @RequestParam(defaultValue = "0") int page,
+            @Parameter(schema = @Schema(type = "integer", format = "int32", minimum = "1", maximum = "100", defaultValue = "20")) @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.success("결제 내역을 조회했습니다.", PaymentHistoryResponse.from(history.read(user.id(), page, size)));
+    }
 
     @PostMapping("/api/payment-orders")
     public ApiResponse<OrderResponse> create(@AuthenticationPrincipal LoginUser user,

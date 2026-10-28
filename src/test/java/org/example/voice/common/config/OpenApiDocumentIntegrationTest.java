@@ -72,7 +72,7 @@ class OpenApiDocumentIntegrationTest {
                 assertThat(field.getValue().path("tags").get(0).asText()).containsPattern("[가-힣]");
             }
         }
-        assertThat(operationCount).isEqualTo(86);
+        assertThat(operationCount).isEqualTo(87);
         paths.fieldNames().forEachRemaining(path -> assertThat(path).doesNotStartWith("/api/internal/"));
         assertThat(paths.path("/api/analysis-capabilities/canonical").path("get").path("summary").asText())
                 .isEqualTo("Canonical 분석 접수 버전 조회");
@@ -97,5 +97,42 @@ class OpenApiDocumentIntegrationTest {
         assertThat(fields.has("membershipType")).isTrue();
         assertThat(fields.has("membershipExpiresAt")).isTrue();
         assertThat(fields.has("membershipEnvironment")).isTrue();
+    }
+    @Test
+    void paymentHistoryDocumentsPaginationFieldsAndAuthentication() throws Exception {
+        var body = mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        var document = objectMapper.readTree(body);
+        var operation = document.path("paths").path("/api/users/me/payment-orders").path("get");
+        assertThat(operation.path("security").toString()).contains("bearerAuth");
+        assertThat(operation.path("parameters").toString()).contains("page", "size", "\"default\":20", "\"default\":0");
+        for (var parameter : operation.path("parameters")) {
+            assertThat(parameter.path("schema").path("type").asText()).isEqualTo("integer");
+            assertThat(parameter.path("schema").path("format").asText()).isEqualTo("int32");
+        }
+        assertThat(operation.path("responses").path("400").path("description").asText()).contains("VALIDATION_ERROR");
+        assertThat(operation.path("responses").has("401")).isTrue();
+        assertThat(operation.path("responses").has("403")).isTrue();
+        var schemas = document.path("components").path("schemas");
+        var properties = schemas.path("PaymentHistoryResponse").path("properties");
+        assertThat(properties.has("items")).isTrue();
+        assertThat(properties.has("totalElements")).isTrue();
+        assertThat(properties.has("totalPages")).isTrue();
+        assertThat(properties.has("hasNext")).isTrue();
+        assertThat(properties.path("items").path("items").path("$ref").asText()).endsWith("/PaymentHistoryItem");
+        var itemFields = new java.util.HashSet<String>();
+        schemas.path("PaymentHistoryItem").path("properties").fieldNames().forEachRemaining(itemFields::add);
+        assertThat(itemFields).containsExactlyInAnyOrder("orderId", "product", "orderName", "totalAmount", "currency",
+                "status", "environment", "createdAt", "paidAt", "expiresAt");
+    }
+
+    @Test
+    void productionDefaultDoesNotExposeTestHistoryEvenToAuthenticatedUser() throws Exception {
+        var authentication = org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
+                new org.example.voice.common.security.LoginUser(1L), null, java.util.List.of());
+        mockMvc.perform(get("/api/users/me/payment-orders").with(
+                        org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(authentication)))
+                .andExpect(status().isForbidden()).andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("TEST_PAYMENT_DISABLED"));
     }
 }
