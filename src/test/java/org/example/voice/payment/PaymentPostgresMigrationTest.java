@@ -9,6 +9,45 @@ import static org.assertj.core.api.Assertions.*;
 
 @EnabledIfEnvironmentVariable(named = "VC_BE_TEST_POSTGRES_URL", matches = ".+")
 class PaymentPostgresMigrationTest {
+    @Test void membershipGrantSnapshotsOnlyExistingActiveUsersAndPreservesRoles() throws Exception {
+        var url = System.getenv("VC_BE_TEST_POSTGRES_URL");
+        var user = System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER", "postgres");
+        var password = System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_PASSWORD", "");
+        var schema = "membership_" + UUID.randomUUID().toString().replace("-", "");
+        try (var db = DriverManager.getConnection(url, user, password); var sql = db.createStatement()) {
+            try {
+                var config = Flyway.configure().dataSource(url, user, password).schemas(schema).defaultSchema(schema)
+                        .locations("classpath:db/migration");
+                config.target("51").load().migrate();
+                db.setSchema(schema);
+                String insert = "insert into users(nickname,status,terms_agreed_at,privacy_agreed_at,created_at,updated_at,role) values";
+                sql.execute(insert + "('existing','ACTIVE',now(),now(),now(),now(),'USER'),"
+                        + "('operator','ACTIVE',now(),now(),now(),now(),'ADMIN'),"
+                        + "('suspended','SUSPENDED',now(),now(),now(),now(),'USER'),"
+                        + "('withdrawn','WITHDRAWN',now(),now(),now(),now(),'USER')");
+                config.target("52").load().migrate();
+                try (var rows = sql.executeQuery("select count(*) from user_test_membership_grants")) {
+                    assertThat(rows.next()).isTrue();
+                    assertThat(rows.getInt(1)).isEqualTo(2);
+                }
+                sql.execute(insert + "('new','ACTIVE',now(),now(),now(),now(),'USER')");
+                config.target("52").load().migrate();
+                try (var rows = sql.executeQuery("select count(*) from user_test_membership_grants g join users u on u.id=g.user_id where u.nickname='new'")) {
+                    assertThat(rows.next()).isTrue();
+                    assertThat(rows.getInt(1)).isZero();
+                }
+                try (var rows = sql.executeQuery("select count(*) from users where role='ADMIN'")) {
+                    assertThat(rows.next()).isTrue();
+                    assertThat(rows.getInt(1)).isEqualTo(1);
+                }
+                assertThatThrownBy(() -> sql.execute("insert into user_test_membership_grants values(999999,now())"))
+                        .isInstanceOf(SQLException.class);
+            } finally {
+                db.setSchema("public");
+                sql.execute("drop schema if exists " + schema + " cascade");
+            }
+        }
+    }
     @Test void cancellationMigrationPreservesOrdersAndEnforcesOneRequestPerOrder() throws Exception {
         var url = System.getenv("VC_BE_TEST_POSTGRES_URL");
         var user = System.getenv().getOrDefault("VC_BE_TEST_POSTGRES_USER", "postgres");

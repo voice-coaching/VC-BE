@@ -12,7 +12,7 @@
 
 ## 실행 조건과 격리
 
-- 기본 `payment.test.enabled=false`. 비활성 상태에서 주문 API는 403이며 회원등급은 free다.
+- 기본 `payment.test.enabled=false`. 비활성 상태에서 주문 API는 403이며 결제에 따른 기본 회원등급은 free다. V52로 기존 활성 회원에 부여한 테스트 admin 등급은 결제 기능과 독립적으로 반환한다. [이용등급 계약](membership-api.md).
 - 활성화하려면 Spring `payment-test` 프로필, `payment.test.enabled=true`, 양수 사용자 ID의 명시적 허용 목록 `payment.test.allowed-user-ids=1,2`, 포트원 설정이 필요하다.
 - `prod`/`production` 프로필과 동시에 활성화하면 시작에 실패한다. **이 프로필을 운영 DB 연결과 함께 사용하지 않는다.** 프로필 검사 자체는 DB가 실제로 격리됐음을 증명하지 않는다.
 - 환경변수: `PORTONE_STORE_ID`, `PORTONE_TEST_CHANNEL_KEY`, `PORTONE_API_SECRET`, 선택 `PORTONE_WEBHOOK_SECRET`. API Secret은 서버 전용이다. 웹훅 Secret 미설정은 웹훅 503으로 처리하며 사용자 요청 검증 API는 사용할 수 있다.
@@ -59,7 +59,7 @@
 }
 ```
 
-free이면 만료·환경은 null이다. `UserRole` USER/ADMIN과 분리되며 JWT에 유료 상태를 고정하지 않는다. 유효한 PAID 원장과 활성 사용자 상태를 조회한다. 기본 운영환경에서 이 테스트 기능이 회원 권한을 부여하지 않는다.
+free이면 만료·환경은 null이다. V52의 기존 활성 회원용 테스트 admin은 만료 null·환경 TEST이며 paid보다 우선한다. `UserRole` USER/ADMIN과 분리되며 JWT에 이용등급을 고정하지 않는다. admin grant가 없는 회원은 기존 유효한 PAID 원장과 활성 사용자 상태를 조회한다. TEST 결제는 기본 운영환경에서 유료 권한을 부여하지 않는다. 기존 회원 테스트 grant는 관리자 권한이나 실제 구독 결제 완료를 뜻하지 않는다.
 
 | HTTP | code | 조건 |
 |---|---|---|

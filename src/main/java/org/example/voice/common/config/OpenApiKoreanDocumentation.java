@@ -95,9 +95,9 @@ public class OpenApiKoreanDocumentation {
     private static void describeSchemas(io.swagger.v3.oas.models.OpenAPI openApi) {
         if (openApi.getComponents() == null || openApi.getComponents().getSchemas() == null) return;
         Map<String, String> descriptions = Map.ofEntries(
-                Map.entry("membershipType", "현재 회원등급 free 또는 paid. 테스트 결제의 paid는 허용된 격리 테스트 환경에만 적용됩니다."),
-                Map.entry("membershipExpiresAt", "유효한 이용 기간의 만료 시각. free이면 null입니다."),
-                Map.entry("membershipEnvironment", "테스트 이용권이면 TEST, 해당 이용권이 없으면 null입니다."),
+                Map.entry("membershipType", "이용등급 free, paid, admin. admin은 V52 적용 시 기존 활성 회원에게 부여한 테스트 이용등급이며 관리자 권한이 아닙니다. paid는 검증된 TEST 결제 조건에 따릅니다."),
+                Map.entry("membershipExpiresAt", "paid 이용기간 만료 시각. free 또는 테스트 admin이면 null입니다."),
+                Map.entry("membershipEnvironment", "테스트 admin 또는 TEST 결제 paid이면 TEST, free이면 null입니다."),
                 Map.entry("email", "사용자 이메일 주소"), Map.entry("password", "영문, 숫자, 특수문자를 포함한 비밀번호"),
                 Map.entry("nickname", "서비스에서 표시할 사용자 닉네임"), Map.entry("termsAgreed", "서비스 이용약관 필수 동의 여부"),
                 Map.entry("privacyAgreed", "개인정보 처리방침 필수 동의 여부"), Map.entry("provider", "SNS 로그인 공급자(GOOGLE 또는 KAKAO)"),
