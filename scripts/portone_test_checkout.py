@@ -73,7 +73,7 @@ class Sandbox:
         self.base = f"http://127.0.0.1:{args.backend_port}"
         self.session = secrets.token_urlsafe(32)
         self.email = f"payment-test-{uuid.uuid4().hex}@example.invalid"
-        self.password = "Test!" + secrets.token_urlsafe(32)
+        self.password = "Test1!" + secrets.token_urlsafe(32)
 
     def command(self, *args):
         with (self.run / "database.log").open("ab") as log:
