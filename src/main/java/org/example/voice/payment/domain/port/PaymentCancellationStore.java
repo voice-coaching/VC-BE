@@ -6,5 +6,6 @@ import java.util.Optional;
 
 public interface PaymentCancellationStore {
     Optional<PaymentCancellation> byOrder(String orderId);
+    Optional<PaymentCancellation> byId(String requestId);
     PaymentCancellation save(PaymentCancellation request);
 }

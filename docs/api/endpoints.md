@@ -10,6 +10,8 @@
 | GET | `/api/payment-orders/{orderId}` | 로그인 + 본인 주문 + TEST 허용 사용자 | 저장된 주문 조회 |
 | POST | `/api/payment-orders/{orderId}/verify` | 로그인 + 본인 주문 + TEST 허용 사용자 | 포트원 상태 검증·반영 |
 | POST | `/api/payment-orders/{orderId}/cancel` | 로그인 + 본인 주문 + TEST 허용 사용자 | 카드 테스트 결제 전액 취소 요청 |
+| POST | `/api/payment-orders/{orderId}/refund-requests` | 로그인 + 본인 주문 + TEST 허용 사용자 | 동일 취소 원장을 사용하는 전액 환불 신청 |
+| GET | `/api/refund-requests/{requestId}` | 로그인 + 본인 요청 + TEST 허용 사용자 | 저장된 전액 환불 처리 상태 조회 |
 | GET | `/api/users/me/payment-orders` | 로그인 + TEST 허용 사용자 | 본인 결제 내역 조회 |
 | POST | `/api/payments/webhooks/portone` | PortOne 웹훅 서명 | 테스트 결제 상태 반영 |
 

@@ -20,6 +20,8 @@
 
 추가 코드: `POST /api/payment-orders/{orderId}/cancel`은 [전액 취소 계약](../../docs/api/payment-cancellation-api.md)을 따른다. V51/JAR/Nginx 변경을 서버에 적용하기 전에는 공개 환경에서 사용할 수 없다. 주문과 요청 원장을 공유하며 실제 취소 승인 테스트는 별도다.
 
+후속 `POST /api/payment-orders/{orderId}/refund-requests`, `GET /api/refund-requests/{requestId}`는 [전액 환불 신청·조회](../../docs/api/payment-refund-api.md)를 따른다. JAR·Nginx와 `SPRINGDOC_PATHS_TO_MATCH`에 `/api/refund-requests/**`를 반영해야 한다. 설정 예시만 수정했으며 서버 환경변수를 자동 변경하지 않는다.
+
 금액·응답·오류 계약은 [테스트 결제 명세](../../docs/api/test-payments-api.md), [내역 명세](../../docs/api/payment-history-api.md)를 따릅니다. 자동 갱신 없는 테스트 월간 이용권입니다. 웹훅 호출 테스트 200은 수신 확인이며 실제 승인 건의 등급 반영까지 증명하지 않습니다.
 
 ## 격리와 자원 제한
@@ -33,7 +35,7 @@
 | 실행 JAR | `/opt/alpha-payment-test/app.jar`, 검증한 release 고정; 운영 배포와 자동 동기화 안 함 |
 | 제한 | backend MemoryMax 384MiB / CPU 50%, DB 128MiB / CPU 25% |
 
-Nginx는 결제·로그인·본인 프로필·Swagger만 허용합니다. 공개 회원가입·탈퇴·AI·내부 관리 경로는 404로 차단하며 Swagger도 9개 operation으로 제한합니다. 요청 본문 상한 64KiB, 속도 제한, 접두사 전용 쿠키 경로를 적용합니다. 웹훅은 JWT 대신 기존 서명 검증을 거칩니다.
+Nginx는 결제·취소·환불·로그인·본인 프로필·Swagger의 명시된 경로만 허용합니다. 공개 회원가입·탈퇴·AI·내부 관리 경로는 404로 차단합니다. Swagger 노출은 `SPRINGDOC_PATHS_TO_MATCH`로 제한하며 실제 호출 허용 여부는 Nginx의 method/path 목록을 따릅니다. 요청 본문 상한 64KiB, 속도 제한, 접두사 전용 쿠키 경로를 적용합니다. 웹훅은 JWT 대신 기존 서명 검증을 거칩니다.
 
 현재 작은 EC2의 여유 메모리는 제한적입니다. 부하 시험이나 운영급 수용량을 검증한 환경이 아닙니다. `alpha-payment-test-guard.timer`는 30초마다 가용 메모리 128MiB 미만, 루트 디스크 여유 512MiB 미만 또는 테스트 backend 실패를 확인하면 **테스트 backend와 테스트 DB만** 중지합니다. 자동 재개하지 않습니다. 운영 서비스는 중지하지 않습니다.
 

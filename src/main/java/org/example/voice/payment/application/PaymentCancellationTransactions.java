@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +26,28 @@ public class PaymentCancellationTransactions {
     private final Clock clock;
 
     public record Reservation(PaymentCancellationData request, boolean send) {}
+
+    @Transactional(readOnly = true)
+    public Optional<PaymentCancellationData> existingRequest(Long userId, String orderId, String reason) {
+        policy.require(userId);
+        var order = orders.find(orderId).orElseThrow(() -> new PaymentException(404, "PAYMENT_ORDER_NOT_FOUND"));
+        if (!order.getUserId().equals(userId)) throw new PaymentException(404, "PAYMENT_ORDER_NOT_FOUND");
+        return cancellations.byOrder(orderId).map(request -> {
+            if (!request.getReason().equals(reason)) throw new PaymentException(409, "PAYMENT_CANCELLATION_CONFLICT");
+            return PaymentCancellationData.from(request);
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentCancellationData read(Long userId, String requestId) {
+        policy.require(userId);
+        var request = cancellations.byId(requestId)
+                .orElseThrow(() -> new PaymentException(404, "PAYMENT_CANCELLATION_NOT_FOUND"));
+        var order = orders.find(request.getOrderId())
+                .orElseThrow(() -> new PaymentException(404, "PAYMENT_CANCELLATION_NOT_FOUND"));
+        if (!order.getUserId().equals(userId)) throw new PaymentException(404, "PAYMENT_CANCELLATION_NOT_FOUND");
+        return PaymentCancellationData.from(request);
+    }
 
     @Transactional(readOnly = true)
     public void assertActive(Long userId) {

@@ -16,3 +16,5 @@ V51 `payment_test_cancellations`는 주문당 하나의 전액 취소 명령을 
 처음에는 UNKNOWN, 접수 응답만 확인되면 PENDING, 실패 응답은 FAILED, 검증된 전액 취소는 SUCCEEDED다. SUCCEEDED는 최종 상태로 다른 상태로 돌아가지 않는다. 비밀·개인정보를 사유에 입력하지 않도록 안내하고, 사유는 API 응답/로그로 노출하지 않는다. 운영 보존·삭제 정책은 기존 TEST 원장과 함께 별도 수립해야 한다.
 
 API·장애/중복 처리: [전액 취소 계약](../api/payment-cancellation-api.md). 운영 DB나 공용 TEST 서버에는 이번 코드 작업만으로 migration을 실행하지 않는다.
+
+후속 환불 신청/조회 API도 동일 테이블·ID를 사용한다. 신규 테이블/컬럼/마이그레이션은 없으며 별도 환불 금액 원장을 만들지 않는다. 요청 소유권은 연결된 주문의 user_id로 검증한다. [환불 신청 계약](../api/payment-refund-api.md).

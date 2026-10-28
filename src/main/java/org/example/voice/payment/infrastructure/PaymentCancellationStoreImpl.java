@@ -24,4 +24,9 @@ public class PaymentCancellationStoreImpl implements PaymentCancellationStore {
         if (!em.contains(request)) em.persist(request);
         return request;
     }
+
+    @Override
+    public Optional<PaymentCancellation> byId(String requestId) {
+        return Optional.ofNullable(em.find(PaymentCancellation.class, requestId));
+    }
 }
