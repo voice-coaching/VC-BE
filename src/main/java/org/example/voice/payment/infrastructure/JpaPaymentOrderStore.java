@@ -6,6 +6,7 @@ import org.example.voice.payment.domain.*;
 import org.springframework.stereotype.Repository;
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import java.util.List;
 
 @Repository
 @RequiredArgsConstructor
@@ -35,5 +36,12 @@ public class JpaPaymentOrderStore implements PaymentOrderStore {
     }
     @Override public void receipt(String eventId, String hash, OffsetDateTime now) {
         em.persist(new PaymentWebhookReceipt(eventId, hash, now));
+    }
+    @Override public List<RecoveryCandidate> recoveryCandidates(String afterId, OffsetDateTime now, int limit) {
+        if (limit < 1 || limit > 100) throw new IllegalArgumentException("Invalid recovery batch size");
+        return em.createQuery("select p from PaymentOrder p where p.id>:after and "
+                        + "(p.status='PENDING' or (p.status='PAID' and p.expiresAt>:now)) order by p.id", PaymentOrder.class)
+                .setParameter("after", afterId).setParameter("now", now).setMaxResults(limit)
+                .getResultStream().map(p -> new RecoveryCandidate(p.getId(), p.getUserId())).toList();
     }
 }
