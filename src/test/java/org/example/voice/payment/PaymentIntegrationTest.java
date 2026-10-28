@@ -34,6 +34,7 @@ class PaymentIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired PaymentTransactions transactions;
     @Autowired PaymentService payments;
+    @Autowired PaymentRecoveryService recovery;
     @Autowired MembershipReader memberships;
     @Autowired EntityManager em;
     @Autowired PlatformTransactionManager transactionManager;
@@ -167,6 +168,65 @@ class PaymentIntegrationTest {
                 .andExpect(status().isPayloadTooLarge());
         when(webhook.verify(anyString(), any(), any(), any())).thenThrow(new PaymentException(401, "WEBHOOK_SIGNATURE_INVALID"));
         mvc.perform(post("/api/payments/webhooks/portone").content("{}")).andExpect(status().isUnauthorized());
+    }
+    @Test void recoveryRepairsMissingClientAndWebhookWithoutExtendingGrantAndRejectsMismatch() {
+        var order = transactions.create(userId, key());
+        var mismatch = transactions.create(userId, key());
+        when(gateway.get(mismatch.getId())).thenReturn(snapshot(mismatch, "PAID", 1, 0));
+        when(gateway.get(order.getId())).thenAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            return snapshot(order, "PAID", 15000, 0);
+        });
+        // Other tests may leave pending orders; sweep through all keyset pages.
+        sweep(order.getId(), "PAID");
+        for (int i = 0; i < 10; i++) recovery.recover();
+        assertThat(transactions.owned(userId, mismatch.getId()).getStatus()).isEqualTo("PENDING");
+        assertThat(transactions.owned(userId, mismatch.getId()).getExpiresAt()).isNull();
+        var expiry = memberships.read(userId).expiresAt();
+        assertThat(expiry).isNotNull();
+        when(gateway.get(order.getId())).thenReturn(snapshot(order, "PAID", 1, 0));
+        for (int i = 0; i < 10; i++) recovery.recover();
+        assertThat(transactions.owned(userId, order.getId()).getExpiresAt()).isEqualTo(expiry);
+        when(gateway.get(order.getId())).thenReturn(snapshot(order, "CANCELLED", 15000, 15000));
+        sweep(order.getId(), "CANCELLED");
+        assertThat(memberships.read(userId).type()).isEqualTo("free");
+        clearInvocations(gateway);
+        for (int i = 0; i < 10; i++) recovery.recover();
+        verify(gateway, never()).get(order.getId());
+    }
+
+    @Test void recoveryCandidateQueryPaginatesAndExcludesExpiredFailedAndCancelledOrders() {
+        var ids = tx().execute(s -> {
+            var now = OffsetDateTime.now();
+            var pending = PaymentOrder.create(userId, key(), now);
+            var paid = PaymentOrder.create(userId, key(), now);
+            paid.apply(snapshot(paid, "PAID", 15000, 0), now);
+            var failed = PaymentOrder.create(userId, key(), now);
+            failed.apply(snapshot(failed, "FAILED", 15000, 0), now);
+            var cancelled = PaymentOrder.create(userId, key(), now);
+            cancelled.apply(snapshot(cancelled, "CANCELLED", 15000, 15000), now);
+            var old = now.minusMonths(2);
+            var expired = PaymentOrder.create(userId, key(), old);
+            expired.apply(new PaymentSnapshot(expired.getId(), "store", "channel", "TEST", "PAID", 15000, 0, "KRW", old, old), old);
+            for (var p : List.of(pending, paid, failed, cancelled, expired)) em.persist(p);
+            return List.of(pending.getId(), paid.getId(), failed.getId(), cancelled.getId(), expired.getId());
+        });
+        var selected = new ArrayList<String>();
+        String after = "";
+        while (true) {
+            var page = transactions.recoveryCandidates(after, 1);
+            if (page.isEmpty()) break;
+            assertThat(page).hasSize(1);
+            selected.add(page.getFirst().orderId());
+            after = page.getLast().orderId();
+        }
+        assertThat(selected).isSorted().doesNotHaveDuplicates().contains(ids.get(0), ids.get(1))
+                .doesNotContain(ids.get(2), ids.get(3), ids.get(4));
+    }
+
+    private void sweep(String orderId, String expected) {
+        for (int i = 0; i < 10 && !transactions.owned(userId, orderId).getStatus().equals(expected); i++) recovery.recover();
+        assertThat(transactions.owned(userId, orderId).getStatus()).isEqualTo(expected);
     }
     private TransactionTemplate tx() { return new TransactionTemplate(transactionManager); }
     private String key() { return UUID.randomUUID().toString(); }

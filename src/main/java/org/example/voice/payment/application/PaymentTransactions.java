@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /** All writes lock the user first, then the order. No provider calls inside these transactions. */
 @Service
@@ -38,6 +39,11 @@ public class PaymentTransactions {
 
     @Transactional(readOnly = true)
     public PaymentOrder findForWebhook(String id) { return orders.find(id).orElse(null); }
+
+    @Transactional(readOnly = true)
+    public List<PaymentOrderStore.RecoveryCandidate> recoveryCandidates(String afterId, int limit) {
+        return orders.recoveryCandidates(afterId, OffsetDateTime.now(clock), limit);
+    }
 
     @Transactional
     public PaymentOrder apply(Long userId, String id, PaymentSnapshot snapshot, String eventId, String hash) {
