@@ -1,0 +1,9 @@
+[Unit]
+Description=Protect production headroom from isolated payment tests
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/alpha-payment-test/resource_guard.py
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
