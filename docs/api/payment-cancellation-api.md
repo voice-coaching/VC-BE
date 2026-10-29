@@ -1,5 +1,7 @@
 # TEST 결제 전액 취소
 
+공통 변경: [회원별 호출 제한](payment-rate-limits.md). 해당 작업 한도를 초과하면 `429 PAYMENT_RATE_LIMITED`와 `Retry-After`(초), 제한 저장소 오류 시 `503 PAYMENT_RATE_LIMIT_UNAVAILABLE`를 반환합니다. 두 응답은 `Cache-Control: no-store`이며 업무 처리를 실행하지 않습니다. 취소·환불 신청은 합산 5회, 세 결제 조회 API는 합산 60회, 주문 생성은 5회, 검증은 10회이며 각 고정 창은 첫 요청부터 60초입니다. 웹훅과 내 정보 조회에는 이 제한을 적용하지 않습니다.
+
 `POST /api/payment-orders/{orderId}/cancel`
 
 - 인증: 기존 Bearer 로그인, TEST 결제 기능 활성화 조건(별도 프로필·회원 허용 목록 없음). 본인 주문만 허용하며 탈퇴/정지 사용자는 요청 불가.

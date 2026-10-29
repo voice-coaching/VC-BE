@@ -2,6 +2,7 @@ package org.example.voice.payment.controller;
 
 import org.example.voice.common.response.ApiResponse;
 import org.example.voice.payment.domain.PaymentException;
+import org.example.voice.payment.domain.PaymentRateLimitedException;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -9,6 +10,12 @@ import org.springframework.web.bind.annotation.*;
 @Order(-20)
 @RestControllerAdvice(assignableTypes = {PaymentController.class, PaymentRefundController.class})
 public class PaymentExceptionHandler {
+    @ExceptionHandler(PaymentRateLimitedException.class)
+    public ResponseEntity<ApiResponse<Void>> limited(PaymentRateLimitedException error) {
+        return ResponseEntity.status(429).cacheControl(org.springframework.http.CacheControl.noStore())
+                .header("Retry-After", Long.toString(error.retryAfterSeconds()))
+                .body(ApiResponse.error("결제 요청을 처리할 수 없습니다.", error.code()));
+    }
     @ExceptionHandler(PaymentException.class)
     public ResponseEntity<ApiResponse<Void>> handle(PaymentException error) {
         return ResponseEntity.status(error.status()).cacheControl(org.springframework.http.CacheControl.noStore())
