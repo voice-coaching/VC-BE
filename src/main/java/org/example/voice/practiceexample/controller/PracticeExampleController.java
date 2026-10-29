@@ -6,6 +6,7 @@ import org.example.voice.common.security.LoginUser;
 import org.example.voice.practiceexample.application.*;
 import org.example.voice.practiceexample.domain.PracticeExampleException;
 import org.example.voice.practiceexample.domain.model.ExampleData.Examples;
+import org.example.voice.practiceexample.controller.dto.CoursePracticeExamplesResponseDto;
 import org.springframework.http.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +17,11 @@ import java.util.Map;
 public class PracticeExampleController {
     private final PracticeExampleService examples;
     private final ExampleAudioService audio;
+    @GetMapping("/courses/{courseId}/practice-examples")
+    public ApiResponse<CoursePracticeExamplesResponseDto> listForCourse(@AuthenticationPrincipal LoginUser user, @PathVariable Long courseId,
+                                               @RequestParam(required = false) Long sessionId) {
+        return ApiResponse.success("OK", CoursePracticeExamplesResponseDto.from(examples.listForCourse(user.id(), courseId, sessionId)));
+    }
     @GetMapping("/courses/{courseId}/steps/{stepId}/practice-examples")
     public ApiResponse<Examples> list(@AuthenticationPrincipal LoginUser user, @PathVariable Long courseId,
                                       @PathVariable Long stepId, @RequestParam(required = false) Long sessionId) {

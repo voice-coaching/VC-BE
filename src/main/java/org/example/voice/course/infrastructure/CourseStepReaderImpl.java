@@ -34,7 +34,7 @@ public class CourseStepReaderImpl implements CourseStepReader {
             return Optional.empty();
         }
 
-        List<CourseStep> steps = courseStepJpaRepository.findByCourseIdOrderByStepOrderAscIdAsc(courseId);
+        List<CourseStep> steps = courseStepJpaRepository.findByCourseIdAndRetiredFalseOrderByStepOrderAscIdAsc(courseId);
         Integer completedStepOrder = findCompletedStepOrder(userId, courseId, steps);
         List<CourseStepData> items = steps.stream()
                 .map(step -> toData(step, completedStepOrder))

@@ -194,6 +194,12 @@ This document summarizes the API list exported from the local API spec directory
 | GET | `/api/courses/{courseId}/progress` | Bearer accessToken | 완료 | 클래스 진행 상태 조회 |
 | PATCH | `/api/courses/{courseId}/progress` | Bearer accessToken | 완료 | 클래스 진행 상태 수정 |
 | POST | `/api/courses/{courseId}/complete` | Bearer accessToken | 완료 | 클래스 완료 처리 |
+## 클래스 진입 예문
+
+| Method | URL | Auth | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/courses/{courseId}/practice-examples` | Bearer JWT (ACTIVE) | 클래스의 단일 연습 단계와 순서별 문장 조회 |
+
 # 예문 음성 공급자 전환 (2026-09-19)
 
 `GET /api/practice-examples/{exampleId}/audio`는 기존 사용자 인증과 발행 예문 접근 검증을 유지한다.
