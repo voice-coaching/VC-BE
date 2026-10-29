@@ -21,8 +21,7 @@ class SettingsIsolationTest(unittest.TestCase):
         substitutions = [('SPRING_PROFILES_ACTIVE=payment-test', 'SPRING_PROFILES_ACTIVE=prod'),
                          ('127.0.0.1:15435/payment_sandbox', 'production.invalid:5432/production'),
                          ('JWT_ISSUER=speakai-payment-sandbox', 'JWT_ISSUER=voice-coaching'),
-                         ('SERVER_ADDRESS=127.0.0.1', 'SERVER_ADDRESS=0.0.0.0'),
-                         ('PAYMENT_TEST_ALLOWED_USER_IDS=1', 'PAYMENT_TEST_ALLOWED_USER_IDS=')]
+                         ('SERVER_ADDRESS=127.0.0.1', 'SERVER_ADDRESS=0.0.0.0')]
         for old, new in substitutions:
             with self.subTest(setting=old), self.assertRaises(RuntimeError):
                 checked_settings(self.template.replace(old, new), self.credentials, 'db', 'jwt')

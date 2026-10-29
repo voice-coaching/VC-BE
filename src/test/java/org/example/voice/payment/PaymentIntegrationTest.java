@@ -8,9 +8,7 @@ import org.example.voice.user.domain.entity.User;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.*;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -28,9 +26,10 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
+@SpringBootTest(properties = {"payment.test.enabled=true", "PORTONE_STORE_ID=store",
+        "PORTONE_TEST_CHANNEL_KEY=channel", "PORTONE_API_SECRET=fixture-secret",
+        "PORTONE_WEBHOOK_SECRET=dGVzdC13ZWJob29rLXNpZ25hdHVyZS1rZXk="})
 @AutoConfigureMockMvc
-@Import(PaymentIntegrationTest.Policy.class)
 class PaymentIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired PaymentTransactions transactions;
@@ -44,6 +43,46 @@ class PaymentIntegrationTest {
     @MockitoBean PaymentGateway gateway;
     @MockitoBean WebhookAuthentication webhook;
     Long userId;
+
+    @Test void sharedServiceAcceptsNewMembersUsingActualSettingsAndKeepsOrderOwnership() throws Exception {
+        Long secondUser = tx().execute(status -> {
+            var user = User.createSocial(null, "new member", OffsetDateTime.now());
+            em.persist(user);
+            return user.getId();
+        });
+        for (Long id : List.of(userId, secondUser)) {
+            assertThat(memberships.read(id).type()).isEqualTo("free");
+            var result = mvc.perform(post("/api/payment-orders").with(as(id)).header("Idempotency-Key", key()))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.environment").value("TEST"))
+                    .andReturn().getResponse().getContentAsString();
+            var orderId = new ObjectMapper().readTree(result).path("data").path("orderId").asText();
+            var order = transactions.owned(id, orderId);
+            when(gateway.get(orderId)).thenReturn(snapshot(order, "PAID", 15000, 0));
+            mvc.perform(post("/api/payment-orders/{id}/verify", orderId).with(as(id)))
+                    .andExpect(status().isOk());
+            mvc.perform(get("/api/users/me").with(as(id)))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.membershipType").value("paid"))
+                    .andExpect(jsonPath("$.data.membershipEnvironment").value("TEST"));
+            mvc.perform(get("/api/payment-orders/{id}", orderId).with(as(id.equals(userId) ? secondUser : userId)))
+                    .andExpect(status().isNotFound());
+        }
+    }
+
+    @Test void sharedServiceExpiredPaidOrderReturnsFreeWithoutAlteringExistingAdminGrant() {
+        var expired = tx().execute(status -> {
+            var old = OffsetDateTime.now().minusMonths(2);
+            var order = PaymentOrder.create(userId, key(), old);
+            order.apply(new PaymentSnapshot(order.getId(), "store", "channel", "TEST", "PAID", 15000, 0,
+                    "KRW", old, old), old);
+            em.persist(order);
+            return order.getId();
+        });
+        assertThat(memberships.read(userId).type()).isEqualTo("free");
+        assertThat(transactions.owned(userId, expired).getStatus()).isEqualTo("PAID");
+        tx().executeWithoutResult(status -> em.persist(
+                org.example.voice.payment.domain.entity.TestMembershipGrant.create(userId, OffsetDateTime.now())));
+        assertThat(memberships.read(userId).type()).isEqualTo("admin");
+    }
 
     @Test void existingMemberUsageGrantIsReturnedInProfileAndIsIndependentOfCancellation() throws Exception {
         tx().executeWithoutResult(status -> em.persist(
@@ -515,17 +554,5 @@ class PaymentIntegrationTest {
     }
     private RequestPostProcessor as(Long id) {
         return authentication(UsernamePasswordAuthenticationToken.authenticated(new LoginUser(id), null, List.of()));
-    }
-    @TestConfiguration static class Policy {
-        @Bean @Primary PaymentPolicy testPolicy() {
-            return new PaymentPolicy() {
-                public boolean eligible(Long userId) { return true; }
-                public CheckoutSettings checkout() { return new CheckoutSettings("store", "channel"); }
-                public void validate(PaymentSnapshot payment) {
-                    if (!"store".equals(payment.storeId()) || !"channel".equals(payment.channelKey()) || !"TEST".equals(payment.channelType()))
-                        throw new PaymentException(409, "PAYMENT_CHANNEL_MISMATCH");
-                }
-            };
-        }
     }
 }

@@ -35,7 +35,7 @@ def load_credentials(path: Path) -> dict[str, str]:
         key, separator, value = line.partition("=")
         if separator and key.strip() in allowed:
             values[key.strip()] = value.strip().strip("\"'")
-    if any(not values.get(key) for key in allowed - {"PORTONE_WEBHOOK_SECRET"}):
+    if any(not values.get(key) for key in allowed):
         raise RuntimeError("Required PortOne test settings are missing; values were not printed")
     return values
 
@@ -98,7 +98,7 @@ class Sandbox:
             "DB_URL": f"jdbc:postgresql://127.0.0.1:{self.args.pg_port}/payment_sandbox",
             "DB_USERNAME": "postgres", "DB_PASSWORD": "", "JWT_SECRET": secrets.token_urlsafe(48),
             "JWT_ISSUER": "payment-local-sandbox", "SPRING_PROFILES_ACTIVE": "payment-test",
-            "PAYMENT_TEST_ENABLED": "true", "PAYMENT_TEST_ALLOWED_USER_IDS": "1",
+            "PAYMENT_TEST_ENABLED": "true",
             "SERVER_ADDRESS": "127.0.0.1", "SERVER_PORT": str(self.args.backend_port),
             "MANAGEMENT_SERVER_PORT": "0", "AUTH_COOKIE_SECURE": "false", "AUTH_COOKIE_SAME_SITE": "Lax",
             "SPRING_JPA_SHOW_SQL": "false", "LOGGING_LEVEL_ROOT": "WARN",

@@ -6,16 +6,16 @@
 
 마이페이지 내역 조회는 [내 결제 내역 API](payment-history-api.md)를 참고한다. 기존 주문·검증 응답 계약은 유지한다.
 
-관련 이슈: #125. 기존 사용자 API에 필드를 추가하고 테스트 주문 API 3개와 서명 인증 웹훅 1개를 추가한다.
+관련 이슈: #125, #137(기존 서비스 전환). 기존 사용자 API에 필드를 추가하고 테스트 주문 API 3개와 서명 인증 웹훅 1개를 추가한다.
 
 이번 범위는 **NHN KCP V2 TEST 일반 카드 결제 1회**이다. 상품 스냅샷은 `SPEAKAI_MONTHLY_TEST_V1`, 15,000 KRW이며 자동 갱신, 빌링키, 실제 이용권 지급, 코칭 횟수 차감, 운영 배포는 포함하지 않는다. 월간 30회/최초 무료 체험 등 BM의 나머지 정책을 구현한 것으로 간주하지 않는다.
 
-## 실행 조건과 격리
+## 실행 조건과 TEST 구분
 
 - 기본 `payment.test.enabled=false`. 비활성 상태에서 주문 API는 403이며 결제에 따른 기본 회원등급은 free다. V52로 기존 활성 회원에 부여한 테스트 admin 등급은 결제 기능과 독립적으로 반환한다. [이용등급 계약](membership-api.md).
-- 활성화하려면 Spring `payment-test` 프로필, `payment.test.enabled=true`, 양수 사용자 ID의 명시적 허용 목록 `payment.test.allowed-user-ids=1,2`, 포트원 설정이 필요하다.
-- `prod`/`production` 프로필과 동시에 활성화하면 시작에 실패한다. **이 프로필을 운영 DB 연결과 함께 사용하지 않는다.** 프로필 검사 자체는 DB가 실제로 격리됐음을 증명하지 않는다.
-- 환경변수: `PORTONE_STORE_ID`, `PORTONE_TEST_CHANNEL_KEY`, `PORTONE_API_SECRET`, 선택 `PORTONE_WEBHOOK_SECRET`. API Secret은 서버 전용이다. 웹훅 Secret 미설정은 웹훅 503으로 처리하며 사용자 요청 검증 API는 사용할 수 있다.
+- 기존 서버·DB·로그인을 사용한다. `payment.test.enabled=true`와 Store ID·TEST Channel Key·API Secret·Webhook Secret을 모두 설정하면 모든 로그인 회원이 본인의 TEST 결제를 이용할 수 있다. 별도 Spring 프로필과 회원 허용 목록은 필요하지 않으며 `payment.test.allowed-user-ids`는 더 이상 사용하지 않는다. 기본은 비활성이다. 활성화 상태에서 필수 설정이 비어 있으면 시작을 거부한다.
+- `prod`/`production` 등 기존 프로필에서도 활성화할 수 있다. 실연동 응답은 서버의 TEST 채널 검증에서 거부한다. 기존 DB·JWT 설정을 변경하지 않는다.
+- 환경변수: `PAYMENT_TEST_ENABLED=true`, `PORTONE_STORE_ID`, `PORTONE_TEST_CHANNEL_KEY`, `PORTONE_API_SECRET`, `PORTONE_WEBHOOK_SECRET`. API/Webhook Secret은 서버 전용이며 모두 필수다. 비활성 상태의 웹훅은 503이다.
 - 테스트 권한 원장은 `payment_test_orders`, 이벤트 수신 원장은 `payment_test_webhook_receipts`다. 운영 구독의 권한 원장으로 사용하지 않는다. 고객 이름, 카드번호, PG 원문 응답, 사용자 원문 웹훅을 DB에 저장하지 않는다.
 - 로컬 실행 도구는 새로운 PostgreSQL DB·JWT 발급자·계정을 매 실행 생성하며 운영 DB나 기존 로그인 세션을 사용하지 않는다.
 
@@ -66,7 +66,7 @@ free이면 만료·환경은 null이다. V52의 기존 활성 회원용 테스�
 | 400 | INVALID_IDEMPOTENCY_KEY | 헤더 누락 또는 형식 오류 |
 | 401 | AUTHENTICATION_REQUIRED | 주문 API 로그인 없음 |
 | 401 | WEBHOOK_SIGNATURE_INVALID | 웹훅 서명·시각·필수 헤더 오류 |
-| 403 | TEST_PAYMENT_DISABLED / PAYMENT_USER_INACTIVE | 비활성·허용 목록 외 사용자 / 비활성 계정 신규 주문 |
+| 403 | TEST_PAYMENT_DISABLED / PAYMENT_USER_INACTIVE | TEST 결제 비활성 / 비활성 계정 신규 주문 |
 | 404 | PAYMENT_ORDER_NOT_FOUND | 미존재·다른 회원 주문 |
 | 409 | MEMBERSHIP_ALREADY_ACTIVE | 새 키로 주문하려는데 유효한 이용권 존재 |
 | 409 | PAYMENT_NOT_COMPLETED | 포트원에 아직 해당 결제 없음 |
@@ -88,17 +88,21 @@ free이면 만료·환경은 null이다. V52의 기존 활성 회원용 테스�
 
 ## TEST 결제 상태 자동 복구 (#127)
 
-새 공개 API나 응답 필드 변경은 없다. 격리된 테스트 DB와 기존 `payment-test` 활성화 조건을 갖춘 환경에서 추가로 `payment.test.recovery.enabled=true`를 설정한다. 환경변수는 `PAYMENT_TEST_RECOVERY_ENABLED=true`이며 기본은 비활성이다. 운영 DB/프로필에 활성화하지 않는다.
+새 공개 API나 응답 필드 변경은 없다. TEST 결제를 활성화한 기존 서버에서 추가로 `payment.test.recovery.enabled=true`를 설정한다. 환경변수는 `PAYMENT_TEST_RECOVERY_ENABLED=true`이며 기본은 비활성이다. 기존 DB의 TEST 원장만 조회하며 실결제 주문을 처리하지 않는다.
 
 - 시작 60초 후, 이전 배치 완료 60초 후마다 최대 10개를 재확인한다. 별도 스케줄러 스레드 설정이 없으면 다른 예약 작업과 스레드를 공유할 수 있다.
 - DB에 이미 존재하는 PENDING 주문과 만료 전 PAID 주문만 ID 순서로 순환한다. 포트원에 없는 미결제 주문이나 실패한 조회도 다음 순환에서 재시도한다. 오래된 미결제 주문을 자동 실패 처리하거나 삭제하지 않는다.
-- 허용된 테스트 사용자만 조회한다. 금액/통화/상점/TEST 채널 검증과 기존 사용자→주문 잠금, 취소 우선 규칙을 그대로 사용한다. 외부 GET 중에는 DB 트랜잭션을 열지 않는다.
+- 별도 회원 허용 목록 없이 저장된 TEST 주문을 조회한다. 금액/통화/상점/TEST 채널 검증과 기존 사용자→주문 잠금, 취소 우선 규칙을 그대로 사용한다. 외부 GET 중에는 DB 트랜잭션을 열지 않는다.
 - 클라이언트 검증이 누락된 PAID를 복구하며 재조회로 이용기간을 연장하지 않는다. PAID 주문의 포트원 취소 상태도 기존 규칙으로 반영하지만 **취소/환불을 요청하지는 않는다**.
 - FAILED/CANCELLED 및 만료된 PAID는 자동 재조회 대상이 아니다. FAILED 주문을 재사용한 결제 시도는 수동 검증 또는 웹훅이 필요하다. 취소·환불 담당자는 기존 주문 ID와 `PaymentTransactions.apply`를 통한 상태/회원등급 계산을 재사용하고 별도 회원등급 필드를 만들지 않는다.
 - 한 주문의 통신 오류나 검증 불일치는 다른 주문 처리를 막지 않는다. 오류 원문과 사용자/주문 식별자는 로그에 기록하지 않는다.
 - Micrometer `payment.test.recovery.orders` (`outcome=applied|not_completed|failed|skipped`) 및 `payment.test.recovery.batch.failures`로 집계한다. `applied`는 상태 검증·반영 경로가 성공했다는 뜻이며 새 결제 건수는 아니다. 기존 내부 Actuator 접근 정책을 유지한다.
 - 커서는 프로세스 메모리에 보관한다. 재시작 시 처음부터 순회하며 중복 반영은 기존 멱등 규칙으로 방지한다. 여러 인스턴스에서는 중복 GET이 발생할 수 있으므로 테스트 환경의 한 인스턴스에서만 활성화한다. 분산 lease와 영구 재시도 원장은 이번 범위에 없다.
 - 배치가 여러 개면 한 바퀴에 여러 분이 걸리며, 외부 API 지연과 장애 시 더 오래 걸린다. 이 작업은 웹훅 설정을 대체하지 않는다. 실제 외부 웹훅 수신은 별도 HTTPS 테스트 환경에서 확인해야 한다.
+
+## 기존 서버 전환
+
+[기존 서비스 TEST 결제 전환 절차](shared-test-payments-rollout.md)를 따른다. 서버 설정과 웹훅 주소 변경은 코드 PR 병합 후 수행한다. 아래 도구는 별도 로컬 확인 용도이며 운영 DB를 사용하지 않는다.
 
 ## 직접 테스트
 

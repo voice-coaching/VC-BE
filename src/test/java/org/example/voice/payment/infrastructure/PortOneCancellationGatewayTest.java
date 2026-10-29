@@ -5,7 +5,6 @@ import org.example.voice.payment.domain.PaymentException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.env.MockEnvironment;
 import tools.jackson.databind.ObjectMapper;
 
 import java.net.InetSocketAddress;
@@ -32,9 +31,7 @@ class PortOneCancellationGatewayTest {
     private String postBody = "{\"cancellation\":{\"status\":\"SUCCEEDED\"}}";
 
     @BeforeEach void start() throws Exception {
-        var env = new MockEnvironment();
-        env.setActiveProfiles("payment-test");
-        var settings = new TestPaymentSettings(true, "1", "store", "channel", "fixture-secret", "", env);
+        var settings = new TestPaymentSettings(true, "store", "channel", "fixture-secret", "fixture-webhook-secret");
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/payments/", exchange -> {
             assertThat(exchange.getRequestHeaders().getFirst("Authorization")).isEqualTo("PortOne fixture-secret");
