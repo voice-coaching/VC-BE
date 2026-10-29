@@ -41,6 +41,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest @AutoConfigureMockMvc
 class PracticeExampleIntegrationTest {
+    @org.springframework.boot.test.context.TestConfiguration
+    static class CacheTestConfig {
+        @org.springframework.context.annotation.Bean
+        @org.springframework.context.annotation.Primary
+        org.springframework.cache.CacheManager practiceTestCacheManager() {
+            return new org.springframework.cache.support.NoOpCacheManager();
+        }
+    }
     @Autowired EntityManager em;
     @Autowired PlatformTransactionManager manager;
     @Autowired PracticeExampleService examples;
@@ -71,6 +79,54 @@ class PracticeExampleIntegrationTest {
     }
     private void seed(int revision) {
         seed(revision, 5);
+    }
+    @Test void courseEntryReturnsSentencesWithoutATheoryStepIdAndPinsOwnedSession() throws Exception {
+        String path = "/api/courses/" + course + "/practice-examples";
+        mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        mvc.perform(get(path).with(auth(user))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.courseId").value(course))
+                .andExpect(jsonPath("$.data.stepId").value(step))
+                .andExpect(jsonPath("$.data.items.length()").value(5))
+                .andExpect(jsonPath("$.data.items[0].practiceContentId").value(firstContent));
+        var session = sessions.create(new TrainingSessionCreateRequestDto(firstContent, step, LearningFocus.BOTH), user);
+        tx.executeWithoutResult(s -> seed(2));
+        assertThat(examples.listForCourse(user, course, session.sessionId()).revision()).isEqualTo(1);
+        assertStatus(404, () -> examples.listForCourse(other, course, session.sessionId()));
+        assertStatus(400, () -> examples.listForCourse(user, 0L, null));
+        tx.executeWithoutResult(s -> fields(em.find(Course.class, course), Map.of("status", PublishStatus.HIDDEN)));
+        mvc.perform(get(path).with(auth(user))).andExpect(status().isNotFound());
+    }
+
+    @Test void courseEntryRejectsAmbiguousPracticeStagesAndIgnoresRetiredStages() {
+        Long extra = tx.execute(s -> {
+            var st = construct(CourseStep.class);
+            fields(st, Map.of("course", em.find(Course.class, course), "stepType", CourseStepType.PRACTICE,
+                    "stepOrder", 2, "title", "other practice", "required", true));
+            em.persist(st); return st.getId();
+        });
+        assertStatus(503, () -> examples.listForCourse(user, course, null));
+        tx.executeWithoutResult(s -> fields(em.find(CourseStep.class, extra), Map.of("retired", true)));
+        assertThat(examples.listForCourse(user, course, null).stepId()).isEqualTo(step);
+    }
+
+    @Test void retiredTheoryIsHiddenFromStepsAndCountButHistoricalDetailRemainsReadable() throws Exception {
+        Long theory = tx.execute(s -> {
+            var st = construct(CourseStep.class);
+            fields(st, Map.of("course", em.find(Course.class, course), "stepType", CourseStepType.THEORY,
+                    "stepOrder", 2, "title", "old theory", "required", false, "retired", true));
+            em.persist(st);
+            var revision = construct(CourseStepRevision.class);
+            fields(revision, Map.of("stepId", st.getId(), "revision", 1, "title", "old theory", "stepOrder", 2,
+                    "stepType", CourseStepType.THEORY, "blocksJson", "[{\"type\":\"TEXT\",\"body\":\"historical\"}]"));
+            em.persist(revision); return st.getId();
+        });
+        mvc.perform(get("/api/courses/" + course + "/steps").with(auth(user))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.stepCount").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").value(step));
+        mvc.perform(get("/api/courses/" + course).with(auth(user))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.stepCount").value(1));
+        mvc.perform(get("/api/courses/" + course + "/steps/" + theory).with(auth(user))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.blocks[0].body").value("historical"));
     }
     private void seed(int revision, int exampleCount) {
         var now = OffsetDateTime.now(ZoneOffset.UTC).minusHours(1);

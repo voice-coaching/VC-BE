@@ -131,7 +131,7 @@ public class CourseProgressWriterImpl implements CourseProgressWriter {
     }
 
     private CourseProgressData createProgress(Course course, Long userId) {
-        CourseStep firstStep = courseStepJpaRepository.findFirstByCourseIdOrderByStepOrderAscIdAsc(course.getId())
+        CourseStep firstStep = courseStepJpaRepository.findFirstByCourseIdAndRetiredFalseOrderByStepOrderAscIdAsc(course.getId())
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
         UserCourseProgress progress = UserCourseProgress.start(course, userId, firstStep.getId(), OffsetDateTime.now());
         return toData(userCourseProgressJpaRepository.save(progress));

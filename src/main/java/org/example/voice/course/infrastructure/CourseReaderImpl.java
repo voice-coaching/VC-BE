@@ -110,7 +110,7 @@ public class CourseReaderImpl implements CourseReader {
                 course.getDescription(),
                 course.getDifficulty(),
                 course.getEstimatedMinutes(),
-                courseStepJpaRepository.countByCourseId(course.getId()),
+                courseStepJpaRepository.countByCourseIdAndRetiredFalse(course.getId()),
                 progress
         );
     }

@@ -50,4 +50,7 @@ public class CourseStep {
 
     @Column(name = "required", nullable = false)
     private Boolean required;
+
+    @Column(name = "retired", nullable = false)
+    private boolean retired;
 }

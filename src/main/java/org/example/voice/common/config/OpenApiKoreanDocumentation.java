@@ -233,6 +233,7 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/notifications", "알림", "알림함 조회", "본인 알림을 최신순으로 조회합니다. hasNext와 전체 미읽음 unreadCount를 반환하며 unreadOnly 필터를 지원합니다.", false);
         add(map, PathItem.HttpMethod.PATCH, "/api/notifications/{notificationId}/read", "알림", "알림 읽음 처리", "본인 알림의 최초 읽음 시각을 보존하며 반복 요청을 안전하게 처리합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/notifications/read-all", "알림", "모든 알림 읽음 처리", "본인의 미읽음 알림만 갱신하고 갱신 건수를 반환합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/courses/{courseId}/practice-examples", "클래스", "클래스 진입 예문 조회", "클래스의 단일 연습 단계에 연결된 문장을 순서대로 반환합니다. 응답 stepId와 각 practiceContentId로 녹음·평가를 시작합니다. 본인 sessionId의 개정 고정을 유지하며 미준비 또는 복수 연습 단계는 503입니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/courses/{courseId}/steps/{stepId}/practice-examples", "클래스", "단계별 예문 조회", "게시된 개정의 예문 5~10개와 숫자 practiceContentId를 순서대로 제공합니다. 본인 sessionId로 고정된 과거 개정을 조회하며 미준비는 503입니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/practice-examples/{exampleId}/audio", "클래스", "Chirp 예문 음성 조회", "게시된 불변 예문만 Aoede 화자/속도 0.92로 합성합니다. 성공은 audio/mpeg와 private cache/ETag, 합성 실패는 JSON 503, 제한 초과는 429입니다. 임의 text query는 허용하지 않습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/payment-orders", "테스트 결제", "테스트 결제 주문 생성", "허용된 테스트 회원만 15,000 KRW 월간 테스트 주문을 생성합니다. 16~64자의 Idempotency-Key가 필수이며 동일 키는 동일 주문을 반환합니다. 자동 갱신과 실제 서비스 이용권 지급은 포함하지 않습니다.", false);

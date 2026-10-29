@@ -1869,6 +1869,10 @@ Content-Type: application/json
 ```
 - Status codes: 200 OK, 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable Entity, 503 Service Unavailable
 - Error cases: callback token 누락 또는 불일치, analysis id 불일치, stale request id, stale execution id, 이미 terminal 상태인 analysis, 지원하지 않는 result schema, 결과 저장 실패
+## 클래스 문장 순차 연습
+
+`GET /api/courses/{courseId}/practice-examples`: ACTIVE 회원 Bearer 인증. 클래스 ID로 단일 연습 단계의 기존 문장을 조회한다. 요청·응답·오류·개정 고정과 프론트 전환은 [클래스 순차 연습 계약](course-sequential-practice-api.md)을 따른다. 클래스 상세 및 단계 목록의 stepCount는 V53으로 은퇴한 단계를 제외한다. 문장별 진도 자동 계산은 이번 변경에 포함하지 않는다.
+
 # 예문 음성 공급자 전환 (2026-09-19)
 
 - Method/path: `GET /api/practice-examples/{exampleId}/audio`.
