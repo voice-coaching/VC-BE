@@ -6,7 +6,7 @@
 
 `POST /api/payment-orders/{orderId}/refund-requests`
 
-- auth: Bearer 로그인 + TEST 결제 활성화 + 허용 사용자. 탈퇴/정지 계정의 신청은 차단한다.
+- auth: Bearer 로그인 + TEST 결제 활성화(별도 회원 허용 목록 없음). 탈퇴/정지 계정의 신청은 차단한다.
 - path: `orderId` string 필수, 본인의 서버 생성 테스트 주문 ID.
 - query: 없음.
 - body: `reason` string 필수/non-null, 원문 1~200자·제어문자 불가·앞뒤 공백 제거 후 비어 있으면 거절. 기존 취소와 동일한 사유 검증을 사용한다. 금액·통화·사용자 ID를 클라이언트 입력으로 결정하지 않는다.
@@ -23,7 +23,7 @@ HTTP 200, Cache-Control: no-store. 메시지는 `전액 환불 신청을 확인�
 
 `GET /api/refund-requests/{requestId}`
 
-- auth: 기존 Bearer 로그인 + TEST 허용 사용자 + 본인 요청 소유권.
+- auth: 기존 Bearer 로그인 + TEST 결제 활성화 + 본인 요청 소유권.
 - path: `requestId` 소문자 UUID string 필수. 없는 ID·잘못된 형식·타인 요청은 모두 404.
 - query/body: 없음.
 - HTTP 200, Cache-Control: no-store. 메시지 `전액 환불 처리 상태를 조회했습니다.`.
@@ -57,7 +57,7 @@ UNKNOWN은 외부 결과 미확인, PENDING은 접수 응답을 받았으나 전
 | 400 | INVALID_CANCELLATION_REASON | 신청 사유 누락/공백/길이 초과/제어문자 |
 | 400 | VALIDATION_ERROR | JSON 요청 형식 오류 |
 | 401 | AUTHENTICATION_REQUIRED | 로그인 없음/만료 |
-| 403 | TEST_PAYMENT_DISABLED | 테스트 비활성/허용 사용자 아님 |
+| 403 | TEST_PAYMENT_DISABLED | TEST 결제 비활성 |
 | 403 | PAYMENT_USER_INACTIVE | 탈퇴/정지/없는 계정의 신청 |
 | 404 | PAYMENT_ORDER_NOT_FOUND | 신청 대상 주문 없음/타인 주문 |
 | 404 | PAYMENT_CANCELLATION_NOT_FOUND | 조회 ID 없음/형식 오류/타인 요청 |
@@ -70,8 +70,8 @@ UNKNOWN은 외부 결과 미확인, PENDING은 접수 응답을 받았으나 전
 
 ## 프론트 연결
 
-공용 TEST base로 로그인한 토큰을 사용한다. 신청 사유를 제출한 뒤 받은 requestId로 상태를 조회한다. 네트워크 오류 시 새 사유/새 금액으로 요청하지 말고 같은 body로 재신청해 기존 요청을 확인한다. SUCCEEDED 후 프로필과 결제 내역을 새로 조회하며 다른 유효한 이용권이 있으면 paid가 유지될 수 있다. 카드사 반영 시점이나 이용기간에 따른 일할 환불 정책은 제공하지 않는다.
+기존 서비스에서 로그인한 토큰을 사용한다. 신청 사유를 제출한 뒤 받은 requestId로 상태를 조회한다. 네트워크 오류 시 새 사유/새 금액으로 요청하지 말고 같은 body로 재신청해 기존 요청을 확인한다. SUCCEEDED 후 프로필과 결제 내역을 새로 조회하며 다른 유효한 이용권이 있으면 paid가 유지될 수 있다. 카드사 반영 시점이나 이용기간에 따른 일할 환불 정책은 제공하지 않는다.
 
-신규 JAR·V51·Nginx 허용 경로·Swagger 필터를 서버에 적용한 뒤 공용 환경 검증이 필요하다. 이번 구현과 푸시는 서버 배포나 실제 카드 취소 승인을 포함하지 않는다.
+기존 서비스의 [TEST 결제 전환 절차](shared-test-payments-rollout.md)에 따라 활성화한 뒤 실제 승인·취소 검증이 필요하다. 코드 PR은 운영 설정 변경이나 실제 카드 취소 승인을 포함하지 않는다.
 
 V52의 기존 회원 테스트 admin 등급은 환불로 회수되지 않는다. 환불 성공과 현재 이용등급은 분리해 표시한다. 일반 계정의 paid/free 전환 검증에는 테스트 admin grant가 없는 신규 계정을 사용한다. [이용등급 계약](membership-api.md).

@@ -30,7 +30,7 @@ public class OpenApiKoreanDocumentation {
                     tag("클래스", "클래스 목록, 단계와 사용자별 학습 진도를 관리합니다."),
                     tag("마이페이지", "내 학습 기록, 통계, 강점·약점과 맞춤 추천을 제공합니다."),
                     tag("고객 지원", "게시된 공지와 본인의 문의를 조회하고 접수합니다."),
-                    tag("테스트 결제", "격리된 테스트 환경에서 주문과 검증된 테스트 회원등급을 관리합니다.")
+                    tag("테스트 결제", "기존 로그인과 DB에서 TEST 주문과 검증된 테스트 회원등급을 관리합니다.")
             ));
             DOCS.forEach((key, doc) -> {
                 PathItem pathItem = openApi.getPaths().get(key.path());
@@ -236,9 +236,9 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/courses/{courseId}/practice-examples", "클래스", "클래스 진입 예문 조회", "클래스의 단일 연습 단계에 연결된 문장을 순서대로 반환합니다. 응답 stepId와 각 practiceContentId로 녹음·평가를 시작합니다. 본인 sessionId의 개정 고정을 유지하며 미준비 또는 복수 연습 단계는 503입니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/courses/{courseId}/steps/{stepId}/practice-examples", "클래스", "단계별 예문 조회", "게시된 개정의 예문 5~10개와 숫자 practiceContentId를 순서대로 제공합니다. 본인 sessionId로 고정된 과거 개정을 조회하며 미준비는 503입니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/practice-examples/{exampleId}/audio", "클래스", "Chirp 예문 음성 조회", "게시된 불변 예문만 Aoede 화자/속도 0.92로 합성합니다. 성공은 audio/mpeg와 private cache/ETag, 합성 실패는 JSON 503, 제한 초과는 429입니다. 임의 text query는 허용하지 않습니다.", false);
-        add(map, PathItem.HttpMethod.POST, "/api/payment-orders", "테스트 결제", "테스트 결제 주문 생성", "허용된 테스트 회원만 15,000 KRW 월간 테스트 주문을 생성합니다. 16~64자의 Idempotency-Key가 필수이며 동일 키는 동일 주문을 반환합니다. 자동 갱신과 실제 서비스 이용권 지급은 포함하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/payment-orders", "테스트 결제", "테스트 결제 주문 생성", "TEST 결제 기능 활성화 시 모든 로그인 회원이 15,000 KRW 월간 테스트 주문을 생성합니다. 16~64자의 Idempotency-Key가 필수이며 동일 키는 동일 주문을 반환합니다. 자동 갱신과 실제 서비스 이용권 지급은 포함하지 않습니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/payment-orders/{orderId}", "테스트 결제", "테스트 결제 주문 조회", "본인의 테스트 주문만 조회합니다. 다른 사용자의 주문은 404이며 조회만으로 포트원 결제 상태를 갱신하지 않습니다.", false);
-        add(map, PathItem.HttpMethod.GET, "/api/users/me/payment-orders", "테스트 결제", "내 결제 내역 조회", "본인의 TEST 주문을 생성 시각과 ID 내림차순으로 조회합니다. page는 0부터, size는 1~100(기본 20), page*size는 2147483647 이하입니다. PENDING/PAID/FAILED/CANCELLED를 포함하며 포트원을 호출하거나 회원등급을 갱신하지 않습니다. 결제 완료 시각 paidAt과 이용권 만료일 expiresAt은 해당 값이 없으면 null입니다. 테스트 결제 활성화 및 허용된 사용자만 접근할 수 있습니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/payment-orders", "테스트 결제", "내 결제 내역 조회", "본인의 TEST 주문을 생성 시각과 ID 내림차순으로 조회합니다. page는 0부터, size는 1~100(기본 20), page*size는 2147483647 이하입니다. PENDING/PAID/FAILED/CANCELLED를 포함하며 포트원을 호출하거나 회원등급을 갱신하지 않습니다. 결제 완료 시각 paidAt과 이용권 만료일 expiresAt은 해당 값이 없으면 null입니다. TEST 결제 기능 활성화 시 모든 로그인 회원이 본인의 내역에 접근할 수 있습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/payment-orders/{orderId}/verify", "테스트 결제", "포트원 테스트 결제 검증", "포트원 서버에서 주문 ID, 상점, 테스트 채널, 금액, 통화와 상태를 확인합니다. 검증된 결제만 테스트 회원등급에 반영하며 중복 요청은 기간을 연장하지 않습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/payment-orders/{orderId}/cancel", "테스트 결제", "테스트 결제 전액 취소", "본인의 TEST 결제를 서버 금액으로 전액 취소합니다. reason은 필수이며 1~200자입니다. 중복 요청은 같은 처리 기록을 반환합니다. SUCCEEDED만 전액 취소 확인 완료이며 UNKNOWN/PENDING은 검증·웹훅으로 확인해야 합니다. 부분 취소나 실결제는 지원하지 않습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/payment-orders/{orderId}/refund-requests", "테스트 결제", "전액 환불 신청", "본인의 TEST 주문에 전액 환불을 신청합니다. reason은 필수 1~200자이며 금액은 서버의 15,000 KRW로 고정됩니다. 기존 취소 요청과 동일한 원장을 사용하고 같은 사유의 재신청은 PG 재전송 없이 동일 requestId와 상태를 반환합니다. 200은 환불 완료를 의미하지 않습니다.", false);

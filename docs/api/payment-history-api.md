@@ -4,7 +4,7 @@
 >
 > 설명: 로그인 사용자의 테스트 주문 내역을 생성 시각 DESC, 같은 시각이면 주문 ID DESC로 조회합니다. PENDING/PAID/FAILED/CANCELLED를 모두 포함합니다.
 >
-> 인증·권한: `Authorization: Bearer <accessToken>` 필수. 기존 테스트 결제 활성화 조건과 허용 사용자 정책을 그대로 적용합니다. 운영 기본 설정에서는 403이며 실제 운영 결제 내역 API가 아닙니다.
+> 인증·권한: `Authorization: Bearer <accessToken>` 필수. TEST 결제 활성화 시 모든 로그인 회원이 본인의 TEST 내역을 조회할 수 있습니다. 별도 회원 허용 목록은 없습니다. 기능 비활성 시 403이며 실결제 내역 API는 아닙니다.
 
 ---
 
@@ -119,7 +119,7 @@ Authorization: Bearer <accessToken>
 {"result":false,"message":"인증이 필요하거나 Access Token이 만료되었습니다.","data":null,"code":"AUTHENTICATION_REQUIRED"}
 ```
 
-### 403 TEST_PAYMENT_DISABLED — 비활성 또는 비허용 사용자
+### 403 TEST_PAYMENT_DISABLED — TEST 결제 비활성
 
 ```json
 {"result":false,"message":"결제 요청을 처리할 수 없습니다.","data":null,"code":"TEST_PAYMENT_DISABLED"}

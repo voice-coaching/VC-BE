@@ -2,7 +2,7 @@
 
 `POST /api/payment-orders/{orderId}/cancel`
 
-- 인증: 기존 Bearer 로그인, `payment-test` 프로필·기능 활성화·허용 사용자 조건. 본인 주문만 허용하며 탈퇴/정지 사용자는 요청 불가.
+- 인증: 기존 Bearer 로그인, TEST 결제 기능 활성화 조건(별도 프로필·회원 허용 목록 없음). 본인 주문만 허용하며 탈퇴/정지 사용자는 요청 불가.
 - path: `orderId` string, 기존 서버 생성 주문 ID.
 - query: 없음.
 - body: JSON 객체. `reason` string 필수, 앞뒤 공백 제거 후 1~200자, 제어문자 불가. 원문 입력 길이도 200자 이하여야 한다. 금액·통화·사용자 ID·상점·채널은 입력받아 결정하지 않는다. 사유에는 카드·계좌·연락처 등 개인정보를 입력하지 않는다.
@@ -49,7 +49,7 @@ V52의 기존 회원 테스트 admin grant는 결제·취소와 별개다. 이 g
 | 400 | INVALID_CANCELLATION_REASON | 사유 없음/공백/200자 초과/제어문자 |
 | 400 | VALIDATION_ERROR | JSON 입력 오류, 기존 공통 처리 |
 | 401 | AUTHENTICATION_REQUIRED | 로그인 없음/만료 |
-| 403 | TEST_PAYMENT_DISABLED | 테스트 비활성/허용 사용자 아님 |
+| 403 | TEST_PAYMENT_DISABLED | TEST 결제 비활성 |
 | 403 | PAYMENT_USER_INACTIVE | 계정 없음/탈퇴/정지 |
 | 404 | PAYMENT_ORDER_NOT_FOUND | 없는 주문/타인 주문 |
 | 409 | PAYMENT_NOT_CANCELLABLE | 미결제/실패/부분 취소/현재 상태에서 취소 불가 |
@@ -60,6 +60,6 @@ V52의 기존 회원 테스트 admin grant는 결제·취소와 별개다. 이 g
 | 502 | PAYMENT_PROVIDER_INVALID_RESPONSE | 사전 재조회 응답 형식 오류 |
 | 502 | PAYMENT_CANCELLATION_UNCONFIRMED | 취소 전송 경로/사후 확인 실패. 요청 원장은 UNKNOWN으로 보존 |
 
-공용 테스트 환경의 Nginx 허용 경로에 cancel을 추가했다. 새 JAR와 V51 및 Nginx 설정을 실제 서버에 적용하는 것은 별도이며, 기존 설치 도구를 운영 서버에 임의 재실행하지 않는다.
+기존 서비스의 로그인·DB로 연결한다. [TEST 결제 전환 절차](shared-test-payments-rollout.md)에 따라 코드 배포와 설정 활성화를 분리한다. 별도 sandbox 설치 도구를 기존 운영 서버에 재실행하지 않는다.
 
 공식 계약: [PortOne V2 REST와 멱등성](https://developers.portone.io/api/rest-v2), [결제 취소](https://developers.portone.io/api/rest-v2/payment), [취소·환불 안내](https://help.portone.io/content/cancel-guide-using-admin-console).

@@ -76,7 +76,6 @@ def checked_settings(template, credentials, database_password, signing_secret):
     require(settings.get('DB_URL') == 'jdbc:postgresql://127.0.0.1:15435/payment_sandbox', 'INVALID_TEST_DATABASE')
     require(settings.get('JWT_ISSUER') == 'speakai-payment-sandbox', 'INVALID_TEST_ISSUER')
     require(settings.get('SERVER_ADDRESS') == '127.0.0.1', 'INVALID_BIND_ADDRESS')
-    require(settings.get('PAYMENT_TEST_ALLOWED_USER_IDS') == '1', 'INVALID_TEST_ALLOWLIST')
     require(not any('REPLACE_WITH_' in value for value in settings.values()), 'UNFILLED_SETTING')
     return settings
 

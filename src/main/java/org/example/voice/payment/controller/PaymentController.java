@@ -38,7 +38,7 @@ public class PaymentController {
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "VALIDATION_ERROR: page는 0 이상, size는 1~100, page*size는 2147483647 이하의 정수"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "AUTHENTICATION_REQUIRED: 로그인 필요"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "TEST_PAYMENT_DISABLED: 테스트 결제 비활성 또는 비허용 사용자")
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "TEST_PAYMENT_DISABLED: 테스트 결제 비활성")
     })
     public ApiResponse<PaymentHistoryResponse> history(@AuthenticationPrincipal LoginUser user,
             @Parameter(schema = @Schema(type = "integer", format = "int32", minimum = "0", defaultValue = "0")) @RequestParam(defaultValue = "0") int page,

@@ -1,5 +1,7 @@
 # 공용 PortOne TEST 환경
 
+> 이 문서는 기존 별도 sandbox의 설치 기록입니다. 새 연동은 [기존 서비스 TEST 결제 전환](../../docs/api/shared-test-payments-rollout.md)을 따릅니다. sandbox의 계정·DB를 복사하지 않으며 자동 삭제하지 않습니다.
+
 관련 이슈: #131. 기존 결제 API를 별도 DB·JWT·테스트 계정으로 실행하는 관리자용 운영 자료입니다. 신규 API나 운영 회원의 유료 등급을 추가하지 않습니다.
 
 ## 팀 연동
