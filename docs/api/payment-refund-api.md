@@ -1,5 +1,7 @@
 # TEST 전액 환불 신청·처리 상태 조회
 
+공통 변경: [회원별 호출 제한](payment-rate-limits.md). 해당 작업 한도를 초과하면 `429 PAYMENT_RATE_LIMITED`와 `Retry-After`(초), 제한 저장소 오류 시 `503 PAYMENT_RATE_LIMIT_UNAVAILABLE`를 반환합니다. 두 응답은 `Cache-Control: no-store`이며 업무 처리를 실행하지 않습니다. 취소·환불 신청은 합산 5회, 세 결제 조회 API는 합산 60회, 주문 생성은 5회, 검증은 10회이며 각 고정 창은 첫 요청부터 60초입니다. 웹훅과 내 정보 조회에는 이 제한을 적용하지 않습니다.
+
 카드 전액 취소와 전액 환불은 PortOne의 같은 취소 API를 사용한다. 별도 환불 실행기·금액 원장을 만들지 않고 V51 `payment_test_cancellations`를 공유한다. 기존 cancel 응답의 requestId도 같은 환불 상태 조회에 사용할 수 있다. 실결제·부분 환불·환불 심사/관리자 승인·정기결제 해지는 이번 범위에 없다.
 
 ## 전액 환불 신청

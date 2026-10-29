@@ -23,6 +23,24 @@ class OpenApiDocumentIntegrationTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    void paymentEndpointsDocumentRateLimitRetryHeaderWithoutApplyingItToWebhooksOrProfile() throws Exception {
+        JsonNode paths = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("paths");
+        for (String[] route : new String[][]{
+                {"/api/payment-orders", "post"}, {"/api/payment-orders/{orderId}", "get"},
+                {"/api/payment-orders/{orderId}/verify", "post"}, {"/api/users/me/payment-orders", "get"},
+                {"/api/payment-orders/{orderId}/cancel", "post"}, {"/api/payment-orders/{orderId}/refund-requests", "post"},
+                {"/api/refund-requests/{requestId}", "get"}}) {
+            var responses = paths.path(route[0]).path(route[1]).path("responses");
+            assertThat(responses.path("429").path("description").asText()).contains("PAYMENT_RATE_LIMITED");
+            assertThat(responses.path("429").path("headers").path("Retry-After").isMissingNode()).isFalse();
+            assertThat(responses.path("503").path("description").asText()).contains("PAYMENT_RATE_LIMIT_UNAVAILABLE");
+        }
+        assertThat(paths.path("/api/payments/webhooks/portone").path("post").path("responses").has("429")).isFalse();
+        assertThat(paths.path("/api/users/me").path("get").path("responses").has("429")).isFalse();
+    }
+
+    @Test
     void documentsSupportValidationIdempotencyAndErrorCodes() throws Exception {
         String body = mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
