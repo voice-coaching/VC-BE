@@ -31,8 +31,19 @@ jobs:
       - name: Grant execute permission for Gradle wrapper
         run: chmod +x gradlew
 
+      - name: Set up Python 3.12 for media sandbox verification
+        id: python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
       - name: Test and build
+        env:
+          VC_BE_TEST_SANDBOX_PYTHON: ${{ steps.python.outputs.python-path }}
         run: ./gradlew clean test bootJar --no-daemon
+
+      - name: Validate isolated payment sandbox settings
+        run: python -m unittest discover -s scripts/payment-sandbox -p test_settings.py
 
       - name: Upload test reports on failure
         if: failure()

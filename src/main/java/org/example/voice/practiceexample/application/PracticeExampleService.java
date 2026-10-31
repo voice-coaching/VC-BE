@@ -13,6 +13,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class PracticeExampleService {
     private final PracticeExampleReader examples;
     private final UserReader users;
+    public Examples listForCourse(Long userId, Long courseId, Long sessionId) {
+        active(userId);
+        if (courseId <= 0 || (sessionId != null && sessionId <= 0)) throw PracticeExampleException.invalid();
+        Long stepId = examples.practiceStepForCourse(courseId);
+        return examples.examples(userId, courseId, stepId, sessionId);
+    }
     public Examples list(Long userId, Long courseId, Long stepId, Long sessionId) {
         active(userId);
         if (courseId <= 0 || stepId <= 0 || (sessionId != null && sessionId <= 0)) throw PracticeExampleException.invalid();

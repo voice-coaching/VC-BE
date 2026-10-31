@@ -10,6 +10,12 @@ public interface CourseStepJpaRepository extends JpaRepository<CourseStep, Long>
 
     int countByCourseId(Long courseId);
 
+    int countByCourseIdAndRetiredFalse(Long courseId);
+
+    List<CourseStep> findByCourseIdAndRetiredFalseOrderByStepOrderAscIdAsc(Long courseId);
+
+    Optional<CourseStep> findFirstByCourseIdAndRetiredFalseOrderByStepOrderAscIdAsc(Long courseId);
+
     List<CourseStep> findByCourseIdOrderByStepOrderAscIdAsc(Long courseId);
 
     Optional<CourseStep> findFirstByCourseIdOrderByStepOrderAscIdAsc(Long courseId);

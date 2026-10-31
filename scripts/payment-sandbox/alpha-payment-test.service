@@ -1,0 +1,36 @@
+[Unit]
+Description=SpeakAI isolated PortOne TEST backend
+After=network-online.target docker.service
+Requires=docker.service
+StartLimitIntervalSec=300
+StartLimitBurst=2
+
+[Service]
+Type=simple
+User=alpha-payment-test
+Group=alpha-payment-test
+WorkingDirectory=/var/lib/alpha-payment-test/runtime
+EnvironmentFile=/etc/alpha-payment-test/backend.env
+ExecStart=/usr/bin/java -Xms32m -Xmx128m -Xss512k -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:+ExitOnOutOfMemoryError -XX:ActiveProcessorCount=1 -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=32m -XX:MaxDirectMemorySize=16m -jar /opt/alpha-payment-test/app.jar
+Restart=on-failure
+RestartSec=20
+TimeoutStopSec=30
+MemoryHigh=368M
+MemoryMax=384M
+MemorySwapMax=0
+CPUQuota=50%
+Nice=10
+OOMScoreAdjust=800
+TasksMax=128
+LimitNOFILE=4096
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/alpha-payment-test/runtime
+RestrictSUIDSGID=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target

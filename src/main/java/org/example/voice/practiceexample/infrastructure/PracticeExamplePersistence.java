@@ -14,8 +14,23 @@ import java.util.List;
 
 @Repository @RequiredArgsConstructor
 public class PracticeExamplePersistence implements PracticeExampleReader {
+    private static final int MIN_EXAMPLE_COUNT = 5;
+    private static final int MAX_EXAMPLE_COUNT = 10;
+
     private final EntityManager em;
     private final Clock clock;
+
+    @Override
+    public Long practiceStepForCourse(Long courseId) {
+        boolean published = !em.createQuery("select c.id from Course c where c.id=:course and c.status=:status", Long.class)
+                .setParameter("course", courseId).setParameter("status", PublishStatus.PUBLISHED).getResultList().isEmpty();
+        if (!published) throw PracticeExampleException.missing();
+        var steps = em.createQuery("select s.id from CourseStep s where s.course.id=:course and s.retired=false and s.stepType=org.example.voice.course.domain.type.CourseStepType.PRACTICE order by s.stepOrder, s.id", Long.class)
+                .setParameter("course", courseId).setMaxResults(2).getResultList();
+        // Never silently choose one curriculum when multiple practice steps exist.
+        if (steps.size() != 1) throw new PracticeExampleException(503, "PRACTICE_EXAMPLES_UNAVAILABLE");
+        return steps.getFirst();
+    }
     public Examples examples(Long userId, Long courseId, Long stepId, Long sessionId) {
         var step = step(stepId);
         if (!step.getCourse().getId().equals(courseId)) throw PracticeExampleException.missing();
@@ -56,8 +71,10 @@ public class PracticeExamplePersistence implements PracticeExampleReader {
         if (set.getPublishedAt().isAfter(OffsetDateTime.now(clock))) throw PracticeExampleException.missing();
         var entries = em.createQuery("select e from PracticeExample e join fetch e.content where e.set.id=:set order by e.order", PracticeExample.class)
                 .setParameter("set", set.getId()).getResultList();
-        if (entries.size() != 5) throw new PracticeExampleException(503, "PRACTICE_EXAMPLES_UNAVAILABLE");
-        for (int i = 0; i < 5; i++) {
+        if (entries.size() < MIN_EXAMPLE_COUNT || entries.size() > MAX_EXAMPLE_COUNT) {
+            throw new PracticeExampleException(503, "PRACTICE_EXAMPLES_UNAVAILABLE");
+        }
+        for (int i = 0; i < entries.size(); i++) {
             var e = entries.get(i); var c = e.getContent();
             if (e.getOrder() != i + 1 || !"ko-KR".equals(e.getLocale()) || c.getOwnerId() != null || c.getStatus() != PublishStatus.PUBLISHED
                     || (c.getPublishedAt() != null && c.getPublishedAt().isAfter(OffsetDateTime.now(clock)))

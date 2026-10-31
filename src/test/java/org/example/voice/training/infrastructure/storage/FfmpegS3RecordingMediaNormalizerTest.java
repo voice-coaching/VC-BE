@@ -305,6 +305,9 @@ class FfmpegS3RecordingMediaNormalizerTest {
         MediaNormalizationProperties properties = new MediaNormalizationProperties();
         properties.setEnabled(true);
         properties.setWorkspaceRoot(workspaceRoot());
+        // Hosted CI images may not install the production absolute path under /usr/bin.
+        properties.setSandboxPythonBinary(System.getenv().getOrDefault(
+                "VC_BE_TEST_SANDBOX_PYTHON", properties.getSandboxPythonBinary()));
         properties.setFfmpegBinary("/usr/bin/ffmpeg");
         properties.setFfprobeBinary("/usr/bin/ffprobe");
         return properties;

@@ -12,11 +12,16 @@ public record UserProfileResponseDto(
         List<String> loginProviders,
         boolean onboardingCompleted,
         OffsetDateTime createdAt,
-        String profileImageUrl
+        String profileImageUrl,
+        @io.swagger.v3.oas.annotations.media.Schema(allowableValues = {"free", "paid", "admin"})
+        String membershipType,
+        OffsetDateTime membershipExpiresAt,
+        String membershipEnvironment
 ) {
     public static UserProfileResponseDto from(UserProfile profile) {
         return new UserProfileResponseDto(
                 profile.id(), profile.email(), profile.nickname(), profile.status().name(),
-                profile.loginProviders(), profile.onboardingCompleted(), profile.createdAt(), profile.profileImageUrl());
+                profile.loginProviders(), profile.onboardingCompleted(), profile.createdAt(), profile.profileImageUrl(),
+                profile.membership().type(), profile.membership().expiresAt(), profile.membership().environment());
     }
 }

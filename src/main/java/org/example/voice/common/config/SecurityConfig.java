@@ -38,6 +38,7 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable()).httpBasic(basic -> basic.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/payments/webhooks/portone").permitAll()
                         .requestMatchers("/api/auth/email-availability", "/api/auth/signup", "/api/auth/login",
                                 "/api/auth/social-login", "/api/auth/token/refresh", "/swagger-ui/**", "/v3/api-docs/**",
                                 "/api/internal/ai/**",
@@ -67,7 +68,7 @@ public class SecurityConfig {
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Idempotency-Key", "If-None-Match",
                 "X-Analysis-Result-Schema"));
-        configuration.setExposedHeaders(List.of("ETag", "Cache-Control"));
+        configuration.setExposedHeaders(List.of("ETag", "Cache-Control", "Retry-After"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

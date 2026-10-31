@@ -44,8 +44,11 @@ class ExampleTtsPostgresTest {
             db.update("INSERT INTO example_tts_jobs(example_id,profile_revision,state,attempt,cache_key,audio_sha256,duration_ms) VALUES('tts-5','r1','GENERATED',1,?,?,1000)","b".repeat(64),legacyDigest);
             var upgrade=Flyway.configure().dataSource(url,user,"").schemas(schema).defaultSchema(schema).load();
             upgrade.migrate();upgrade.validate();
+            // Later seed migrations add published examples/news. This disposable-schema test
+            // exercises the five legacy fixtures, not production seed counts or job scheduling.
+            db.update("UPDATE practice_contents SET status='HIDDEN' WHERE id NOT BETWEEN 800011 AND 800015");
             assertThat(db.queryForObject("SELECT content_id FROM example_tts_jobs WHERE example_id='tts-5'",Long.class)).isEqualTo(800015L);
-            assertThat(db.queryForObject("SELECT count(*) FROM example_tts_outbox",Integer.class)).isEqualTo(5);
+            assertThat(db.queryForObject("SELECT count(*) FROM example_tts_outbox WHERE example_id IN ('tts-1','tts-2','tts-3','tts-4','tts-5')",Integer.class)).isEqualTo(5);
             tx.executeWithoutResult(s->store.reconcile("r1","a".repeat(64)));
             tx.executeWithoutResult(s->store.reconcile("r1","a".repeat(64)));
             assertThat(db.queryForObject("SELECT count(*) FROM example_tts_jobs",Integer.class)).isEqualTo(5);
@@ -91,7 +94,8 @@ class ExampleTtsPostgresTest {
             db.update("INSERT INTO reference_audios(content_id,speaker_name,speaker_type,audio_url,duration_ms,is_primary,created_at) VALUES(900001,'placeholder','COACH','https://cdn.example.com/fake.mp3',1000,true,now())");
             var props=new org.example.voice.practiceexample.application.ExampleTtsProperties();props.setRevision("r1");
             var asset=org.mockito.Mockito.mock(org.example.voice.practiceexample.domain.port.ExampleTtsAssets.class);
-            var reader=new org.example.voice.practicecontent.infrastructure.ReferenceAudioReaderImpl(db,props,asset);
+            var referenceAssets=org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+            var reader=new org.example.voice.practicecontent.infrastructure.ReferenceAudioReaderImpl(db,props,asset,referenceAssets);
             assertThat(reader.findReferenceAudiosByContentId(900001L).items()).hasSize(1);
             assertThat(reader.findReferenceAudiosByContentId(900001L).items().getFirst().speakerType()).isEqualTo(org.example.voice.practicecontent.domain.type.SpeakerType.TTS);
             db.update("UPDATE practice_contents SET status='HIDDEN' WHERE id=900001");

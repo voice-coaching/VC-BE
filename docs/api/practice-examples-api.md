@@ -6,8 +6,9 @@
 
 - GET /api/courses/{courseId}/steps/{stepId}/practice-examples
 - 기존 Bearer 인증, 기존 envelope. data는 courseId,stepId,revision,items다.
-- items는 정확히 5개이며 order=1..5다. 각 item은 id,order,text,hint,focus,locale와 추가 practiceContentId를 제공한다.
-- **프론트는 선택한 item의 숫자 practiceContentId를 기존 학습 생성 contentId로 전달한다.** 클래스 학습이면 courseStepId도 전달한다. 문자열 exampleId를 contentId로 보내지 않는다.
+- items는 5~10개이며 order=1..items.length다. 각 item은 id,order,text,hint,focus,locale와 추가 practiceContentId를 제공한다.
+- **프론트는 문제 수를 하드코딩하지 않고 items를 order 오름차순으로 모두 수행한다. 각 item의 숫자 practiceContentId를 기존 학습 생성 contentId로 전달한다.** 클래스 학습이면 동일한 courseStepId도 전달한다. 문자열 exampleId를 contentId로 보내지 않는다.
+- 각 예문은 독립된 학습 세션과 분석 결과를 사용한다. 이전 예문의 학습 세션을 완료한 뒤 다음 예문 세션을 생성하며, `completedOrders.length === items.length`가 되기 전에는 클래스 단계 진도를 완료 처리하지 않는다.
 - 새 개정은 새 exampleId와 새 practiceContentId를 사용한다. exampleId는 영숫자/하이픈/밑줄 1~100자다. 과거 ID의 텍스트를 덮어쓰지 않는다.
 - 기본은 본인 최신 진행 중 세션에 고정된 개정, 없으면 최신 게시 개정이다. 선택 sessionId는 본인의 과거 세션에 고정된 개정을 조회한다.
 - 학습 세션과 승급 시험에 예문 세트/개정을 저장한다. 기존 세션 상세 content에 practiceExampleId/practiceExampleRevision을 추가한다(일반 콘텐츠 null).
@@ -17,10 +18,10 @@
 ## 게시 데이터
 
 V25는 운영 문장을 임의 생성하지 않는다. 실제 승인된 교육 예문이 필요하다.
-한 트랜잭션에서 해당 step의 course_step_revisions, practice_example_sets, CLASS_PRACTICE 콘텐츠 5개와 practice_examples 5개를 준비한다.
+한 트랜잭션에서 해당 step의 course_step_revisions, practice_example_sets, CLASS_PRACTICE 콘텐츠와 practice_examples 5~10개를 준비한다.
 세트는 education_revision_id와 해당 step이 일치해야 하며, 콘텐츠는 owner 없는 PUBLISHED/ko-KR, 비어 있지 않은 UTF-8 4500바이트 이하 원고여야 한다.
 기존 교육 개정을 참조해도 되지만 새 예문 개정의 모든 exampleId/contentId는 새로 부여한다. published_at으로 예약 게시를 지원한다.
-PostgreSQL deferred trigger는 커밋 시 정확히 5개/순서 유일성/교육 단계 일치를 검사한다. 세트·예문 UPDATE/DELETE 및 참조 원고·제목 변경은 차단한다.
+PostgreSQL deferred trigger는 커밋 시 5~10개/1부터 시작하는 연속 순서/교육 단계 일치를 검사한다. 세트·예문 UPDATE/DELETE 및 참조 원고·제목 변경은 차단한다.
 상태를 숨김으로 바꾸는 것은 가능하나 해당 세트 조회/합성은 더 이상 준비 완료로 반환하지 않는다. 이미 생성된 오디오는 DB 캐시에 남을 수 있으며 각 요청에서 게시 상태를 다시 확인한다.
 
 ## 합성 음성
