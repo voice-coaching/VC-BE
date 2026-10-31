@@ -4,6 +4,10 @@ The production backend deployment no longer requires an external RunPod
 readiness check or an AI runtime profile. The deployment entry point remains
 `scripts/deploy.sh` because CI invokes it on the EC2 host.
 
+Both `develop` and `main` use the same production service after the workflow
+change is merged into each branch. See [branch policy and rollout](main-auto-deployment.md)
+for pre-deployment tests, serialized execution and live-release preservation.
+
 The release flow is:
 
 1. Verify the uploaded JAR SHA-256.

@@ -10,6 +10,7 @@ import shutil
 import time
 from common import ROOT, HOLD, SERVICE, atomic, command, digest, environment, record, require, trusted
 import probes
+from release_snapshot import RELEASES, current_snapshot, trusted_release_jar
 
 LIVE = Path('/opt/alpha/app.jar')
 
@@ -65,14 +66,26 @@ def stage(state_path, state, name):
 def run(args):
     require(os.geteuid() == 0 and re.fullmatch('[0-9a-f]{40}', args.release), 'ROOT_RELEASE_REQUIRED')
     require(re.fullmatch('[0-9a-f]{64}', args.jar_sha), 'JAR_SHA_REQUIRED')
+    expected_release = getattr(args, 'expected_current_release', None)
+    expected_jar = getattr(args, 'expected_current_jar_sha', None)
+    require((expected_release is None) == (expected_jar is None), 'EXPECTED_CURRENT_PAIR_REQUIRED')
+    if expected_release is not None:
+        require(args.phase == 'deploy', 'EXPECTED_CURRENT_DEPLOY_ONLY')
+        require(re.fullmatch('[0-9a-f]{40}', expected_release)
+                and re.fullmatch('[0-9a-f]{64}', expected_jar), 'EXPECTED_CURRENT_INVALID')
     ROOT.mkdir(mode=0o755, exist_ok=True); trusted(ROOT)
     require(ROOT.stat().st_mode & 0o777 == 0o755, 'MAINTENANCE_DIRECTORY_PERMISSIONS')
     with (ROOT / 'deployment.lock').open('a') as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if expected_release is not None:
+            # Close the gap between the runner's Git policy check and activation.
+            # Fail before nginx reload, admission hold, drain or service restart.
+            require(current_snapshot() == {'releaseId': expected_release, 'jarSha256': expected_jar},
+                    'CURRENT_RELEASE_CHANGED')
         directory = ROOT / 'releases' / args.release
         state_path = directory / 'state.json'
         effective = environment()
-        target = Path('/opt/alpha/releases') / (args.release + '.jar')
+        target = RELEASES / (args.release + '.jar')
         incoming = Path('/var/tmp') / ('alpha-' + args.release + '.jar')
         source = target if target.exists() else incoming
         if args.phase not in ('abort', 'rollback'): check_jar(source, args.jar_sha)
@@ -135,7 +148,8 @@ def run(args):
             require(prior is not None and prior['jarSha256'] == state['previousJarSha256'],
                     'PREVIOUS_RELEASE_REQUIRED')
             wait_drained(effective)
-            previous_jar = trusted(state['previousJar'])
+            previous_jar = trusted_release_jar(Path(state['previousJar']))
+            require(previous_jar == RELEASES / (prior['releaseId'] + '.jar'), 'PREVIOUS_RELEASE_PATH_INVALID')
             check_jar(previous_jar, prior['jarSha256'])
             stage(state_path, state, 'ROLLING_BACK')
             switch_jar(previous_jar)
@@ -161,6 +175,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('phase', choices=('check', 'deploy', 'hold', 'activate', 'resume', 'abort', 'rollback'))
     parser.add_argument('release'); parser.add_argument('jar_sha')
+    parser.add_argument('--expected-current-release')
+    parser.add_argument('--expected-current-jar-sha')
     try: run(parser.parse_args())
     except Exception as error:
         detail = str(error)
