@@ -23,6 +23,45 @@ class OpenApiDocumentIntegrationTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    void segmentAndNotificationItemsHaveSeparateCorrectSchemas() throws Exception {
+        var document = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var schemas = document.path("components").path("schemas");
+        var segmentRef = schemas.path("AnalysisSegmentResponseDto").path("properties").path("items").path("items").path("$ref").asText();
+        assertThat(segmentRef).endsWith("/AnalysisSegmentItem");
+        var segment = schemas.path("AnalysisSegmentItem").path("properties");
+        assertThat(segment.has("sequenceNo")).isTrue();
+        assertThat(segment.has("expectedText")).isTrue();
+        assertThat(segment.has("startMs")).isTrue();
+        assertThat(segment.has("pronunciationScore")).isTrue();
+        assertThat(segment.has("deepLink")).isFalse();
+        var notifications = document.path("paths").path("/api/notifications/{notificationId}/read").path("patch")
+                .path("responses").path("200").path("content").path("*/*").path("schema").path("$ref").asText();
+        var envelope = schemas.path(notifications.substring(notifications.lastIndexOf('/') + 1));
+        var itemRef = envelope.path("properties").path("data").path("$ref").asText();
+        assertThat(itemRef).isNotEmpty().isNotEqualTo(segmentRef);
+        var item = schemas.path(itemRef.substring(itemRef.lastIndexOf('/') + 1)).path("properties");
+        assertThat(item.has("deepLink")).isTrue();
+        assertThat(item.has("title")).isTrue();
+        assertThat(item.has("sequenceNo")).isFalse();
+    }
+
+    @Test
+    void practiceContentQuerySchemasDescribeRecommendationLimitAndRequiredNextType() throws Exception {
+        var document = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var schemas = document.path("components").path("schemas");
+        var limit = schemas.path("PracticeContentRecommendationConditionDto").path("properties").path("limit");
+        assertThat(limit.path("type").asText()).isEqualTo("integer");
+        assertThat(limit.path("minimum").asInt()).isEqualTo(1);
+        assertThat(limit.path("default").asInt()).isEqualTo(5);
+        assertThat(schemas.path("PracticeContentNextConditionDto").path("required").toString()).contains("type");
+        var parameters = document.path("paths").path("/api/practice-contents/{contentId}/recommendations")
+                .path("get").path("parameters").toString();
+        assertThat(parameters).contains("PracticeContentRecommendationConditionDto");
+    }
+
+    @Test
     void paymentEndpointsDocumentRateLimitRetryHeaderWithoutApplyingItToWebhooksOrProfile() throws Exception {
         JsonNode paths = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("paths");

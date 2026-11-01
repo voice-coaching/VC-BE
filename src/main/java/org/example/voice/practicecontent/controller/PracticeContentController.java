@@ -1,6 +1,8 @@
 package org.example.voice.practicecontent.controller;
 
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import org.example.voice.practicecontent.controller.dto.PracticeContentRecommendationConditionDto;
 import org.example.voice.common.response.ApiResponse;
 import org.example.voice.practicecontent.application.PracticeContentService;
 import org.example.voice.practicecontent.controller.dto.PracticeContentDetailResponseDto;
@@ -47,10 +49,11 @@ public class PracticeContentController {
 
     @GetMapping("/{contentId}/recommendations")
     public ApiResponse<PracticeContentRecommendationsResponseDto> getPracticeContentRecommendations(
-            @PathVariable Long contentId
+            @PathVariable Long contentId,
+            @Valid @ModelAttribute PracticeContentRecommendationConditionDto condition
     ) {
         PracticeContentRecommendationsResponseDto response =
-                practiceContentService.getPracticeContentRecommendations(contentId);
+                practiceContentService.getPracticeContentRecommendations(contentId, condition.limit());
         return ApiResponse.success("콘텐츠 기반 추천을 조회했습니다.", response);
     }
 }

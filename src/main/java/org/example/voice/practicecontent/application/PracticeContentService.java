@@ -51,8 +51,9 @@ public class PracticeContentService {
     }
 
     @Transactional(readOnly = true)
-    public PracticeContentRecommendationsResponseDto getPracticeContentRecommendations(Long contentId) {
-        return practiceContentReader.findRecommendationsByContentId(contentId)
+    public PracticeContentRecommendationsResponseDto getPracticeContentRecommendations(Long contentId, int limit) {
+        if (limit < 1) throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+        return practiceContentReader.findRecommendationsByContentId(contentId, limit)
                 .map(recommendations -> PracticeContentRecommendationsResponseDto.from(recommendations.items()))
                 .orElseThrow(ContentNotFoundException::new);
     }
