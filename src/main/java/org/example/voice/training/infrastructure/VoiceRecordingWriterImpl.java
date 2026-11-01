@@ -92,6 +92,9 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
                         session.getUserId()
                 )
                 .forEach(VoiceRecording::unselect);
+        // Flush removals before selecting the replacement: Hibernate may otherwise
+        // update the target first and violate the immediate active-selection index.
+        voiceRecordingJpaRepository.flush();
 
         recording.select();
         return new RecordingSelectionData(
