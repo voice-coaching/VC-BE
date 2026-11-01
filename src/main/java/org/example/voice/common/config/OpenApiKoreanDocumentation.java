@@ -236,6 +236,7 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/users/me/title", "마이페이지", "내 칭호와 시험 자격 조회", "완료 학습 수와 다음 칭호 응시 자격을 조회합니다. 횟수만으로 자동 승급하지 않습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/users/me/title-exams", "마이페이지", "승급 시험 생성", "게시된 정책 콘텐츠와 합격점을 고정해 다음 칭호 시험을 만듭니다. 기존 진행 시험과 Idempotency-Key 요청은 중복 생성하지 않습니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/users/me/title-exams/{examId}", "마이페이지", "승급 시험 조회", "본인의 시험 상태와 고정된 시험 정책을 조회합니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/users/me/title-exams/{examId}/restart", "마이페이지", "승급 시험 새로 시작", "미채점 시험의 이전 세션 ID를 확인하고 진행 중 작업을 취소한 뒤 새 녹음 세션을 연결합니다. 같은 이전 세션 ID로 재요청하면 교체된 현재 세션을 반환합니다. 완료된 이전 학습 기록과 시험 정책은 보존합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/users/me/title-exams/{examId}/submit", "마이페이지", "승급 시험 채점", "해당 시험 세션의 실제 분석 점수로 채점하고 합격 시 한 단계만 승급합니다. 같은 분석 재요청은 같은 결과를 반환합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/users/me/notification-preferences", "알림", "알림 설정 조회", "연습 시간·요일·시간대와 마케팅 비활성 상태를 반환합니다.", false);
         add(map, PathItem.HttpMethod.PATCH, "/api/users/me/notification-preferences", "알림", "알림 설정 변경", "전달된 연습 설정만 변경합니다. HH:mm, IANA 시간대와 요일을 검증하며 마케팅 활성화는 409입니다.", false);
