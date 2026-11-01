@@ -25,6 +25,7 @@ public class OpenApiKoreanDocumentation {
                     tag("온보딩", "사용자의 학습 수준, 목표와 설문 답변을 저장하고 조회합니다."),
                     tag("홈", "홈 화면의 학습 현황과 맞춤 추천 데이터를 제공합니다."),
                     tag("학습 콘텐츠", "연습 콘텐츠와 예시 음성 정보를 조회합니다."),
+                    tag("내 원고", "본인의 암호화된 원고 보관함과 주제를 관리합니다."),
                     tag("학습 세션", "학습 세션, 녹음 파일과 분석 요청 과정을 관리합니다."),
                     tag("분석 결과", "완료된 음성 분석 점수, 구간별 피드백과 종합 피드백을 제공합니다."),
                     tag("클래스", "클래스 목록, 단계와 사용자별 학습 진도를 관리합니다."),
@@ -157,6 +158,14 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.PATCH, "/api/users/me", "사용자", "내 프로필 수정", "인증된 사용자의 닉네임을 검증한 뒤 변경합니다.", false);
         add(map, PathItem.HttpMethod.DELETE, "/api/users/me", "사용자", "회원 탈퇴", "사용자 계정을 탈퇴 처리하고 활성 로그인 세션을 사용할 수 없게 만듭니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/users/me/training-sessions/recent", "사용자", "최근 학습 세션 조회", "내가 가장 최근에 진행한 학습 세션과 콘텐츠 정보를 조회합니다.", false);
+
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/script-library", "내 원고", "내 원고 보관함 조회", "본인이 저장한 원고, 주제와 분류를 조회합니다. 응답은 no-store이며 다른 사용자의 원고는 반환하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/users/me/script-library", "내 원고", "내 원고 저장", "100자 제목과 300자 원고, 선택한 본인 주제를 저장합니다. Idempotency-Key가 필요하며 원고와 주제 이름은 암호화합니다.", false);
+        add(map, PathItem.HttpMethod.PUT, "/api/users/me/script-library/{id}", "내 원고", "내 원고 수정", "새 콘텐츠 ID의 원고 버전을 저장하고 이전 보관함 항목을 교체합니다. 기존 녹음과 분석은 수정 전 원문을 유지하며 Idempotency-Key로 재요청을 처리합니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/users/me/script-library/delete", "내 원고", "내 원고 일괄 삭제", "본인의 보관함 항목을 일괄 삭제합니다. 기존 학습 기록은 유지하며 참조되지 않는 원문의 암호문은 삭제합니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/users/me/script-library/topics", "내 원고", "내 원고 주제 생성", "10자 이내의 중복되지 않는 본인 주제를 만듭니다. 미분류는 예약된 이름입니다.", false);
+        add(map, PathItem.HttpMethod.PUT, "/api/users/me/script-library/topics/{id}", "내 원고", "내 원고 주제 수정", "본인 주제의 이름을 변경하며 소속 원고의 분류도 함께 변경합니다.", false);
+        add(map, PathItem.HttpMethod.DELETE, "/api/users/me/script-library/topics/{id}", "내 원고", "내 원고 주제 삭제", "본인 주제와 해당 보관함 항목을 삭제합니다. 기존 학습 기록은 유지합니다.", false);
 
         add(map, PathItem.HttpMethod.PUT, "/api/onboarding/me", "온보딩", "온보딩 정보 전체 저장", "현재 수준, 학습 목표, 일간·주간 목표와 설문 답변을 한 번에 저장합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/onboarding/me", "온보딩", "내 온보딩 정보 조회", "인증된 사용자가 저장한 학습 목표와 설문 답변 전체를 조회합니다.", false);

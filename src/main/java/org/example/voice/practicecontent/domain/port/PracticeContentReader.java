@@ -17,5 +17,5 @@ public interface PracticeContentReader {
 
     Optional<PracticeContentSummaryData> findNextPracticeContent(PracticeContentNextConditionDto condition);
 
-    Optional<PracticeContentRecommendationListData> findRecommendationsByContentId(Long contentId);
+    Optional<PracticeContentRecommendationListData> findRecommendationsByContentId(Long contentId, int limit);
 }
