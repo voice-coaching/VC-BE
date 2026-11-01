@@ -79,8 +79,32 @@ public class TitlePersistence implements TitleRepository {
     public Optional<TrainingSessionCreatedData> reusableSession(Long sessionId, Long userId) {
         if (sessionId == null) return Optional.empty();
         return em.createQuery("select s from TrainingSession s join fetch s.content where s.id=:id and s.userId=:user and s.status not in (org.example.voice.training.domain.type.TrainingSessionStatus.CANCELED,org.example.voice.training.domain.type.TrainingSessionStatus.FAILED)", TrainingSession.class)
-                .setParameter("id", sessionId).setParameter("user", userId).getResultStream().findFirst()
+                .setParameter("id", sessionId).setParameter("user", userId)
+                .setLockMode(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+                .getResultStream().findFirst()
+                .filter(this::canReuseExamSession)
                 .map(s -> new TrainingSessionCreatedData(s.getId(), s.getContent().getId(), s.getCourseStepId(), s.getLearningFocus(), s.getStatus(), s.getStartedAt()));
+    }
+
+    private boolean canReuseExamSession(TrainingSession session) {
+        if (session.allowsRecordingChanges()) return true;
+        long selected = em.createQuery("""
+                select count(r) from VoiceRecording r
+                where r.trainingSession.id=:session and r.selected=true and r.deletedAt is null
+                """, Long.class).setParameter("session", session.getId()).getSingleResult();
+        if (selected > 0) return true;
+        long running = em.createQuery("""
+                select count(a) from AnalysisResult a
+                where a.recording.trainingSession.id=:session and a.status in
+                    (org.example.voice.analysis.domain.type.AnalysisStatus.PENDING,
+                     org.example.voice.analysis.domain.type.AnalysisStatus.PROCESSING)
+                """, Long.class).setParameter("session", session.getId()).getSingleResult();
+        if (running > 0) {
+            throw new org.example.voice.title.domain.TitleException(409, "TITLE_EXAM_ANALYSIS_IN_PROGRESS");
+        }
+        // No recording or live analysis can be resumed. The owning service still
+        // verifies the exam is ungraded before binding a new session under its lock.
+        return false;
     }
 
     private Optional<org.example.voice.analysis.domain.entity.AnalysisResult> canonicalAnalysis(
