@@ -7,7 +7,7 @@ import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-/** Audio practice and title exams; audiovisual exams and courses remain unsupported. */
+/** Audio practice, pinned audio courses and audio title exams. */
 @Component
 @RequiredArgsConstructor
 public final class CanonicalRequestScope {
@@ -19,7 +19,8 @@ public final class CanonicalRequestScope {
         var recording=result.getRecording();var session=recording.getTrainingSession();
         return (audiovisual ? recording.getVisualObjectKey()!=null : recording.getVisualObjectKey()==null)
                 && recording.getQualityStatus()==RecordingQualityStatus.PASS
-                && session.getCourseStepId()==null && session.getCourseEducationRevisionId()==null
+                && ((session.getCourseStepId()==null && session.getCourseEducationRevisionId()==null)
+                    || (!audiovisual && session.getCourseStepId()!=null && session.getCourseEducationRevisionId()!=null))
                 && session.getLearningFocus()==LearningFocus.PRONUNCIATION
                 && (!audiovisual || !Boolean.TRUE.equals(jdbc.queryForObject(
                     "SELECT EXISTS(SELECT 1 FROM title_exams WHERE training_session_id=?)",Boolean.class,session.getId())));

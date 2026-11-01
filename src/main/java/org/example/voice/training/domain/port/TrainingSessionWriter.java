@@ -9,6 +9,9 @@ public interface TrainingSessionWriter {
 
     TrainingSessionCreatedData create(Long userId, Long contentId, Long courseStepId, LearningFocus learningFocus);
 
+    TrainingSessionCreatedData createSentence(Long userId, Long contentId, Long courseStepId, LearningFocus learningFocus,
+            Integer sentenceIndex, String expectedText);
+
     void beginUpload(Long sessionId);
 
     /** Keep the selected source stable until the surrounding request/retry transaction commits. */

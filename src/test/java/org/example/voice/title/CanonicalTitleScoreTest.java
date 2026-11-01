@@ -83,6 +83,10 @@ class CanonicalTitleScoreTest {
         verifyNoInteractions(jdbc);
         when(session.getCourseStepId()).thenReturn(99L);
         assertThat(scope.eligible(analysis, false)).isFalse();
+        when(session.getCourseEducationRevisionId()).thenReturn(123L);
+        assertThat(scope.eligible(analysis, false)).isTrue();
+        when(session.getLearningFocus()).thenReturn(org.example.voice.practicecontent.domain.type.LearningFocus.INTONATION);
+        assertThat(scope.eligible(analysis, false)).isFalse();
     }
     @Test void capabilitiesAdvertiseTitleExamsButKeepAdmissionReadiness() {
         var readiness = mock(org.example.voice.analysis.infrastructure.canonical.CanonicalHandoffReadiness.class);
@@ -92,6 +96,6 @@ class CanonicalTitleScoreTest {
         var value = service.read();
         assertThat(value.scopes().get("TITLE_EXAM").supported()).isTrue();
         assertThat(value.admissionEnabled()).isFalse();
-        assertThat(value.scopes().get("COURSE").supported()).isFalse();
+        assertThat(value.scopes().get("COURSE").supported()).isTrue();
     }
 }

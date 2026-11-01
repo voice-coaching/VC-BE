@@ -105,7 +105,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     public Optional<MyPageData.HistoryDetail> findHistoryDetail(Long userId, Long sessionId) {
         List<Object[]> sessions = entityManager.createQuery("""
                 select s.id, s.status, s.startedAt, s.completedAt, s.totalLearningSeconds,
-                       c.id, c
+                       c.id, c, s
                 from TrainingSession s join s.content c where s.id=:id and s.userId=:userId
                 """, Object[].class).setParameter("id", sessionId).setParameter("userId", userId).getResultList();
         if (sessions.isEmpty()) return Optional.empty();
@@ -128,7 +128,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
         return Optional.of(new MyPageData.HistoryDetail(
                 new MyPageData.Session((Long) session[0], session[1].toString(), (OffsetDateTime) session[2],
                         (OffsetDateTime) session[3], (Integer) session[4]),
-                new MyPageData.Content((Long) session[5], ((PracticeContent) session[6]).getTitle(), ((PracticeContent) session[6]).getScriptText()),
+                new MyPageData.Content((Long) session[5], ((PracticeContent) session[6]).getTitle(), ((org.example.voice.training.domain.entity.TrainingSession) session[7]).analysisScriptText()),
                 new MyPageData.Recording((Long) analysis[0], (Integer) analysis[1], analysis[2].toString()),
                 new MyPageData.Analysis((Long) analysis[3], (String) analysis[4], round((BigDecimal) analysis[5])), segments));
     }

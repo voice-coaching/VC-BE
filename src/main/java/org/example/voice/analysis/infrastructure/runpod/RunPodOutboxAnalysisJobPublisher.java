@@ -118,7 +118,7 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
                 || !canonicalScope.eligible(result, audiovisual)
                 || request.learningFocus() != org.example.voice.practicecontent.domain.type.LearningFocus.PRONUNCIATION
                 ) {
-            // Initial rollout supports standalone pronunciation; course/title grading stays excluded.
+            // Only supported pronunciation sources with trusted session bindings are admitted.
             throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
         }
     }
