@@ -33,8 +33,10 @@ correctiveClaimsAllowed는 false이다. 영상 분석이나 점수를 만들어 
   명시적인 구버전 V5 또는 다른 값은 400 `INVALID_INPUT_VALUE`이다.
 - `POST /api/training-sessions/{sessionId}/analysis/retry`: 현재 V6 계약으로 새 실행을 생성한다.
 - 기존 capabilities 조회는 신규 제출 지원 결과 schema를 V6으로 알린다.
-- `GET /api/v2/analyses/{analysisId}`: V6의 public view는 V3 schemaVersion을 사용한다.
-  경로의 `/v2`와 문서의 schemaVersion은 별개다. 기존 응답 envelope와 인증은 유지한다.
+- `GET /api/v3/analyses/{analysisId}`: V6의 public view는
+  `voice-coaching.canonical-analysis-view.v3` schemaVersion을 사용한다.
+  기존 응답 envelope와 인증은 유지한다. 과거 V5 결과의 V2 public view도 같은 경로에서
+  기존 profile과 schemaVersion을 유지한다. 퇴역한 `/api/v2/analyses`를 신규 조회에 사용하지 않는다.
 - 승급시험은 V6 음성 결과도 채점에 사용한다. 본인 세션·선택된 녹음·콘텐츠·완료 상태와
   검증된 committed proof를 요구하며, 가변 `overall_score` 컬럼으로 우회하지 않는다.
   점수가 없거나 증거 검증에 실패하면 승급 점수로 처리하지 않는다.
@@ -43,6 +45,26 @@ correctiveClaimsAllowed는 false이다. 영상 분석이나 점수를 만들어 
 차단하지 않는다. 영상은 별도 readiness를 추가로 요구한다. 저장공간/예약 headroom,
 오프라인 검증기 설치, worker 실행기와 동일 schema pin은 공통 필수 조건이다.
 readiness가 닫혀 있으면 기존 503 `ANALYSIS_INTEGRATION_UNAVAILABLE`을 유지한다.
+
+## 프론트와 함께 전환할 계약
+
+2026-11-01 확인한 VC-FE 기본 브랜치의 음성 클라이언트는 아직 V5 요청 헤더를 보내고,
+capabilities의 `analysisProfile`도 V5 리터럴만 허용한다. 이 상태로 백엔드만 전환하면
+명시적 V5 요청은 400이 되고 V6 capabilities도 프론트 검증을 통과하지 못한다.
+
+- `src/lib/api/canonical.ts`: 음성·영상의 analyze/retry 모두
+  `X-Analysis-Result-Schema: voice-coaching.runpod-analysis-result.v6`을 사용한다.
+  이 헤더는 결과 계약 선택이며 실제 영상 입력이 있다는 뜻이 아니다.
+- `src/lib/api/analysis-capabilities.ts`: 현재 profile
+  `CANONICAL_AUDIOVISUAL_20261007_V6`와 V6 result schema를 확인한다.
+  `scopes.TITLE_EXAM.supported`와 `admissionEnabled` 검사도 유지한다.
+- 결과는 `/api/v3/analyses/{analysisId}`에서 조회하고 V6 public view V3 및
+  음성의 `visual.status=NOT_PROVIDED`를 허용한다. 과거 V5 결과 읽기는 보존한다.
+- 음성·영상 헤더, V6 capabilities, 접수 비활성 거부, V6 음성 결과와 과거 결과 조회,
+  시험 세션 연결·분석 완료 후 submit을 프론트 회귀 검증에 포함한다.
+
+이는 백엔드의 최초 503을 프론트만 바꿔 해결한다는 뜻이 아니다. 백엔드·독립 검증기·AI의
+계약 정합성을 복구하고, 같은 계약을 사용하는 프론트를 함께 배포해야 한다.
 
 ## 공통 readiness와 원본 schema pin
 
@@ -83,7 +105,8 @@ schema pin은 저장소 원본 바이트 SHA-256이고, 실행 payload digest는
 3. 새 bundle의 `--check-installation`에서 READY, handoff V2, 11개 pin 및 frozen 자산 identity를
    확인한다. 현재 V1 검증기 설정을 단순히 V2 문자열로 바꾸거나 검증을 생략하지 않는다.
 4. 검토된 새 verifier 경로와 백엔드 코드를 함께 전환하고 양쪽 readiness 및 저장공간을 점검한다.
-   기존 실행이 처리 중이면 전환 전 reconciliation을 완료한다.
+   위 프론트 요청·capabilities 계약도 함께 전환한다. 기존 실행이 처리 중이면 전환 전
+   reconciliation을 완료한다.
 5. 신규 QA 음성 요청 → 실제 AI 처리 → handoff 독립 검증/commit → 본인 결과 조회 → 시험 채점까지
    확인한 뒤 접수를 연다. 선택적 영상 활성화는 실제 영상 자산·영수증 검증 후 별도로 한다.
 
