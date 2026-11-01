@@ -759,6 +759,7 @@ Content-Type: application/json
 
 ### GET /api/practice-contents
 - Description: 학습 콘텐츠 목록 조회 - Query: type, category, difficulty, focus, page, size. NEWS·SENTENCE·ANNOUNCER·CLASS_PRACTICE 공통 목록
+- Category: 화면 표시명이 아닌 저장 코드를 전달한다. V58의 일반 문장 코드는 `FINAL_CONSONANT`(받침), `TENSE_CONSONANT`(된소리), `CONSONANT`(자음), `VOWEL`(모음)이며 기존 분류도 유지한다. 선택지는 `/api/practice-contents/facets?type=SENTENCE`의 `categories[].value`를 사용한다. [연동 안내](frontend-sentence-categories.md).
 - Auth: Bearer accessToken
 - Path params: None
 - Query params: `type`, `category`, `difficulty`, `focus`, `page`, `size`
