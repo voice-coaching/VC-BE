@@ -15,9 +15,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OpenApiKoreanDocumentationTest {
     @Test
     void documentsEveryCurrentEndpointInKorean() {
-        assertThat(OpenApiKoreanDocumentation.documentation()).hasSize(100)
+        assertThat(OpenApiKoreanDocumentation.documentation()).hasSize(101)
                 .containsKey(new OpenApiKoreanDocumentation.ApiKey(
                         PathItem.HttpMethod.GET, "/api/analysis-capabilities"
+                ))
+                .containsKey(new OpenApiKoreanDocumentation.ApiKey(
+                        PathItem.HttpMethod.POST, "/api/users/me/title-exams/{examId}/restart"
                 ));
         assertThat(OpenApiKoreanDocumentation.documentation().values())
                 .allSatisfy(doc -> {
