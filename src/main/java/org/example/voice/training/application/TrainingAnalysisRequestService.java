@@ -1,6 +1,7 @@
 package org.example.voice.training.application;
 
 import lombok.RequiredArgsConstructor;
+import org.example.voice.coaching.domain.port.CoachingUsageReservation;
 import org.example.voice.analysis.domain.model.AnalysisWorkerRequest;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationIssue;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
@@ -48,6 +49,7 @@ public class TrainingAnalysisRequestService {
     private final AnalysisAuthorizationIssuer analysisAuthorizationIssuer;
     private final ProcessingConsentLedger processingConsentLedger;
     private final AnalysisAdmissionGuard analysisAdmissionGuard;
+    private final CoachingUsageReservation coachingUsageService;
 
     @Transactional
     public AnalysisRequestData requestAnalysis(Long sessionId, Long userId, AnalysisConsentData consent) {
@@ -87,6 +89,8 @@ public class TrainingAnalysisRequestService {
         );
         trainingSessionWriter.startAnalysis(sessionId);
         AnalysisRequestData result = trainingAnalysisWriter.createPending(source.recordingId(), requestEventId);
+        coachingUsageService.reserve(userId, result.analysisId(), source.recordingId(), requestEventId,
+                source.scriptText(), source.durationMs());
         publish(toWorkerRequest(
                 result.analysisId(), requestEventId, userId, sessionId, source,
                 consent.policyRevision(), consentReceipt.receiptSha256()
@@ -140,6 +144,8 @@ public class TrainingAnalysisRequestService {
                 failed.analysisId(),
                 requestEventId
         );
+        coachingUsageService.reserve(userId, result.analysisId(), source.recordingId(), requestEventId,
+                source.scriptText(), source.durationMs());
         publish(toWorkerRequest(
                 result.analysisId(), requestEventId, userId, sessionId, source,
                 consent.policyRevision(), consentReceipt.receiptSha256()

@@ -71,6 +71,10 @@ public class CanonicalCallbackCommitter {
                 doc.status(),doc.source().audioSha256(),doc.workerRevision(),doc.pipelineRevision(),summary(doc),
                 doc.failure()==null?null:doc.failure().code(),doc.failure()==null?null:failureReason(),doc.overallScore());
         if(!result.finishCanonical(completion))throw new RunPodContractException(409,"RESULT_ALREADY_FINALIZED");
+        result.recordCanonicalCoachingDelivery(doc.decision() != null
+                && doc.decision().status() == CanonicalCallbackDocument.DecisionStatus.ACCEPT
+                && (("READY".equals(doc.adapterStatus()) && doc.feedbackDeliveryAllowed())
+                    || doc.overallScore() != null));
         writer.save(result);
         var session=result.getRecording().getTrainingSession();
         jdbc.update("INSERT INTO analysis_canonical_result_effects(event_id,analysis_id,user_id,session_id) VALUES (?,?,?,?)",
