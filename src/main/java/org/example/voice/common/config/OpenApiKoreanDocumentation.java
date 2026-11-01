@@ -155,6 +155,7 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.POST, "/api/auth/logout", "인증", "로그아웃", "현재 사용자의 Refresh Token 세션을 폐기하고 브라우저의 Refresh Token 쿠키를 만료시킵니다.", false);
 
         add(map, PathItem.HttpMethod.GET, "/api/users/me", "사용자", "내 프로필 조회", "인증된 사용자의 이메일, 닉네임, 가입 방식과 온보딩 완료 여부를 조회합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/coaching-usage", "코칭 이용량", "내 코칭 사용량 조회", "최초 한 달 무료 8회 또는 TEST 유료 이용기간당 30회의 사용·예약·잔여 횟수와 기간을 조회합니다. 테스트 admin은 횟수 제한을 면제하며 응답은 저장하지 않습니다. 코칭 가능 여부는 요금제 한도 기준이며 AI 가용성과 별개입니다.", false);
         add(map, PathItem.HttpMethod.PATCH, "/api/users/me", "사용자", "내 프로필 수정", "인증된 사용자의 닉네임을 검증한 뒤 변경합니다.", false);
         add(map, PathItem.HttpMethod.DELETE, "/api/users/me", "사용자", "회원 탈퇴", "사용자 계정을 탈퇴 처리하고 활성 로그인 세션을 사용할 수 없게 만듭니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/users/me/training-sessions/recent", "사용자", "최근 학습 세션 조회", "내가 가장 최근에 진행한 학습 세션과 콘텐츠 정보를 조회합니다.", false);
@@ -194,9 +195,9 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.PATCH, "/api/training-sessions/{sessionId}/recordings/{recordingId}/select", "학습 세션", "분석 대상 녹음 선택", "분석에 사용할 녹음 하나를 선택하고 기존 선택 녹음은 해제합니다.", false);
         add(map, PathItem.HttpMethod.DELETE, "/api/training-sessions/{sessionId}/recordings/{recordingId}", "학습 세션", "녹음 삭제", "내 학습 세션의 녹음을 삭제 처리하며 선택된 녹음이라면 선택 상태도 해제합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/recordings/{recordingId}/playback-url", "학습 세션", "내 녹음 재생 URL 발급", "등록된 내 녹음을 제한된 시간 동안 재생할 수 있는 URL을 발급합니다.", false);
-        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/analyze", "학습 세션", "AI 분석 요청", "명시적 동의를 확인하고 선택된 녹음에 대해 Seungun 발음 분석 작업을 요청합니다. 영상 기반 녹음이면 음성과 영상 입력을 함께 사용합니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/analyze", "학습 세션", "AI 분석 요청", "명시적 동의와 선택된 녹음의 원고 300자·음성 90초 상한 및 코칭 한도를 확인하고 분석을 접수합니다. 최초 한 달 무료 8회, TEST 유료 이용기간당 30회이며 실행 중 횟수를 예약합니다. 한도 소진·기간 만료는 403, 입력 상한 초과는 422입니다. 영상 녹음은 음성과 영상 입력을 함께 사용합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/training-sessions/{sessionId}/analysis/status", "학습 세션", "음성 분석 진행 상태 조회", "학습 세션의 최신 분석 작업이 대기, 처리, 완료 또는 실패 중 어느 상태인지 조회합니다.", false);
-        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/analysis/retry", "학습 세션", "실패한 음성 분석 재시도", "새 명시적 동의를 확인하고 실패한 최신 분석 작업을 새 request generation으로 재요청합니다.", false);
+        add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/analysis/retry", "학습 세션", "실패한 음성 분석 재시도", "새 명시적 동의와 현재 이용기간·잔여 코칭 한도·원고 300자·음성 90초 상한을 확인하고 실패한 분석을 재요청합니다. 실패 시 반환된 예약을 재사용하며 성공 결과나 결과 재조회는 중복 차감하지 않습니다. 한도 소진·기간 만료는 403, 입력 상한 초과는 422입니다.", false);
 
         add(map, PathItem.HttpMethod.GET, "/api/analyses/{analysisId}", "분석 결과", "종합 분석 결과 조회", "완료된 분석의 STT 문장, 종합·발음·억양·속도 점수와 강점, 개선점, 종합 피드백을 조회합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/analyses/{analysisId}/segments", "분석 결과", "음절별 분석 결과 조회", "분석 결과의 구간별 기대 문장, 인식 문장, 시간 범위, 일치 유형, 점수와 피드백을 페이지로 조회합니다.", false);

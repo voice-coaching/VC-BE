@@ -1,6 +1,7 @@
 package org.example.voice.training.application;
 
 import org.example.voice.analysis.domain.model.AnalysisWorkerRequest;
+import org.example.voice.coaching.domain.port.CoachingUsageReservation;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationGrant;
 import org.example.voice.analysis.domain.model.AnalysisAuthorizationIssue;
 import org.example.voice.analysis.domain.model.AnalysisWorkerVisualInput;
@@ -58,6 +59,7 @@ class TrainingAnalysisRequestServiceTest {
     @Mock private AnalysisAuthorizationIssuer analysisAuthorizationIssuer;
     @Mock private ProcessingConsentLedger processingConsentLedger;
     @Mock private AnalysisAdmissionGuard analysisAdmissionGuard;
+    @Mock private CoachingUsageReservation coachingUsageService;
 
     @Test
     void createsTrustedWorkerRequestAndPersistsItsEventGeneration() {
@@ -292,7 +294,8 @@ class TrainingAnalysisRequestServiceTest {
                 analysisJobPublisher,
                 analysisAuthorizationIssuer,
                 processingConsentLedger,
-                analysisAdmissionGuard
+                analysisAdmissionGuard,
+                coachingUsageService
         );
     }
 
