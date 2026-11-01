@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = InternalRunPodAnalysisController.class)
+@RestControllerAdvice(assignableTypes = {InternalRunPodAnalysisController.class, InternalDirectHistoryController.class})
 public class RunPodExceptionHandler {
     @ExceptionHandler(RunPodContractException.class)
     public ResponseEntity<Failure> protocol(RunPodContractException error) { return response(error.status(), error.reason()); }

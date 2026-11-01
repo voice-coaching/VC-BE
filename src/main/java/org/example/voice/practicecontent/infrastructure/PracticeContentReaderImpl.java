@@ -28,7 +28,6 @@ import java.util.Optional;
 @Transactional(readOnly = true)
 public class PracticeContentReaderImpl implements PracticeContentReader {
 
-    private static final int RECOMMENDATION_LIMIT = 5;
     private static final String CONTENT_RECOMMENDATION_REASON = "같은 난이도와 학습 초점의 콘텐츠입니다.";
 
     private final PracticeContentJpaRepository practiceContentJpaRepository;
@@ -84,17 +83,17 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     @Override
     @Cacheable(
             cacheNames = PracticeContentCacheNames.RECOMMENDATIONS,
-            key = "#p0",
+            key = "{#p0, #p1}",
             unless = "#result == null"
     )
-    public Optional<PracticeContentRecommendationListData> findRecommendationsByContentId(Long contentId) {
+    public Optional<PracticeContentRecommendationListData> findRecommendationsByContentId(Long contentId, int limit) {
         return practiceContentJpaRepository.findById(contentId)
                 .filter(PracticeContent::isPublished)
                 .map(content -> practiceContentJpaRepository.findAll(
                                 recommendationSpec(content),
                                 PageRequest.of(
                                         0,
-                                        RECOMMENDATION_LIMIT,
+                                        limit,
                                         Sort.by(Sort.Order.desc("publishedAt").nullsLast(), Sort.Order.desc("createdAt"))
                                 )
                         )

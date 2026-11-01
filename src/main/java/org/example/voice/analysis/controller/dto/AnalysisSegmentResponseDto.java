@@ -10,6 +10,7 @@ public record AnalysisSegmentResponseDto(List<Item> items, int page, int size, l
     public static AnalysisSegmentResponseDto from(AnalysisSegmentPageData result) {
         return new AnalysisSegmentResponseDto(result.items().stream().map(Item::from).toList(), result.page(), result.size(), result.totalElements());
     }
+    @io.swagger.v3.oas.annotations.media.Schema(name = "AnalysisSegmentItem")
     public record Item(Long id, Integer sequenceNo, String expectedText, String recognizedText, Integer startMs,
             Integer endMs, String matchType, String resultStatus, String targetUnit, String errorType,
             BigDecimal pronunciationScore, BigDecimal intonationScore, String feedback) {
