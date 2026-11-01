@@ -95,6 +95,49 @@ class TitleIntegrationTest {
         assertCode(() -> titles.createSession(user,exam.id(),content+999,null,LearningFocus.BOTH),"TITLE_EXAM_CONTENT_MISMATCH");
         assertCode(() -> titles.get(other,exam.id()),"RESOURCE_NOT_FOUND");
     }
+    @Test void replacesAnUnusableUngradedSessionWithoutAwardingATitle() {
+        completed(5);
+        var exam = titles.create(user, "unusable-link");
+        Long previous = bind(exam.id());
+        tx.executeWithoutResult(s -> ReflectionTestUtils.setField(
+                em.find(TrainingSession.class, previous), "status", TrainingSessionStatus.ANALYZING));
+
+        var replacement = titles.createSession(user, exam.id(), content, null, LearningFocus.PRONUNCIATION);
+        assertThat(replacement.sessionId()).isNotEqualTo(previous);
+        assertThat(replacement.status()).isEqualTo(TrainingSessionStatus.RECORDING);
+        assertThat(titles.get(user, exam.id()).trainingSessionId()).isEqualTo(replacement.sessionId());
+        assertThat(titles.progress(user).code()).isEqualTo("ABSOLUTE_BEGINNER");
+        assertThat(titles.createSession(user, exam.id(), content, null, LearningFocus.PRONUNCIATION).sessionId())
+                .isEqualTo(replacement.sessionId());
+    }
+
+    @Test void preservesSelectedAnalysisSessionsForResumeAndGrading() {
+        completed(5);
+        var exam = titles.create(user, "valid-link");
+        Long session = bind(exam.id());
+        analysis(user, session, BigDecimal.valueOf(80));
+        for (var status : List.of(TrainingSessionStatus.ANALYZING, TrainingSessionStatus.COMPLETED)) {
+            tx.executeWithoutResult(s -> ReflectionTestUtils.setField(em.find(TrainingSession.class, session), "status", status));
+            assertThat(titles.createSession(user, exam.id(), content, null, LearningFocus.PRONUNCIATION).sessionId())
+                    .isEqualTo(session);
+        }
+    }
+
+    @Test void missingSelectionDoesNotRebindAnExamWhileItsAnalysisIsRunning() {
+        completed(5);
+        var exam = titles.create(user, "running-link");
+        Long session = bind(exam.id());
+        Long result = analysis(user, session, BigDecimal.valueOf(80));
+        tx.executeWithoutResult(s -> {
+            var running = em.find(AnalysisResult.class, result);
+            ReflectionTestUtils.setField(running, "status", AnalysisStatus.PROCESSING);
+            running.getRecording().unselect();
+        });
+        assertCode(() -> titles.createSession(user, exam.id(), content, null, LearningFocus.PRONUNCIATION),
+                "TITLE_EXAM_ANALYSIS_IN_PROGRESS");
+        assertThat(titles.get(user, exam.id()).trainingSessionId()).isEqualTo(session);
+    }
+
     @Test void failedThenPassingExamUsesServerScoreAndStablePolicySnapshot() {
         completed(5); var exam=titles.create(user,"first");
         Long session=bind(exam.id()); Long failed=analysis(user,session,new BigDecimal("69.99"));
