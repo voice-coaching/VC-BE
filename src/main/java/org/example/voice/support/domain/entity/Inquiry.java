@@ -8,12 +8,15 @@ import org.example.voice.support.domain.model.SupportData.InquiryDraft;
 
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 
 @Entity
 @Getter
 @Table(name = "inquiries")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Inquiry {
+    @Version @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long version;
     public enum Status { RECEIVED, IN_PROGRESS, ANSWERED, CLOSED }
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -59,4 +62,17 @@ public class Inquiry {
     }
 
     public boolean matchesRequest(String digest) { return requestSha256.equals(digest); }
+
+    public void answer(String answer, OffsetDateTime now) {
+        if (status == Status.CLOSED) throw new IllegalStateException("INQUIRY_CLOSED");
+        this.answer = Objects.requireNonNull(answer);
+        status = Status.ANSWERED; answeredAt = now;
+    }
+
+    public void transition(Status target) {
+        boolean allowed = (status == Status.RECEIVED && target == Status.IN_PROGRESS)
+                || (status == Status.ANSWERED && target == Status.CLOSED);
+        if (!allowed) throw new IllegalStateException("INVALID_INQUIRY_TRANSITION");
+        status = target;
+    }
 }

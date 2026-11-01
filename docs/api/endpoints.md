@@ -248,6 +248,34 @@ This document summarizes the API list exported from the local API spec directory
 | GET | `/api/analyses/{id}/result-contract` | User login + ownership | Current attempt contract |
 | GET | `/api/v3/analyses/{id}` | User login + ownership | Committed v5 public result |
 
+## 관리자 1차
+
+| Method | Path | Authentication | Purpose |
+|---|---|---|---|
+| GET | `/api/admin/me` | Bearer + active ADMIN | 관리자 접근 정보 |
+| GET | `/api/admin/users` | Bearer + active ADMIN | 회원 목록 |
+| GET | `/api/admin/users/{userId}` | Bearer + active ADMIN | 회원 상세 |
+| GET | `/api/admin/content-categories` | Bearer + active ADMIN | 등록용 카테고리 |
+| GET | `/api/admin/contents` | Bearer + active ADMIN | 공용 콘텐츠 목록 |
+| GET | `/api/admin/contents/{contentId}` | Bearer + active ADMIN | 공용 콘텐츠 상세 |
+| POST | `/api/admin/contents` | Bearer + active ADMIN | 초안 생성 |
+| PATCH | `/api/admin/contents/{contentId}` | Bearer + active ADMIN | 초안 수정 |
+| PATCH | `/api/admin/contents/{contentId}/publication` | Bearer + active ADMIN | 공개·숨김 |
+| GET | `/api/admin/notices` | Bearer + active ADMIN | 공지 목록 |
+| GET | `/api/admin/notices/{noticeId}` | Bearer + active ADMIN | 공지 상세 |
+| POST | `/api/admin/notices` | Bearer + active ADMIN | 공지 생성 |
+| PATCH | `/api/admin/notices/{noticeId}` | Bearer + active ADMIN | 공지 수정 |
+| GET | `/api/admin/inquiries` | Bearer + active ADMIN | 문의 목록 |
+| GET | `/api/admin/inquiries/{inquiryId}` | Bearer + active ADMIN | 문의 상세 |
+| PATCH | `/api/admin/inquiries/{inquiryId}/answer` | Bearer + active ADMIN | 문의 답변 |
+| PATCH | `/api/admin/inquiries/{inquiryId}/status` | Bearer + active ADMIN | 문의 상태 전환 |
+| GET | `/api/admin/audit-logs` | Bearer + active ADMIN | 관리자 작업 이력 |
+| POST | `/api/admin/contents/{contentId}/reference-audios/upload-url` | Bearer + active ADMIN | 아나운서 음성 업로드 발급 |
+| POST | `/api/admin/contents/{contentId}/reference-audios` | Bearer + active ADMIN | 검증한 음성 연결 |
+| GET | `/api/admin/contents/{contentId}/reference-audios` | Bearer + active ADMIN | 초안 포함 기준 음성 목록 |
+| PATCH | `/api/admin/reference-audios/{audioId}/primary` | Bearer + active ADMIN | 대표 음성 지정 |
+| GET | `/api/admin/reference-audios/{audioId}/playback-url` | Bearer + active ADMIN | 관리자 음성 미리듣기 |
+
 ## Direct analysis background history (default OFF)
 
 [Contract](../contracts/direct_analysis_history_v1.md). These endpoints never gate RunPod result display.

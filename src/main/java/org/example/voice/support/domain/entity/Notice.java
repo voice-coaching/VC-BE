@@ -17,6 +17,8 @@ import java.util.Objects;
 @Table(name = "notices")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Notice {
+    @Version @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long version;
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @Column(nullable = true, length = 200)
@@ -46,4 +48,13 @@ public class Notice {
     }
 
     public void hide() { published = false; }
+
+    public void edit(String title, String summary, List<Section> sections,
+                     boolean pinned, boolean published, OffsetDateTime publishedAt) {
+        this.title = Objects.requireNonNull(title);
+        this.summary = Objects.requireNonNull(summary);
+        this.sections = List.copyOf(sections);
+        this.pinned = pinned; this.published = published;
+        this.publishedAt = Objects.requireNonNull(publishedAt);
+    }
 }

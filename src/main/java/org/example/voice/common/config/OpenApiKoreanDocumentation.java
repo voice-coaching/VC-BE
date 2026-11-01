@@ -31,7 +31,8 @@ public class OpenApiKoreanDocumentation {
                     tag("클래스", "클래스 목록, 단계와 사용자별 학습 진도를 관리합니다."),
                     tag("마이페이지", "내 학습 기록, 통계, 강점·약점과 맞춤 추천을 제공합니다."),
                     tag("고객 지원", "게시된 공지와 본인의 문의를 조회하고 접수합니다."),
-                    tag("테스트 결제", "기존 로그인과 DB에서 TEST 주문과 검증된 테스트 회원등급을 관리합니다.")
+                    tag("테스트 결제", "기존 로그인과 DB에서 TEST 주문과 검증된 테스트 회원등급을 관리합니다."),
+                    tag("관리자", "현재 활성 ADMIN이 공용 콘텐츠·공지·문의와 작업 이력을 관리합니다.")
             ));
             DOCS.forEach((key, doc) -> {
                 PathItem pathItem = openApi.getPaths().get(key.path());
@@ -256,6 +257,45 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.POST, "/api/payment-orders/{orderId}/refund-requests", "테스트 결제", "전액 환불 신청", "본인의 TEST 주문에 전액 환불을 신청합니다. reason은 필수 1~200자이며 금액은 서버의 15,000 KRW로 고정됩니다. 기존 취소 요청과 동일한 원장을 사용하고 같은 사유의 재신청은 PG 재전송 없이 동일 requestId와 상태를 반환합니다. 200은 환불 완료를 의미하지 않습니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/refund-requests/{requestId}", "테스트 결제", "전액 환불 처리 상태 조회", "본인 TEST 환불·취소 요청의 저장된 UNKNOWN/PENDING/SUCCEEDED/FAILED 상태를 조회합니다. 포트원을 호출하지 않으며 타인 요청은 404입니다. 최신화는 기존 주문 verify·서명 웹훅·활성화된 복구가 담당합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/payments/webhooks/portone", "테스트 결제", "포트원 웹훅 수신", "사용자 JWT 대신 webhook-id, webhook-signature, webhook-timestamp와 원문 본문으로 공식 SDK 서명을 검증합니다. 최대 64KiB이며 설정되지 않으면 503입니다. 포트원 재조회와 이벤트 중복 처리를 거쳐 본 시스템의 테스트 주문만 갱신합니다.", true);
+        String[][] adminRoutes = {
+                {"GET", "/api/admin/me", "현재 관리자 접근 정보"},
+                {"GET", "/api/admin/users", "관리자 회원 목록 조회"},
+                {"GET", "/api/admin/users/{userId}", "관리자 회원 상세 조회"},
+                {"GET", "/api/admin/content-categories", "등록용 카테고리 조회"},
+                {"GET", "/api/admin/contents", "공용 콘텐츠 목록 조회"},
+                {"GET", "/api/admin/contents/{contentId}", "공용 콘텐츠 상세 조회"},
+                {"POST", "/api/admin/contents", "공용 콘텐츠 초안 생성"},
+                {"PATCH", "/api/admin/contents/{contentId}", "공용 콘텐츠 초안 수정"},
+                {"PATCH", "/api/admin/contents/{contentId}/publication", "공용 콘텐츠 공개·숨김"},
+                {"GET", "/api/admin/notices", "관리자 공지 목록 조회"},
+                {"GET", "/api/admin/notices/{noticeId}", "관리자 공지 상세 조회"},
+                {"POST", "/api/admin/notices", "관리자 공지 생성"},
+                {"PATCH", "/api/admin/notices/{noticeId}", "관리자 공지 수정"},
+                {"GET", "/api/admin/inquiries", "관리자 문의 목록 조회"},
+                {"GET", "/api/admin/inquiries/{inquiryId}", "관리자 문의 상세 조회"},
+                {"PATCH", "/api/admin/inquiries/{inquiryId}/answer", "관리자 문의 답변"},
+                {"PATCH", "/api/admin/inquiries/{inquiryId}/status", "관리자 문의 상태 변경"},
+                {"GET", "/api/admin/audit-logs", "관리자 작업 이력 조회"}
+        };
+        for (String[] route : adminRoutes) {
+            add(map, PathItem.HttpMethod.valueOf(route[0]), route[1], "관리자", route[2],
+                    "JWT ROLE_ADMIN 및 현재 DB의 활성 관리자 권한이 필요합니다. 테스트 이용등급 admin은 관리 권한이 아닙니다. "
+                    + "목록은 page=0, size=20(최대 100), items 페이지 응답을 사용합니다. "
+                    + "변경은 reason, 수정은 version이 필요하며 감사 기록과 함께 저장됩니다. 상세 계약은 docs/api/admin-phase-one.md를 따릅니다.", false);
+        }
+        String[][] audioRoutes = {
+                {"POST", "/api/admin/contents/{contentId}/reference-audios/upload-url", "아나운서 기준 음성 업로드 URL 발급"},
+                {"POST", "/api/admin/contents/{contentId}/reference-audios", "검증한 아나운서 기준 음성 등록"},
+                {"GET", "/api/admin/contents/{contentId}/reference-audios", "관리자 아나운서 기준 음성 목록"},
+                {"PATCH", "/api/admin/reference-audios/{audioId}/primary", "아나운서 대표 음성 지정"},
+                {"GET", "/api/admin/reference-audios/{audioId}/playback-url", "관리자 기준 음성 미리듣기"}
+        };
+        for (String[] route : audioRoutes) {
+            add(map, PathItem.HttpMethod.valueOf(route[0]), route[1], "관리자", route[2],
+                    "현재 활성 ADMIN 전용이며 공용 ANNOUNCER 콘텐츠만 처리합니다. MP3 또는 AAC M4A, 최대 20MiB·180초입니다. "
+                    + "서버 발급 uploadId와 SHA-256으로 검증하고 기존 문장 version을 확인합니다. signed URL은 저장하지 않습니다. "
+                    + "기존 사용자 기준 음성 조회·재생 계약을 유지합니다. 상세 계약은 docs/api/admin-reference-audios.md를 따릅니다.", false);
+        }
         return Map.copyOf(map);
     }
 

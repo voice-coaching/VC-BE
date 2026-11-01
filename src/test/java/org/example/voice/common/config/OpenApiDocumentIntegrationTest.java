@@ -140,7 +140,7 @@ class OpenApiDocumentIntegrationTest {
                 assertThat(field.getValue().path("tags").get(0).asText()).containsPattern("[가-힣]");
             }
         }
-        assertThat(operationCount).isEqualTo(101);
+        assertThat(operationCount).isEqualTo(124);
         var popularity = paths.path("/api/practice-contents/popular").path("get");
         assertThat(popularity.path("summary").asText()).isEqualTo("일별 인기 뉴스 순위 조회");
         assertThat(popularity.path("security").toString()).contains("bearerAuth");
@@ -213,5 +213,32 @@ class OpenApiDocumentIntegrationTest {
                         org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(authentication)))
                 .andExpect(status().isForbidden()).andExpect(
                         org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("TEST_PAYMENT_DISABLED"));
+    }
+
+    @Test
+    void adminContractDocumentsJwtVersionsAndSeparateNoticeRequestSections() throws Exception {
+        var document=objectMapper.readTree(mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        var paths=document.path("paths");var schemas=document.path("components").path("schemas");
+        assertThat(paths.path("/api/admin/me").path("get").path("security").toString()).contains("bearerAuth");
+        assertThat(paths.path("/api/admin/contents").path("post").path("responses").has("201")).isTrue();
+        assertThat(paths.path("/api/admin/contents/{contentId}").path("patch").path("responses").has("409")).isTrue();
+        assertThat(schemas.path("ContentEditDto").path("required").toString()).contains("version","content","reason");
+        assertThat(schemas.path("AdminSectionRequestDto").path("required").toString()).contains("title","paragraphs");
+        assertThat(schemas.path("UserDto").path("properties").has("maskedEmail")).isTrue();
+        assertThat(schemas.path("UserDto").path("properties").has("password")).isFalse();
+    }
+
+    @Test
+    void adminReferenceAudioContractKeepsUploadRequestAndResponseSchemasSeparate() throws Exception {
+        var document=objectMapper.readTree(mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        var paths=document.path("paths");var schemas=document.path("components").path("schemas");
+        var upload=paths.path("/api/admin/contents/{contentId}/reference-audios/upload-url").path("post");
+        assertThat(upload.path("security").toString()).contains("bearerAuth");assertThat(upload.path("responses").has("201")).isTrue();
+        assertThat(schemas.path("AdminAudioUploadRequestDto").path("required").toString()).contains("version","sha256","fileName");
+        assertThat(schemas.path("AdminAudioUploadRequestDto").path("properties").has("uploadUrl")).isFalse();
+        assertThat(schemas.path("AdminAudioUploadResponseDto").path("properties").has("requiredHeaders")).isTrue();
+        assertThat(paths.path("/api/admin/contents/{contentId}/reference-audios").path("post").path("responses").has("422")).isTrue();
     }
 }
