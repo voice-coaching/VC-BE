@@ -176,6 +176,7 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/recommendations", "홈", "맞춤 학습 추천 조회", "사용자의 학습 이력과 요청 조건을 기준으로 추천 콘텐츠 목록을 조회합니다.", false);
 
         add(map, PathItem.HttpMethod.GET, "/api/practice-contents", "학습 콘텐츠", "학습 콘텐츠 목록 조회", "콘텐츠 유형, 난이도와 검색 조건을 적용해 연습 콘텐츠를 페이지 단위로 조회합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/practice-contents/popular", "학습 콘텐츠", "일별 인기 뉴스 순위 조회", "전날 한국 시간 기준 기사별 연습 완료 사용자 수로 상위 10개 뉴스를 조회합니다. 매일 00:00에 갱신하며 사용 기록이 없으면 기존 목록 순서를 반환합니다. NEWS 유형과 1~10개 limit을 지원합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/practice-contents/next", "학습 콘텐츠", "다음 학습 콘텐츠 추천", "현재 콘텐츠와 조회 조건을 기준으로 이어서 학습할 다음 콘텐츠를 찾습니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/practice-contents/{contentId}", "학습 콘텐츠", "학습 콘텐츠 상세 조회", "선택한 콘텐츠의 원문, 난이도, 학습 포인트와 부가 정보를 조회합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/practice-contents/{contentId}/reference-audios", "학습 콘텐츠", "예시 음성 목록 조회", "학습 콘텐츠에 등록된 아나운서 또는 예시 발화 음성 목록을 조회합니다.", false);
