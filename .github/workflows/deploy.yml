@@ -108,6 +108,16 @@ jobs:
             "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/release_snapshot.py'" \
             > "$RUNNER_TEMP/alpha-live-release.json"
 
+      - name: Read-only analysis readiness diagnostics
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          analysis_report=$(ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
+            "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/analysis_diagnostics.py'")
+          echo "::notice title=Analysis readiness::$analysis_report"
+
       - name: Check latest branch commit and live code ancestry
         id: policy
         run: |
@@ -132,6 +142,17 @@ jobs:
           [[ "$EXPECTED_RELEASE" =~ ^[0-9a-f]{40}$ && "$EXPECTED_JAR" =~ ^[0-9a-f]{64}$ ]]
           ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
             "sudo bash '/var/tmp/alpha-deploy-${GITHUB_SHA}/deploy.sh' '$GITHUB_SHA' '$JAR_SHA' '$EXPECTED_RELEASE' '$EXPECTED_JAR'"
+
+      - name: Verify analysis readiness after deployment
+        if: steps.policy.outputs.deploy == 'true'
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          analysis_report=$(ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
+            "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/analysis_diagnostics.py'")
+          echo "::notice title=Analysis readiness after deployment::$analysis_report"
 
       - name: Remove this run's upload copies
         if: always() && (steps.upload.outcome == 'success' || steps.upload.outcome == 'failure')

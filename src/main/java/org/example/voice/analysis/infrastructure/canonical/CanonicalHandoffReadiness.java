@@ -44,8 +44,10 @@ public final class CanonicalHandoffReadiness {
                 if(reply.statusCode()!=200 || !reply.headers().firstValue("content-encoding").orElse("identity").equals("identity"))throw new IllegalStateException();
                 byte[] bytes=stream.readNBytes(65537);if(bytes.length>65536)throw new IllegalStateException();
                 var node=new com.fasterxml.jackson.databind.ObjectMapper().readTree(bytes);
-                if(!"voice-coaching.canonical-handoff.v1".equals(node.path("contractVersion").asText()) || !node.path("executorConfigured").asBoolean())throw new IllegalStateException();
-                if(!digests().equals(new com.fasterxml.jackson.databind.ObjectMapper().convertValue(node.path("schemaDigests"),Map.class)))throw new IllegalStateException();
+                var videoDigests=new LinkedHashMap<String,String>();
+                if("voice-coaching.canonical-handoff.v2".equals(node.path("contractVersion").asText()))
+                    for(var file:CanonicalAudiovisualReadiness.SCHEMAS)videoDigests.put(file,contract.schemaSha256(file));
+                if(!HandoffPeerReadiness.matches(node,digests(),videoDigests))throw new IllegalStateException();
                 podUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(45);
             }
         }catch(Exception e){podUntil=0;}
