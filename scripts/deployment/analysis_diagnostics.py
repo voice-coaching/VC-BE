@@ -31,7 +31,7 @@ def writer_configured(env):
         and 0 < len(key) <= 512 and all(32 < ord(c) < 127 for c in key)
         and env.get(PREFIX + 'RETENTION') == 'INDEFINITE')
 
-def worker_health(env, expected):
+def worker_health(env, expected, details=None):
     target = urlsplit(env.get('RUNPOD_ENDPOINT_URL', '').rstrip('/'))
     if target.scheme != 'https' or not target.hostname or target.username or target.password or target.query or target.fragment:
         return 'WORKER_ENDPOINT_INVALID'
@@ -39,6 +39,24 @@ def worker_health(env, expected):
     try:
         raw = fetch(target.geturl() + '/health/handoff', env['AI_ANALYSIS_API_TOKEN'], limit=65536)
         doc = json.loads(raw)
+        if details is not None:
+            def public_version(key):
+                value = doc.get(key)
+                return value if isinstance(value,str) and re.fullmatch(r'voice-coaching\.[a-z0-9._-]{1,96}',value) else ('MISSING' if value is None else 'UNRECOGNIZED')
+            rows = doc.get('schemaDigests')
+            mapped = rows
+            if isinstance(rows,list):
+                try:
+                    mapped = {row['file']:row['sha256'] for row in rows}
+                    if len(mapped) != len(rows): mapped = None
+                except (KeyError,TypeError): mapped = None
+            details.update({'contractVersion':public_version('contractVersion'),
+                'handoffContractVersion':public_version('handoffContractVersion'),
+                'executorConfigured':doc.get('executorConfigured') is True,
+                'admissionEnabled':doc.get('admissionEnabled') is True,
+                'digestsAsList':isinstance(rows,list),'digestsAsMap':isinstance(rows,dict),
+                'digestsMatch':mapped == expected,
+                'fields':{key:key in doc for key in ('contractVersion','handoffContractVersion','executorConfigured','admissionEnabled','schemaDigests','reasonCode','executor_configured','schema_digests')}})
         if doc.get('contractVersion') != 'voice-coaching.canonical-handoff.v1': return 'WORKER_CONTRACT_MISMATCH'
         if doc.get('executorConfigured') is not True: return 'WORKER_EXECUTOR_UNCONFIGURED'
         if doc.get('schemaDigests') != expected: return 'WORKER_SCHEMA_MISMATCH'
@@ -66,7 +84,7 @@ def inspect(env):
     if env.get('AI_ANALYSIS_TRANSPORT') != 'runpod_http': reasons.append('ANALYSIS_TRANSPORT_UNCONFIGURED')
     if not all(env.get(k) for k in ('RUNPOD_ENDPOINT_URL','AI_ANALYSIS_API_TOKEN','AI_ANALYSIS_CALLBACK_TOKEN','AI_ANALYSIS_CALLBACK_BASE_URL')):
         reasons.append('RUNPOD_CONFIGURATION_INCOMPLETE')
-    if not all(env.get(k) for k in ('ANALYSIS_AUTHORIZATION_KEY_ID','ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64','ANALYSIS_CONSENT_POLICY_REVISION')):
+    if env.get('AI_ANALYSIS_TRANSPORT') != 'runpod_http' and not all(env.get(k) for k in ('ANALYSIS_AUTHORIZATION_KEY_ID','ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64','ANALYSIS_CONSENT_POLICY_REVISION')):
         reasons.append('ANALYSIS_AUTHORIZATION_UNCONFIGURED')
     if not writer_configured(env): reasons.append('ARCHIVE_WRITER_UNCONFIGURED')
     try:
@@ -85,11 +103,12 @@ def inspect(env):
             if query(env, sql).get('fits') is not True: reasons.append('HANDOFF_CAPACITY_EXHAUSTED')
     except ValueError: reasons.append('HANDOFF_BUDGET_UNCONFIGURED')
     except Exception: reasons.append('READINESS_DATABASE_UNAVAILABLE')
-    try: worker = worker_health(env, contracts())
+    worker_details = {}
+    try: worker = worker_health(env, contracts(), worker_details)
     except Exception: worker = 'BACKEND_CONTRACT_UNAVAILABLE'
     if worker != 'READY': reasons.append(worker)
     return {'kind':'ANALYSIS_READ_ONLY_DIAGNOSTICS','source':'PROCESS_ENVIRONMENT',
-            'workerHealth':worker,'checks':checks,'reasonCodes':reasons}
+            'workerHealth':worker,'workerDetails':worker_details,'checks':checks,'reasonCodes':reasons}
 
 if __name__ == '__main__':
     try: report = inspect(environment())

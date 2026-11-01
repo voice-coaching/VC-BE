@@ -31,6 +31,13 @@ class AnalysisDiagnosticsTest(unittest.TestCase):
         for secret in ('private-', 'worker.example','backend.example','us-west-004'):
             self.assertNotIn(secret,json.dumps(report))
 
+    def test_runpod_transport_does_not_require_redis_signing_keys(self):
+        env=self.env()
+        for key in ('ANALYSIS_AUTHORIZATION_KEY_ID','ANALYSIS_AUTHORIZATION_SIGNING_SECRET_BASE64','ANALYSIS_CONSENT_POLICY_REVISION'):
+            del env[key]
+        with patch.object(d,'contracts',return_value={}), patch.object(d,'worker_health',return_value='READY'), patch.object(d,'query',return_value={'fits':True}), patch.object(d.Path,'exists',return_value=False):
+            self.assertNotIn('ANALYSIS_AUTHORIZATION_UNCONFIGURED',d.inspect(env)['reasonCodes'])
+
     def test_disabled_flags_capacity_and_worker_are_reported(self):
         env=self.env()
         env[d.PREFIX+'ADMISSION_ENABLED']='false'
