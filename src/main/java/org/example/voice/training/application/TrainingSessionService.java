@@ -39,7 +39,7 @@ public class TrainingSessionService {
         // 프론트가 "없는 콘텐츠"와 "현재 학습 불가 콘텐츠"를 다르게 처리할 수 있게 하기 위함이다.
         validateCreateRequest(request);
         if (customContents.validateSession(request.contentId(),userId,request.courseStepId(),request.titleExamId())) {
-            return trainingSessionWriter.create(userId,request.contentId(),null,request.learningFocus());
+            return createTrainingSession(request,userId,null);
         }
         if (!trainingSessionReader.existsContent(request.contentId())) {
             throw new BaseException(ErrorCode.CONTENT_NOT_FOUND);
@@ -50,12 +50,7 @@ public class TrainingSessionService {
         if (request.titleExamId() != null) {
             return titleExams.createSession(userId,request.titleExamId(),request.contentId(),request.courseStepId(),request.learningFocus());
         }
-        return trainingSessionWriter.create(
-                userId,
-                request.contentId(),
-                request.courseStepId(),
-                request.learningFocus()
-        );
+        return createTrainingSession(request,userId,request.courseStepId());
     }
 
     public TrainingSessionDetailData getSession(Long sessionId, Long userId) {
@@ -96,8 +91,17 @@ public class TrainingSessionService {
         }
     }
 
+    private TrainingSessionCreatedData createTrainingSession(TrainingSessionCreateRequestDto request, Long userId, Long stepId) {
+        if (request.sentenceIndex() == null)
+            return trainingSessionWriter.create(userId, request.contentId(), stepId, request.learningFocus());
+        return trainingSessionWriter.createSentence(userId, request.contentId(), stepId, request.learningFocus(),
+                request.sentenceIndex(), request.sentenceText());
+    }
+
     private void validateCreateRequest(TrainingSessionCreateRequestDto request) {
-        if (request == null || request.contentId() == null || request.learningFocus() == null) {
+        if (request == null || request.contentId() == null || request.learningFocus() == null
+                || (request.sentenceIndex() == null) != (request.sentenceText() == null)
+                || (request.sentenceIndex() != null && (request.sentenceIndex() < 0 || request.titleExamId() != null))) {
             throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
         }
     }

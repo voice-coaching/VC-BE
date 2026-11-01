@@ -112,7 +112,7 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
                 || !canonicalScope.eligible(result, audiovisual)
                 || request.learningFocus() != org.example.voice.practicecontent.domain.type.LearningFocus.PRONUNCIATION
                 ) {
-            // Audio title exams share pronunciation scope. Courses/video exams stay excluded.
+            // Pronunciation sources require trusted session bindings; video exams remain excluded.
             throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
         }
     }

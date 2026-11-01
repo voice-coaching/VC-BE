@@ -78,9 +78,10 @@ public class TrainingSessionReaderImpl implements TrainingSessionReader {
                 new TrainingSessionDetailData.ContentData(
                         session.getContent().getId(),
                         session.getContent().getTitle(),
-                        session.getContent().getScriptText(),
+                        session.analysisScriptText(),
                         session.getPracticeExampleId(),
-                        session.getPracticeExampleRevision()
+                        session.getPracticeExampleRevision(),
+                        session.getSentenceIndex()
                 ),
                 selectedRecordingId,
                 recordingCount,

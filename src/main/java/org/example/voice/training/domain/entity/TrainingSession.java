@@ -62,6 +62,32 @@ public class TrainingSession {
         courseEducationRevisionId = revisionId;
     }
 
+    @Column(name = "sentence_index") private Integer sentenceIndex;
+    @Column(name = "sentence_text_sha256", length = 64) private String sentenceTextSha256;
+    @Column(name = "sentence_prompt_revision", length = 128) private String sentencePromptRevision;
+
+    public void pinSentence(Integer index, String expectedText) {
+        if (sentenceIndex != null || index == null || expectedText == null)
+            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+        String selected = org.example.voice.training.domain.model.SentenceTranscript.at(content.getScriptText(), index);
+        if (!selected.equals(expectedText)) throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+        sentenceIndex = index;
+        sentenceTextSha256 = org.example.voice.training.domain.model.SentenceTranscript.sha256(selected);
+        sentencePromptRevision = content.getUpdatedAt().toInstant() + ":sentence:" + index;
+    }
+
+    public String analysisScriptText() {
+        if (sentenceIndex == null) return content.getScriptText();
+        String selected = org.example.voice.training.domain.model.SentenceTranscript.at(content.getScriptText(), sentenceIndex);
+        if (!org.example.voice.training.domain.model.SentenceTranscript.sha256(selected).equals(sentenceTextSha256))
+            throw new BaseException(ErrorCode.CONTENT_NOT_AVAILABLE);
+        return selected;
+    }
+
+    public String analysisPromptRevision() {
+        return sentenceIndex == null ? content.getUpdatedAt().toInstant().toString() : sentencePromptRevision;
+    }
+
     @Enumerated(EnumType.STRING)
     @Column(name = "learning_focus", nullable = false)
     private LearningFocus learningFocus;
