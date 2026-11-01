@@ -115,7 +115,7 @@ jobs:
         run: |
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
           analysis_report=$(ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
-            "sudo python3 '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/analysis_diagnostics.py'")
+            "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/analysis_diagnostics.py'")
           echo "::notice title=Analysis readiness::$analysis_report"
 
       - name: Check latest branch commit and live code ancestry
