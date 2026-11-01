@@ -5,6 +5,23 @@ from urllib.error import HTTPError
 import analysis_diagnostics as d
 
 class AnalysisDiagnosticsTest(unittest.TestCase):
+    def setUp(self):
+        self.backend = patch.object(d,'backend_readiness',return_value={})
+        self.backend.start()
+        self.addCleanup(self.backend.stop)
+
+    def test_v2_requires_all_audio_pins_and_checks_known_extensions(self):
+        audio,video={'audio':'a'},{'video':'v'}
+        body={'contractVersion':'voice-coaching.canonical-handoff.v2','executorConfigured':True,
+              'schemaDigests':dict(audio,**video)}
+        with patch.object(d,'contracts',return_value=video), patch.object(d,'fetch',return_value=json.dumps(body).encode()):
+            details={}
+            self.assertEqual(d.worker_health(self.env(),audio,details),'READY')
+            self.assertTrue(details['audioDigestsMatch'])
+        body['schemaDigests']['audio']='changed'
+        with patch.object(d,'contracts',return_value=video), patch.object(d,'fetch',return_value=json.dumps(body).encode()):
+            self.assertEqual(d.worker_health(self.env(),audio),'WORKER_SCHEMA_MISMATCH')
+
     def env(self):
         env = {d.PREFIX+k:'true' for k in ('WORKER_ENABLED','ADMISSION_ENABLED','ARCHIVE_ENABLED')}
         env.update({
@@ -37,6 +54,12 @@ class AnalysisDiagnosticsTest(unittest.TestCase):
             del env[key]
         with patch.object(d,'contracts',return_value={}), patch.object(d,'worker_health',return_value='READY'), patch.object(d,'query',return_value={'fits':True}), patch.object(d.Path,'exists',return_value=False):
             self.assertNotIn('ANALYSIS_AUTHORIZATION_UNCONFIGURED',d.inspect(env)['reasonCodes'])
+
+    def test_closed_worker_admission_is_not_reported_as_available(self):
+        body={'contractVersion':'voice-coaching.canonical-handoff.v1','executorConfigured':True,
+              'admissionEnabled':False,'schemaDigests':{}}
+        with patch.object(d,'contracts',return_value={}), patch.object(d,'query',return_value={'fits':True}), patch.object(d,'fetch',return_value=json.dumps(body).encode()), patch.object(d.Path,'exists',return_value=False):
+            self.assertIn('WORKER_ADMISSION_CLOSED',d.inspect(self.env())['reasonCodes'])
 
     def test_disabled_flags_capacity_and_worker_are_reported(self):
         env=self.env()
