@@ -47,6 +47,10 @@ public enum ErrorCode {
     NEXT_CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "조건에 맞는 다음 콘텐츠가 없습니다."),
 
     // Training
+    COACHING_QUOTA_EXCEEDED(HttpStatus.FORBIDDEN, "이용기간의 코칭 횟수를 모두 사용했습니다."),
+    COACHING_PERIOD_EXPIRED(HttpStatus.FORBIDDEN, "무료 코칭 체험 기간이 종료되었습니다."),
+    COACHING_SCRIPT_LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "코칭 원고는 300자 이내여야 합니다."),
+    COACHING_AUDIO_LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "코칭 음성은 90초 이내여야 합니다."),
     CONTENT_NOT_AVAILABLE(HttpStatus.CONFLICT, "현재 학습할 수 없는 콘텐츠입니다."),
     TRAINING_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "학습 세션을 찾을 수 없습니다."),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),

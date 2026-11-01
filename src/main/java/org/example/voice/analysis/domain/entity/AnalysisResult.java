@@ -127,6 +127,17 @@ public class AnalysisResult {
     @Column(name = "analysis_outcome")
     private AnalysisOutcome analysisOutcome;
 
+    @Column(name = "coaching_delivered", nullable = false)
+    private boolean coachingDelivered;
+
+    /** The verified canonical commit records delivery without parsing diagnostic JSON in SQL. */
+    public void recordCanonicalCoachingDelivery(boolean delivered) {
+        if (!isCanonicalExecution() || !isCompletedOrFailed()) {
+            throw new IllegalStateException("Coaching delivery requires a terminal canonical result");
+        }
+        this.coachingDelivered = status == AnalysisStatus.COMPLETED && delivered;
+    }
+
     @Column(name = "active_request_event_id", length = 36)
     private String activeRequestEventId;
 
@@ -398,6 +409,8 @@ public class AnalysisResult {
         }
         this.status = AnalysisStatus.COMPLETED;
         this.analysisOutcome = result.outcome();
+        this.coachingDelivered = result.outcome() == AnalysisOutcome.COACHING_READY
+                || result.outcome() == AnalysisOutcome.COMPLETED_NO_ISSUE;
         this.transcript = result.transcript();
         this.sttConfidence = result.sttConfidence();
         this.sttModelName = result.sttModelName();
@@ -497,6 +510,7 @@ public class AnalysisResult {
     }
 
     private void clearWorkerResult() {
+        this.coachingDelivered = false;
         this.canonicalResultEventId = null;
         this.committedResultSchemaVersion = null;
         this.coachingDocument = null;
