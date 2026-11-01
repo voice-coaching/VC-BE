@@ -50,8 +50,15 @@ public class JwtTokenProvider implements TokenProvider {
 
     @Override
     public IssuedTokens issue(Long userId, UserRole role) {
+        return reissue(userId, role, UUID.randomUUID().toString());
+    }
+
+    @Override
+    public IssuedTokens reissue(Long userId, UserRole role, String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            throw new IllegalArgumentException("Login session ID is required");
+        }
         Instant now = clock.instant();
-        String sessionId = UUID.randomUUID().toString();
         return new IssuedTokens(
                 encode(userId, role, sessionId, "access", now, now.plusSeconds(accessSeconds)),
                 encode(userId, role, sessionId, "refresh", now, now.plusSeconds(refreshSeconds)),

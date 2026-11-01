@@ -37,9 +37,16 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Ensure real media tools for normalization tests
+        run: |
+          if [ ! -x /usr/bin/ffmpeg ] || [ ! -x /usr/bin/ffprobe ]; then
+            sudo apt-get update
+            sudo apt-get install --yes ffmpeg libseccomp2
+          fi
+          echo "VC_BE_TEST_SANDBOX_PYTHON=$(readlink -f '${{ steps.python.outputs.python-path }}')" >> "$GITHUB_ENV"
+          echo 'VC_BE_REQUIRE_MEDIA_TOOLS=true' >> "$GITHUB_ENV"
+
       - name: Test and build
-        env:
-          VC_BE_TEST_SANDBOX_PYTHON: ${{ steps.python.outputs.python-path }}
         run: ./gradlew clean test bootJar --no-daemon
 
       - name: Validate deployment branch and release policy

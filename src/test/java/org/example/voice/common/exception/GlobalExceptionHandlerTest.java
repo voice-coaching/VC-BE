@@ -13,6 +13,15 @@ class GlobalExceptionHandlerTest {
     record Address(@Email String email) {}
 
     @Test
+    void recordingNormalizationFailureRetainsItsMachineReadableCode() {
+        var response = new GlobalExceptionHandler().handleBusinessException(
+                new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED));
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        assertThat(response.getBody().getCode()).isEqualTo("MEDIA_NORMALIZATION_FAILED");
+        assertThat(response.getBody().getMessage()).isEqualTo(ErrorCode.MEDIA_NORMALIZATION_FAILED.getMessage());
+    }
+
+    @Test
     void pageValidationDoesNotReportAnEmailError() {
         try (var factory = Validation.buildDefaultValidatorFactory()) {
             var error = new ConstraintViolationException(factory.getValidator().validate(new Page(-1)));

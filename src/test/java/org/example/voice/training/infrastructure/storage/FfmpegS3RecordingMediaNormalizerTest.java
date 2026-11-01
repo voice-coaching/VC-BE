@@ -47,6 +47,84 @@ class FfmpegS3RecordingMediaNormalizerTest {
     @Mock private S3Client s3Client;
 
     @Test
+    void liveWebmDefersMissingDurationToDecodedPcmMeasurement() throws Exception {
+        var parser = org.mockito.Mockito.mock(FfmpegS3RecordingMediaNormalizer.class,
+                org.mockito.Mockito.CALLS_REAL_METHODS);
+        org.springframework.test.util.ReflectionTestUtils.setField(parser, "media", new MediaNormalizationProperties());
+        var type = Class.forName(FfmpegS3RecordingMediaNormalizer.class.getName() + "$ProbeDocument");
+        for (String duration : new String[]{"", ", \"duration\": \"N/A\""}) {
+            String json = "{\"format\":{\"format_name\":\"matroska,webm\"" + duration
+                    + "},\"streams\":[{\"codec_type\":\"audio\",\"codec_name\":\"opus\",\"sample_rate\":\"48000\",\"channels\":1}]}";
+            Object probe = new ObjectMapper().readValue(json, type);
+            Long measured = org.springframework.test.util.ReflectionTestUtils.invokeMethod(
+                    parser, "validateProbe", probe, "audio/webm");
+            assertThat(measured).isNull();
+        }
+    }
+
+    @Test
+    void normalizesLiveAudioWebmWithoutContainerDuration() throws Exception {
+        assumeFfmpeg();
+        Path source = temporaryDirectory.resolve("browser-live.webm");
+        Process encoder = new ProcessBuilder("/usr/bin/ffmpeg", "-nostdin", "-v", "error",
+                "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=1",
+                "-c:a", "libopus", "-live", "1", "-f", "webm", source.toString()).start();
+        assertThat(encoder.waitFor(10, TimeUnit.SECONDS)).isTrue();
+        assertThat(encoder.exitValue()).isZero();
+        Process probe = new ProcessBuilder("/usr/bin/ffprobe", "-v", "error",
+                "-show_entries", "format=duration", "-of", "json", source.toString()).start();
+        assertThat(probe.waitFor(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(new String(probe.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8))
+                .doesNotContain("duration");
+        assertSupportedAudio(source, "audio/webm");
+    }
+
+    @Test
+    void missingWebmDurationCannotBypassTheDecodedDurationLimit() throws Exception {
+        assumeFfmpeg();
+        Path source = temporaryDirectory.resolve("over-limit.webm");
+        Process encoder = new ProcessBuilder("/usr/bin/ffmpeg", "-nostdin", "-v", "error",
+                "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=1",
+                "-c:a", "libopus", "-live", "1", "-f", "webm", source.toString()).start();
+        assertThat(encoder.waitFor(10, TimeUnit.SECONDS)).isTrue();
+        assertThat(encoder.exitValue()).isZero();
+        stubStorageDownload(source, "audio/webm");
+        var properties = mediaProperties();
+        properties.setMaximumDurationMs(900);
+        assertThatThrownBy(() -> normalizer(properties).normalize(9L, 7L,
+                "recordings/users/9/sessions/7/source.webm", "audio/webm", Files.size(source), null))
+                .isInstanceOfSatisfying(BaseException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.MEDIA_NORMALIZATION_FAILED));
+        verify(s3Client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+    }
+
+    @Test
+    void normalizesBrowserStylePcmWav() throws Exception {
+        assumeFfmpeg();
+        Path source = temporaryDirectory.resolve("browser-pcm.wav");
+        Process encoder = new ProcessBuilder("/usr/bin/ffmpeg", "-nostdin", "-v", "error",
+                "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=1",
+                "-ac", "1", "-c:a", "pcm_s16le", source.toString()).start();
+        assertThat(encoder.waitFor(10, TimeUnit.SECONDS)).isTrue();
+        assertThat(encoder.exitValue()).isZero();
+        assertSupportedAudio(source, "audio/wav");
+    }
+
+    private void assertSupportedAudio(Path source, String mimeType) throws Exception {
+        stubStorageDownload(source, mimeType);
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenReturn(PutObjectResponse.builder().build());
+        when(s3Client.deleteObject(any(DeleteObjectRequest.class)))
+                .thenReturn(DeleteObjectResponse.builder().build());
+        var normalized = normalizer().normalize(9L, 7L,
+                "recordings/users/9/sessions/7/source" + extension(source), mimeType, Files.size(source), null);
+        assertThat(normalized.durationMs()).isBetween(900, 1100);
+        assertThat(normalized.qualityStatus()).isEqualTo(RecordingQualityStatus.PASS);
+        assertThat(normalized.preparation()).isNotNull();
+        assertThat(normalized.visual()).isNull();
+    }
+
+    @Test
     @EnabledOnOs(OS.LINUX)
     void sandboxLauncherDeniesNetworkSocketCreation() throws Exception {
         Process process = new ProcessBuilder(
@@ -332,6 +410,10 @@ class FfmpegS3RecordingMediaNormalizerTest {
     }
 
     private static void assumeFfmpeg() {
+        if ("true".equals(System.getenv("VC_BE_REQUIRE_MEDIA_TOOLS"))) {
+            assertThat(Files.isExecutable(Path.of("/usr/bin/ffmpeg"))).isTrue();
+            assertThat(Files.isExecutable(Path.of("/usr/bin/ffprobe"))).isTrue();
+        }
         Assumptions.assumeTrue(Files.isExecutable(Path.of("/usr/bin/ffmpeg")));
         Assumptions.assumeTrue(Files.isExecutable(Path.of("/usr/bin/ffprobe")));
     }
