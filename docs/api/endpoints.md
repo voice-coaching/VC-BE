@@ -2,6 +2,14 @@
 
 # Endpoint List - voice
 
+## 승급시험 새로 시작
+
+| Method | URL | Auth | Description |
+| --- | --- | --- | --- |
+| POST | `/api/users/me/title-exams/{examId}/restart` | 로그인 + 본인 미채점 시험 | 이전 세션 ID를 확인하고 새 녹음 세션을 연결. [요청·재전송·취소 계약](title-exam-restart.md) |
+
+이 항목은 소스 계약이며 운영 배포 완료를 뜻하지 않는다. Backend를 먼저 배포한 뒤 프런트의 재개·새 시작 선택 화면을 배포한다.
+
 ## TEST 결제
 
 결제 호출 제한 계약: [회원별 작업 한도·429/503 응답](payment-rate-limits.md).

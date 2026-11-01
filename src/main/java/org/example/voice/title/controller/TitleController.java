@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.common.response.ApiResponse;
 import org.example.voice.common.security.LoginUser;
 import org.example.voice.title.application.TitleService;
+import org.example.voice.title.application.TitleExamRestartService;
+import org.example.voice.title.controller.dto.TitleExamRestartRequestDto;
 import org.example.voice.title.controller.dto.TitleExamGradeResponseDto;
 import org.example.voice.title.controller.dto.TitleExamResponseDto;
 import org.example.voice.title.controller.dto.TitleExamSubmitRequestDto;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/users/me")
 public class TitleController {
     private final TitleService service;
+    private final TitleExamRestartService restarts;
 
     @GetMapping("/title")
     public ApiResponse<TitleProgressResponseDto> progress(@AuthenticationPrincipal LoginUser user) {
@@ -43,6 +46,16 @@ public class TitleController {
     @GetMapping("/title-exams/{examId}")
     public ApiResponse<TitleExamResponseDto> get(@AuthenticationPrincipal LoginUser user, @PathVariable Long examId) {
         return ApiResponse.success("승급 시험을 조회했습니다.", TitleExamResponseDto.from(service.get(user.id(), examId)));
+    }
+
+    @PostMapping("/title-exams/{examId}/restart")
+    public ApiResponse<TitleExamResponseDto> restart(
+            @AuthenticationPrincipal LoginUser user,
+            @PathVariable Long examId,
+            @Valid @RequestBody TitleExamRestartRequestDto request
+    ) {
+        return ApiResponse.success("새 녹음으로 시험을 시작합니다.",
+                TitleExamResponseDto.from(restarts.restart(user.id(), examId, request.previousTrainingSessionId())));
     }
 
     @PostMapping("/title-exams/{examId}/submit")
