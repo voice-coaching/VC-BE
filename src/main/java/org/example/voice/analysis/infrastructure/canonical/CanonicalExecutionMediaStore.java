@@ -53,26 +53,47 @@ public class CanonicalExecutionMediaStore {
 
     public void requireRequest(UUID execution, com.fasterxml.jackson.databind.JsonNode request) {
         var media = request.path("mediaPreparation");
-        String sha = contract.digest(media.path("receipt"));
-        if (!sha.equals(media.path("receiptSha256").asText())) invalid();
+        String sha=null;
+        if (!media.isNull() && !media.isMissingNode()) {
+            sha = contract.digest(media.path("receipt"));
+            if (!sha.equals(media.path("receiptSha256").asText())) invalid();
+        }
         requireSnapshot(execution, request.path("recordingId").asLong(), request.path("audio").path("sha256").asText(),
-                request.path("video").path("sha256").asText(), sha);
+                nullable(request.path("video").get("sha256")), sha);
     }
 
     public void requireResult(CanonicalCallbackDocument document) {
         var node = contract.parse(document.bytes(), "result").path("mediaBinding");
         requireSnapshot(document.identity().executionId(), document.identity().recordingId(),
-                document.source().audioSha256(), node.path("videoSha256").asText(), node.path("mediaReceiptSha256").asText());
+                document.source().audioSha256(), nullable(node.get("videoSha256")), nullable(node.get("mediaReceiptSha256")));
     }
 
     private void requireSnapshot(UUID execution, long recording, String audio, String video, String receipt) {
+        if (receipt==null) {
+            if(video!=null || !Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM analysis_canonical_executions e
+                    JOIN voice_recordings r ON r.id=e.recording_id
+                    WHERE e.execution_id=? AND e.recording_id=? AND e.audio_sha256=?
+                    AND r.audio_sha256=e.audio_sha256 AND r.visual_sha256 IS NULL AND r.visual_object_key IS NULL
+                    AND NOT EXISTS(SELECT 1 FROM analysis_execution_media m WHERE m.execution_id=e.execution_id))
+                """,Boolean.class,execution,recording,audio)))invalid();
+            return;
+        }
         if (!Boolean.TRUE.equals(jdbc.queryForObject("""
             SELECT EXISTS(SELECT 1 FROM analysis_execution_media m
               JOIN voice_recordings r ON r.id=m.recording_id
-              WHERE m.execution_id=? AND m.recording_id=? AND m.audio_sha256=? AND m.video_sha256=?
-                AND m.receipt_sha256=? AND m.media_type='AUDIO_VISUAL'
-                AND r.audio_sha256=m.audio_sha256 AND r.visual_sha256=m.video_sha256)
-            """, Boolean.class, execution, recording, audio, video, receipt))) invalid();
+              WHERE m.execution_id=? AND m.recording_id=? AND m.audio_sha256=?
+                AND m.video_sha256 IS NOT DISTINCT FROM CAST(? AS varchar)
+                AND m.receipt_sha256=? AND m.media_type=?
+                AND r.audio_sha256=m.audio_sha256 AND r.visual_sha256 IS NOT DISTINCT FROM m.video_sha256
+                AND ((m.media_type='AUDIO_ONLY' AND r.visual_object_key IS NULL)
+                    OR (m.media_type='AUDIO_VISUAL' AND r.visual_object_key IS NOT NULL)))
+            """, Boolean.class, execution, recording, audio, video, receipt,
+                video==null?"AUDIO_ONLY":"AUDIO_VISUAL"))) invalid();
+    }
+
+    private static String nullable(com.fasterxml.jackson.databind.JsonNode node) {
+        return node==null || node.isNull()?null:node.asText();
     }
 
     private static void invalid() {

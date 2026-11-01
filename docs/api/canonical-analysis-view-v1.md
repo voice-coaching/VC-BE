@@ -1,5 +1,8 @@
 # Canonical public view v1 — local implementation
 
+2026-11-01: 신규 음성·영상 V6 및 public view V3 계약은
+[통합 V6 계약](ai-unified-v6-contract.md)을 참조한다. 아래 V1 설명은 과거 계약이다.
+
 2026-10-03: [scored-H5 점수 계약](../canonical-scoring-20261003.md)을 추가했다. 새 하네스는 숫자 overallScore/rubricRevision/9개 criteria를 반환한다. 아래 점수 null 고정 설명은 기존 S7/H5 결과에 적용한다. 새 채점 실패는 UNSCORABLE이며 완료할 수 없다.
 
 2026-10-01. Implemented in this worktree; **not deployed or runtime-validated**.

@@ -6,15 +6,27 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class CanonicalSemanticVerifierInstallationTest {
-    @Test void handoffCapabilityIsRequiredOnlyForV5Admission() {
+    final org.example.voice.analysis.infrastructure.runpod.RunPodContract contract =
+            new org.example.voice.analysis.infrastructure.runpod.RunPodContract();
+    @Test void currentV2VerifierIsRequiredForNewAdmission() {
         var installed = scoredInstallation();
         assertThatCode(() -> CanonicalSemanticVerifier.validateInstallation(installed)).doesNotThrowAnyException();
-        assertThatThrownBy(() -> CanonicalSemanticVerifier.validateHandoffInstallation(installed))
+        assertThatThrownBy(() -> CanonicalSemanticVerifier.validateHandoffInstallation(installed,contract))
                 .isInstanceOf(EvidenceFailure.class);
-        installed.put("handoffContractVersion", "voice-coaching.canonical-handoff.v1");
-        assertThatCode(() -> CanonicalSemanticVerifier.validateHandoffInstallation(installed)).doesNotThrowAnyException();
+        installed.put("handoffContractVersion", "voice-coaching.canonical-handoff.v2");
+        var pins=installed.putObject("schemaDigests");
+        for(var file:CanonicalHandoffReadiness.SCHEMAS)pins.put(file,contract.schemaSha256(file));
+        assertThatCode(() -> CanonicalSemanticVerifier.validateHandoffInstallation(installed,contract)).doesNotThrowAnyException();
+        pins.put("runpod_result_v6.schema.json","0".repeat(64));
+        assertThatThrownBy(() -> CanonicalSemanticVerifier.validateHandoffInstallation(installed,contract))
+                .isInstanceOf(EvidenceFailure.class);
+        pins.put("runpod_result_v6.schema.json",contract.schemaSha256("runpod_result_v6.schema.json"));
+        pins.put("unapproved.schema.json","0".repeat(64));
+        assertThatThrownBy(() -> CanonicalSemanticVerifier.validateHandoffInstallation(installed,contract))
+                .isInstanceOf(EvidenceFailure.class);
+        pins.remove("unapproved.schema.json");
         installed.put("handoffContractVersion", "unknown");
-        assertThatThrownBy(() -> CanonicalSemanticVerifier.validateHandoffInstallation(installed))
+        assertThatThrownBy(() -> CanonicalSemanticVerifier.validateHandoffInstallation(installed,contract))
                 .isInstanceOf(EvidenceFailure.class);
     }
 
