@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** Writes the event inside the request transaction; a separate dispatcher performs Redis I/O. */
 @Repository
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 @ConditionalOnExpression("'${analysis.transport:redis_stream}' == 'redis_stream'")
 @ConditionalOnProperty(prefix = "analysis.stream", name = "enabled", havingValue = "true")
 public class OutboxAnalysisJobPublisher implements AnalysisJobPublisher {
@@ -41,5 +42,6 @@ public class OutboxAnalysisJobPublisher implements AnalysisJobPublisher {
                 analysisResult,
                 payload
         ));
+        org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,"analysis_queued",analysisResult.getId(),request.eventId().toString(),null,null);
     }
 }

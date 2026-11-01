@@ -20,6 +20,7 @@ import java.util.UUID;
 /** Applies an AI result only when it belongs to the currently active retry generation. */
 @Service
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class AnalysisResultIngestionService {
 
     private static final String DELIVERY_EXHAUSTED_CODE = "analysis_result_retry_exhausted";
@@ -83,6 +84,8 @@ public class AnalysisResultIngestionService {
                 }
                 analysisResultWriter.save(analysisResult);
                 analysisSegmentWriter.replaceForAnalysis(analysisResult, message.segments());
+                org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,"analysis_completed",analysisResult.getId(),
+                        analysisResult.getActiveRequestEventId(),analysisResult.getActiveExecutionId(),null);
                 scheduleVisualDeletion(analysisResult);
                 yield AnalysisResultIngestionDisposition.APPLIED;
             }
@@ -97,6 +100,8 @@ public class AnalysisResultIngestionService {
                     analysisResult.rememberResultEvent(message.eventId(), payloadSha256);
                 }
                 analysisResultWriter.save(analysisResult);
+                if(failed)org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,"analysis_failed",analysisResult.getId(),
+                        analysisResult.getActiveRequestEventId(),analysisResult.getActiveExecutionId(),message.failureCode());
                 yield failed
                         ? AnalysisResultIngestionDisposition.APPLIED
                         : AnalysisResultIngestionDisposition.IGNORED_DUPLICATE;
@@ -145,6 +150,8 @@ public class AnalysisResultIngestionService {
             return AnalysisResultIngestionDisposition.IGNORED_DUPLICATE;
         }
         analysisResultWriter.save(analysisResult);
+        org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,"analysis_failed",analysisResult.getId(),
+                analysisResult.getActiveRequestEventId(),analysisResult.getActiveExecutionId(),DELIVERY_EXHAUSTED_CODE);
         return AnalysisResultIngestionDisposition.APPLIED;
     }
 }

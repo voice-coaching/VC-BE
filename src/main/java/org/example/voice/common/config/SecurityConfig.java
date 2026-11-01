@@ -46,10 +46,12 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) -> {
+                            org.example.voice.common.logging.HttpLogErrors.record(request,"AUTHENTICATION_REQUIRED");
                             response.setStatus(401); response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                             objectMapper.writeValue(response.getOutputStream(), ApiResponse.error(ErrorCode.UNAUTHORIZED.getMessage(), "AUTHENTICATION_REQUIRED"));
                         })
                         .accessDeniedHandler((request, response, exception) -> {
+                            org.example.voice.common.logging.HttpLogErrors.record(request,"FORBIDDEN");
                             response.setStatus(403); response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                             objectMapper.writeValue(response.getOutputStream(), ApiResponse.error(ErrorCode.ACCESS_DENIED.getMessage(), "FORBIDDEN"));
                         }))
@@ -68,7 +70,7 @@ public class SecurityConfig {
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Idempotency-Key", "If-None-Match",
                 "X-Analysis-Result-Schema"));
-        configuration.setExposedHeaders(List.of("ETag", "Cache-Control", "Retry-After"));
+        configuration.setExposedHeaders(List.of("ETag", "Cache-Control", "Retry-After", "X-Request-ID"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

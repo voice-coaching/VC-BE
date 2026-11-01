@@ -18,6 +18,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 @ConditionalOnProperty(prefix = "analysis", name = "transport", havingValue = "runpod_http")
 public class RunPodExecutionTimeoutSweeper {
     private final AnalysisResultJpaRepository results;
@@ -39,6 +40,8 @@ public class RunPodExecutionTimeoutSweeper {
         for (var result : expired) {
             if(delivery.current(result)!=null)continue; // Durable receipt moved responsibility to Backend.
             result.fail("analysis_execution_timeout", "분석 실행 시간이 만료되었습니다. 다시 시도해 주세요.", null, null);
+            org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,"analysis_failed",result.getId(),
+                    result.getActiveRequestEventId(),result.getActiveExecutionId(),"analysis_execution_timeout");
             outboxes.findByAnalysisResultIdAndStatus(result.getId(), AnalysisRequestOutboxStatus.PENDING)
                     .forEach(o -> o.cancelPending("analysis_execution_timeout"));
             cancellations.schedule(UUID.fromString(result.getActiveRequestEventId()));
