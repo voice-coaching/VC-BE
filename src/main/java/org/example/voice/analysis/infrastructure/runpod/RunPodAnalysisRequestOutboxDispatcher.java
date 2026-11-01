@@ -60,12 +60,11 @@ public class RunPodAnalysisRequestOutboxDispatcher {
                             return null;
                         }
                         if (event.getNextAttemptAt().isAfter(now))
-                            return new Delivery(event.getId(), event.getAnalysisResult().getId(), null, event.getNextAttemptAt());
+                            return new Delivery(event.getId(), event.getAnalysisResult().getId(), null, event.getNextAttemptAt(),event.getEventId(),event.getExecutionId());
                         event.reserveDeliveryUntil(now.plusSeconds(60));
-                        log.info("analysis_dispatch_queue analysisId={} requestId={} executionId={} queueAgeMs={}",
-                                analysis.getId(), event.getEventId(), event.getExecutionId(),
-                                java.time.Duration.between(event.getCreatedAt(), now).toMillis());
-                        return new Delivery(event.getId(), event.getAnalysisResult().getId(), event.getPayload(), now);
+                        org.example.voice.common.logging.AnalysisLogEvents.event(log,"analysis_dispatch_attempt",analysis.getId(),event.getEventId(),event.getExecutionId(),null)
+                                .addKeyValue("queue_age_ms",java.time.Duration.between(event.getCreatedAt(),now).toMillis()).log("Analysis dispatch attempt");
+                        return new Delivery(event.getId(), event.getAnalysisResult().getId(), event.getPayload(), now,event.getEventId(),event.getExecutionId());
                     }).orElse(null));
             if (delivery == null) return;
             if (delivery.payload() == null) { next = delivery.readyAt(); return; }
@@ -93,8 +92,8 @@ public class RunPodAnalysisRequestOutboxDispatcher {
             final boolean retry = retryable;
             final int delay = retryAfter;
             next = transactions.execute(status -> finish(delivery, outcome, retry, delay));
-            log.info("analysis_dispatch_span analysisId={} elapsedMs={} code={}", delivery.analysisId(),
-                    (System.nanoTime()-started)/1_000_000, outcome == null ? "ACCEPTED" : outcome);
+            org.example.voice.common.logging.AnalysisLogEvents.event(log,"analysis_dispatch_finished",delivery.analysisId(),delivery.requestId(),delivery.executionId(),outcome)
+                    .addKeyValue("duration_ms",(System.nanoTime()-started)/1_000_000).log("Analysis dispatch finished");
         } finally {
             gate.release(claim, next == null ? OffsetDateTime.now(ZoneOffset.UTC).plusSeconds(1) : next);
         }
@@ -116,23 +115,24 @@ public class RunPodAnalysisRequestOutboxDispatcher {
             return OffsetDateTime.now(ZoneOffset.UTC);
         }
         if ("runpod_capacity_busy".equals(error) && result.getWorkerInstanceId() == null) {
-            log.info("analysis_capacity_wait analysisId={} busyCount={}", delivery.analysisId(), event.getBusyCount()+1);
+            org.example.voice.common.logging.AnalysisLogEvents.event(log,"analysis_capacity_wait",delivery.analysisId(),event.getEventId(),event.getExecutionId(),null).log("Analysis capacity wait");
             return event.deferCapacity(retryAfter);
         }
         // A claim proves delivery even if its HTTP acknowledgment was lost; never fail live inference.
         if (error == null || result.getWorkerInstanceId() != null) {
             event.markDelivered(event.getExecutionId());
         } else {
-            log.warn("runpod delivery failed: eventId={}, code={}", event.getEventId(), error);
+            org.example.voice.common.logging.AnalysisLogEvents.event(log,"analysis_dispatch_failed",delivery.analysisId(),event.getEventId(),event.getExecutionId(),error).log("Analysis dispatch failed");
             if (event.recordDispatchFailure(error, retryable ? properties.getDispatchMaxAttempts() : 1)) {
                 boolean expired = "analysis_execution_timeout".equals(error);
                 result.fail(expired ? error : FAILURE, expired ? "분석 제한 시간이 지났습니다. 다시 시도해 주세요."
                         : "분석 작업을 전달하지 못했습니다. 다시 시도해 주세요.", null, null);
+                org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,"analysis_failed",result.getId(),result.getActiveRequestEventId(),result.getActiveExecutionId(),expired?error:FAILURE);
             }
         }
         return event.getStatus() == AnalysisRequestOutboxStatus.PENDING
                 ? event.getNextAttemptAt() : OffsetDateTime.now(ZoneOffset.UTC);
     }
 
-    private record Delivery(Long id, Long analysisId, String payload, OffsetDateTime readyAt) {}
+    private record Delivery(Long id, Long analysisId, String payload, OffsetDateTime readyAt,String requestId,String executionId) {}
 }

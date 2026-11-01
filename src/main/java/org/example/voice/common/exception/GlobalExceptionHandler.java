@@ -12,7 +12,6 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.stream.Collectors;
 
 @RestControllerAdvice
 @Slf4j
@@ -25,25 +24,22 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException exception) {
-        log.warn("Business exception: {}", exception.getMessage());
         ErrorCode errorCode = exception.getErrorCode();
+        log.atInfo().addKeyValue("event","api_rejected").addKeyValue("error_code",errorCode.name()).log("API request rejected");
         return ResponseEntity.status(errorCode.getHttpStatus())
                 .body(ApiResponse.error(exception.getMessage(), errorCode.name()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException exception) {
-        String message = exception.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                .collect(Collectors.joining(", "));
-        log.warn("Validation failed: {}", message);
+        log.atInfo().addKeyValue("event","api_rejected").addKeyValue("error_code","VALIDATION_ERROR").log("Request validation failed");
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error(ErrorCode.VALIDATION_ERROR.getMessage()));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(ConstraintViolationException exception) {
-        log.warn("Constraint violation: {}", exception.getMessage());
+        log.atInfo().addKeyValue("event","api_rejected").addKeyValue("error_code","INVALID_INPUT_VALUE").log("Request constraint violation");
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error(exception.getConstraintViolations().stream()
                         .allMatch(violation -> violation.getConstraintDescriptor().getAnnotation()
@@ -55,7 +51,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ApiResponse<Void>> handleMissingRequestParameter(MissingServletRequestParameterException exception) {
-        log.warn("Required request parameter missing: {}", exception.getParameterName());
+        log.atInfo().addKeyValue("event","api_rejected").addKeyValue("error_code","VALIDATION_ERROR").log("Required request parameter missing");
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error(ErrorCode.VALIDATION_ERROR.getMessage(), ErrorCode.VALIDATION_ERROR.name()));
     }
@@ -85,7 +81,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(Exception exception) {
-        log.error("Unexpected error", exception);
+        log.atError().addKeyValue("event","api_failed").addKeyValue("exception_type",exception.getClass().getName())
+                .setCause(exception).log("Unexpected API error");
         return ResponseEntity.internalServerError()
                 .body(ApiResponse.error(ErrorCode.INTERNAL_SERVER_ERROR.getMessage()));
     }

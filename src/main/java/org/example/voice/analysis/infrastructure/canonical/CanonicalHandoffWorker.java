@@ -2,6 +2,8 @@ package org.example.voice.analysis.infrastructure.canonical;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import lombok.extern.slf4j.Slf4j;
+import org.example.voice.common.logging.AnalysisLogEvents;
 import org.example.voice.analysis.application.CanonicalCallbackCommitter;
 import org.example.voice.analysis.infrastructure.runpod.*;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -14,6 +16,7 @@ import java.util.concurrent.*;
 
 /** Durable verification lane; no B2 dependency and no HTTP transaction held during Python. */
 @Component
+@Slf4j
 public final class CanonicalHandoffWorker {
     private final JdbcTemplate jdbc; private final TransactionTemplate tx;
     private final CanonicalHandoffSettings settings; private final CanonicalHandoffStore store;
@@ -60,7 +63,9 @@ public final class CanonicalHandoffWorker {
                 verifier.verifyHandoff(request,(byte[])job.get("metadata_bytes"),raw,(byte[])job.get("projection_bytes"),
                     "voice-coaching.canonical-handoff.v2".equals(metadata.path("schemaVersion").asText()) ? Duration.ofSeconds(90) : Duration.between(java.time.Instant.now(),deadline.toInstant()));
             }
-            org.slf4j.LoggerFactory.getLogger(getClass()).info("canonical_handoff_verify analysisId={} executionId={} elapsedMs={}",job.get("analysis_id"),job.get("execution_id"),TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));
+            AnalysisLogEvents.event(log,"analysis_evidence_verified",((Number)job.get("analysis_id")).longValue(),
+                    job.get("request_id").toString(),job.get("execution_id").toString(),null)
+                    .addKeyValue("duration_ms",TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started)).log("Analysis evidence verified");
             var doc=CanonicalCallbackDocument.parse((byte[])job.get("projection_bytes"),contract);
             tx.executeWithoutResult(t->{
                 store.active(current,true); // analysis lock before handoff lock
@@ -81,10 +86,14 @@ public final class CanonicalHandoffWorker {
                         UPDATE analysis_canonical_handoffs SET state=?,reason_code=?,claim_id=NULL,claim_until=NULL,
                         next_attempt_at=CURRENT_TIMESTAMP+INTERVAL '5 seconds' WHERE handoff_id=? AND claim_id=? AND state='VERIFYING'
                         """,revoked?"REVOKED":invalid?"REJECTED":"RECEIVED",revoked?"EXECUTION_INACTIVE":invalid?"EVIDENCE_INVALID":"VERIFIER_UNAVAILABLE",failed.get("handoff_id"),failed.get("claim_id"));
-                    if(changed==1 && invalid)jdbc.update("""
+                    if(changed==1 && invalid){
+                        int failedAnalysis=jdbc.update("""
                         UPDATE analysis_results SET status='FAILED',failure_code='canonical_handoff_invalid',failure_reason='Analysis evidence validation failed'
                         WHERE id=? AND active_execution_id=? AND status IN ('PENDING','PROCESSING')
                         """,failed.get("analysis_id"),failed.get("execution_id").toString());
+                        if(failedAnalysis==1)AnalysisLogEvents.afterCommit(log,"analysis_failed",((Number)failed.get("analysis_id")).longValue(),
+                                failed.get("request_id").toString(),failed.get("execution_id").toString(),"canonical_handoff_invalid");
+                    }
                 });
             } catch(Exception ignored){/* Expiring claim survives database outages. */}
         }

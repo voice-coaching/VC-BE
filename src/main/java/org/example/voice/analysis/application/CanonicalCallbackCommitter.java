@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** Fenced commit. No remote I/O and, pending post-processing approval, NO deletion calls. */
 @Service
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class CanonicalCallbackCommitter {
     private final CanonicalCallbackInbox inbox;
     private final AnalysisResultReader results;
@@ -86,6 +87,9 @@ public class CanonicalCallbackCommitter {
             jdbc.update("INSERT INTO analysis_canonical_archive_jobs(handoff_id) VALUES (?)",handoff);
             jdbc.update("INSERT INTO analysis_canonical_archive_artifacts(handoff_id,kind) SELECT handoff_id,kind FROM analysis_canonical_handoff_artifacts WHERE handoff_id=?",handoff);
         }
+        org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,
+                doc.status()==AnalysisStatus.FAILED?"analysis_failed":"analysis_completed",id.analysisId(),
+                id.requestId().toString(),id.executionId().toString(),doc.failure()==null?null:doc.failure().code());
         return AnalysisResultIngestionDisposition.APPLIED;
     }
     private static String summary(CanonicalCallbackDocument doc) {

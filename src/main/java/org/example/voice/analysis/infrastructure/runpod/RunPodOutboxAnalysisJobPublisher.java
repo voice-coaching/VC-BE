@@ -22,6 +22,7 @@ import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 @ConditionalOnProperty(prefix = "analysis", name = "transport", havingValue = "runpod_http")
 public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
 
@@ -99,6 +100,8 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
         // Registry failure rolls back this entire admission transaction.
         outboxRepository.flush();
         canonicalExecutions.registerCurrent(analysisResult.getId(), request.eventId(), executionId);
+        org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,"analysis_queued",analysisResult.getId(),
+                request.eventId().toString(),executionId.toString(),null);
     }
 
     private void assertCanonicalScope(AnalysisResult result, AnalysisWorkerRequest request, boolean audiovisual) {
