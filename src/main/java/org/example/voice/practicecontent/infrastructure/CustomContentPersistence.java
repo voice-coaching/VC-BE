@@ -33,10 +33,14 @@ public class CustomContentPersistence implements CustomContentRepository {
     }
     @Override public void eraseIfUnreferenced(Long id,Long user) {
         if(id == null) return;
+        if(em.createQuery("select count(e) from ScriptLibraryEntry e where e.contentId=:id and e.userId=:user",Long.class).setParameter("id",id).setParameter("user",user).getSingleResult()>0) return;
         if(em.createQuery("select count(s) from TrainingSession s where s.content.id=:id",Long.class).setParameter("id",id).getSingleResult()==0)
             erase("c.id=:id and c.ownerId=:user",id,user);
     }
     @Override public void eraseForUser(Long user) {
+        em.createQuery("delete from ScriptLibraryRequest r where r.userId=:user").setParameter("user",user).executeUpdate();
+        em.createQuery("delete from ScriptLibraryEntry e where e.userId=:user").setParameter("user",user).executeUpdate();
+        em.createQuery("delete from ScriptLibraryTopic t where t.userId=:user").setParameter("user",user).executeUpdate();
         erase("c.ownerId=:user",null,user);
         em.createQuery("update AnalysisRequestOutbox o set o.privatePayload=null where o.analysisResult.recording.trainingSession.userId=:user and o.privatePayload is not null")
                 .setParameter("user",user).executeUpdate();
