@@ -9,13 +9,23 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class RefreshTokenWriterImpl implements RefreshTokenWriter {
     private final RefreshTokenJpaRepository repository;
+    private final SessionCacheTransactions cacheTransactions;
 
     @Override
-    public RefreshToken save(RefreshToken refreshToken) { return repository.save(refreshToken); }
+    public RefreshToken save(RefreshToken refreshToken) {
+        cacheTransactions.changing(refreshToken.getUserId());
+        return repository.save(refreshToken);
+    }
 
     @Override
-    public void delete(RefreshToken refreshToken) { repository.delete(refreshToken); }
+    public void delete(RefreshToken refreshToken) {
+        cacheTransactions.changing(refreshToken.getUserId());
+        repository.delete(refreshToken);
+    }
 
     @Override
-    public void deleteByUserId(Long userId) { repository.deleteByUserId(userId); }
+    public void deleteByUserId(Long userId) {
+        cacheTransactions.changing(userId);
+        repository.deleteByUserId(userId);
+    }
 }

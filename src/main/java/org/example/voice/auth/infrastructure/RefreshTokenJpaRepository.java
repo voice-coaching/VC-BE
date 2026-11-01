@@ -20,4 +20,7 @@ interface RefreshTokenJpaRepository extends JpaRepository<RefreshToken, Long> {
 
     void deleteByUserId(Long userId);
     boolean existsByUserIdAndSessionIdAndExpiresAtAfter(Long userId, String sessionId, java.time.OffsetDateTime now);
+
+    @Query("select new org.example.voice.auth.domain.model.LoginSessionState(token.sessionId, token.expiresAt) from RefreshToken token where token.userId=:userId")
+    Optional<org.example.voice.auth.domain.model.LoginSessionState> findSessionState(@Param("userId") Long userId);
 }
