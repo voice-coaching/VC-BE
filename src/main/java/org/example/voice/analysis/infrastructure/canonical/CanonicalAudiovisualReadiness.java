@@ -18,9 +18,7 @@ import java.util.concurrent.*;
 @Component
 public final class CanonicalAudiovisualReadiness {
     public static final String H5="d70372926d3406842b95c370b5ceb152480e7f0af83ba840028ec8d9ace2dc50";
-    public static final List<String> SCHEMAS=List.of("runpod_analysis_request_v4.schema.json",
-        "runpod_result_v6.schema.json","runpod_canonical_handoff_v2.schema.json",
-        "runpod_media_preparation_v1.schema.json","runpod_visual_coaching_input_v1.schema.json");
+    public static final List<String> SCHEMAS=CanonicalHandoffReadiness.SCHEMAS;
     private final CanonicalDeliverySpool delivery;
     private final Environment environment;
     private final CanonicalHandoffReadiness handoff;

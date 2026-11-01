@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
+import org.example.voice.analysis.infrastructure.runpod.RunPodContract;
 import java.io.DataOutputStream;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -19,9 +20,12 @@ import java.util.concurrent.TimeUnit;
 public final class CanonicalSemanticVerifier {
     private static final String PROTOCOL="voice-coaching.canonical-offline-verification.v1";
     private final CanonicalEvidenceSettings settings;
+    private final RunPodContract contract;
     private final ObjectMapper mapper=new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
             .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
-    public CanonicalSemanticVerifier(CanonicalEvidenceSettings settings){this.settings=settings;}
+    public CanonicalSemanticVerifier(CanonicalEvidenceSettings settings, RunPodContract contract){
+        this.settings=settings;this.contract=contract;
+    }
 
     /** Installation/pins only: no job, fixture, model inference or external network. */
     public void assertInstalled() { assertInstalled(false); }
@@ -49,7 +53,7 @@ public final class CanonicalSemanticVerifier {
             if(raw.length>4096 || child.exitValue()!=0)unavailable();
             var response=mapper.readTree(raw);
             validateInstallation(response);
-            if(handoffRequired)validateHandoffInstallation(response);
+            if(handoffRequired)validateHandoffInstallation(response,contract);
             if(audiovisualRequired && (!"4cc0cbacd41b5c6f2ac20e6e4840bc5406f4c7ab79ecf53702586eeb5874ecbc".equals(response.path("audiovisualCoreManifestSha256").asText())
                 || !"d70372926d3406842b95c370b5ceb152480e7f0af83ba840028ec8d9ace2dc50".equals(response.path("audiovisualManifestSha256").asText())
                 || !"934729ee467a2eb030c244584c6fa5c3575ca9ed0a43348a59a486199c0f55e9".equals(response.path("audiovisualLockSha256").asText()))) unavailable();
@@ -78,8 +82,11 @@ public final class CanonicalSemanticVerifier {
         }
     }
 
-    static void validateHandoffInstallation(JsonNode response) {
+    static void validateHandoffInstallation(JsonNode response, RunPodContract contract) {
         validateInstallation(response);
+        var expected=new java.util.LinkedHashMap<String,String>();
+        for(var file:CanonicalHandoffReadiness.SCHEMAS)expected.put(file,contract.schemaSha256(file));
+        if(!new ObjectMapper().valueToTree(expected).equals(response.path("schemaDigests")))unavailable();
         // Additive source registration is separate from RunPod execution approval.
         // Existing installations may omit the entire Native tuple while rolling out.
         if (response.has("nativeCoreManifestSha256") || response.has("nativeManifestSha256")
@@ -112,9 +119,13 @@ public final class CanonicalSemanticVerifier {
                     "f6d56e1decc160f0ca38cc8d52303f3de20945f872d714bf6a2e743ed94c0391",
                     "def65f68a849a2452b0e4dde600f0ef85d99beaa97123d30d97262653ebf8e77",
                     "b605c3b9ba06bbf18fc126770b18de3d2da0d3f70c08e04873f17bc735b948bc");
-            if (!nativeV1 && !nativeV2 && !nativeV4 && !seungunGpt && !seungunGop && !dlpcGop && !dlpcAnnouncer) unavailable();
+            boolean dlpcConcise=matchesNativeIdentity(response,
+                    "f6d56e1decc160f0ca38cc8d52303f3de20945f872d714bf6a2e743ed94c0391",
+                    "3e430635a4d714ead5d8e08352e41ff9a2b06c893d73af7f018fb43b4c37f61c",
+                    "58c26086546abb8b94eb6998671101d67633af426adf373cceb42862ccaf0ec4");
+            if (!nativeV1 && !nativeV2 && !nativeV4 && !seungunGpt && !seungunGop && !dlpcGop && !dlpcAnnouncer && !dlpcConcise) unavailable();
         }
-        if (!"voice-coaching.canonical-handoff.v1".equals(response.path("handoffContractVersion").asText()))
+        if (!CanonicalHandoffReadiness.VERSION.equals(response.path("handoffContractVersion").asText()))
             unavailable();
     }
 
@@ -161,7 +172,7 @@ public final class CanonicalSemanticVerifier {
                         frame(out,request,65536);
                         if(manifest!=null) {
                             frame(out,manifest,65536);
-                            if((!mode.equals("VERIFY_HANDOFF") && originals.size()<4) || originals.size()>5)throw new IllegalArgumentException("ARTIFACT_COUNT");
+                            if((!mode.equals("VERIFY_HANDOFF") && originals.size()<4) || originals.size()>7)throw new IllegalArgumentException("ARTIFACT_COUNT");
                             for(byte[] raw:originals)frame(out,raw,16*1024*1024);
                         }
                         if(callback!=null)frame(out,callback,1024*1024);

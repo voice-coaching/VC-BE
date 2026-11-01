@@ -10,10 +10,11 @@ import java.time.Duration;
 import java.net.URI;
 import java.net.http.*;
 
-/** Independent v5 readiness; B2 availability does not gate result verification. */
+/** Common v6 readiness, independent of optional video assets. */
 @Component
 public final class CanonicalHandoffReadiness {
-    public static final List<String> SCHEMAS=List.of("runpod_http_control_v1.schema.json","runpod_http_control_v1_2.schema.json","runpod_canonical_parent.schema.json","runpod_canonical_input.schema.json","runpod_canonical_output.schema.json","runpod_canonical_journal_v1.schema.json","runpod_analysis_request_v3.schema.json","runpod_result_v5.schema.json","runpod_canonical_handoff_v1.schema.json");
+    public static final String VERSION="voice-coaching.canonical-handoff.v2";
+    public static final List<String> SCHEMAS=List.of("runpod_http_control_v1.schema.json","runpod_http_control_v1_2.schema.json","runpod_canonical_parent.schema.json","runpod_canonical_input.schema.json","runpod_canonical_output.schema.json","runpod_canonical_journal_v1.schema.json","runpod_analysis_request_v4.schema.json","runpod_result_v6.schema.json","runpod_canonical_handoff_v2.schema.json","runpod_media_preparation_v1.schema.json","runpod_visual_coaching_input_v1.schema.json");
     private final CanonicalHandoffSettings settings;private final CanonicalEvidenceSettings evidence;
     private final CanonicalSemanticVerifier verifier;private final CanonicalHandoffWorker worker;
     private final CanonicalArchiveWorker archive;private final CanonicalArchiveWriter writer;
@@ -31,11 +32,11 @@ public final class CanonicalHandoffReadiness {
     }
     public Map<String,String> digests(){var result=new LinkedHashMap<String,String>();for(var file:SCHEMAS)result.put(file,contract.schemaSha256(file));return result;}
     public boolean supported(){return delivery.operational() && deliveryWorker.operational() && System.nanoTime()<installedUntil && settings.workerEnabled() && worker.operational() && effects.operational();}
-    public boolean admission(){try{return supported() && delivery.headroom() && settings.admissionEnabled() && settings.archiveEnabled() && writer.configured() && archive.operational() && System.nanoTime()<podUntil && settings.used()+CanonicalHandoffSettings.RESERVATION<=settings.budget();}catch(Exception e){return false;}}
+    public boolean admission(){try{return supported() && delivery.headroom(CanonicalHandoffSettings.AUDIOVISUAL_RESERVATION) && settings.admissionEnabled() && settings.archiveEnabled() && writer.configured() && archive.operational() && System.nanoTime()<podUntil && settings.used()+CanonicalHandoffSettings.AUDIOVISUAL_RESERVATION<=settings.budget();}catch(Exception e){return false;}}
     @PostConstruct public void start(){lane.scheduleWithFixedDelay(this::probe,2,15,TimeUnit.SECONDS);}
     private void probe(){
         if(!settings.workerEnabled() || settings.budget()==0 || !evidence.journalEnabled() || !evidence.callbackEnabled())return;
-        try{if(!delivery.enabled())verifier.assertHandoffInstalled();settings.used();installedUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(90);}catch(Exception e){installedUntil=podUntil=0;return;}
+        try{verifier.assertHandoffInstalled();settings.used();installedUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(90);}catch(Exception e){installedUntil=podUntil=0;return;}
         try{
             var uri=URI.create(pod.normalizedEndpointUrl()+"/health/handoff");
             if(!"https".equals(uri.getScheme()) || uri.getUserInfo()!=null)throw new IllegalStateException();
@@ -44,10 +45,7 @@ public final class CanonicalHandoffReadiness {
                 if(reply.statusCode()!=200 || !reply.headers().firstValue("content-encoding").orElse("identity").equals("identity"))throw new IllegalStateException();
                 byte[] bytes=stream.readNBytes(65537);if(bytes.length>65536)throw new IllegalStateException();
                 var node=new com.fasterxml.jackson.databind.ObjectMapper().readTree(bytes);
-                var videoDigests=new LinkedHashMap<String,String>();
-                if("voice-coaching.canonical-handoff.v2".equals(node.path("contractVersion").asText()))
-                    for(var file:CanonicalAudiovisualReadiness.SCHEMAS)videoDigests.put(file,contract.schemaSha256(file));
-                if(!HandoffPeerReadiness.matches(node,digests(),videoDigests))throw new IllegalStateException();
+                if(!HandoffPeerReadiness.matches(node,digests()))throw new IllegalStateException();
                 podUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(45);
             }
         }catch(Exception e){podUntil=0;}

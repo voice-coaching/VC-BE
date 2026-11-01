@@ -47,7 +47,7 @@ public class TitlePersistence implements TitleRepository {
                 select a.overallScore from AnalysisResult a join a.recording r join r.trainingSession s
                 where a.id=:id and s.userId=:user and s.id=:session and s.content.id=:content
                 and a.status=org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
-                and a.analysisProfile not in ('CANONICAL_FROZEN_20260928_V4','CANONICAL_HANDOFF_20261004_V5')
+                and a.analysisProfile not in ('CANONICAL_FROZEN_20260928_V4','CANONICAL_HANDOFF_20261004_V5','CANONICAL_AUDIOVISUAL_20261007_V6')
                 and (a.analysisOutcome is null or a.analysisOutcome in
                     (org.example.voice.analysis.domain.type.AnalysisOutcome.COACHING_READY,
                      org.example.voice.analysis.domain.type.AnalysisOutcome.COMPLETED_NO_ISSUE))
@@ -69,7 +69,7 @@ public class TitlePersistence implements TitleRepository {
                 where a.id=:id and s.userId=:user and s.id=:session and s.content.id=:content
                 and a.status=org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
                 and ((a.coachingDocument is not null and a.overallScore is null)
-                    or a.analysisProfile in ('CANONICAL_FROZEN_20260928_V4','CANONICAL_HANDOFF_20261004_V5'))
+                    or a.analysisProfile in ('CANONICAL_FROZEN_20260928_V4','CANONICAL_HANDOFF_20261004_V5','CANONICAL_AUDIOVISUAL_20261007_V6'))
                 and r.selected=true and r.deletedAt is null
                 and s.status in (org.example.voice.training.domain.type.TrainingSessionStatus.ANALYZING,
                                  org.example.voice.training.domain.type.TrainingSessionStatus.COMPLETED)
@@ -112,7 +112,8 @@ public class TitlePersistence implements TitleRepository {
         return em.createQuery("""
                 select a from AnalysisResult a join a.recording r join r.trainingSession s
                 where a.id=:id and s.userId=:user and s.id=:session and s.content.id=:content
-                and a.analysisProfile='CANONICAL_HANDOFF_20261004_V5'
+                and a.analysisProfile in ('CANONICAL_HANDOFF_20261004_V5','CANONICAL_AUDIOVISUAL_20261007_V6')
+                and r.visualObjectKey is null
                 and a.status=org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
                 and r.selected=true and r.deletedAt is null
                 and s.status in (org.example.voice.training.domain.type.TrainingSessionStatus.ANALYZING,

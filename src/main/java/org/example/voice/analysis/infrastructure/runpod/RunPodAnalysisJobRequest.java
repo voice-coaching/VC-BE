@@ -85,11 +85,7 @@ record RunPodAnalysisJobRequest(
                 legacy.deadlineAt(), RunPodContract.RESULT_V4, "CANONICAL_FROZEN_20260928_V4");
     }
 
-    RunPodAnalysisJobRequest asHandoff() {
-        return new RunPodAnalysisJobRequest(RunPodContract.REQUEST_V3,requestId,executionId,analysisId,recordingId,contentId,learningFocus,promptRevision,scriptText,scriptSha256,audio,video,deadlineAt,RunPodContract.RESULT_V5,RunPodContract.HANDOFF_PROFILE);
-    }
-
-    RunPodAnalysisJobRequest asAudiovisual(MediaPreparationInput preparation) {
+    RunPodAnalysisJobRequest asV6(MediaPreparationInput preparation) {
         return new RunPodAnalysisJobRequest(RunPodContract.REQUEST_V4,requestId,executionId,analysisId,recordingId,
                 contentId,learningFocus,promptRevision,scriptText,scriptSha256,audio,video,deadlineAt,
                 RunPodContract.RESULT_V6,RunPodContract.AUDIOVISUAL_PROFILE,preparation);

@@ -11,9 +11,7 @@ from common import HOLD, environment, fetch, query
 SCHEMAS = ('runpod_http_control_v1.schema.json', 'runpod_http_control_v1_2.schema.json',
  'runpod_canonical_parent.schema.json', 'runpod_canonical_input.schema.json',
  'runpod_canonical_output.schema.json', 'runpod_canonical_journal_v1.schema.json',
- 'runpod_analysis_request_v3.schema.json', 'runpod_result_v5.schema.json',
- 'runpod_canonical_handoff_v1.schema.json')
-VIDEO_SCHEMAS = ('runpod_analysis_request_v4.schema.json','runpod_result_v6.schema.json',
+ 'runpod_analysis_request_v4.schema.json', 'runpod_result_v6.schema.json',
  'runpod_canonical_handoff_v2.schema.json','runpod_media_preparation_v1.schema.json',
  'runpod_visual_coaching_input_v1.schema.json')
 PREFIX = 'ANALYSIS_CANONICAL_HANDOFF_'
@@ -61,15 +59,14 @@ def worker_health(env, expected, details=None):
                 'digestsMatch':mapped == expected,
                 'fields':{key:key in doc for key in ('contractVersion','handoffContractVersion','executorConfigured','admissionEnabled','schemaDigests','reasonCode','executor_configured','schema_digests')}})
         version = doc.get('contractVersion')
-        if version not in ('voice-coaching.canonical-handoff.v1','voice-coaching.canonical-handoff.v2'):
+        if version != 'voice-coaching.canonical-handoff.v2':
             return 'WORKER_CONTRACT_MISMATCH'
         if doc.get('executorConfigured') is not True: return 'WORKER_EXECUTOR_UNCONFIGURED'
         rows = doc.get('schemaDigests')
         if not isinstance(rows,dict): return 'WORKER_SCHEMA_MISMATCH'
-        video = contracts(VIDEO_SCHEMAS) if version.endswith('.v2') else {}
         audio_match = all(rows.get(name) == digest for name,digest in expected.items())
         extras = {name:digest for name,digest in rows.items() if name not in expected}
-        extras_match = all(name in video and video[name] == digest for name,digest in extras.items())
+        extras_match = not extras
         if details is not None:
             details.update({'audioDigestsMatch':audio_match,'knownExtensionsMatch':extras_match,
                 'missingAudioSchemas':sorted(name for name in expected if name not in rows),
@@ -116,7 +113,7 @@ def inspect(env):
     if not writer_configured(env): reasons.append('ARCHIVE_WRITER_UNCONFIGURED')
     try:
         budget = int(env.get(PREFIX+'SPOOL_BUDGET_BYTES', '0'))
-        if not 85065728 <= budget <= 16*1024**3: reasons.append('HANDOFF_BUDGET_UNCONFIGURED')
+        if not 118620160 <= budget <= 16*1024**3: reasons.append('HANDOFF_BUDGET_UNCONFIGURED')
         else:
             sql = """SELECT json_build_object('fits',
               (SELECT COALESCE(SUM(reserved_bytes),0) FROM analysis_canonical_handoffs) +
@@ -126,7 +123,7 @@ def inspect(env):
               WHERE e.result_schema_version IN ('voice-coaching.runpod-analysis-result.v5','voice-coaching.runpod-analysis-result.v6')
               AND a.status IN ('PENDING','PROCESSING')
               AND NOT EXISTS(SELECT 1 FROM analysis_canonical_handoffs h WHERE h.execution_id=e.execution_id))
-              <= %d)""" % (budget-85065728)
+              <= %d)""" % (budget-118620160)
             if query(env, sql).get('fits') is not True: reasons.append('HANDOFF_CAPACITY_EXHAUSTED')
     except ValueError: reasons.append('HANDOFF_BUDGET_UNCONFIGURED')
     except Exception: reasons.append('READINESS_DATABASE_UNAVAILABLE')

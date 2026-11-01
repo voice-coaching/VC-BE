@@ -22,8 +22,7 @@ public class CanonicalCapabilitiesService {
         boolean videoOpen = open && audiovisual.admission();
         // Audio title exams use verified committed rubric scores; courses remain unsupported.
         return new CanonicalCapabilitiesData("voice-coaching.analysis-capabilities.v1",
-                RunPodContract.HANDOFF_PROFILE, videoOpen ? List.of(RunPodContract.RESULT_V5,RunPodContract.RESULT_V6)
-                        : open ? List.of(RunPodContract.RESULT_V5) : List.of(), open,
+                RunPodContract.AUDIOVISUAL_PROFILE, open ? List.of(RunPodContract.RESULT_V6) : List.of(), open,
                 Map.of("STANDALONE_AUDIO", new Scope(true, null),
                        "COURSE", new Scope(false, "COURSE_ANALYSIS_UNSUPPORTED"),
                        "TITLE_EXAM", new Scope(true, null),

@@ -25,7 +25,10 @@ public class RunPodAnalysisPayloadCodec {
 
     String encodeRequest(RunPodAnalysisJobRequest request) {
         try {
-            String json = objectMapper.writeValueAsString(request);
+            com.fasterxml.jackson.databind.node.ObjectNode node=objectMapper.valueToTree(request);
+            if (RunPodContract.REQUEST_V4.equals(request.schemaVersion()) && request.mediaPreparation()==null)
+                node.putNull("mediaPreparation");
+            String json = objectMapper.writeValueAsString(node);
             contract.parse(json.getBytes(StandardCharsets.UTF_8), "analysisRequest");
             return json;
         } catch (JsonProcessingException error) {

@@ -19,7 +19,7 @@ public class CanonicalHandoffReadinessController {
     @GetMapping("/api/internal/ai/worker-readiness/handoff")
     public ResponseEntity<Map<String,Object>> internal(HttpServletRequest request){
         var tokens=Collections.list(request.getHeaders("Authorization"));if(tokens.size()!=1)throw new RunPodContractException(401,"UNAUTHENTICATED");authentication.verify(tokens.getFirst());
-        return ResponseEntity.ok().header("Cache-Control","no-store").body(Map.of("contractVersion","voice-coaching.canonical-handoff.v1","supported",readiness.supported(),"admissionEnabled",readiness.admission(),"schemaDigests",readiness.digests()));
+        return ResponseEntity.ok().header("Cache-Control","no-store").body(Map.of("contractVersion",CanonicalHandoffReadiness.VERSION,"supported",readiness.supported(),"admissionEnabled",readiness.admission(),"schemaDigests",readiness.digests()));
     }
     @GetMapping("/api/analysis-capabilities/canonical")
     public ResponseEntity<ApiResponse<org.example.voice.analysis.domain.model.CanonicalCapabilitiesData>> publicCapabilities(){
