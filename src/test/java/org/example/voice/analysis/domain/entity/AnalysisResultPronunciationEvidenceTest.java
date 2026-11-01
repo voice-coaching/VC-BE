@@ -27,6 +27,7 @@ class AnalysisResultPronunciationEvidenceTest {
 
         assertThat(entity.complete(completed(requestEventId))).isTrue();
         assertThat(entity.getAnalysisOutcome()).isEqualTo(AnalysisOutcome.COACHING_READY);
+        assertThat(entity.isCoachingDelivered()).isTrue();
         assertThat(entity.getSelectedPhone()).isEqualTo("ㄱ");
         assertThat(entity.getSelectedExpectedIndex()).isZero();
         assertThat(entity.getDetectorScore()).isEqualByComparingTo("0.91");
@@ -36,6 +37,7 @@ class AnalysisResultPronunciationEvidenceTest {
         entity.retry(UUID.randomUUID());
 
         assertThat(entity.getStatus()).isEqualTo(AnalysisStatus.PENDING);
+        assertThat(entity.isCoachingDelivered()).isFalse();
         assertThat(entity.getSelectedPhone()).isNull();
         assertThat(entity.getDetectorScore()).isNull();
         assertThat(entity.getPronunciationEvidenceSchemaVersion()).isNull();

@@ -140,7 +140,10 @@ class OpenApiDocumentIntegrationTest {
                 assertThat(field.getValue().path("tags").get(0).asText()).containsPattern("[가-힣]");
             }
         }
-        assertThat(operationCount).isEqualTo(98);
+        assertThat(operationCount).isEqualTo(100);
+        var popularity = paths.path("/api/practice-contents/popular").path("get");
+        assertThat(popularity.path("summary").asText()).isEqualTo("일별 인기 뉴스 순위 조회");
+        assertThat(popularity.path("security").toString()).contains("bearerAuth");
         paths.fieldNames().forEachRemaining(path -> assertThat(path).doesNotStartWith("/api/internal/"));
         assertThat(paths.path("/api/analysis-capabilities/canonical").path("get").path("summary").asText())
                 .isEqualTo("Canonical 분석 접수 버전 조회");
