@@ -1,152 +1,117 @@
-# 프론트 전달: 클래스 녹음의 기존 직접 분석 경로 연결
+# 프론트 전달: 클래스 문장 분석 연결의 최신 검증 결과
 
 ## 작업 유형
 
-- 클래스 연습의 분석 화면 선택 분기 정정
-- 기존 개별 녹음·직접 AI 분석 기능 재사용
-- 프론트 변경사항 전달 문서 작성
+- 클래스 Canonical 차단 해소 커밋 검증
+- 최신 프론트 문장별 녹음·분석·결과 표시 경로 대조
+- 과거 직접 분석 전환 안내 정정
 
-## 1. 수정 범위
+## 1. 결론
 
-현재 사용하는 직접 분석 경로로 클래스 녹음을 연결한다. 새 연습 묶음, 묶음 ID, 테이블, 분석 API를 만들지 않는다. 승급 횟수·승급 채점·회원 이용등급은 이번 범위에 포함하지 않는다. 프론트 코드는 이 문서 작업에서 수정하지 않았다.
+**기존 COURSE_ANALYSIS_UNSUPPORTED를 유발한 백엔드의 클래스 제외 조건은 3821415에서 수정되었다.** 최신 프론트도 개별 문장 녹음과 분석 결과를 모아서 표시하는 세션 기반 V6 경로로 변경되었다. 앞서 제안한 DirectPracticeSession으로의 전환은 현재 코드에 그대로 적용하지 않는다.
 
-이 PR은 전달 문서만 추가한다. 현재 운영 방향에 대한 사용자 설명은 프론트↔AI 직접 분석이며, 이 문서의 전환 지침도 그 방향을 기준으로 한다. 앞서 임시 작성했던 백엔드 Canonical 허용 수정은 되돌렸으며 이 PR에 포함하지 않는다.
+이 문서는 소스·회귀 테스트·배포 진단 검증이다. 인증된 실제 회원으로 클래스 60의 녹음→분석→결과 확인을 완료한 실사용 검증은 아니다.
 
-### 최신 develop 대조
+## 2. 확인한 리비전
 
-- 이 문서의 rebase 기준은 `e38b9b5`다.
-- 선행 커밋 `3821415`에서 백엔드가 이미 고정된 발음 클래스 음성을 허용하도록 변경되었다. capability의 COURSE.supported도 true다. 따라서 최신 소스 자체가 여전히 COURSE=false라고 설명하면 안 된다.
-- 최신 백엔드는 V6 계약 및 문장별 원문 고정도 포함한다. 코드 이름에 runpod/Canonical이 남아 있다는 사실만으로 현재 물리적인 AI 운영 환경이나 해당 경로의 폐기를 단정하지 않는다.
-- 사용자가 제시한 COURSE=false 응답은 당시 관찰한 배포 응답이다. 최신 소스와 다르면 실제 배포 리비전·연결 환경을 먼저 대조한다. 이 PR은 운영 반영이나 실제 분석 성공을 확인한 기록이 아니다.
+| 대상 | 리비전 | 확인 내용 |
+| --- | --- | --- |
+| 백엔드 develop | e38b9b5 | 클래스 지원 및 문장별 원문 고정 병합 |
+| 핵심 백엔드 커밋 | 3821415 | COURSE.supported=true, 교육 개정이 고정된 발음 클래스 음성 허용 |
+| 백엔드 운영 배포 커밋 | c0d9d77b525eeb8604306299901779d04dcebe83 | GitHub 비교에서 3821415를 포함하는 후속 커밋임을 확인 |
+| 프론트 main | 6c0fb91 | 신규 연습을 SentencePracticeSequence로 연결하고 V6 계약 사용 |
+| 과거 프론트 확인 기준 | 45a9faa | courseId/courseStepId가 있으면 DirectPracticeSession에서 제외되던 코드. 현재 안내의 기준으로 사용하지 않음 |
 
-## 2. 당시 증상과 확인한 프론트 분기
+운영 배포 근거: [GitHub Actions 41294521775](https://github.com/voice-coaching/VC-BE/actions/runs/41294521775). 코드 이름의 runpod/Canonical만으로 실제 AI 서버의 물리적 호스팅 방식 또는 현재 경로의 폐기를 판단하지 않는다.
 
-프론트 코드 확인 기준: main의 `45a9faa`. 이후 프론트 변경이 있다면 아래 분기를 다시 대조한다.
+## 3. 백엔드에서 해소된 조건
 
-`src/components/practice-session.tsx`에서 다음 조건을 모두 만족할 때만 `DirectPracticeSession`을 선택한다.
+### 지원 여부
 
-```tsx
-directAnalysisEnabled &&
-!params.get("courseId") &&
-!params.get("sessionId") &&
-!params.get("courseStepId")
-```
-
-따라서 다음과 같은 클래스 URL은 `courseId`/`courseStepId` 때문에 직접 분석 경로에서 제외된다.
+`CanonicalCapabilitiesService`에서 다음처럼 변경되었다.
 
 ```text
-/practice/274?courseId=60&courseStepId=12&exampleId=pronunciation-advanced-r1-1&exampleRevision=1
+이전: COURSE.supported=false, reasonCode=COURSE_ANALYSIS_UNSUPPORTED
+변경: COURSE.supported=true, reasonCode=null
 ```
 
-그 결과 `RecordingPracticeSession`으로 진입해 `/api/analysis-capabilities/canonical`을 확인한다. 사용자가 제공한 당시 응답이 COURSE=false였으므로 해당 시점에는 COURSE_ANALYSIS_UNSUPPORTED로 차단됐다. 예문 목록 조회와 분석 지원 여부 조회는 별개다. 최신 develop에는 클래스 지원 변경이 있으므로 현재도 같은 응답인지는 배포 후 재확인이 필요하다.
+### 실제 분석 허용 범위
 
-현재 운영 방침대로 클래스를 직접 분석에 연결하려면 아래 프론트 전환을 적용한다. 반대로 백엔드 세션 분석 경로를 유지하기로 했다면 아래 전환을 무조건 적용하지 말고 최신 백엔드 배포와 계약을 먼저 맞춘다. 두 흐름을 혼합해 같은 녹음을 중복 제출하지 않는다.
+`CanonicalRequestScope`는 courseStepId와 courseEducationRevisionId가 고정된 음성 클래스 세션을 허용한다. PRONUNCIATION 학습 초점, 품질 PASS, 음성/영상 조건 등 기존 제한은 유지한다. 억양 전용·BOTH·영상 클래스를 전부 지원한다는 의미는 아니다.
 
-## 3. 프론트에서 고칠 부분
+허용 검사가 null 유무를 확인하는 부분만으로 구성된 것처럼 사용해서는 안 된다. 정상 세션 생성 과정의 게시 콘텐츠·클래스/예문 연결·교육 개정 검증을 통과해 생성된 세션을 사용해야 한다.
 
-| 파일 | 필요한 수정 |
-| --- | --- |
-| `src/components/practice-session.tsx` | 신규 클래스 연습이라는 이유만으로 직접 분석에서 제외하지 않는다. 검증된 클래스 예문도 직접 분석 화면으로 연결한다. 승급시험과 기존 sessionId 재개 분기는 일괄 변경하지 않는다. |
-| `src/components/direct-practice-session.tsx` | 현재 예문 정보와 순서를 받을 수 있도록 연결한다. 화면에서 선택한 문장과 직접 분석에 전송하는 scriptText/contentId가 같아야 한다. |
-| `src/lib/practice-examples.ts` | 기존 `loadPracticeSelection()`의 클래스·단계·개정·예문·콘텐츠 원문 검증을 유지한다. |
-| `src/lib/class-practice.ts` | 기존 예문 정렬과 `classPracticeHref()` URL 생성 기능을 재사용한다. |
-| `src/lib/direct-analysis.ts` | 기존 `submitDirect`, `findDirect`, `readDirect`, `observeDirect`, `linkDirectHistory`를 재사용한다. 새 HTTP 계약을 임의로 만들지 않는다. |
+### 문장별 원문 고정
 
-분기에서 조건 두 개를 지우는 것만으로 전체 흐름이 완성되지는 않는다. `DirectPracticeSession`이 클래스 예문/순서를 받고 다음 문장으로 넘어갈 수 있게 연결해야 한다. `courseId`, `courseStepId`, `exampleId`, `exampleRevision`을 URL에서 제거해 일반 연습으로 위장하지 않는다.
+같은 콘텐츠 안에서도 녹음한 문장만 분석할 수 있도록 세션 생성 입력과 저장 구조에 sentenceIndex/sentenceText 및 원문 고정 검증이 추가되었다. 임의의 클라이언트 문장을 그대로 신뢰하지 않고 원본과 대조한다. 세부 계약은 최신 TrainingSessionCreateRequestDto와 SentenceTranscript 구현을 따른다.
 
-## 4. 기존 API 사용 방식
+## 4. 실제 배포 진단
 
-### 클래스 예문
-
-```http
-GET /api/courses/{courseId}/practice-examples
-Authorization: Bearer <accessToken>
-```
-
-`data.items`를 order 오름차순으로 사용한다. 전체 문장 수는 items.length이고 stepCount가 아니다. 예문마다 새로운 콘텐츠나 백엔드 학습 세션을 임의 생성하지 않는다.
-
-### 직접 분석
-
-현재 프론트의 분석 origin 설정은 `NEXT_PUBLIC_DIRECT_ANALYSIS_ORIGIN`이며 코드 기본값은 다음과 같다. 실제 배포에 별도 환경변수가 있으면 그 설정이 우선한다.
-
-```text
-https://ai.voice-coaching.site/direct
-```
-
-기존 `submitDirect()`가 호출하는 경로:
-
-```http
-POST {DIRECT_ANALYSIS_ORIGIN}/api/v1/analyses
-```
-
-기존 음성 변환 및 metadata 인코딩을 재사용한다. metadata에는 scriptText, contentId, clientAttemptId, historyClaimSha256가 포함된다. AI 요청에 백엔드 사용자 토큰·쿠키·외부 서비스 비밀키를 추가하지 않는다.
-
-작업 조회 및 이벤트 수신:
-
-```http
-GET {DIRECT_ANALYSIS_ORIGIN}/api/v1/analyses/{jobId}
-GET {DIRECT_ANALYSIS_ORIGIN}/api/v1/analyses/{jobId}/events
-```
-
-jobId/clientAttemptId/historyClaim은 현재 문장의 기존 분석 시도에 연결한다. 재연결 때문에 무조건 새 작업을 만들지 않는다. 기존 결과 schema와 실행 식별 검증도 유지한다.
-
-### 회원 이력 연결
-
-```http
-POST /api/direct-analysis-history/{jobId}/link
-Authorization: Bearer <accessToken>
-Content-Type: application/json
-```
+위 배포의 2026-11-01 18:50:12 KST 배포 후 진단 결과:
 
 ```json
 {
-  "historyClaim": "<현재 분석 시도의 historyClaim>"
+  "backendReadiness": {
+    "admissionEnabled": true,
+    "supported": true
+  },
+  "workerHealth": "READY",
+  "reasonCodes": [],
+  "workerDetails": {
+    "admissionEnabled": true,
+    "audioDigestsMatch": true,
+    "missingAudioSchemas": []
+  }
 }
 ```
 
-AI가 백엔드에 전달하는 결과 이력과 회원 연결은 기존 계약을 사용한다. 프론트가 받은 점수 JSON을 임의의 백엔드 주소에 다시 POST하거나, jobId를 training session ID처럼 사용하지 않는다. 이력 기능의 실제 활성화·저장 상태는 별도로 확인해야 한다.
+과거의 admissionEnabled=false와 음성 계약 누락은 이 배포 후 진단 시점에는 재현되지 않았다. 서버 상태는 변할 수 있으므로 위 결과를 영구적인 정상 상태로 해석하지 않는다. 실제 회원 세션·녹음별 분석 성공도 이 진단만으로 보장되지 않는다.
 
-## 5. 문장별 전송과 마지막 결과 화면
+## 5. 최신 프론트 흐름
 
-요구사항은 문장마다 녹음을 별도로 전송하고 마지막에 모든 문장의 평가를 모아서 보여주는 흐름이다.
+`src/components/practice-session.tsx`의 최신 흐름:
 
 ```text
-문장 1 녹음 → 기존 직접 분석에 개별 접수
-문장 2 녹음 → 기존 직접 분석에 개별 접수
-…
-마지막 문장 접수
-→ 각 jobId의 결과 확인
-→ 문장 순서대로 전체 평가 화면 표시
+승급시험 URL → TitleExamSession
+신규 연습이며 기존 sessionId가 없음 → SentencePracticeSequence
+기존 sessionId 재개 또는 별도 localOnly 흐름 → RecordingPracticeSession
 ```
 
-각 문장의 exampleId/order와 해당 jobId를 프론트에서 구분한다. 페이지 전환으로 이전 작업의 식별자·결과를 잃거나 다른 문장 결과를 덮어쓰지 않도록 한다. 회원이 바뀌면 이전 회원의 복구 상태를 재사용하지 않는다. 재시도는 해당 문장의 작업을 대상으로 한다.
+`SentencePracticeSequence`는 클래스 예문을 문장 목록으로 구성하고, 문장별 분석 접수·결과 추적 및 결과 화면을 관리한다. 백엔드에 별도 연습 묶음 API를 새로 추가하는 방식은 아니다.
 
-현재 확인한 직접 분석 클라이언트는 작업별 결과를 조회한다. 따라서 **개별 결과를 프론트에서 모아 마지막에 표시하는 것과 서버가 한 HTTP 응답으로 일괄 반환하는 것은 다르다.** 이번 수정에서 백엔드 일괄 결과 API를 새로 만든 것으로 안내하지 않는다. AI 측 일괄 반환을 사용하려면 이미 제공되는 실제 계약이 있는지 별도 확인해야 한다.
+`src/lib/api/analysis-capabilities.ts`는 AUDIOVISUAL_PROFILE을 확인하고, `src/lib/api/canonical.ts`의 신규 분석 결과 계약은 V6다. V5는 과거 결과 reader 계약으로 남는다. 코드에 예전 상수가 존재한다는 이유만으로 현재 요청이 V5라고 판단하지 않는다.
 
-## 6. 오류 처리 및 검증
+이전 문서의 다음 안내는 현재 신규 연습 흐름에 적용하지 않는다.
 
-| 상황 | 처리 |
-| --- | --- |
-| 예문 조회 실패 또는 개정 불일치 | 녹음을 시작하지 않고 클래스에서 예문을 다시 선택하도록 안내 |
-| 개별 녹음 접수 실패 | 현재 문장 유지. 접수되지 않은 문장을 완료로 계산하지 않음 |
-| 결과 연결 일시 중단 | 기존 jobId 조회로 복구. 중복 분석을 무조건 제출하지 않음 |
-| 일부 문장 결과가 아직 없음 | 준비 중인 문장을 표시하고 전체 결과가 완료됐다고 안내하지 않음 |
-| 문장 분석 실패 | 실패한 문장과 재시도를 구분. 다른 문장의 결과는 보존 |
-| 이력 연결 충돌/지연 | 분석 결과 수신과 구분해 상태 안내 |
-| report-saves 오류 | 별도 리포트 저장 선택 기능의 문제. 클래스 녹음 실패와 혼합하지 않음 |
+- 클래스 파라미터를 직접 분석 제외 조건에서 제거하라는 안내
+- DirectPracticeSession으로 클래스 화면을 전환하라는 안내
+- 신규 클래스 분석을 /direct/api/v1/analyses로 보내라는 안내
 
-배포 후 클래스 60에서 확인할 항목:
+현재 세션 기반 경로와 과거 직접 분석 경로를 혼합해 같은 녹음을 중복 제출하지 않는다. 프론트·백엔드는 같은 V6 계약으로 배포되어야 한다.
 
-1. 예문 API가 반환한 콘텐츠 ID와 표시 원문이 일치한다.
-2. 신규 클래스 연습이 `DirectPracticeSession`으로 진입한다.
-3. 직접 분석으로 전환한 신규 클래스 연습이 백엔드 세션 분석과 중복 제출되지 않고 기존 직접 분석 요청을 수행한다.
-4. 각 문장의 녹음이 각각 접수되고 jobId가 구분된다.
-5. 마지막에 문장 순서대로 결과를 표시하며, 누락/실패를 정상 완료로 표시하지 않는다.
-6. 직접 분석 이력 연결 상태를 확인한다. 클래스 진도·승급 횟수가 자동으로 갱신된다고 가정하지 않는다.
+## 6. 재실행한 테스트와 한계
 
-## 7. 반영 상태
+다음 테스트를 최신 develop 기반 코드에서 재실행했다.
 
-- 백엔드: 이 PR은 기능·스키마·API를 추가하지 않음. 선행 develop의 클래스 음성 허용·문장 원문 고정 변경은 그대로 포함된 기준에서 작성함.
-- 프론트: 코드 수정 없이 위 변경사항을 전달함. 실제 수정 및 배포 후 확인이 필요함.
-- 별도 브랜치: 백엔드의 `docs/class-direct-analysis-handoff`에서 전달 문서만 커밋함. 코드 수정·배포 PR이 아님.
-- 승급 집계·채점: 변경 없음.
+- CanonicalTitleScoreTest: 클래스 음성 허용, 억양 초점 거부, capability 지원과 readiness 분리 등
+- SentenceSessionIntegrationTest: 개별 문장 원문 고정, 원문 변조 거부, 선택 문장 분석 입력, 원문 변경 검증 등
+- UnifiedV6PublisherTest: V6 분석 발행 관련 검증
+
+결과: **15개 통과, 실패 0개, 제외 0개**. 전체 회귀 테스트나 외부 AI의 실추론을 이번 검증에서 실행한 것은 아니다. 클래스 scope 테스트는 mock 세션 조건 검증이며, 이것만으로 전체 운영 흐름 검증이 끝났다고 보지 않는다.
+
+## 7. 실제 화면에서 남은 확인
+
+1. 배포 프론트가 최신 코드인지 확인한다. 저장소 main의 변경만으로 Vercel 배포 반영을 단정하지 않는다.
+2. 로그인 후 클래스 60에서 예문 5개와 현재 콘텐츠/예문 ID가 일치하는지 확인한다.
+3. capability 응답의 COURSE.supported=true, admissionEnabled=true와 V6 결과 계약을 확인한다.
+4. 실제 문장 녹음이 세션 기반 분석으로 접수되는지 확인한다.
+5. 문장별 결과가 올바른 원문과 연결되고 마지막 화면에서 순서대로 표시되는지 확인한다.
+6. 일부 실패·연결 중단을 전체 완료로 표시하지 않고 재조회/재시도할 수 있는지 확인한다.
+7. report-saves 등 별도 기능의 오류가 발생하면 분석 접수 문제와 구분한다.
+
+## 8. 반영 상태
+
+- 백엔드 클래스 지원 변경은 선행 develop에 이미 존재하며, 해당 커밋을 포함한 운영 배포 성공 및 배포 후 readiness를 확인했다.
+- 최신 프론트 main은 세션 기반 문장 순차 분석을 사용한다. 실제 Vercel 반영 및 회원 녹음 검증은 별도다.
+- 이 PR은 최신 확인 내용에 맞춘 문서 정정만 포함한다. 프론트·백엔드 코드, DB 스키마, 별도 분석 API를 변경하지 않는다.
+- 승급 집계·채점은 이번 작업에서 수정하지 않는다.
