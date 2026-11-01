@@ -12,6 +12,8 @@ spring:
     enabled: false
 
 auth:
+  session-cache:
+    enabled: false
   jwt:
     secret: test-secret-test-secret-test-secret-1234
     issuer: voice-test

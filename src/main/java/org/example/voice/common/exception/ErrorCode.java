@@ -27,6 +27,7 @@ public enum ErrorCode {
     INVALID_AUTHORIZATION_CODE(HttpStatus.UNAUTHORIZED, "SNS 인증 정보가 유효하지 않습니다."),
     REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "세션이 만료되었습니다. 다시 로그인해 주세요."),
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."),
+    AUTH_SESSION_STORE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "로그인 세션 상태를 안전하게 변경할 수 없습니다. 잠시 후 다시 시도해 주세요."),
 
     // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
