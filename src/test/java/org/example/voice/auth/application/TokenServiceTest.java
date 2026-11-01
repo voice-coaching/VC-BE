@@ -46,12 +46,14 @@ class TokenServiceTest {
         when(provider.parseRefreshToken("old-token")).thenReturn(new TokenClaims(1L, UserRole.USER, "old-session", now.plusHours(1)));
         when(reader.findByTokenHashForUpdate(anyString())).thenReturn(Optional.of(stored));
         when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(user));
-        when(provider.issue(1L, UserRole.USER)).thenReturn(new IssuedTokens("new-access", "new-refresh", "new-session", now.plusDays(1)));
+        when(provider.reissue(1L, UserRole.USER, "old-session")).thenReturn(new IssuedTokens("new-access", "new-refresh", "old-session", now.plusDays(1)));
         when(reader.findByUserIdForUpdate(1L)).thenReturn(Optional.of(stored));
 
         IssuedTokens result = service.rotate("old-token");
 
         assertThat(result.refreshToken()).isEqualTo("new-refresh");
+        assertThat(stored.getSessionId()).isEqualTo("old-session");
+        verify(provider, never()).issue(anyLong(), any());
         assertThat(stored.getTokenHash()).doesNotContain("new-refresh").hasSize(64);
         verify(writer).save(stored);
     }

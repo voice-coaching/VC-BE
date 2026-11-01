@@ -20,6 +20,17 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    void refreshRotatesBothCredentialsWithinTheSameLoginSession() {
+        var original = provider.issue(7L, UserRole.USER);
+        var renewed = provider.reissue(7L, UserRole.USER, original.sessionId());
+        assertThat(renewed.accessToken()).isNotEqualTo(original.accessToken());
+        assertThat(renewed.refreshToken()).isNotEqualTo(original.refreshToken());
+        assertThat(provider.parseAccessToken(renewed.accessToken()).sessionId()).isEqualTo(original.sessionId());
+        assertThat(provider.parseRefreshToken(renewed.refreshToken()).sessionId()).isEqualTo(original.sessionId());
+        assertThat(provider.issue(7L, UserRole.USER).sessionId()).isNotEqualTo(original.sessionId());
+    }
+
+    @Test
     void rejectsRefreshTokenAsAccessToken() {
         var issued = provider.issue(7L, UserRole.USER);
         assertThatThrownBy(() -> provider.parseAccessToken(issued.refreshToken()))

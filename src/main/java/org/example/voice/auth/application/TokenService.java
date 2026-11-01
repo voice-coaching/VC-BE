@@ -56,10 +56,16 @@ public class TokenService {
             refreshTokenWriter.delete(stored);
             throw new InvalidTokenException(ErrorCode.REFRESH_TOKEN_EXPIRED);
         }
-        if (!stored.getUserId().equals(claims.userId())) {
+        if (!stored.getUserId().equals(claims.userId())
+                || !stored.getSessionId().equals(claims.sessionId())) {
             throw new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
-        return issueSession(user);
+        // Rotate credentials within the same login session. Existing access
+        // tokens remain valid until expiry; logout/new login still revokes the SID.
+        IssuedTokens issued = tokenProvider.reissue(user.getId(), user.getRole(), stored.getSessionId());
+        stored.rotate(hash(issued.refreshToken()), issued.sessionId(), issued.refreshExpiresAt(), now);
+        refreshTokenWriter.save(stored);
+        return issued;
     }
 
     @Transactional
