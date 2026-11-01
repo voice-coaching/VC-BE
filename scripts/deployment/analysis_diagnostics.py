@@ -13,12 +13,15 @@ SCHEMAS = ('runpod_http_control_v1.schema.json', 'runpod_http_control_v1_2.schem
  'runpod_canonical_output.schema.json', 'runpod_canonical_journal_v1.schema.json',
  'runpod_analysis_request_v3.schema.json', 'runpod_result_v5.schema.json',
  'runpod_canonical_handoff_v1.schema.json')
+VIDEO_SCHEMAS = ('runpod_analysis_request_v4.schema.json','runpod_result_v6.schema.json',
+ 'runpod_canonical_handoff_v2.schema.json','runpod_media_preparation_v1.schema.json',
+ 'runpod_visual_coaching_input_v1.schema.json')
 PREFIX = 'ANALYSIS_CANONICAL_HANDOFF_'
 
-def contracts():
+def contracts(names=SCHEMAS):
     with zipfile.ZipFile('/opt/alpha/app.jar') as jar:
         return {name: hashlib.sha256(jar.read('BOOT-INF/classes/contracts/' + name)).hexdigest()
-                for name in SCHEMAS}
+                for name in names}
 
 def writer_configured(env):
     def value(name): return env.get(PREFIX + 'B2_' + name, '')
@@ -57,15 +60,39 @@ def worker_health(env, expected, details=None):
                 'digestsAsList':isinstance(rows,list),'digestsAsMap':isinstance(rows,dict),
                 'digestsMatch':mapped == expected,
                 'fields':{key:key in doc for key in ('contractVersion','handoffContractVersion','executorConfigured','admissionEnabled','schemaDigests','reasonCode','executor_configured','schema_digests')}})
-        if doc.get('contractVersion') != 'voice-coaching.canonical-handoff.v1': return 'WORKER_CONTRACT_MISMATCH'
+        version = doc.get('contractVersion')
+        if version not in ('voice-coaching.canonical-handoff.v1','voice-coaching.canonical-handoff.v2'):
+            return 'WORKER_CONTRACT_MISMATCH'
         if doc.get('executorConfigured') is not True: return 'WORKER_EXECUTOR_UNCONFIGURED'
-        if doc.get('schemaDigests') != expected: return 'WORKER_SCHEMA_MISMATCH'
-        return 'READY'
+        rows = doc.get('schemaDigests')
+        if not isinstance(rows,dict): return 'WORKER_SCHEMA_MISMATCH'
+        video = contracts(VIDEO_SCHEMAS) if version.endswith('.v2') else {}
+        audio_match = all(rows.get(name) == digest for name,digest in expected.items())
+        extras = {name:digest for name,digest in rows.items() if name not in expected}
+        extras_match = all(name in video and video[name] == digest for name,digest in extras.items())
+        if details is not None:
+            details.update({'audioDigestsMatch':audio_match,'knownExtensionsMatch':extras_match,
+                'missingAudioSchemas':sorted(name for name in expected if name not in rows),
+                'changedAudioSchemas':sorted(name for name in expected if name in rows and rows[name] != expected[name]),
+                'extraSchemaCount':len(extras)})
+        return 'READY' if audio_match and extras_match else 'WORKER_SCHEMA_MISMATCH'
     except HTTPError as error:
         return {401:'WORKER_AUTH_REJECTED', 403:'WORKER_AUTH_REJECTED',
                 404:'WORKER_HEALTH_ENDPOINT_NOT_FOUND', 503:'WORKER_HEALTH_UNAVAILABLE'}.get(error.code, 'WORKER_HEALTH_HTTP_ERROR')
     except (TimeoutError, URLError): return 'WORKER_UNREACHABLE'
     except Exception: return 'WORKER_HEALTH_RESPONSE_INVALID'
+
+def backend_readiness(env):
+    try:
+        port = int(env.get('SERVER_PORT','8080'))
+        if not 1 <= port <= 65535: return {'status':'UNAVAILABLE'}
+        raw = fetch('http://127.0.0.1:%d/api/internal/ai/worker-readiness/handoff' % port,
+                    env.get('AI_ANALYSIS_CALLBACK_TOKEN'),limit=65536)
+        doc = json.loads(raw)
+        return {key:doc.get(key) if type(doc.get(key)) is bool else None
+                for key in ('supported','admissionEnabled')}
+    except Exception:
+        return {'status':'UNAVAILABLE'}
 
 def inspect(env):
     reasons, checks = [], {}
@@ -107,8 +134,13 @@ def inspect(env):
     try: worker = worker_health(env, contracts(), worker_details)
     except Exception: worker = 'BACKEND_CONTRACT_UNAVAILABLE'
     if worker != 'READY': reasons.append(worker)
+    if worker_details.get('fields',{}).get('admissionEnabled') and not worker_details.get('admissionEnabled'):
+        reasons.append('WORKER_ADMISSION_CLOSED')
+    backend = backend_readiness(env)
+    if backend.get('supported') is False: reasons.append('BACKEND_READINESS_UNSUPPORTED')
+    elif backend.get('admissionEnabled') is False: reasons.append('BACKEND_ADMISSION_CLOSED')
     return {'kind':'ANALYSIS_READ_ONLY_DIAGNOSTICS','source':'PROCESS_ENVIRONMENT',
-            'workerHealth':worker,'workerDetails':worker_details,'checks':checks,'reasonCodes':reasons}
+            'workerHealth':worker,'workerDetails':worker_details,'backendReadiness':backend,'checks':checks,'reasonCodes':reasons}
 
 if __name__ == '__main__':
     try: report = inspect(environment())
