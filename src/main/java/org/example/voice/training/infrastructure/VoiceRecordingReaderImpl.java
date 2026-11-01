@@ -93,8 +93,8 @@ public class VoiceRecordingReaderImpl implements VoiceRecordingReader {
                 .map(recording -> new SelectedRecordingAnalysisData(
                         recording.getId(),
                         recording.getTrainingSession().getContent().getId(),
-                        recording.getTrainingSession().getContent().getUpdatedAt().toInstant().toString(),
-                        recording.getTrainingSession().getContent().getScriptText(),
+                        recording.getTrainingSession().analysisPromptRevision(),
+                        recording.getTrainingSession().analysisScriptText(),
                         recording.getAudioUrl(),
                         recording.getMimeType(),
                         recording.getFileSizeBytes(),

@@ -1,5 +1,8 @@
 # 칭호 승급 시험 API
 
+2026-11-01: 신규 시험 음성 분석은 [통합 V6 / handoff V2 계약](ai-unified-v6-contract.md)을 사용한다.
+V6 결과는 독립 검증을 통과한 committed proof의 점수로만 채점한다.
+
 이 문서는 프론트 승급 시험 플로우와 백엔드 구현 계약을 맞추기 위한 명세다. 모든 API는 로그인 사용자 기준이며 `Authorization: Bearer <accessToken>`이 필요하다.
 
 ## 엔드포인트

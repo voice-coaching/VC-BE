@@ -190,6 +190,11 @@ public class RunPodContract {
 
     private JsonSchema schema(String kind) {
         ObjectNode root = ((ObjectNode) root(kind)).deepCopy();
+        // AI pins the original schema bytes. networknt requires an absolute resource
+        // identifier; give relative annotation-only root IDs a local URN in this copy.
+        // Constraints, embedded resource scopes and packaged digest bytes stay exact.
+        if(root.has("$id") && !java.net.URI.create(root.get("$id").asText()).isAbsolute())
+            root.put("$id","urn:voice-coaching:schema:"+root.get("$id").asText());
         // v2 is a standalone schema: retain its own root and local reference scope.
         if (!(REQUEST_V2_KIND.equals(kind) || ("analysisRequestV3".equals(kind) || "analysisRequestV4".equals(kind)))) root.put("$ref", "#/$defs/" + definitionName(kind));
         SchemaValidatorsConfig config = new SchemaValidatorsConfig();

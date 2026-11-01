@@ -10,10 +10,10 @@ class AnalysisDiagnosticsTest(unittest.TestCase):
         self.backend.start()
         self.addCleanup(self.backend.stop)
 
-    def test_v2_requires_all_audio_pins_and_checks_known_extensions(self):
+    def test_v2_requires_exact_current_pins(self):
         audio,video={'audio':'a'},{'video':'v'}
         body={'contractVersion':'voice-coaching.canonical-handoff.v2','executorConfigured':True,
-              'schemaDigests':dict(audio,**video)}
+              'schemaDigests':dict(audio)}
         with patch.object(d,'contracts',return_value=video), patch.object(d,'fetch',return_value=json.dumps(body).encode()):
             details={}
             self.assertEqual(d.worker_health(self.env(),audio,details),'READY')
@@ -40,7 +40,7 @@ class AnalysisDiagnosticsTest(unittest.TestCase):
 
     def test_report_never_discloses_private_configuration(self):
         expected = {'contract':'digest'}
-        body = json.dumps({'contractVersion':'voice-coaching.canonical-handoff.v1',
+        body = json.dumps({'contractVersion':'voice-coaching.canonical-handoff.v2',
                            'executorConfigured':True,'schemaDigests':expected}).encode()
         with patch.object(d,'contracts',return_value=expected), patch.object(d,'query',return_value={'fits':True}), patch.object(d,'fetch',return_value=body), patch.object(d.Path,'exists',return_value=False):
             report = d.inspect(self.env())
@@ -56,7 +56,7 @@ class AnalysisDiagnosticsTest(unittest.TestCase):
             self.assertNotIn('ANALYSIS_AUTHORIZATION_UNCONFIGURED',d.inspect(env)['reasonCodes'])
 
     def test_closed_worker_admission_is_not_reported_as_available(self):
-        body={'contractVersion':'voice-coaching.canonical-handoff.v1','executorConfigured':True,
+        body={'contractVersion':'voice-coaching.canonical-handoff.v2','executorConfigured':True,
               'admissionEnabled':False,'schemaDigests':{}}
         with patch.object(d,'contracts',return_value={}), patch.object(d,'query',return_value={'fits':True}), patch.object(d,'fetch',return_value=json.dumps(body).encode()), patch.object(d.Path,'exists',return_value=False):
             self.assertIn('WORKER_ADMISSION_CLOSED',d.inspect(self.env())['reasonCodes'])
@@ -76,8 +76,8 @@ class AnalysisDiagnosticsTest(unittest.TestCase):
     def test_contract_executor_and_schema_failures_are_distinct(self):
         cases=[
           ({'contractVersion':'old'},'WORKER_CONTRACT_MISMATCH'),
-          ({'contractVersion':'voice-coaching.canonical-handoff.v1','executorConfigured':False},'WORKER_EXECUTOR_UNCONFIGURED'),
-          ({'contractVersion':'voice-coaching.canonical-handoff.v1','executorConfigured':True,'schemaDigests':{}},'WORKER_SCHEMA_MISMATCH')]
+          ({'contractVersion':'voice-coaching.canonical-handoff.v2','executorConfigured':False},'WORKER_EXECUTOR_UNCONFIGURED'),
+          ({'contractVersion':'voice-coaching.canonical-handoff.v2','executorConfigured':True,'schemaDigests':{}},'WORKER_SCHEMA_MISMATCH')]
         for body,reason in cases:
             with patch.object(d,'fetch',return_value=json.dumps(body).encode()):
                 self.assertEqual(d.worker_health(self.env(),{'required':'digest'}),reason)

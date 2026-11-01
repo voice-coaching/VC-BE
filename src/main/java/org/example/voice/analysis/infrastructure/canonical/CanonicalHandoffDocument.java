@@ -22,9 +22,14 @@ public record CanonicalHandoffDocument(JsonNode metadata, byte[] metadataBytes,
         var kinds=new HashSet<String>();
         for(var item:meta.get("artifacts"))if(!kinds.add(item.path("kind").asText()))invalid();
         if (RunPodContract.RESULT_V6.equals(projection.schemaVersion()) != "voice-coaching.canonical-handoff.v2".equals(meta.path("schemaVersion").asText())) invalid();
-        var required=RunPodContract.RESULT_V6.equals(projection.schemaVersion())
-            ? Set.of("CORE","BRIDGE_RESULT","BINDING","ASSOCIATION","MEDIA_RECEIPT","VISUAL_EVIDENCE")
-            : Set.of("CORE","BRIDGE_RESULT","BINDING","ASSOCIATION");
+        var required=new HashSet<>(Set.of("CORE","BRIDGE_RESULT","BINDING","ASSOCIATION"));
+        if (RunPodContract.RESULT_V6.equals(projection.schemaVersion())) {
+            var media=node.get("projection").path("mediaBinding");
+            if(media.hasNonNull("videoSha256")) required.add("VISUAL_EVIDENCE");
+            if(media.hasNonNull("mediaReceiptSha256")) required.add("MEDIA_RECEIPT");
+            if(projection.decision()!=null && (kinds.contains("VISUAL_EVIDENCE")!=media.hasNonNull("visualEvidenceSha256")
+                || kinds.contains("MEDIA_RECEIPT")!=media.hasNonNull("mediaReceiptSha256"))) invalid();
+        }
         if(projection.decision()==null ? !kinds.isEmpty() : !kinds.containsAll(required))invalid();
         var inline=new HashMap<String,byte[]>();
         node.get("inlineArtifacts").fields().forEachRemaining(e -> {

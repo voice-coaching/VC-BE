@@ -40,6 +40,14 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     @Transactional
     @CacheEvict(cacheNames = HomeCacheNames.RECENT_TRAINING, allEntries = true)
     public TrainingSessionCreatedData create(Long userId, Long contentId, Long courseStepId, LearningFocus learningFocus) {
+        return createSentence(userId, contentId, courseStepId, learningFocus, null, null);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(cacheNames = HomeCacheNames.RECENT_TRAINING, allEntries = true)
+    public TrainingSessionCreatedData createSentence(Long userId, Long contentId, Long courseStepId, LearningFocus learningFocus,
+            Integer sentenceIndex, String expectedText) {
         PracticeContent content = practiceContentJpaRepository.findById(contentId)
                 .orElseThrow(() -> new BaseException(ErrorCode.CONTENT_NOT_FOUND));
         var example = examples.forSession(contentId, courseStepId);
@@ -47,6 +55,7 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
         TrainingSession session = TrainingSession.create(userId, content, courseStepId, learningFocus);
         session.pinCourseEducation(revisionId);
         if (example != null) session.pinPracticeExample(example.id(), example.setId(), example.revision());
+        if (sentenceIndex != null) session.pinSentence(sentenceIndex, expectedText);
         session = trainingSessionJpaRepository.save(session);
         return new TrainingSessionCreatedData(
                 session.getId(),

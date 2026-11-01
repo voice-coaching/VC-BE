@@ -17,6 +17,7 @@ import org.example.voice.training.domain.entity.TrainingSession;
 import org.example.voice.training.domain.entity.VoiceRecording;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
 import org.example.voice.training.domain.type.TrainingSessionStatus;
+import org.example.voice.user.domain.entity.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,6 +40,10 @@ class MyPagePersistenceAdapterTest {
 
     @Test void readsAggregatesAndDeletesOwnedHistory() throws Exception {
         OffsetDateTime now = OffsetDateTime.now();
+        User owner = User.createLocal(java.util.UUID.randomUUID() + "@example.invalid",
+                "fixture-hash", "history fixture", now);
+        entityManager.persist(owner);
+        Long ownerId = owner.getId();
         PracticeContent content = construct(PracticeContent.class);
         set(content, "contentType", ContentType.SENTENCE); set(content, "learningFocus", LearningFocus.PRONUNCIATION);
         set(content, "title", "된소리 연습"); set(content, "scriptText", "쌀을 씻어요");
@@ -47,7 +52,7 @@ class MyPagePersistenceAdapterTest {
         set(content, "createdAt", now); set(content, "updatedAt", now); set(content, "publishedAt", now);
         entityManager.persist(content);
 
-        TrainingSession session = TrainingSession.create(1L, content, null, LearningFocus.PRONUNCIATION);
+        TrainingSession session = TrainingSession.create(ownerId, content, null, LearningFocus.PRONUNCIATION);
         set(session, "status", TrainingSessionStatus.COMPLETED); set(session, "completedAt", now);
         set(session, "totalLearningSeconds", 120); entityManager.persist(session);
         VoiceRecording recording = VoiceRecording.create(
@@ -84,15 +89,15 @@ class MyPagePersistenceAdapterTest {
         }
         entityManager.flush(); entityManager.clear();
 
-        MyPageData.HistoryPage history = adapter.findHistory(1L, ContentType.SENTENCE, null,
+        MyPageData.HistoryPage history = adapter.findHistory(ownerId, ContentType.SENTENCE, null,
                 now.minusDays(1), now.plusDays(1), 0, 20);
         assertThat(history.items()).hasSize(1);
-        assertThat(adapter.findHistoryDetail(1L, session.getId())).isPresent();
-        assertThat(adapter.calculateStatistics(1L, now.minusDays(1), now.plusDays(1), now.minusDays(1),
+        assertThat(adapter.findHistoryDetail(ownerId, session.getId())).isPresent();
+        assertThat(adapter.calculateStatistics(ownerId, now.minusDays(1), now.plusDays(1), now.minusDays(1),
                 now.plusDays(1)).totalSessionCount()).isEqualTo(1);
-        assertThat(adapter.findUnitScores(1L, now.minusDays(1), now.plusDays(1)).items()).singleElement()
+        assertThat(adapter.findUnitScores(ownerId, now.minusDays(1), now.plusDays(1)).items()).singleElement()
                 .extracting(MyPageData.UnitScore::attemptCount).isEqualTo(3);
-        assertThat(adapter.findScoreTrend(1L, "PRONUNCIATION", now.minusDays(1), now.plusDays(1)).items()).hasSize(1);
+        assertThat(adapter.findScoreTrend(ownerId, "PRONUNCIATION", now.minusDays(1), now.plusDays(1)).items()).hasSize(1);
         assertThat(adapter.findRecommendations(java.util.List.of("TENSE_SS"), ContentType.SENTENCE, 10).items()).hasSize(1);
 
         adapter.deleteHistory(session.getId()); entityManager.flush(); entityManager.clear();

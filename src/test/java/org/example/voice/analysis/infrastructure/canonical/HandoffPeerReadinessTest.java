@@ -32,34 +32,34 @@ class HandoffPeerReadinessTest {
     }
 
     @Test
-    void exactV1RemainsCompatibleAndV2VideoPinsAreAdditive() {
+    void onlyCurrentV2WithCompletePinsIsAccepted() {
         var audio = audioDigests();
         var video = videoDigests();
-        assertThat(HandoffPeerReadiness.matches(response("v1", audio, true), audio, video)).isTrue();
+        assertThat(HandoffPeerReadiness.matches(response("v1", audio, true), audio)).isFalse();
         var combined = new LinkedHashMap<>(audio);
         combined.putAll(video);
-        assertThat(HandoffPeerReadiness.matches(response("v2", combined, true), audio, video)).isTrue();
-        assertThat(HandoffPeerReadiness.matches(response("v1", combined, true), audio, video)).isFalse();
+        assertThat(HandoffPeerReadiness.matches(response("v2", combined, true), audio)).isTrue();
+        assertThat(HandoffPeerReadiness.matches(response("v1", combined, true), audio)).isFalse();
     }
 
     @Test
     void incompatibleVersionsMissingAudioPinsAndUnknownExtensionsStayClosed() {
         var audio = audioDigests();
         var video = videoDigests();
-        assertThat(HandoffPeerReadiness.matches(response("v3", audio, true), audio, video)).isFalse();
-        assertThat(HandoffPeerReadiness.matches(response("v2", audio, false), audio, video)).isFalse();
+        assertThat(HandoffPeerReadiness.matches(response("v3", audio, true), audio)).isFalse();
+        assertThat(HandoffPeerReadiness.matches(response("v2", audio, false), audio)).isFalse();
         var missing = new LinkedHashMap<>(audio);
-        missing.remove("runpod_result_v5.schema.json");
-        assertThat(HandoffPeerReadiness.matches(response("v2", missing, true), audio, video)).isFalse();
+        missing.remove("runpod_result_v6.schema.json");
+        assertThat(HandoffPeerReadiness.matches(response("v2", missing, true), audio)).isFalse();
         var changed = new LinkedHashMap<>(audio);
-        changed.put("runpod_result_v5.schema.json", "0".repeat(64));
-        assertThat(HandoffPeerReadiness.matches(response("v2", changed, true), audio, video)).isFalse();
+        changed.put("runpod_result_v6.schema.json", "0".repeat(64));
+        assertThat(HandoffPeerReadiness.matches(response("v2", changed, true), audio)).isFalse();
         changed = new LinkedHashMap<>(audio);
         changed.put("unknown.schema.json", "0".repeat(64));
-        assertThat(HandoffPeerReadiness.matches(response("v2", changed, true), audio, video)).isFalse();
+        assertThat(HandoffPeerReadiness.matches(response("v2", changed, true), audio)).isFalse();
         changed = new LinkedHashMap<>(audio);
         changed.put("runpod_result_v6.schema.json", "0".repeat(64));
-        assertThat(HandoffPeerReadiness.matches(response("v2", changed, true), audio, video)).isFalse();
+        assertThat(HandoffPeerReadiness.matches(response("v2", changed, true), audio)).isFalse();
     }
 
     private com.fasterxml.jackson.databind.JsonNode response(String version, Map<String, String> digests, boolean configured) {
@@ -69,7 +69,7 @@ class HandoffPeerReadinessTest {
     }
 
     @Test
-    void aV2PeerRetainingExactV5SchemasOpensAudioAdmission() throws Exception {
+    void aV2PeerWithExactCurrentSchemasOpensAudioAdmission() throws Exception {
         var settings = mock(CanonicalHandoffSettings.class);
         var evidence = mock(CanonicalEvidenceSettings.class);
         var verifier = mock(CanonicalSemanticVerifier.class);
@@ -94,7 +94,7 @@ class HandoffPeerReadinessTest {
         when(effects.operational()).thenReturn(true);
         when(delivery.enabled()).thenReturn(true);
         when(delivery.operational()).thenReturn(true);
-        when(delivery.headroom()).thenReturn(true);
+        when(delivery.headroom(CanonicalHandoffSettings.AUDIOVISUAL_RESERVATION)).thenReturn(true);
         when(deliveryWorker.operational()).thenReturn(true);
         var hashes = audioDigests();
         hashes.putAll(videoDigests());

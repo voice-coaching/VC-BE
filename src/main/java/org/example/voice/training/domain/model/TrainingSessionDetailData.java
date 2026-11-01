@@ -19,8 +19,9 @@ public record TrainingSessionDetailData(
             String title,
             String scriptText,
             String practiceExampleId,
-            Integer practiceExampleRevision
+            Integer practiceExampleRevision,
+            Integer sentenceIndex
     ) {
-        public ContentData(Long id, String title, String scriptText) { this(id, title, scriptText, null, null); }
+        public ContentData(Long id, String title, String scriptText) { this(id, title, scriptText, null, null, null); }
     }
 }
