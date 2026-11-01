@@ -23,6 +23,17 @@ class OpenApiDocumentIntegrationTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    void sessionMutationEndpointsDocumentUnavailableWithoutChangingSuccessContracts() throws Exception {
+        var paths=objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("paths");
+        for(String path:java.util.List.of("/api/auth/signup","/api/auth/login","/api/auth/social-login","/api/auth/token/refresh","/api/auth/logout","/api/users/me")) {
+            var responses=paths.path(path).path(path.equals("/api/users/me")?"delete":"post").path("responses");
+            assertThat(responses.path("503").path("description").asText()).contains("AUTH_SESSION_STORE_UNAVAILABLE");
+            assertThat(responses.path("503").path("headers").has("Retry-After")).isTrue();
+        }
+    }
+
+    @Test
     void segmentAndNotificationItemsHaveSeparateCorrectSchemas() throws Exception {
         var document = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
