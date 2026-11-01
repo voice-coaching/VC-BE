@@ -6,6 +6,7 @@ import org.example.voice.user.domain.type.UserRole;
 
 public interface TokenProvider {
     IssuedTokens issue(Long userId, UserRole role);
+    IssuedTokens reissue(Long userId, UserRole role, String sessionId);
     TokenClaims parseAccessToken(String token);
     TokenClaims parseRefreshToken(String token);
     long accessTokenSeconds();

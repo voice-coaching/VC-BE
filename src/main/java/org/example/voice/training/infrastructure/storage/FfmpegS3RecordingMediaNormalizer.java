@@ -141,7 +141,7 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             ProbeDocument probe = probe(source);
             String sourceDigest = sha256(source);
             ProbeDocument extractionProbe = probe;
-            long probedDurationMs = validateProbe(probe, declaredMimeType);
+            Long probedDurationMs = validateProbe(probe, declaredMimeType);
             Path audioSource = source;
             NormalizedVisualData visual = null;
             if (video) {
@@ -151,9 +151,10 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                 ProbeDocument canonicalProbe = probe(canonicalVisual);
                 extractionProbe = canonicalProbe;
                 long canonicalDurationMs = validateProbe(canonicalProbe, NormalizedVisualData.CANONICAL_MIME_TYPE);
-                if (Math.abs(canonicalDurationMs - probedDurationMs) > 1_500) {
+                if (probedDurationMs != null && Math.abs(canonicalDurationMs - probedDurationMs) > 1_500) {
                     throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
                 }
+                probedDurationMs = canonicalDurationMs;
                 String visualDigest = sha256(canonicalVisual);
                 s3Client.putObject(
                         PutObjectRequest.builder()
@@ -180,7 +181,8 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             Files.setPosixFilePermissions(canonical, READ_ONLY_FILE_PERMISSIONS);
             requireRestrictedRegularFile(canonical, null, media.getMaximumNormalizedBytes());
             PcmQuality quality = inspectCanonicalWav(canonical);
-            if (Math.abs(quality.durationMs() - probedDurationMs) > 1_500) {
+            validateDuration(quality.durationMs());
+            if (probedDurationMs != null && Math.abs(quality.durationMs() - probedDurationMs) > 1_500) {
                 throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
             }
             String digest = sha256(canonical);
@@ -530,14 +532,20 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
         return fileName.toString();
     }
 
-    private long validateProbe(ProbeDocument probe, String declaredMimeType) {
+    private Long validateProbe(ProbeDocument probe, String declaredMimeType) {
         if (probe == null || probe.format() == null || probe.streams() == null) {
             throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
         }
-        long durationMs = parseDurationMs(probe.format().duration());
-        if (durationMs < media.getMinimumDurationMs() || durationMs > media.getMaximumDurationMs()) {
+        String duration = probe.format().duration();
+        Long durationMs = null;
+        if (duration != null && !"N/A".equals(duration)) {
+            durationMs = parseDurationMs(duration);
+            validateDuration(durationMs);
+        } else if (!"audio/webm".equals(declaredMimeType) && !"video/webm".equals(declaredMimeType)) {
             throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
         }
+        // Browser MediaRecorder WebM can omit duration. Codec/container checks
+        // still apply here; decoded PCM length is authoritative before storage.
         List<ProbeStream> audioStreams = probe.streams().stream()
                 .filter(stream -> "audio".equals(stream.codecType()))
                 .toList();
@@ -574,6 +582,12 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             default -> throw new BaseException(ErrorCode.UNSUPPORTED_AUDIO_FORMAT);
         }
         return durationMs;
+    }
+
+    private void validateDuration(long durationMs) {
+        if (durationMs < media.getMinimumDurationMs() || durationMs > media.getMaximumDurationMs()) {
+            throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
+        }
     }
 
     private PcmQuality inspectCanonicalWav(Path path) throws IOException {
