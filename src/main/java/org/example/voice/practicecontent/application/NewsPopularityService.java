@@ -39,8 +39,10 @@ public class NewsPopularityService {
         int claimed = jdbc.update("""
                 INSERT INTO news_popularity_snapshots
                     (ranking_date, period_start, period_end, generated_at, next_update_at, ranking_basis)
-                VALUES (?, ?, ?, ?, ?, 'CATALOG_ORDER') ON CONFLICT (ranking_date) DO UPDATE SET period_start=EXCLUDED.period_start,period_end=EXCLUDED.period_end,generated_at=EXCLUDED.generated_at,next_update_at=EXCLUDED.next_update_at,ranking_basis=EXCLUDED.ranking_basis
-""", date, Timestamp.from(start), Timestamp.from(end), Timestamp.from(now), Timestamp.from(next));
+                VALUES (?, ?, ?, ?, ?, 'CATALOG_ORDER') ON CONFLICT (ranking_date) DO NOTHING
+                """, date, Timestamp.from(start), Timestamp.from(end), Timestamp.from(now), Timestamp.from(next));
+        // A conflicting date is an existing completed snapshot, not a claim to rebuild its items.
+        // DO UPDATE would also report one affected row and duplicate the (date, content) primary key.
         if (claimed == 1) {
             jdbc.update("""
                     WITH usage AS (
