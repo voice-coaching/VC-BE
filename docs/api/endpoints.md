@@ -258,3 +258,8 @@ This document summarizes the API list exported from the local API spec directory
 | POST | `/api/direct-analysis-history/{jobId}/link` | Existing user login | Attach received result to the account |
 | GET | `/api/direct-analysis-history/{jobId}` | Existing user login | History storage state |
 | GET | `/api/direct-analysis-history` | Existing user login | Independent voice analysis history |
+
+
+## JWT 서명 복구 (2026-11-02)
+
+기존 인증 API와 응답 필드를 유지하면서 Access·Refresh를 HS256 서명 토큰으로 발급하고 검증한다. alg=none은 거절한다. 배포 후 기존 무서명 토큰 사용자는 재로그인이 필요하다. 기존 JWT_SECRET 최소32바이트 조건을 복구하며 신규 환경변수·DB 변경은 없다. 전체 API 접근 정책을 변경한 작업은 아니다. [수정·배포·프론트 적용 계약](jwt-signature-recovery-20261102.md)을 따른다.

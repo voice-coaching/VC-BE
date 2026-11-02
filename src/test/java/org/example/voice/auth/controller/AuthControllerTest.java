@@ -67,6 +67,9 @@ class AuthControllerTest {
 
     @Test
     void missingRefreshCookieUsesSpecifiedErrorContract() throws Exception {
+        // Token parsing is owned by the real service/provider, not this standalone controller fixture.
+        when(tokenService.rotate(null)).thenThrow(new org.example.voice.auth.exception.InvalidTokenException(
+                org.example.voice.common.exception.ErrorCode.INVALID_REFRESH_TOKEN));
         mockMvc.perform(post("/api/auth/token/refresh"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.result").value(false))
