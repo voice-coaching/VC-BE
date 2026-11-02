@@ -75,10 +75,28 @@ class ReleaseGuardsTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'CURRENT_RELEASE_DRIFT'):
             snapshot.current_snapshot()
         self.live.resolve.return_value=self.jar
-        self.state['stage']='ACTIVATED'
+        self.state['stage']='PREPARED'
         (self.root/'current.json').write_text(json.dumps(self.state),encoding='utf-8')
         with self.assertRaisesRegex(RuntimeError,'CURRENT_RELEASE_NOT_COMPLETE'):
             snapshot.current_snapshot()
+
+    def test_legacy_activated_current_requires_matching_jar_and_live_backend_health(self):
+        self.state['stage']='ACTIVATED'
+        state_file=self.root/'current.json'
+        state_file.write_text(json.dumps(self.state),encoding='utf-8')
+        original=state_file.read_bytes()
+        with patch.object(snapshot.probes,'backend_health') as health:
+            self.assertEqual(snapshot.current_snapshot(),{'releaseId':self.live_id,'jarSha256':self.sha})
+            health.assert_called_once_with()
+        self.assertEqual(state_file.read_bytes(),original)
+        with patch.object(snapshot.probes,'backend_health',side_effect=RuntimeError('BACKEND_HEALTH_NOT_READY')):
+            with self.assertRaisesRegex(RuntimeError,'BACKEND_HEALTH_NOT_READY'):
+                snapshot.current_snapshot()
+        self.jar.write_bytes(b'changed JAR')
+        with patch.object(snapshot.probes,'backend_health') as health:
+            with self.assertRaisesRegex(RuntimeError,'CURRENT_RELEASE_DRIFT'):
+                snapshot.current_snapshot()
+            health.assert_not_called()
 
     def test_snapshot_rejects_missing_malformed_and_invalid_state(self):
         state=self.root/'current.json'
@@ -91,12 +109,27 @@ class ReleaseGuardsTest(unittest.TestCase):
         with self.assertRaises(OSError):snapshot.current_snapshot()
 
     def test_snapshot_cli_requires_root_and_sanitizes_error(self):
-        with patch.object(snapshot.os,'geteuid',return_value=1,create=True),contextlib.redirect_stdout(io.StringIO()) as output:
+        stderr=io.StringIO()
+        with patch.object(snapshot.os,'geteuid',return_value=1,create=True),contextlib.redirect_stdout(io.StringIO()) as output,contextlib.redirect_stderr(stderr):
             self.assertEqual(snapshot.main(),1)
         self.assertEqual(json.loads(output.getvalue()),{'error':'ROOT_REQUIRED'})
-        with patch.object(snapshot.os,'geteuid',return_value=0,create=True),patch.object(snapshot,'current_snapshot',side_effect=OSError('private details')),contextlib.redirect_stdout(io.StringIO()) as output:
+        self.assertEqual(stderr.getvalue(),'LIVE_RELEASE_SNAPSHOT_FAILED: ROOT_REQUIRED\n')
+        stderr=io.StringIO()
+        with patch.object(snapshot.os,'geteuid',return_value=0,create=True),patch.object(snapshot,'current_snapshot',side_effect=OSError('private details')),contextlib.redirect_stdout(io.StringIO()) as output,contextlib.redirect_stderr(stderr):
             self.assertEqual(snapshot.main(),1)
         self.assertEqual(json.loads(output.getvalue()),{'error':'LIVE_SNAPSHOT_UNAVAILABLE'})
+        self.assertEqual(stderr.getvalue(),'LIVE_RELEASE_SNAPSHOT_FAILED: LIVE_SNAPSHOT_UNAVAILABLE\n')
+
+    def test_snapshot_failure_is_visible_when_stdout_is_redirected_to_policy_input(self):
+        for code in ('CURRENT_RELEASE_DRIFT','UNTRUSTED_RELEASE_PATH',
+                     'DEPLOYMENT_ALREADY_PENDING_INSPECT','CURRENT_RELEASE_NOT_COMPLETE'):
+            with self.subTest(code=code):
+                stderr=io.StringIO()
+                with (self.root/'runner-snapshot.json').open('w',encoding='utf-8') as output:
+                    with patch.object(snapshot.os,'geteuid',return_value=0,create=True),patch.object(snapshot,'current_snapshot',side_effect=RuntimeError(code)),contextlib.redirect_stdout(output),contextlib.redirect_stderr(stderr):
+                        self.assertEqual(snapshot.main(),1)
+                self.assertEqual(json.loads((self.root/'runner-snapshot.json').read_text(encoding='utf-8')),{'error':code})
+                self.assertEqual(stderr.getvalue(),'LIVE_RELEASE_SNAPSHOT_FAILED: '+code+'\n')
 
     @unittest.skipUnless(HAS_FLOCK,'Actual flock requires Linux; covered by Linux CI')
     def test_snapshot_refuses_an_active_exclusive_deployment_lock(self):

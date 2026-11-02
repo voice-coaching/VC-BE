@@ -34,6 +34,32 @@ Git 이력 검사는 실제 의미상의 회귀나 의도적인 revert를 판별
 
 ## 검증
 
+### 운영 릴리스 조회 실패 진단
+
+2026-11-02 확인한 운영 릴리스 `abf9930`은 main의 배포 스크립트가
+`current.json`에 `stage=ACTIVATED`로 기록했다. develop의 기존 조회기는
+`COMPLETE`만 허용해 `CURRENT_RELEASE_NOT_COMPLETE`로 종료했다.
+조회기는 이 legacy 상태도 읽되, 기존 잠금·보류·경로·릴리스 ID·JAR 해시 검증을
+모두 수행한 뒤 로컬 backend health가 UP일 때만 snapshot을 반환한다.
+상태 파일은 수정하지 않으며 다른 미완료 상태는 계속 거부한다.
+이 호환 처리는 이후 Git 이력 검사를 우회하지 않는다. 운영 main 변경이 develop
+이력에 없으면 여전히 `LIVE_CODE_NOT_INCLUDED_SYNC_BRANCH_FIRST`로 중단된다.
+
+`Read committed live release`는 SSH 명령의 stdout을 runner의 JSON 파일에 저장한다.
+`release_snapshot.py`는 실패 시 같은 JSON 오류 응답을 유지하면서 stderr에도
+`LIVE_RELEASE_SNAPSHOT_FAILED: <CODE>`를 출력한다. 따라서 SSH 종료 코드가 1이어도
+실제 검증 실패 코드를 Actions 로그에서 확인할 수 있다. 임의 예외 메시지·서버 경로는
+출력하지 않는다. SSH의 post-quantum key exchange 경고만으로 snapshot 실패 원인을
+판단하지 않는다.
+
+- `CURRENT_RELEASE_DRIFT`: current.json의 릴리스·해시와 실제 JAR 연결·해시 비교가 실패했다.
+- `UNTRUSTED_DEPLOYMENT_PATH` / `UNTRUSTED_RELEASE_PATH`: 상태 또는 릴리스 경로의 소유권·권한·링크 조건을 확인한다.
+- `DEPLOYMENT_ALREADY_PENDING_INSPECT` / `CURRENT_RELEASE_NOT_COMPLETE`: 보류 상태나 미완료 릴리스를 확인한다.
+- `LIVE_SNAPSHOT_UNAVAILABLE`: 파일 부재·잠금 충돌·파싱 오류 등을 포함한 나머지 실패다. 운영 서버에서 읽기 전용 확인이 필요하다.
+
+이 진단 변경은 운영 상태를 자동 복구하거나 검증 실패를 무시하지 않는다.
+상태 파일·실제 JAR·잠금·보류 파일을 확인하기 전에는 원인을 확정하지 않는다.
+
 ```bash
 python -B -m unittest discover -s scripts/deployment -p 'test_*.py'
 python -B -m unittest discover -s scripts/payment-sandbox -p test_settings.py

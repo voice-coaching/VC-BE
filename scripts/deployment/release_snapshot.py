@@ -5,7 +5,9 @@ import os
 from pathlib import Path
 import re
 import stat
+import sys
 from common import ROOT, HOLD, digest, require, trusted
+import probes
 
 LIVE = Path('/opt/alpha/app.jar')
 RELEASES = Path('/opt/alpha/releases')
@@ -31,9 +33,14 @@ def current_snapshot():
     release, sha = state.get('releaseId'), state.get('jarSha256')
     require(isinstance(release, str) and re.fullmatch('[0-9a-f]{40}', release), 'CURRENT_RELEASE_INVALID')
     require(isinstance(sha, str) and re.fullmatch('[0-9a-f]{64}', sha), 'CURRENT_RELEASE_INVALID')
-    require(state.get('stage', 'COMPLETE') == 'COMPLETE', 'CURRENT_RELEASE_NOT_COMPLETE')
+    stage = state.get('stage', 'COMPLETE')
+    # The main branch's legacy writer publishes current.json as ACTIVATED after
+    # restarting the service. Verify its actual health instead of rewriting it.
+    require(stage in ('COMPLETE', 'ACTIVATED'), 'CURRENT_RELEASE_NOT_COMPLETE')
     target = trusted_release_jar(LIVE.resolve())
     require(target == RELEASES / (release + '.jar') and digest(target) == sha, 'CURRENT_RELEASE_DRIFT')
+    if stage == 'ACTIVATED':
+        probes.backend_health()
     return {'releaseId': release, 'jarSha256': sha}
 
 
@@ -48,7 +55,11 @@ def main():
         return 0
     except Exception as error:
         code = str(error)
-        print(json.dumps({'error': code if re.fullmatch('[A-Z_]+', code) else 'LIVE_SNAPSHOT_UNAVAILABLE'}))
+        code = code if re.fullmatch('[A-Z_]+', code) else 'LIVE_SNAPSHOT_UNAVAILABLE'
+        print(json.dumps({'error': code}))
+        # CI saves stdout as the policy input. Keep the sanitized failure visible
+        # on stderr even when the snapshot file is never read after SSH exits.
+        print('LIVE_RELEASE_SNAPSHOT_FAILED: ' + code, file=sys.stderr)
         return 1
 
 
