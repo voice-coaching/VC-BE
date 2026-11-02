@@ -170,3 +170,8 @@ PATCH /api/admin/contents/123/publication
 ```
 
 프론트는 먼저 `/api/admin/me`로 접근 여부를 확인한다. 모든 목록·상세를 서버 응답으로 구성하고 role·version·코드값을 임의 생성하지 않는다. UI 배치는 [구현 계획서](../architecture/admin-implementation-plan.md)를 참고한다.
+
+
+## 관리자 알림·회원 기록 추가 구현
+
+전체·개별 앱 내 알림, 수동 요금제 안내, 기간 지정 전체 팝업, 회원별 기록·분석 UUID 조회를 추가했다. API 12개(관리자11·사용자1), V63 신규 테이블3개이며 프론트는 수정하지 않았다. [API 계약](admin-communications-and-members.md), [DB 구조](../database/admin-communications.md)를 따른다. 웹 푸시·결제 자동 알림·회원 PK UUID 전환은 포함하지 않는다.

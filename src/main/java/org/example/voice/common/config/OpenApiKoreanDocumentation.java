@@ -296,6 +296,27 @@ public class OpenApiKoreanDocumentation {
                     + "서버 발급 uploadId와 SHA-256으로 검증하고 기존 문장 version을 확인합니다. signed URL은 저장하지 않습니다. "
                     + "기존 사용자 기준 음성 조회·재생 계약을 유지합니다. 상세 계약은 docs/api/admin-reference-audios.md를 따릅니다.", false);
         }
+        String[][] communicationRoutes = {
+                {"GET", "/api/admin/notification-campaigns", "전체·개별 알림 목록 조회"},
+                {"POST", "/api/admin/notification-campaigns", "전체·개별 알림 초안 등록"},
+                {"GET", "/api/admin/notification-campaigns/{campaignId}", "알림 상세 및 발송 대상 조회"},
+                {"POST", "/api/admin/notification-campaigns/{campaignId}/dispatch", "앱 내 전체·개별 알림 발송"},
+                {"GET", "/api/admin/popups", "전체 팝업 목록 조회"},
+                {"POST", "/api/admin/popups", "기간 지정 전체 팝업 등록"},
+                {"GET", "/api/admin/popups/{popupId}", "전체 팝업 상세 조회"},
+                {"PATCH", "/api/admin/popups/{popupId}", "전체 팝업 수정·노출 중지"},
+                {"GET", "/api/admin/users/resolve", "회원 번호·분석 UUID로 회원 찾기"},
+                {"GET", "/api/admin/users/{userId}/overview", "회원별 관련 기록 현황 조회"},
+                {"GET", "/api/admin/users/{userId}/records", "회원별 분류별 관련 기록 조회"}
+        };
+        for (String[] route : communicationRoutes) {
+            add(map, PathItem.HttpMethod.valueOf(route[0]), route[1], "관리자", route[2],
+                    "JWT ROLE_ADMIN과 현재 DB 활성 관리자 권한이 필요합니다. 앱 내 알림만 발송하며 웹 푸시·자동 결제 알림은 포함하지 않습니다. "
+                    + "변경 사유 reason과 수정 version을 검증합니다. 회원 기록은 허용된 분류의 메타데이터만 조회합니다. "
+                    + "상세 계약은 docs/api/admin-communications-and-members.md를 따릅니다.", false);
+        }
+        add(map, PathItem.HttpMethod.GET, "/api/users/me/popup", "사용자", "현재 노출할 전체 팝업 조회",
+                "활성 로그인 회원에게 서버 시각 기준으로 게시 중인 팝업 한 개를 반환합니다. 우선순위·시작 시각·ID 내림차순이며 없으면 data=null입니다. 캐시하지 않습니다.", false);
         return Map.copyOf(map);
     }
 
