@@ -24,6 +24,12 @@ import java.time.OffsetDateTime;
 @Table(name = "reference_audios")
 public class ReferenceAudio {
 
+    public static ReferenceAudio announcer(PracticeContent content,String speaker,String key,int duration,boolean primary,OffsetDateTime now) {
+        var audio=new ReferenceAudio();audio.content=content;audio.speakerName=speaker;audio.speakerType=SpeakerType.ANNOUNCER;
+        audio.objectKey=key;audio.durationMs=duration;audio.primary=primary;audio.createdAt=now;
+        return audio;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

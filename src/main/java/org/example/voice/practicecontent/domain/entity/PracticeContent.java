@@ -27,6 +27,10 @@ import java.util.List;
 @Table(name = "practice_contents")
 public class PracticeContent {
 
+    @jakarta.persistence.Version
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long version;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -116,4 +120,33 @@ public class PracticeContent {
     public boolean isPublished() {
         return ownerId == null && status == PublishStatus.PUBLISHED;
     }
+
+    public static PracticeContent draft(ContentType type, LearningFocus focus, String category, Difficulty difficulty,
+            String title, String description, String script, List<String> targets, Integer seconds, OffsetDateTime now) {
+        var content = new PracticeContent();
+        content.contentType = type;
+        content.status = PublishStatus.DRAFT;
+        content.createdAt = now;
+        content.editDraft(focus, category, difficulty, title, description, script, targets, seconds, now);
+        return content;
+    }
+
+    public void editDraft(LearningFocus focus, String category, Difficulty difficulty, String title,
+            String description, String script, List<String> targets, Integer seconds, OffsetDateTime now) {
+        if (ownerId != null || status != PublishStatus.DRAFT || publishedAt != null)
+            throw new IllegalStateException("PUBLISHED_CONTENT_IMMUTABLE");
+        this.learningFocus = focus; this.category = category; this.difficulty = difficulty;
+        this.title = title; this.description = description; this.scriptText = script;
+        this.targetPronunciations = List.copyOf(targets); this.estimatedSeconds = seconds; this.updatedAt = now;
+    }
+
+    public void changePublication(PublishStatus target, OffsetDateTime now) {
+        if (ownerId != null || target == PublishStatus.DRAFT || target == null
+                || (target == PublishStatus.HIDDEN && status == PublishStatus.DRAFT))
+            throw new IllegalStateException("INVALID_PUBLICATION_STATE");
+        status = target;
+        if (target == PublishStatus.PUBLISHED && publishedAt == null) publishedAt = now;
+        updatedAt = now;
+    }
+
 }
