@@ -151,12 +151,12 @@ records는 기존 페이지 envelope를 사용하며 items 각 항목은 `{field
 
 | resource | fields |
 | --- | --- |
-| TRAINING_SESSIONS | id, contentId, courseStepId, status, startedAt, completedAt |
-| RECORDINGS | id, sessionId, attemptNo, mimeType, durationMs, qualityStatus, createdAt, deletedAt |
-| ANALYSES | id, recordingId, status, failureCode, requestId, executionId, resultEventId, createdAt, analyzedAt |
+| TRAINING_SESSIONS | id, contentId, courseStepId, status, learningFocus, totalLearningSeconds, startedAt, completedAt |
+| RECORDINGS | id, sessionId, attemptNo, mimeType, durationMs, fileSizeBytes, qualityStatus, createdAt, deletedAt |
+| ANALYSES | id, recordingId, status, overallScore, pronunciationScore, intonationScore, failureCode, requestId, executionId, resultEventId, createdAt, analyzedAt |
 | PAYMENTS | id, product, amount, currency, status, createdAt, paidAt, expiresAt |
-| CANCELLATIONS | id, orderId, status, requestedAt, updatedAt (취소·전액 환불 공용 요청 원장) |
-| INQUIRIES | id, category, status, createdAt, answeredAt (본문은 기존 관리자 문의 상세에서 조회) |
+| CANCELLATIONS | id, orderId, status, reason, requestedAt, updatedAt (취소·전액 환불 공용 요청 원장) |
+| INQUIRIES | id, category, subject, status, createdAt, answeredAt (본문은 기존 관리자 문의 상세에서 조회) |
 | NOTIFICATIONS | id, type, title, readAt, createdAt |
 | COURSE_PROGRESS | id, courseId, lastStepId, status, progressPercent, updatedAt |
 | TITLES | userId, rank, minimumTrainingCount, updatedAt |
@@ -180,3 +180,75 @@ PAYMENTS와 CANCELLATIONS는 현재 TEST 결제 원장이다. 운영 실결제 �
 ## 5. 반영 상태
 
 별도 브랜치 `feat/admin-phase-one-api`에서 구현했다. rebase 기준 원격 develop은 `6ae98d1`이다. 기존 사용자 문서 변경은 보존했고 프론트 수정·실제 발송·운영 DB 실행·배포는 수행하지 않았다. V62/V63/V64을 적용하는 백엔드 배포와 프론트 UI 연결 후 환경별 확인이 필요하다. 실제 관리자 계정 지정도 별도 관리 절차를 따른다.
+
+
+## 6. 회원 상세 보완 및 관리자 탈퇴 처리 (이슈 #175)
+
+최신 main `6806dd3`에서 분기했다. 이 변경은 운영 회원에게 실제 탈퇴를 실행하지 않으며, DB 마이그레이션을 추가하지 않는다.
+
+### 회원 상세 조회
+
+`GET /api/admin/users/{userId}/overview`의 기존 응답에 `account`를 추가한다. 목록 이메일은 계속 마스킹하고, 인증된 관리자에게 상세 화면에서만 원래 이메일을 제공한다.
+
+```ts
+type AccountDetails = {
+  email: string | null;
+  lastLoginAt: string | null;
+  updatedAt: string | null;
+  withdrawnAt: string | null;
+  termsAgreedAt: string | null;
+  privacyAgreedAt: string | null;
+  loginConnections: Array<{
+    provider: string;
+    email: string | null;
+    connectedAt: string;
+  }>;
+};
+```
+
+로그인 연결의 이메일은 소셜 제공자가 제공한 값이며 회원 이메일과 다르거나 없을 수 있다. 제공자 내부 회원 식별자·비밀번호·토큰·원본 음성 주소·개인 원고는 반환하지 않는다. 기존 13개 관계별 기록 조회는 유지하며 학습 초점·학습 시간·녹음 용량·평가 점수·취소 사유·문의 제목을 허용 목록에 추가한다. 임의 테이블 전체를 조회하는 API는 제공하지 않는다.
+
+### 관리자 회원 탈퇴
+
+```http
+POST /api/admin/users/{userId}/withdrawal
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+
+```json
+{
+  "confirmationUserId": 14,
+  "expectedUpdatedAt": "2026-11-03T00:00:00.123456+09:00",
+  "reason": "회원 요청에 따른 탈퇴 처리"
+}
+```
+
+`confirmationUserId`는 경로의 회원 번호와 일치해야 한다. `expectedUpdatedAt`은 최신 상세 응답 `account.updatedAt`을 정밀도 변환 없이 그대로 전송한다. 기존 회원의 해당 값이 null이면 null을 전송하며, DB도 null일 때만 일치로 판단한다. 관리자는 자신의 계정을 이 API로 탈퇴시킬 수 없다.
+
+성공 응답 `data`:
+
+```json
+{
+  "userId": 14,
+  "withdrawnAt": "2026-11-03T00:01:00+09:00",
+  "alreadyWithdrawn": false
+}
+```
+
+이미 탈퇴한 회원이면 `alreadyWithdrawn=true`를 반환하고 정리·성공 감사 기록을 중복 실행하지 않는다. 이전 데이터에 탈퇴 시각이 없으면 `withdrawnAt`도 null일 수 있다.
+
+| 상황 | 응답 및 화면 처리 |
+| --- | --- |
+| 확인 번호 불일치 | 400, 확인 번호 수정 |
+| 관리자 권한 없음 | 403, 상세 정보 및 명령 접근 차단 |
+| 회원 없음 | 404 |
+| 본인 계정 탈퇴 | 409 `ADMIN_SELF_WITHDRAWAL_NOT_ALLOWED` |
+| 최신 수정 시각 불일치 | 409, 입력을 유지하고 사용자가 최신 상세를 다시 조회 |
+| 저장·감사 기록 실패 | 트랜잭션 롤백, 자동 재요청하지 않음 |
+
+기존 `UserService.withdraw` 정리 절차를 재사용한다. 회원은 WITHDRAWN으로 바뀌고 이메일·비밀번호·프로필 주소를 비우며 닉네임은 ‘탈퇴한 회원’으로 바뀐다. 로그인 연결 및 세션 해제, 분석 취소, 동의 철회, 업로드 만료, 개인 콘텐츠·알림 정리, 녹음 삭제 예약을 수행한다. 저장소의 음성 파일 삭제는 기존 예약 처리에 따른다.
+
+**회원 행과 학습·평가·결제 기록은 보존한다. DB에서 회원 및 모든 연관 기록을 물리 삭제하는 기능이 아니다.** 탈퇴 회원도 관리자에서 보존 기록을 조회할 수 있다. 모든 기존 개인정보 컬럼을 일괄 삭제한다고 안내하지 않는다. 실제 운영 탈퇴는 별도 관리자의 명시적 화면 조작으로만 수행한다.
+
+프론트는 확인창에서 처리 범위와 보존 기록을 설명하고 회원 번호·사유를 받는다. 성공하면 회원 상세·목록 캐시를 갱신한다. 화면 용어만 한글화하며 API의 영문 상태·분류·필드 계약은 유지한다. 관리 권한 ADMIN과 시험 이용권 admin은 계속 구분한다.

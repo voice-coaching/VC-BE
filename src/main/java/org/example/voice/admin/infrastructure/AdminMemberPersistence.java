@@ -15,16 +15,25 @@ public class AdminMemberPersistence implements AdminMemberStore {
         return ((Number)em.createNativeQuery("select count(*) from users where id=:id and status='ACTIVE' and deleted_at is null")
                 .setParameter("id",userId).getSingleResult()).longValue()==1;
     }
+    public Optional<AccountDetails> accountDetails(long userId) {
+        var user=em.find(org.example.voice.user.domain.entity.User.class,userId);
+        if(user==null) return Optional.empty();
+        var connections=em.createQuery("select s from SocialAccount s where s.userId=:id order by s.id",org.example.voice.auth.domain.entity.SocialAccount.class)
+                .setParameter("id",userId).getResultList().stream()
+                .map(s->new LoginConnection(s.getProvider()==null?null:s.getProvider().name(),s.getProviderEmail(),s.getCreatedAt())).toList();
+        return Optional.of(new AccountDetails(user.getEmail(),user.getLastLoginAt(),user.getUpdatedAt(),user.getDeletedAt(),
+                user.getTermsAgreedAt(),user.getPrivacyAgreedAt(),connections));
+    }
     private record Projection(String from,String where,String columns,String names,String order) {}
     // Every table, column and predicate is server-owned. No arbitrary SQL/table/column names from the client.
     private Projection projection(AdminUserResource r) {
         return switch(r) {
-            case TRAINING_SESSIONS -> new Projection("training_sessions s","s.user_id=:user","s.id,s.content_id,s.course_step_id,s.status,s.started_at,s.completed_at","id,contentId,courseStepId,status,startedAt,completedAt","s.id desc");
-            case RECORDINGS -> new Projection("voice_recordings r join training_sessions s on s.id=r.training_session_id","s.user_id=:user","r.id,r.training_session_id,r.attempt_no,r.mime_type,r.duration_ms,r.quality_status,r.created_at,r.deleted_at","id,sessionId,attemptNo,mimeType,durationMs,qualityStatus,createdAt,deletedAt","r.id desc");
-            case ANALYSES -> new Projection("analysis_results a join voice_recordings r on r.id=a.recording_id join training_sessions s on s.id=r.training_session_id","s.user_id=:user","a.id,a.recording_id,a.status,a.failure_code,a.active_request_event_id,a.active_execution_id,a.canonical_result_event_id,a.created_at,a.analyzed_at","id,recordingId,status,failureCode,requestId,executionId,resultEventId,createdAt,analyzedAt","a.id desc");
+            case TRAINING_SESSIONS -> new Projection("training_sessions s","s.user_id=:user","s.id,s.content_id,s.course_step_id,s.status,s.learning_focus,s.total_learning_seconds,s.started_at,s.completed_at","id,contentId,courseStepId,status,learningFocus,totalLearningSeconds,startedAt,completedAt","s.id desc");
+            case RECORDINGS -> new Projection("voice_recordings r join training_sessions s on s.id=r.training_session_id","s.user_id=:user","r.id,r.training_session_id,r.attempt_no,r.mime_type,r.file_size_bytes,r.duration_ms,r.quality_status,r.created_at,r.deleted_at","id,sessionId,attemptNo,mimeType,fileSizeBytes,durationMs,qualityStatus,createdAt,deletedAt","r.id desc");
+            case ANALYSES -> new Projection("analysis_results a join voice_recordings r on r.id=a.recording_id join training_sessions s on s.id=r.training_session_id","s.user_id=:user","a.id,a.recording_id,a.status,a.overall_score,a.pronunciation_score,a.intonation_score,a.failure_code,a.active_request_event_id,a.active_execution_id,a.canonical_result_event_id,a.created_at,a.analyzed_at","id,recordingId,status,overallScore,pronunciationScore,intonationScore,failureCode,requestId,executionId,resultEventId,createdAt,analyzedAt","a.id desc");
             case PAYMENTS -> new Projection("payment_test_orders p","p.user_id=:user","p.id,p.product,p.amount,p.currency,p.status,p.created_at,p.paid_at,p.expires_at","id,product,amount,currency,status,createdAt,paidAt,expiresAt","p.created_at desc,p.id desc");
-            case CANCELLATIONS -> new Projection("payment_test_cancellations c join payment_test_orders p on p.id=c.order_id","p.user_id=:user","c.id,c.order_id,c.status,c.requested_at,c.updated_at","id,orderId,status,requestedAt,updatedAt","c.requested_at desc,c.id desc");
-            case INQUIRIES -> new Projection("inquiries i","i.user_id=:user","i.id,i.category,i.status,i.created_at,i.answered_at","id,category,status,createdAt,answeredAt","i.id desc");
+            case CANCELLATIONS -> new Projection("payment_test_cancellations c join payment_test_orders p on p.id=c.order_id","p.user_id=:user","c.id,c.order_id,c.status,c.reason,c.requested_at,c.updated_at","id,orderId,status,reason,requestedAt,updatedAt","c.requested_at desc,c.id desc");
+            case INQUIRIES -> new Projection("inquiries i","i.user_id=:user","i.id,i.category,i.subject,i.status,i.created_at,i.answered_at","id,category,subject,status,createdAt,answeredAt","i.id desc");
             case NOTIFICATIONS -> new Projection("user_notifications n","n.user_id=:user","n.id,n.type,n.title,n.read_at,n.created_at","id,type,title,readAt,createdAt","n.id desc");
             case COURSE_PROGRESS -> new Projection("user_course_progress p","p.user_id=:user","p.id,p.course_id,p.last_step_id,p.status,p.progress_percent,p.updated_at","id,courseId,lastStepId,status,progressPercent,updatedAt","p.id desc");
             case TITLES -> new Projection("user_titles t","t.user_id=:user","t.user_id,t.rank,t.minimum_training_count,t.updated_at","userId,rank,minimumTrainingCount,updatedAt","t.user_id desc");

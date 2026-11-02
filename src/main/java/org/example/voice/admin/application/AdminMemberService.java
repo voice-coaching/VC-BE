@@ -16,10 +16,10 @@ public class AdminMemberService {
     private final AdminReadService reads;
     private final AdminMemberStore store;
     private final CoachingUsageService coaching;
-    public record Overview(AdminReadService.Member member,List<ResourceCount> counts,CoachingUsage coachingUsage,String usageUnavailableReason) {}
+    public record Overview(AdminReadService.Member member,List<ResourceCount> counts,CoachingUsage coachingUsage,String usageUnavailableReason,AccountDetails account) {}
     public Overview overview(long actor,long userId) {
         var member=reads.user(actor,userId);boolean active=store.activeMember(userId);
-        return new Overview(member,store.counts(userId),active?coaching.getUsage(userId):null,active?null:"ACCOUNT_INACTIVE");
+        return new Overview(member,store.counts(userId),active?coaching.getUsage(userId):null,active?null:"ACCOUNT_INACTIVE",store.accountDetails(userId).orElse(null));
     }
     public Page<RecordView> records(long actor,long userId,AdminUserResource resource,int page,int size) {
         reads.user(actor,userId);AdminValidation.page(page,size);if(resource==null)AdminValidation.invalid();
