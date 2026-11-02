@@ -1,8 +1,12 @@
 # AI V2 handoff / 통합 음성 V6 계약
 
-2026-11-01. 신규 요청 계약을 AI 저장소 `4fc844a35c4a748b1688006b6bf170d0d01f22da`의
+2026-11-01 기준, 2026-11-02 bounded H5 pin 갱신. 신규 요청 계약을 AI 저장소 `4fc844a35c4a748b1688006b6bf170d0d01f22da`의
 `docs/canonical-integration/v6-unification.md` 및 원본 JSON Schema와 맞춘다.
 이 문서는 코드 계약이며 운영 전환 완료를 의미하지 않는다.
+
+결과 V6 schema는 이후 [bounded H5 분류 보정](bounded-h5-result-contract-20261102.md)을
+포함한다. 아래 pin과 패키징 검증 테스트도 해당 개정의 정확한 바이트 해시를 사용한다.
+초기 AI 기준 커밋의 V6 해시와 구분하며, AI·독립 검증기에도 같은 개정을 적용해야 한다.
 
 ## 신규 실행과 과거 기록
 
@@ -82,7 +86,7 @@ schema pin은 저장소 원본 바이트 SHA-256이고, 실행 payload digest는
 | runpod_canonical_output.schema.json | `5ca5421f8053b51cc9da9dafe06c0dffcd98e85ca24ce24d373e2d2b0351def8` |
 | runpod_canonical_journal_v1.schema.json | `798aa2eee85f9196d0519763119f266b14f065899c03faa75599fab5fed2e5f5` |
 | runpod_analysis_request_v4.schema.json | `8fde9cf8ee44b5b151bf31205a355c80789fedc6c8d74ba994274bc898c9eec0` |
-| runpod_result_v6.schema.json | `e7a3d57bb3d8f2d7114a1f20c1339706f07e5b3377259bf6539bcb79dc0c6987` |
+| runpod_result_v6.schema.json | `f17fd6ff70cd4fa3fcb1ee91d878cdf7fef0b2880159e4da17b5d19a46b9e40f` |
 | runpod_canonical_handoff_v2.schema.json | `8677401f5edf88258ca72344cde932b0ddbefdd8e35ccc1885970e6ac2632c07` |
 | runpod_media_preparation_v1.schema.json | `0a9c91e88d37f2108a77772512db1d23fcdce48b3a3741407a7f27b31c06946f` |
 | runpod_visual_coaching_input_v1.schema.json | `b9bb57c31bd1ab1dcb80957343449ab0a6b231bdea61a4adf876fc70af3a868c` |
