@@ -20,23 +20,32 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.Locale;
 
 @Component
+/** Issues only signed HS256 credentials; unsigned migration-era JWTs are not accepted. */
 public class JwtTokenProvider implements TokenProvider {
-
+    private final JwtEncoder encoder;
+    private final JwtDecoder decoder;
     private final String issuer;
     private final long accessSeconds;
     private final long refreshSeconds;
     private final Clock clock;
 
     public JwtTokenProvider(
-            @Value("${auth.jwt.secret:}") String secret,
+            @Value("${auth.jwt.secret}") String secret,
             @Value("${auth.jwt.issuer}") String issuer,
             @Value("${auth.jwt.access-token-seconds}") long accessSeconds,
             @Value("${auth.jwt.refresh-token-seconds}") long refreshSeconds
     ) {
-        {}
-
+        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalArgumentException("JWT secret must be at least 32 bytes");
+        }
+        SecretKey key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        this.encoder = new NimbusJwtEncoder(new ImmutableSecret<>(key));
+        NimbusJwtDecoder verifier = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
+        verifier.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
+        this.decoder = verifier;
         this.issuer = issuer;
         this.accessSeconds = accessSeconds;
         this.refreshSeconds = refreshSeconds;
@@ -50,7 +59,12 @@ public class JwtTokenProvider implements TokenProvider {
 
     @Override
     public IssuedTokens reissue(Long userId, UserRole role, String sessionId) {
-
+        if (userId == null || userId <= 0 || role == null) {
+            throw new IllegalArgumentException("A valid token subject and role are required");
+        }
+        if (sessionId == null || sessionId.isBlank()) {
+            throw new IllegalArgumentException("Login session ID is required");
+        }
         Instant now = clock.instant();
         return new IssuedTokens(
                 encode(userId, role, sessionId, "access", now, now.plusSeconds(accessSeconds)),
@@ -61,10 +75,11 @@ public class JwtTokenProvider implements TokenProvider {
     }
 
     private String encode(Long userId, UserRole role, String sessionId, String type, Instant issuedAt, Instant expiresAt) {
-        return new com.nimbusds.jwt.PlainJWT(new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer(issuer).subject(userId.toString())
-                .issueTime(java.util.Date.from(issuedAt)).expirationTime(java.util.Date.from(expiresAt))
-                .jwtID(UUID.randomUUID().toString()).claim("role",role.name()).claim("sid",sessionId).claim("type",type)
-                .build()).serialize();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(issuer).subject(userId.toString()).issuedAt(issuedAt).expiresAt(expiresAt)
+                .id(UUID.randomUUID().toString()).claim("role", role.name()).claim("sid", sessionId).claim("type", type).build();
+        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
+        return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
 
     @Override
@@ -75,12 +90,24 @@ public class JwtTokenProvider implements TokenProvider {
 
     private TokenClaims parse(String token, String expectedType, ErrorCode errorCode) {
         try {
-            var claims = com.nimbusds.jwt.JWTParser.parse(token).getJWTClaimsSet();
-            var expires = claims.getExpirationTime();
-            String role = claims.getStringClaim("role");
-            return new TokenClaims(Long.valueOf(claims.getSubject()), role == null ? UserRole.USER : UserRole.valueOf(role),
-                    claims.getStringClaim("sid"), expires == null ? null : OffsetDateTime.ofInstant(expires.toInstant(), ZoneOffset.UTC));
-        } catch (java.text.ParseException | IllegalArgumentException exception) {
+            Jwt jwt = decoder.decode(token);
+            String sessionId = jwt.getClaimAsString("sid");
+            if (!expectedType.equals(jwt.getClaimAsString("type")) || jwt.getExpiresAt() == null
+                    || sessionId == null || sessionId.isBlank()) {
+                throw new InvalidTokenException(errorCode);
+            }
+            long userId = Long.parseLong(jwt.getSubject());
+            if (userId <= 0) throw new InvalidTokenException(errorCode);
+            return new TokenClaims(userId, UserRole.valueOf(jwt.getClaimAsString("role")), sessionId,
+                    OffsetDateTime.ofInstant(jwt.getExpiresAt(), ZoneOffset.UTC));
+        } catch (JwtValidationException exception) {
+            ErrorCode mapped = "refresh".equals(expectedType) && exception.getErrors().stream()
+                    .anyMatch(error -> error.getDescription().toLowerCase(Locale.ROOT).contains("expired"))
+                    ? ErrorCode.REFRESH_TOKEN_EXPIRED : errorCode;
+            throw new InvalidTokenException(mapped, exception);
+        } catch (InvalidTokenException exception) {
+            throw exception;
+        } catch (JwtException | IllegalArgumentException | NullPointerException exception) {
             throw new InvalidTokenException(errorCode, exception);
         }
     }
