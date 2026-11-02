@@ -54,6 +54,7 @@ public final class CanonicalHandoffWorker {
             var raw=new ArrayList<byte[]>();
             for(var item:metadata.get("artifacts")) {
                 byte[] bytes=jdbc.queryForObject("SELECT raw_bytes FROM analysis_canonical_handoff_artifacts WHERE handoff_id=? AND kind=?",byte[].class,job.get("handoff_id"),item.path("kind").asText());
+                CanonicalHandoffDocument.checkBytes(item,bytes);
                 raw.add(bytes);
             }
             long started=System.nanoTime();
@@ -84,8 +85,11 @@ public final class CanonicalHandoffWorker {
                     CanonicalDeliveryWorker.sqlState(error));
             if(job!=null)try {
                 var failed=job;
-                boolean revoked=false;
-                boolean invalid=false;
+                boolean revoked=error instanceof RunPodContractException protocol
+                        && protocol.status()==409 && "EXECUTION_INACTIVE".equals(protocol.reason());
+                boolean invalid=error instanceof RunPodContractException protocol
+                        && (protocol.status()==400 || protocol.status()==422 || (protocol.status()==409 && Set.of(
+                                "RESULT_EVENT_CONFLICT","PAYLOAD_DIGEST_MISMATCH").contains(protocol.reason())));
                 tx.executeWithoutResult(t->{
                     jdbc.queryForList("SELECT id FROM analysis_results WHERE id=? FOR UPDATE",failed.get("analysis_id"));
                     int changed=jdbc.update("""

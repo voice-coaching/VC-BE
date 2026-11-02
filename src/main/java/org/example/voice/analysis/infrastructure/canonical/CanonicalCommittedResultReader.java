@@ -23,9 +23,13 @@ public final class CanonicalCommittedResultReader {
     private record Stored(byte[] bytes, String rawSha, String payloadSha, UUID receiptId, String manifestSha) {}
 
     public Optional<CanonicalCallbackDocument> findCurrent(AnalysisResult result) {
-        var bytes=jdbc.query("SELECT callback_bytes FROM analysis_canonical_results WHERE analysis_id=? ORDER BY applied_at DESC",
-                (row,index)->row.getBytes(1),result.getId());
-        return bytes.stream().findFirst().map(raw -> CanonicalCallbackDocument.parse(raw,contract));
+        var bytes=jdbc.query("""
+                SELECT callback_bytes FROM analysis_canonical_results
+                WHERE analysis_id=? AND execution_id::text=? AND request_id::text=?
+                ORDER BY applied_at DESC
+                """,(row,index)->row.getBytes(1),result.getId(),result.getActiveExecutionId(),result.getActiveRequestEventId());
+        return bytes.stream().map(raw -> CanonicalCallbackDocument.parse(raw,contract))
+                .filter(doc -> CanonicalResultAttempt.visible(result,doc)).findFirst();
     }
 
     private static IllegalStateException unavailable() {

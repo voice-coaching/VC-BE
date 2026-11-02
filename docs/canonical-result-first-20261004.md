@@ -68,3 +68,15 @@ verifier가 초기화하지 않는다. 취소 HTTP는 공용 scheduler와 분리
 
 운영 근거·파일별 변경·개발자 확인 범위는
 [추가 장애 수정 기록](troubleshooting/canonical-result-head-blocking-20261103.md)을 따른다.
+
+## 2026-11-03 현재 실행 조회와 거절 상태 복원
+
+PUBLISHED·DB·파일 큐 조회는 현재 request/execution/worker와 녹음·콘텐츠 identity를
+비교한다. Backend timeout·취소 이후 미저장 preview와 재시도 이전 결과를 반환하지
+않는다. 신규 commit도 같은 분석 잠금 아래 현재 실행을 확인하며 이미 저장된 동일
+결과의 멱등 ACK는 유지한다.
+
+파일 큐는 rejected marker를 복원하고 원본의 제한 크기·SHA를 확인한 뒤 preview를
+연다. 확정적인 계약/충돌 오류는 REJECTED, 비활성 DB 인계는 REVOKED로 마감한다.
+일시 I/O·DB 장애는 재시도하고 원본은 보존한다. 구현 범위·운영 관측·검증 제한은
+[현재 실행·큐 복원 기록](troubleshooting/canonical-generation-recovery-20261103.md)을 따른다.
