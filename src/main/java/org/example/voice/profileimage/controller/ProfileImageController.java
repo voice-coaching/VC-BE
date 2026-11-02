@@ -62,8 +62,8 @@ public class ProfileImageController {
     @DeleteMapping @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal LoginUser user) { service.delete(user.id()); }
     private byte[] bytes(MultipartFile file) {
-        if (file.getSize() > 5 * 1024 * 1024) throw new ProfileImageException(413, "PAYLOAD_TOO_LARGE");
-        try (var input = file.getInputStream()) { return input.readNBytes(5 * 1024 * 1024 + 1); }
+
+        try (var input = file.getInputStream()) { return input.readAllBytes(); }
         catch (IOException ignored) { throw ProfileImageException.invalid(); }
     }
 }

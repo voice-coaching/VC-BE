@@ -35,7 +35,7 @@ public final class SentenceTranscript {
     private static boolean digit(char c) { return c >= '0' && c <= '9'; }
     public static String at(String source, int index) {
         var sentences = split(source);
-        if (index < 0 || index >= sentences.size()) throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+
         return sentences.get(index);
     }
     public static String sha256(String text) {

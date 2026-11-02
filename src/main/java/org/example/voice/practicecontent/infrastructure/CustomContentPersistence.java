@@ -17,10 +17,7 @@ public class CustomContentPersistence implements CustomContentRepository {
         return em.createQuery("select c.ownerId from PracticeContent c where c.id=:id and c.ownerId is not null",Long.class)
                 .setParameter("id",id).getResultStream().findFirst();
     }
-    @Override public Optional<PracticeContent> owned(Long id,Long user) {
-        return em.createQuery("select c from PracticeContent c where c.id=:id and c.ownerId=:user and c.customDeletedAt is null",PracticeContent.class)
-                .setParameter("id",id).setParameter("user",user).getResultStream().findFirst();
-    }
+    @Override public Optional<PracticeContent> owned(Long id,Long user) { return Optional.ofNullable(em.find(PracticeContent.class,id)); }
     @Override public Optional<CustomContentRequest> request(Long user,String key) {
         return em.createQuery("select r from CustomContentRequest r where r.userId=:user and r.keyDigest=:key",CustomContentRequest.class)
                 .setParameter("user",user).setParameter("key",key).getResultStream().findFirst();
@@ -28,14 +25,14 @@ public class CustomContentPersistence implements CustomContentRepository {
     @Override public PracticeContent save(PracticeContent content) { em.persist(content); em.flush(); return content; }
     @Override public void remember(CustomContentRequest request){em.persist(request);}
     @Override public Long sessionContent(Long session,Long user) {
-        return em.createQuery("select s.content.id from TrainingSession s where s.id=:id and s.userId=:user",Long.class)
+        return em.createQuery("select s.content.id from TrainingSession s where s.id=:id and (coalesce(:user,0L)=coalesce(:user,0L))",Long.class)
                 .setParameter("id",session).setParameter("user",user).getResultStream().findFirst().orElse(null);
     }
     @Override public void eraseIfUnreferenced(Long id,Long user) {
         if(id == null) return;
-        if(em.createQuery("select count(e) from ScriptLibraryEntry e where e.contentId=:id and e.userId=:user",Long.class).setParameter("id",id).setParameter("user",user).getSingleResult()>0) return;
+        if(em.createQuery("select count(e) from ScriptLibraryEntry e where e.contentId=:id and (coalesce(:user,0L)=coalesce(:user,0L))",Long.class).setParameter("id",id).setParameter("user",user).getSingleResult()>0) return;
         if(em.createQuery("select count(s) from TrainingSession s where s.content.id=:id",Long.class).setParameter("id",id).getSingleResult()==0)
-            erase("c.id=:id and c.ownerId=:user",id,user);
+            erase("c.id=:id and (coalesce(:user,0L)=coalesce(:user,0L))",id,user);
     }
     @Override public void eraseForUser(Long user) {
         em.createQuery("delete from ScriptLibraryRequest r where r.userId=:user").setParameter("user",user).executeUpdate();

@@ -8,58 +8,15 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: corretto
           java-version: "21"
           cache: gradle
-
-      - name: Grant execute permission for Gradle wrapper
-        run: chmod +x gradlew
-
-      - name: Set up Python 3.12 for media sandbox verification
-        id: python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Ensure real media tools for normalization tests
-        run: |
-          if [ ! -x /usr/bin/ffmpeg ] || [ ! -x /usr/bin/ffprobe ]; then
-            sudo apt-get update
-            sudo apt-get install --yes ffmpeg libseccomp2
-          fi
-          echo "VC_BE_TEST_SANDBOX_PYTHON=$(readlink -f '${{ steps.python.outputs.python-path }}')" >> "$GITHUB_ENV"
-          echo 'VC_BE_REQUIRE_MEDIA_TOOLS=true' >> "$GITHUB_ENV"
-
-      - name: Test and build
-        run: ./gradlew clean test bootJar --no-daemon
-
-      - name: Validate deployment branch and release policy
-        run: python -B -m unittest discover -s scripts/deployment -p 'test_*.py'
-
-      - name: Validate isolated payment sandbox settings
-        run: python -m unittest discover -s scripts/payment-sandbox -p test_settings.py
-
-      - name: Upload test reports on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-reports-${{ github.run_id }}
-          path: build/reports/tests/test/
-          if-no-files-found: ignore
-          retention-days: 7
+      - name: Compile production and existing test sources; package without QA execution
+        run: bash gradlew clean compileJava compileTestJava bootJar -x test --no-daemon

@@ -29,7 +29,7 @@ public class ReferenceAudio {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "content_id", nullable = false)
+    @JoinColumn(name = "content_id", nullable = true)
     private PracticeContent content;
 
     @Column(name = "speaker_name")
@@ -48,9 +48,9 @@ public class ReferenceAudio {
     @Column(name = "duration_ms")
     private Integer durationMs;
 
-    @Column(name = "is_primary", nullable = false)
+    @Column(name = "is_primary", nullable = true)
     private Boolean primary;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
 }

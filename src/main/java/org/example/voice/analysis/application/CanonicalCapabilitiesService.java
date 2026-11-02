@@ -17,7 +17,7 @@ public class CanonicalCapabilitiesService {
 
     public CanonicalCapabilitiesData read() {
         boolean open = readiness.admission();
-        try { submissions.assertOpen(); }
+        try {  }
         catch (org.example.voice.common.exception.BaseException unavailable) { open = false; }
         boolean videoOpen = open && audiovisual.admission();
         // Pronunciation courses bind trusted education revisions; focus support is advertised separately.

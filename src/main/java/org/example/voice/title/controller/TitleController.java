@@ -52,7 +52,7 @@ public class TitleController {
     public ApiResponse<TitleExamResponseDto> restart(
             @AuthenticationPrincipal LoginUser user,
             @PathVariable Long examId,
-            @Valid @RequestBody TitleExamRestartRequestDto request
+             @RequestBody TitleExamRestartRequestDto request
     ) {
         return ApiResponse.success("새 녹음으로 시험을 시작합니다.",
                 TitleExamResponseDto.from(restarts.restart(user.id(), examId, request.previousTrainingSessionId())));
@@ -62,11 +62,11 @@ public class TitleController {
     public ApiResponse<TitleExamGradeResponseDto> submit(
             @AuthenticationPrincipal LoginUser user,
             @PathVariable Long examId,
-            @Valid @RequestBody TitleExamSubmitRequestDto request
+             @RequestBody(required = false) TitleExamSubmitRequestDto request
     ) {
         return ApiResponse.success(
-                "승급 시험 채점이 완료됐습니다.",
-                TitleExamGradeResponseDto.from(service.submit(user.id(), examId, request.analysisId()))
+                "승급 시험 제출을 처리했습니다.",
+                TitleExamGradeResponseDto.from(service.submit(user.id(), examId, request == null ? null : request.analysisId()))
         );
     }
 }

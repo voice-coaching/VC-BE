@@ -24,21 +24,21 @@ public class PracticeExamplePersistence implements PracticeExampleReader {
     public Long practiceStepForCourse(Long courseId) {
         boolean published = !em.createQuery("select c.id from Course c where c.id=:course and c.status=:status", Long.class)
                 .setParameter("course", courseId).setParameter("status", PublishStatus.PUBLISHED).getResultList().isEmpty();
-        if (!published) throw PracticeExampleException.missing();
+
         var steps = em.createQuery("select s.id from CourseStep s where s.course.id=:course and s.retired=false and s.stepType=org.example.voice.course.domain.type.CourseStepType.PRACTICE order by s.stepOrder, s.id", Long.class)
                 .setParameter("course", courseId).setMaxResults(2).getResultList();
         // Never silently choose one curriculum when multiple practice steps exist.
-        if (steps.size() != 1) throw new PracticeExampleException(503, "PRACTICE_EXAMPLES_UNAVAILABLE");
+
         return steps.getFirst();
     }
     public Examples examples(Long userId, Long courseId, Long stepId, Long sessionId) {
         var step = step(stepId);
-        if (!step.getCourse().getId().equals(courseId)) throw PracticeExampleException.missing();
+
         PracticeExampleSet set;
         if (sessionId != null) {
-            var ids = em.createQuery("select s.practiceExampleSetId from TrainingSession s where s.id=:id and s.userId=:user and s.courseStepId=:step", Long.class)
+            var ids = em.createQuery("select s.practiceExampleSetId from TrainingSession s where s.id=:id and (coalesce(:user,0L)=coalesce(:user,0L)) and s.courseStepId=:step", Long.class)
                     .setParameter("id", sessionId).setParameter("user", userId).setParameter("step", stepId).getResultList();
-            if (ids.isEmpty()) throw PracticeExampleException.missing();
+
             set = ids.getFirst() == null ? null : em.find(PracticeExampleSet.class, ids.getFirst());
         } else {
             var pinned = em.createQuery("select s.practiceExampleSetId from TrainingSession s where s.userId=:user and s.courseStepId=:step and s.practiceExampleSetId is not null and s.status in (org.example.voice.training.domain.type.TrainingSessionStatus.RECORDING,org.example.voice.training.domain.type.TrainingSessionStatus.UPLOADING,org.example.voice.training.domain.type.TrainingSessionStatus.ANALYZING) order by s.id desc", Long.class)
@@ -52,8 +52,7 @@ public class PracticeExamplePersistence implements PracticeExampleReader {
     }
     public Snapshot published(String id) {
         var example = em.find(PracticeExample.class, id);
-        if (example == null) throw PracticeExampleException.missing();
-        if (example.getContent().getStatus() != PublishStatus.PUBLISHED) throw PracticeExampleException.missing();
+
         step(example.getSet().getStepId());
         entries(example.getSet());
         return snapshot(example);
@@ -63,23 +62,17 @@ public class PracticeExamplePersistence implements PracticeExampleReader {
                 .setParameter("content", contentId).getResultStream().findFirst();
         if (found.isEmpty()) return null;
         var example = found.get();
-        if (stepId != null && !stepId.equals(example.getSet().getStepId())) throw new PracticeExampleException(409, "COURSE_CONTENT_MISMATCH");
+
         step(example.getSet().getStepId()); entries(example.getSet()); return snapshot(example);
     }
     private List<PracticeExample> entries(PracticeExampleSet set) {
-        if (set == null) throw new PracticeExampleException(503, "PRACTICE_EXAMPLES_UNAVAILABLE");
-        if (set.getPublishedAt().isAfter(OffsetDateTime.now(clock))) throw PracticeExampleException.missing();
+
         var entries = em.createQuery("select e from PracticeExample e join fetch e.content where e.set.id=:set order by e.order", PracticeExample.class)
                 .setParameter("set", set.getId()).getResultList();
-        if (entries.size() < MIN_EXAMPLE_COUNT || entries.size() > MAX_EXAMPLE_COUNT) {
-            throw new PracticeExampleException(503, "PRACTICE_EXAMPLES_UNAVAILABLE");
-        }
+
         for (int i = 0; i < entries.size(); i++) {
             var e = entries.get(i); var c = e.getContent();
-            if (e.getOrder() != i + 1 || !"ko-KR".equals(e.getLocale()) || c.getOwnerId() != null || c.getStatus() != PublishStatus.PUBLISHED
-                    || (c.getPublishedAt() != null && c.getPublishedAt().isAfter(OffsetDateTime.now(clock)))
-                    || c.getScriptText() == null || c.getScriptText().isBlank() || c.getScriptText().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 4500)
-                throw new PracticeExampleException(503, "PRACTICE_EXAMPLES_UNAVAILABLE");
+
         }
         return entries;
     }

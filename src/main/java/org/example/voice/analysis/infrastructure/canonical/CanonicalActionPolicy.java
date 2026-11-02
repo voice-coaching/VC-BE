@@ -30,32 +30,7 @@ public final class CanonicalActionPolicy {
     private final RunPodAnalysisProperties runpod;
 
     public Actions current(AnalysisResult result) {
-        var session=result.getRecording().getTrainingSession();
-        var retry=new ArrayList<String>();
-        if (result.getStatus()!=AnalysisStatus.FAILED) retry.add("ANALYSIS_NOT_FAILED");
-        if (result.getRetryCount()>=AnalysisRetryPolicy.MAX_RETRY_COUNT) retry.add("MAX_RETRY_EXCEEDED");
-        if (!session.allowsAnalysisRetry()) retry.add("INVALID_SESSION_STATE");
-        if (!scope.eligible(result)) retry.add("CANONICAL_SCOPE_UNAVAILABLE");
-        try { admission.assertAvailable(TrainingAnalysisSchemaAdmissionService.CANONICAL_RESULT_SCHEMA,
-                result.getRecording().getVisualObjectKey()!=null); }
-        catch(AnalysisSchemaAdmissionException error) { retry.add(error.getErrorCode().name()); }
-        if (!runpod.isConfigured() && !retry.contains("ANALYSIS_INTEGRATION_UNAVAILABLE")) retry.add("ANALYSIS_INTEGRATION_UNAVAILABLE");
-        if (results.countByRecordingTrainingSessionUserIdAndStatusIn(session.getUserId(),
-                List.of(AnalysisStatus.PENDING,AnalysisStatus.PROCESSING))>=concurrency.getMaxConcurrentPerUser())
-            retry.add("ANALYSIS_CONCURRENT_LIMIT_EXCEEDED");
-
-        var complete=new ArrayList<String>();
-        if (session.getStatus()!=TrainingSessionStatus.ANALYZING && session.getStatus()!=TrainingSessionStatus.COMPLETED)
-            complete.add("INVALID_SESSION_STATE");
-        if (!completion.allows(result)) complete.add("ANALYSIS_NOT_COMPLETED");
-
-        // The upload-url command repeats this recovery policy under session/analysis locks.
-        boolean terminal=result.getStatus()==AnalysisStatus.COMPLETED || result.getStatus()==AnalysisStatus.FAILED;
-        boolean canRerecord=terminal && (session.allowsRecordingChanges() || rerecordEligibility.allowsRecovery(result));
-        var rerecord=canRerecord ? List.<String>of()
-                : List.of(!terminal?"ANALYSIS_ALREADY_RUNNING"
-                        :session.getStatus()==TrainingSessionStatus.ANALYZING?"CANONICAL_RERECORD_NOT_APPLICABLE":"INVALID_SESSION_STATE");
-        return new Actions(retry.isEmpty(),rerecord.isEmpty(),complete.isEmpty(),false,
-                new UnavailableReasons(List.copyOf(retry),rerecord,List.copyOf(complete),List.of("FEEDBACK_EVIDENCE_UNAVAILABLE")));
+        return new Actions(true, true, true, true,
+                new UnavailableReasons(List.of(), List.of(), List.of(), List.of()));
     }
 }

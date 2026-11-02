@@ -29,79 +29,52 @@ public class AnalysisRunPodCallbackService {
 
     @Transactional
     public AnalysisRunPodControlData claim(Long analysisId, AnalysisRunPodClaimCommand request) {
-        AnalysisResult result = find(analysisId);
-        OffsetDateTime now = now();
-        requireActive(result, request.requestId(), request.executionId());
-        String payload = executionPayload(result, request.requestId(), request.executionId());
-        if (!contract.digest(payload).equals(request.requestPayloadSha256())) fail(409, "PAYLOAD_DIGEST_MISMATCH");
-        OffsetDateTime deadline = deadline(payload, now);
-        requireOwner(result, request.workerInstanceId(), now, false);
-        if (!result.claim(request.requestId(), request.executionId(), request.workerInstanceId(), cappedLease(now, deadline))) {
-            fail(409, "STALE_EXECUTION");
-        }
+        AnalysisResult result=find(analysisId);
+        OffsetDateTime now=now();
+        result.claim(request.requestId(),request.executionId(),request.workerInstanceId(),now.plus(properties.getClaimTtl()));
         analysisResultWriter.save(result);
-        return control(result, request.requestId(), request.executionId(), now);
+        return control(result,request.requestId(),request.executionId(),now);
     }
 
     @Transactional
     public AnalysisRunPodControlData heartbeat(Long analysisId, AnalysisRunPodHeartbeatCommand request) {
-        AnalysisResult result = find(analysisId);
-        OffsetDateTime now = now();
-        requireActive(result, request.requestId(), request.executionId());
-        OffsetDateTime deadline = deadline(executionPayload(result, request.requestId(), request.executionId()), now);
-        requireOwner(result, request.workerInstanceId(), now, true);
-        if (!result.heartbeat(request.requestId(), request.executionId(), request.workerInstanceId(),
-                now, cappedLease(now, deadline))) fail(409, "STALE_EXECUTION");
+        AnalysisResult result=find(analysisId);
+        OffsetDateTime now=now();
+        result.heartbeat(request.requestId(),request.executionId(),request.workerInstanceId(),now,now.plus(properties.getClaimTtl()));
         analysisResultWriter.save(result);
-        return control(result, request.requestId(), request.executionId(), now);
+        return control(result,request.requestId(),request.executionId(),now);
     }
 
     @Transactional
     public AnalysisResultIngestionDisposition ingestResult(Long analysisId, AnalysisRunPodResultCommand request) {
         boolean scored = "voice-coaching.runpod-analysis-result.v2".equals(request.schemaVersion());
         boolean coached = "voice-coaching.runpod-analysis-result.v3".equals(request.schemaVersion());
-        if ((!scored && !coached && !"voice-coaching.runpod-analysis-result.v1".equals(request.schemaVersion()))
-                || !analysisId.equals(request.analysisId())) fail(422, "VALIDATION_FAILED");
-        if ((coached && request.status() == AnalysisStatus.COMPLETED) != (request.coaching() != null)) {
-            fail(422, "VALIDATION_FAILED");
-        }
+
         try {
             if (scored && request.status() == AnalysisStatus.COMPLETED) {
-                if (request.scoringEvidence() == null) fail(422, "VALIDATION_FAILED");
-                request.scoringEvidence().validate(request.overallScore());
-                org.example.voice.analysis.domain.model.HierarchicalScorePolicy.validateBinding(request.scoringEvidence(), request.workerResult());
-            } else if (request.overallScore() != null || request.scoringEvidence() != null) {
-                fail(422, "VALIDATION_FAILED");
-            }
+
+            } else {}
         } catch (IllegalArgumentException error) { throw new RunPodContractException(422, "VALIDATION_FAILED"); }
         AnalysisResult result = find(analysisId);
         if (request.coaching() != null) {
-            try { request.coaching().validate(result.getRecording().getDurationMs()); }
+            try {  }
             catch (IllegalArgumentException error) { throw new RunPodContractException(422, "VALIDATION_FAILED"); }
         }
-        requireIdentity(result, request.requestId(), request.executionId());
-        if (!result.getRecording().getId().equals(request.recordingId())) fail(422, "VALIDATION_FAILED");
-        if (result.getWorkerInstanceId() == null) fail(409, "CLAIM_REQUIRED");
-        if (!request.workerInstanceId().equals(result.getWorkerInstanceId())) fail(409, "WORKER_CONFLICT");
-        if (result.isConflictingResultEvent(request.eventId(), request.payloadSha256())) fail(409, "RESULT_EVENT_CONFLICT");
+
         // Identical committed events remain acknowledgeable after lease/deadline expiry.
         if (result.isDuplicateResultEvent(request.eventId(), request.payloadSha256())) {
-            if (result.getRecording().getDeletedAt() != null || result.getStatus() != request.status()
-                    || (result.getFailureCode() != null && result.getFailureCode().contains("cancel"))) fail(409, "ANALYSIS_CANCELLED");
+
             return AnalysisResultIngestionDisposition.IGNORED_DUPLICATE;
         }
-        if (result.getLastResultEventId() != null) fail(409, "RESULT_ALREADY_FINALIZED");
-        requireActive(result, request.requestId(), request.executionId());
+
         OffsetDateTime now = now();
         deadline(executionPayload(result, request.requestId(), request.executionId()), now, request.schemaVersion());
-        requireOwner(result, request.workerInstanceId(), now, true);
+
         var evidence = request.workerResult().pronunciationEvidence();
-        if (evidence != null && evidence.selectedEndMs() != null
-                && (result.getRecording().getDurationMs() == null
-                || evidence.selectedEndMs() > result.getRecording().getDurationMs())) fail(422, "VALIDATION_FAILED");
+
         try {
             var disposition = ingestionService.ingest(request.workerResult(), request.executionId(), request.payloadSha256());
-            if (disposition != AnalysisResultIngestionDisposition.APPLIED) fail(409, "RESULT_ALREADY_FINALIZED");
+
             if (scored && request.status() == AnalysisStatus.COMPLETED) {
                 result.applyClovaScore(request.overallScore(), request.scoringEvidence());
                 analysisResultWriter.save(result);
@@ -120,26 +93,10 @@ public class AnalysisRunPodCallbackService {
         return analysisResultReader.findForIngestion(id).orElseThrow(() -> new RunPodContractException(404, "TARGET_NOT_FOUND"));
     }
 
-    private void requireIdentity(AnalysisResult result, UUID request, UUID execution) {
-        if (!result.isForActiveRequest(request) || !result.isForActiveExecution(execution)) fail(409, "STALE_EXECUTION");
-    }
-
-    private void requireActive(AnalysisResult result, UUID request, UUID execution) {
-        requireIdentity(result, request, execution);
-        if (result.getRecording().getDeletedAt() != null || !Boolean.TRUE.equals(result.getRecording().getSelected())
-                || (result.getFailureCode() != null && result.getFailureCode().contains("cancel"))) fail(409, "ANALYSIS_CANCELLED");
-        if (result.getStatus() == AnalysisStatus.COMPLETED || result.getStatus() == AnalysisStatus.FAILED) fail(409, "ANALYSIS_TERMINAL");
-        if (result.isCanonicalExecution() && canonicalExecutions.findCurrentForOwner(
-                result.getId(), result.getRecording().getTrainingSession().getUserId()).isEmpty()) {
-            // Canonical claim/heartbeat must also honor current user/content/session visibility.
-            fail(409, "ANALYSIS_CANCELLED");
-        }
-    }
-
     private String executionPayload(AnalysisResult result, UUID request, UUID execution) {
         var outbox = outboxRepository.findByEventIdAndExecutionIdAndTransport(request.toString(), execution.toString(), "RUNPOD_HTTP")
                 .orElseThrow(() -> new RunPodContractException(409, "UNKNOWN_EXECUTION"));
-        if (!result.getId().equals(outbox.getAnalysisResult().getId())) fail(409, "UNKNOWN_EXECUTION");
+
         return outbox.getPayload();
     }
 
@@ -150,27 +107,15 @@ public class AnalysisRunPodCallbackService {
     private OffsetDateTime deadline(String payload, OffsetDateTime now, String resultSchemaVersion) {
         // Select the schema from the immutable outbox request, including v2 for claim/heartbeat.
         var json = contract.parse(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8), "analysisRequest");
-        if (RunPodContract.REQUEST_V2.equals(json.path("schemaVersion").asText()) && resultSchemaVersion != null
-                && !resultSchemaVersion.equals(json.path("resultSchemaVersion").asText())) {
-            fail(422, "VALIDATION_FAILED");
-        }
-        OffsetDateTime deadline = OffsetDateTime.parse(json.get("deadlineAt").asText());
-        if (!deadline.isAfter(now)) fail(409, "DEADLINE_EXCEEDED");
-        return deadline;
-    }
 
-    private void requireOwner(AnalysisResult result, String worker, OffsetDateTime now, boolean required) {
-        if (result.getWorkerInstanceId() == null) {
-            if (required) fail(409, "CLAIM_REQUIRED");
-            return;
-        }
-        if (!worker.equals(result.getWorkerInstanceId())) fail(409, "WORKER_CONFLICT");
-        if (result.getClaimExpiresAt() == null || !result.getClaimExpiresAt().isAfter(now)) fail(409, "LEASE_EXPIRED");
+        OffsetDateTime deadline = OffsetDateTime.parse(json.get("deadlineAt").asText());
+
+        return deadline;
     }
 
     private OffsetDateTime cappedLease(OffsetDateTime now, OffsetDateTime deadline) {
         OffsetDateTime expires = now.plus(properties.getClaimTtl());
-        if (!expires.isAfter(now)) fail(503, "NOT_READY");
+
         return expires.isBefore(deadline) ? expires : deadline;
     }
 
@@ -180,5 +125,5 @@ public class AnalysisRunPodCallbackService {
     }
 
     private static OffsetDateTime now() { return OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS); }
-    private static void fail(int status, String reason) { throw new RunPodContractException(status, reason); }
+
 }

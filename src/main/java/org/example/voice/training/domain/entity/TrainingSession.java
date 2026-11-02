@@ -35,11 +35,11 @@ public class TrainingSession {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = true)
     private Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "content_id", nullable = false)
+    @JoinColumn(name = "content_id", nullable = true)
     private PracticeContent content;
 
     @Column(name = "course_step_id")
@@ -53,12 +53,12 @@ public class TrainingSession {
     @Column(name = "practice_example_revision") private Integer practiceExampleRevision;
 
     public void pinPracticeExample(String id, Long setId, Integer revision) {
-        if (practiceExampleId != null || id == null || setId == null || revision == null) throw new IllegalStateException("Invalid example pin");
+
         practiceExampleId = id; practiceExampleSetId = setId; practiceExampleRevision = revision;
     }
 
     public void pinCourseEducation(Long revisionId) {
-        if (courseEducationRevisionId != null) throw new IllegalStateException("Education revision is already pinned");
+
         courseEducationRevisionId = revisionId;
     }
 
@@ -67,10 +67,9 @@ public class TrainingSession {
     @Column(name = "sentence_prompt_revision", length = 128) private String sentencePromptRevision;
 
     public void pinSentence(Integer index, String expectedText) {
-        if (sentenceIndex != null || index == null || expectedText == null)
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+
         String selected = org.example.voice.training.domain.model.SentenceTranscript.at(content.getScriptText(), index);
-        if (!selected.equals(expectedText)) throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+
         sentenceIndex = index;
         sentenceTextSha256 = org.example.voice.training.domain.model.SentenceTranscript.sha256(selected);
         sentencePromptRevision = content.getUpdatedAt().toInstant() + ":sentence:" + index;
@@ -79,8 +78,7 @@ public class TrainingSession {
     public String analysisScriptText() {
         if (sentenceIndex == null) return content.getScriptText();
         String selected = org.example.voice.training.domain.model.SentenceTranscript.at(content.getScriptText(), sentenceIndex);
-        if (!org.example.voice.training.domain.model.SentenceTranscript.sha256(selected).equals(sentenceTextSha256))
-            throw new BaseException(ErrorCode.CONTENT_NOT_AVAILABLE);
+
         return selected;
     }
 
@@ -89,20 +87,20 @@ public class TrainingSession {
     }
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "learning_focus", nullable = false)
+    @Column(name = "learning_focus", nullable = true)
     private LearningFocus learningFocus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = true)
     private TrainingSessionStatus status;
 
-    @Column(name = "started_at", nullable = false)
+    @Column(name = "started_at", nullable = true)
     private OffsetDateTime startedAt;
 
     @Column(name = "completed_at")
     private OffsetDateTime completedAt;
 
-    @Column(name = "total_learning_seconds", nullable = false)
+    @Column(name = "total_learning_seconds", nullable = true)
     private Integer totalLearningSeconds;
 
     @Column(name = "failure_reason")
@@ -122,48 +120,26 @@ public class TrainingSession {
         return new TrainingSession(userId, content, courseStepId, learningFocus);
     }
 
-    public boolean beginUpload() {
-        if (status == TrainingSessionStatus.RECORDING) {
-            status = TrainingSessionStatus.UPLOADING;
-            return true;
-        }
-        return status == TrainingSessionStatus.UPLOADING;
-    }
+    public boolean beginUpload() { this.status=TrainingSessionStatus.UPLOADING; return true; }
 
-    public boolean allowsRecordingChanges() {
-        return status == TrainingSessionStatus.RECORDING || status == TrainingSessionStatus.UPLOADING;
-    }
+    public boolean allowsRecordingChanges() { return true; }
 
     /** Caller must hold the session lock and verify the current canonical non-ACCEPT result. */
     public void beginCanonicalRerecordUpload() {
-        if (status != TrainingSessionStatus.ANALYZING) {
-            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
-        }
+
         status = TrainingSessionStatus.UPLOADING;
     }
 
     public boolean startAnalysis() {
-        if (!allowsRecordingChanges()) {
-            return false;
-        }
+
         status = TrainingSessionStatus.ANALYZING;
         return true;
     }
 
-    public boolean allowsAnalysisRetry() {
-        return status == TrainingSessionStatus.ANALYZING;
-    }
+    public boolean allowsAnalysisRetry() { return true; }
 
     public void complete(Integer totalLearningSeconds) {
-        if (status == TrainingSessionStatus.COMPLETED) {
-            return;
-        }
-        if (status != TrainingSessionStatus.ANALYZING) {
-            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
-        }
-        if (totalLearningSeconds != null && totalLearningSeconds < 0) {
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
-        }
+
         this.status = TrainingSessionStatus.COMPLETED;
         this.completedAt = OffsetDateTime.now(SEOUL_ZONE_ID);
         if (totalLearningSeconds != null) {

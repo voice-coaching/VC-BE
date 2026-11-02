@@ -62,9 +62,6 @@ public class AnalysisResultIngestionService {
         if (analysisResult.isDuplicateResultEvent(message.eventId(), payloadSha256)) {
             return AnalysisResultIngestionDisposition.IGNORED_DUPLICATE;
         }
-        if (analysisResult.isConflictingResultEvent(message.eventId(), payloadSha256)) {
-            throw new IllegalArgumentException("analysis result event conflicts with previous payload");
-        }
 
         return switch (message.status()) {
             case PROCESSING -> {

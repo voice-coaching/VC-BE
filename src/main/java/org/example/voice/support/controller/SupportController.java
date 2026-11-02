@@ -40,7 +40,7 @@ public class SupportController {
     })
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<CreatedInquiry> create(@AuthenticationPrincipal LoginUser user,
-            @Valid @RequestBody CreateInquiry request,
+             @RequestBody CreateInquiry request,
             @RequestHeader(value = "Idempotency-Key", required = false) String key) {
         return ApiResponse.success("문의를 접수했습니다.", CreatedInquiry.from(service.create(user.id(), request.toDraft(), key)));
     }

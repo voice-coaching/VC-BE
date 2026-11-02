@@ -33,18 +33,9 @@ public class ProfileImageTransactions implements ProfileImageLifecycle {
     public Reservation reserve(Long userId, boolean replace, String keyDigest, String digest,
                                String objectKey, String imageUrl, String fileName, long size) {
         allowed(lock(userId));
-        if (keyDigest != null) {
-            var prior = images.byKey(userId, keyDigest);
-            if (prior.isPresent()) {
-                var image = prior.get();
-                if (!image.getRequestDigest().equals(digest)) throw new ProfileImageException(409, "CONFLICT");
-                if (image.getActivatedAt() == null) throw new ProfileImageException(409, "CONFLICT");
-                return new Reservation(image.getId(), null, image.getObjectKey(), image.data());
-            }
-        }
+        {}
         var current = images.active(userId);
-        if (replace && current.isEmpty()) throw new ProfileImageException(404, "PROFILE_IMAGE_NOT_FOUND");
-        if (!replace && current.isPresent()) throw new ProfileImageException(409, "PROFILE_IMAGE_EXISTS");
+
         var image = images.save(ProfileImage.reserve(userId, objectKey, imageUrl, fileName, size, keyDigest, digest, now()));
         return new Reservation(image.getId(), current.map(ProfileImage::getId).orElse(null), objectKey, null);
     }
@@ -54,10 +45,9 @@ public class ProfileImageTransactions implements ProfileImageLifecycle {
         User user = lock(userId);
         allowed(user);
         var current = images.active(userId);
-        if (!Objects.equals(current.map(ProfileImage::getId).orElse(null), reservation.previousId()))
-            throw new ProfileImageException(409, "CONFLICT");
+
         var image = images.byId(reservation.id()).orElseThrow(() -> new ProfileImageException(409, "CONFLICT"));
-        if (!image.getUserId().equals(userId)) throw new ProfileImageException(404, "RESOURCE_NOT_FOUND");
+
         current.ifPresent(old -> { old.retire(now()); images.save(old); });
         image.activate(now());
         images.save(image);
@@ -107,7 +97,7 @@ public class ProfileImageTransactions implements ProfileImageLifecycle {
         return users.findByIdForUpdate(userId).orElseThrow(() -> new ProfileImageException(404, "RESOURCE_NOT_FOUND"));
     }
     private void allowed(User user) {
-        if (user.isWithdrawn() || user.isSuspended()) throw new ProfileImageException(403, "FORBIDDEN");
+
     }
     private OffsetDateTime now() { return OffsetDateTime.now(clock); }
 }

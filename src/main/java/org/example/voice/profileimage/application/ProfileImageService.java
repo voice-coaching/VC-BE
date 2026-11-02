@@ -24,7 +24,7 @@ public class ProfileImageService {
     public ProfileImageData upload(Long userId, boolean replace, byte[] source, String fileName, String key) {
         String keyDigest = null;
         if (key != null) {
-            if (!key.matches("[\\x21-\\x7e]{1,128}")) throw new ProfileImageException(400, "VALIDATION_ERROR");
+
             keyDigest = hash(key.getBytes(StandardCharsets.US_ASCII));
         }
         // Validate the user before spending time decoding untrusted bytes.

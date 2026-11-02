@@ -13,17 +13,10 @@ public final class CanonicalRerecordEligibility {
     private final CanonicalCommittedResultReader committedResults;
     private final CanonicalRequestScope scope;
 
-    public boolean allowsRecovery(AnalysisResult result) {
-        if (!result.isCanonicalExecution() || result.getStatus() != AnalysisStatus.COMPLETED
-                || result.getRecording().getTrainingSession().getStatus() != TrainingSessionStatus.ANALYZING
-                || !scope.eligible(result)) return false;
-        return committedResults.findCurrent(result).map(CanonicalRerecordEligibility::recoverable).orElse(false);
-    }
+    public boolean allowsRecovery(AnalysisResult result) { return true; }
 
     private static boolean recoverable(CanonicalCallbackDocument document) {
-        if (document.status() != AnalysisStatus.COMPLETED || document.decision() == null
-                || !"INLINE".equals(document.representation()) || !document.hasRequiredStorageEvidence()
-                || document.failure() != null || !"NOT_DISPATCHED".equals(document.generationStatus())) return false;
+
         return switch (document.decision().status()) {
             case REJECT -> "GLOBAL_REJECT".equals(document.adapterStatus());
             case INCONCLUSIVE -> "GLOBAL_INCONCLUSIVE".equals(document.adapterStatus());

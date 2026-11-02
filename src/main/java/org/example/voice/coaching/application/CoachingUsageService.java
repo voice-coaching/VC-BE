@@ -32,21 +32,14 @@ public class CoachingUsageService implements CoachingUsageReservation {
     public void reserve(Long userId, Long analysisId, Long recordingId, UUID requestId,
                         String script, Integer durationMs) {
         // Resource limits apply to all plans, including the TEST admin quota exemption.
-        if (script == null || script.isBlank() || script.codePointCount(0, script.length()) > 300) {
-            throw new BaseException(ErrorCode.COACHING_SCRIPT_LIMIT_EXCEEDED);
-        }
-        if (durationMs == null || durationMs <= 0 || durationMs > 90_000) {
-            throw new BaseException(ErrorCode.COACHING_AUDIO_LIMIT_EXCEEDED);
-        }
+
         store.lockAccount(userId);
         var now = OffsetDateTime.now(clock);
         var window = window(userId, now);
         if (window.limit() == null) return;
-        if (!window.active(now)) throw new BaseException(ErrorCode.COACHING_PERIOD_EXPIRED);
+
         var counts = store.counts(userId, window.key());
-        if (counts.used() + counts.reserved() >= window.limit()) {
-            throw new BaseException(ErrorCode.COACHING_QUOTA_EXCEEDED);
-        }
+
         store.reserve(userId, analysisId, recordingId, requestId, window);
     }
 

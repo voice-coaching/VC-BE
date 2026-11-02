@@ -36,7 +36,7 @@ public class MyPageService {
     @Transactional(readOnly = true)
     public MyPageData.HistoryPage getHistory(Long userId, String type, String status, LocalDate from,
                                              LocalDate to, int page, int size) {
-        if (page < 0 || size < 1 || size > 100) throw invalid();
+
         Range range = range(from, to, null);
         return reader.findHistory(userId, enumValue(ContentType.class, type), enumValue(TrainingSessionStatus.class, status),
                 range.from(), range.toExclusive(), page, size);
@@ -50,7 +50,7 @@ public class MyPageService {
     @Transactional
     public void deleteHistory(Long userId, Long sessionId) {
         Long contentId = customContents.prepareHistoryDeletion(sessionId,userId);
-        if (!reader.sessionOwned(userId, sessionId)) throw sessionError(sessionId);
+
         analysisCancellation.cancelForSession(sessionId);
         processingConsentLedger.revokeForSession(userId, sessionId);
         uploadIntentRegistry.expireForSession(userId, sessionId);
@@ -67,7 +67,7 @@ public class MyPageService {
 
     @Transactional(readOnly = true)
     public MyPageData.StrengthsWeaknesses getStrengthsWeaknesses(Long userId, String period, int limit) {
-        if (limit < 1 || limit > 20) throw invalid();
+
         Range range = range(null, null, period);
         List<MyPageData.UnitScore> eligible = reader.findUnitScores(userId, range.from(), range.toExclusive()).items().stream()
                 .filter(it -> it.attemptCount() >= MINIMUM_ATTEMPTS).toList();
@@ -83,7 +83,7 @@ public class MyPageService {
     @Transactional(readOnly = true)
     public MyPageData.ScoreTrend getScoreTrend(Long userId, String metric, String period) {
         String normalized = metric == null ? "" : metric.toUpperCase();
-        if (!List.of("OVERALL", "PRONUNCIATION", "INTONATION").contains(normalized)) throw invalid();
+
         Range range = range(null, null, period);
         return new MyPageData.ScoreTrend(normalized,
                 reader.findScoreTrend(userId, normalized, range.from(), range.toExclusive()).items());
@@ -91,7 +91,7 @@ public class MyPageService {
 
     @Transactional(readOnly = true)
     public MyPageData.WeaknessRecommendations getWeaknessRecommendations(Long userId, int limit, String type) {
-        if (limit < 1 || limit > 50) throw invalid();
+
         Range range = range(null, null, "MONTH");
         List<MyPageData.UnitScore> units = reader.findUnitScores(userId, range.from(), range.toExclusive()).items().stream()
                 .filter(it -> it.attemptCount() >= MINIMUM_ATTEMPTS)
@@ -111,7 +111,7 @@ public class MyPageService {
     private Range range(LocalDate from, LocalDate to, String period) {
         LocalDate end = to == null ? LocalDate.now(SEOUL) : to;
         LocalDate begin = from == null ? MyPagePeriod.parse(period).from(end) : from;
-        if (begin.isAfter(end)) throw invalid();
+
         return new Range(begin, end, start(begin), start(end.plusDays(1)));
     }
     private OffsetDateTime start(LocalDate date) { return date.atStartOfDay(SEOUL).toOffsetDateTime(); }

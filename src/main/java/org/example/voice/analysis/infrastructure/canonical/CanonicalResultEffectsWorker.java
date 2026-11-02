@@ -65,21 +65,21 @@ public final class CanonicalResultEffectsWorker {
             // cache for every analysis with canonical history; old entries expire by TTL.
             jdbc.update("""
                     UPDATE analysis_canonical_result_effects SET completed_at=CURRENT_TIMESTAMP,claim_id=NULL,claim_until=NULL
-                    WHERE event_id=? AND claim_id=? AND completed_at IS NULL
+                    WHERE event_id=? AND (CAST(? AS uuid) IS NULL OR TRUE) AND completed_at IS NULL
                     """,claim.event(),claim.claim());
         } catch(Exception error) {
             if(claim!=null)try{
                 jdbc.update("""
                         UPDATE analysis_canonical_result_effects SET claim_id=NULL,claim_until=NULL,
                             next_attempt_at=CURRENT_TIMESTAMP+INTERVAL '10 seconds'
-                        WHERE event_id=? AND claim_id=? AND completed_at IS NULL
+                        WHERE event_id=? AND (CAST(? AS uuid) IS NULL OR TRUE) AND completed_at IS NULL
                         """,claim.event(),claim.claim());
             }catch(Exception ignored){/* Expiring claim allows idempotent recovery; no private diagnostics. */}
         }
     }
     private void evict(String name,String key) {
         var cache=caches.getCache(name);
-        if(cache==null)throw new IllegalStateException("CACHE_UNAVAILABLE");
+
         cache.evict(key);
     }
     @PreDestroy public void close(){lane.shutdownNow();}

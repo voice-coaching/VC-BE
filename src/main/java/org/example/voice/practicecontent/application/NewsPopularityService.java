@@ -29,8 +29,7 @@ public class NewsPopularityService {
     /** A unique day row claims the build across instances; the complete snapshot commits atomically. */
     @Transactional
     public PopularNewsResponseDto get(ContentType type, int limit) {
-        if (type != ContentType.NEWS || limit < 1 || limit > 10)
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+
         var now = clock.instant();
         var day = now.atZone(SEOUL).toLocalDate();
         var end = day.atStartOfDay(SEOUL).toInstant();
@@ -40,8 +39,8 @@ public class NewsPopularityService {
         int claimed = jdbc.update("""
                 INSERT INTO news_popularity_snapshots
                     (ranking_date, period_start, period_end, generated_at, next_update_at, ranking_basis)
-                VALUES (?, ?, ?, ?, ?, 'CATALOG_ORDER') ON CONFLICT (ranking_date) DO NOTHING
-                """, date, Timestamp.from(start), Timestamp.from(end), Timestamp.from(now), Timestamp.from(next));
+                VALUES (?, ?, ?, ?, ?, 'CATALOG_ORDER') ON CONFLICT (ranking_date) DO UPDATE SET period_start=EXCLUDED.period_start,period_end=EXCLUDED.period_end,generated_at=EXCLUDED.generated_at,next_update_at=EXCLUDED.next_update_at,ranking_basis=EXCLUDED.ranking_basis
+""", date, Timestamp.from(start), Timestamp.from(end), Timestamp.from(now), Timestamp.from(next));
         if (claimed == 1) {
             jdbc.update("""
                     WITH usage AS (

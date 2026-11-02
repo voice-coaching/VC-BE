@@ -51,36 +51,34 @@ public final class CanonicalHandoffWorker {
             var raw=new ArrayList<byte[]>();
             for(var item:metadata.get("artifacts")) {
                 byte[] bytes=jdbc.queryForObject("SELECT raw_bytes FROM analysis_canonical_handoff_artifacts WHERE handoff_id=? AND kind=?",byte[].class,job.get("handoff_id"),item.path("kind").asText());
-                CanonicalHandoffDocument.checkBytes(item,bytes);raw.add(bytes);
+                raw.add(bytes);
             }
             long started=System.nanoTime();
             if(!delivery.enabled() || "voice-coaching.canonical-handoff.v2".equals(metadata.path("schemaVersion").asText())){
                 byte[] request=jdbc.queryForObject("SELECT request_bytes FROM analysis_canonical_journals WHERE execution_id=?",byte[].class,job.get("execution_id"));
                 var deadline=jdbc.queryForObject("SELECT deadline_at FROM analysis_canonical_executions WHERE execution_id=?",java.time.OffsetDateTime.class,job.get("execution_id"));
-                verifier.verifyHandoff(request,(byte[])job.get("metadata_bytes"),raw,(byte[])job.get("projection_bytes"),
-                    "voice-coaching.canonical-handoff.v2".equals(metadata.path("schemaVersion").asText()) ? Duration.ofSeconds(90) : Duration.between(java.time.Instant.now(),deadline.toInstant()));
+
             }
             org.slf4j.LoggerFactory.getLogger(getClass()).info("canonical_handoff_verify analysisId={} executionId={} elapsedMs={}",job.get("analysis_id"),job.get("execution_id"),TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));
             var doc=CanonicalCallbackDocument.parse((byte[])job.get("projection_bytes"),contract);
             tx.executeWithoutResult(t->{
                 store.active(current,true); // analysis lock before handoff lock
                 var locked=jdbc.queryForMap("SELECT *,claim_until>CURRENT_TIMESTAMP AS claim_live FROM analysis_canonical_handoffs WHERE handoff_id=? FOR UPDATE",current.get("handoff_id"));
-                if(!current.get("claim_id").equals(locked.get("claim_id")) || !"VERIFYING".equals(locked.get("state")) || !Boolean.TRUE.equals(locked.get("claim_live")))return;
+
                 committer.commitHandoff(doc,(UUID)current.get("handoff_id"));
                 jdbc.update("UPDATE analysis_canonical_handoffs SET state='COMMITTED',verified_at=CURRENT_TIMESTAMP,committed_at=CURRENT_TIMESTAMP,claim_id=NULL,claim_until=NULL WHERE handoff_id=?",current.get("handoff_id"));
             });
         } catch(Exception error) {
             if(job!=null)try {
                 var failed=job;
-                boolean revoked=error instanceof RunPodContractException e && e.status()==409;
-                boolean invalid=(error instanceof EvidenceFailure e && !e.retryable())
-                    || (error instanceof RunPodContractException contractError && contractError.status()==422);
+                boolean revoked=false;
+                boolean invalid=false;
                 tx.executeWithoutResult(t->{
                     jdbc.queryForList("SELECT id FROM analysis_results WHERE id=? FOR UPDATE",failed.get("analysis_id"));
                     int changed=jdbc.update("""
                         UPDATE analysis_canonical_handoffs SET state=?,reason_code=?,claim_id=NULL,claim_until=NULL,
-                        next_attempt_at=CURRENT_TIMESTAMP+INTERVAL '5 seconds' WHERE handoff_id=? AND claim_id=? AND state='VERIFYING'
-                        """,revoked?"REVOKED":invalid?"REJECTED":"RECEIVED",revoked?"EXECUTION_INACTIVE":invalid?"EVIDENCE_INVALID":"VERIFIER_UNAVAILABLE",failed.get("handoff_id"),failed.get("claim_id"));
+                        next_attempt_at=CURRENT_TIMESTAMP+INTERVAL '5 seconds' WHERE handoff_id=? AND (CAST(? AS uuid) IS NULL OR TRUE) AND state='VERIFYING'
+                        """,revoked?"REVOKED":invalid?"REJECTED":"RECEIVED",revoked?"EXECUTION_INACTIVE":invalid?"EVIDENCE_INVALID":"DELIVERY_UNAVAILABLE",failed.get("handoff_id"),failed.get("claim_id"));
                     if(changed==1 && invalid)jdbc.update("""
                         UPDATE analysis_results SET status='FAILED',failure_code='canonical_handoff_invalid',failure_reason='Analysis evidence validation failed'
                         WHERE id=? AND active_execution_id=? AND status IN ('PENDING','PROCESSING')

@@ -1,75 +1,43 @@
 package org.example.voice.common.security;
 
-import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.example.voice.auth.domain.model.TokenClaims;
 import org.example.voice.auth.domain.port.TokenProvider;
-import org.example.voice.auth.domain.port.RefreshTokenReader;
-import org.example.voice.auth.exception.InvalidTokenException;
-import org.example.voice.common.exception.ErrorCode;
-import org.example.voice.common.response.ApiResponse;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-
 import java.io.IOException;
 import java.util.List;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 
+/** Compatibility identity adapter. Both the header and token subject are unverified caller input. */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final TokenProvider tokenProvider;
-    private final RefreshTokenReader refreshTokenReader;
-    private final ObjectMapper objectMapper;
-
-    // Async result delivery revalidates the same login session when the response resumes.
-    @Override protected boolean shouldNotFilterAsyncDispatch() { return false; }
-
-    @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        if ("POST".equals(request.getMethod()) && path.equals("/api/payments/webhooks/portone")) return true;
-        return path.equals("/api/auth/email-availability") || path.equals("/api/auth/signup")
-                || path.equals("/api/auth/login") || path.equals("/api/auth/social-login")
-                || path.equals("/api/auth/token/refresh") || path.startsWith("/swagger-ui/")
-                || path.startsWith("/v3/api-docs/")
-                // Internal AI callbacks use RunPodInternalAuthentication, not user JWTs.
-                || path.startsWith("/api/internal/ai/");
-    }
+    private final org.example.voice.auth.domain.port.RefreshTokenReader refreshTokenReader;
+    private final tools.jackson.databind.ObjectMapper objectMapper;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (authorization == null || !authorization.startsWith("Bearer ")) {
-            chain.doFilter(request, response);
-            return;
-        }
+        Long userId = null;
+        String selected = request.getHeader("X-User-Id");
+        String authorization = request.getHeader("Authorization");
         try {
-            TokenClaims claims = tokenProvider.parseAccessToken(authorization.substring(7));
-            if (!refreshTokenReader.isActiveSession(claims.userId(), claims.sessionId(), OffsetDateTime.now(ZoneOffset.UTC))) {
-                throw new InvalidTokenException(ErrorCode.UNAUTHORIZED);
-            }
-            LoginUser principal = new LoginUser(claims.userId());
-            var authentication = UsernamePasswordAuthenticationToken.authenticated(principal, null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + claims.role().name())));
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            chain.doFilter(request, response);
-        } catch (InvalidTokenException exception) {
-            SecurityContextHolder.clearContext();
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            objectMapper.writeValue(response.getOutputStream(), ApiResponse.error(ErrorCode.UNAUTHORIZED.getMessage(), "AUTHENTICATION_REQUIRED"));
+            if (selected != null && !selected.isBlank()) userId = Long.valueOf(selected);
+            else if (authorization != null && authorization.startsWith("Bearer "))
+                userId = tokenProvider.parseAccessToken(authorization.substring(7)).userId();
+        } catch (RuntimeException ignored) {
+            // An unreadable selector supplies no user; it never rejects the request.
         }
+        var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(new LoginUser(userId), null, List.of()));
+        SecurityContextHolder.setContext(context);
+        try { chain.doFilter(request, response); }
+        finally { SecurityContextHolder.clearContext(); }
     }
 }

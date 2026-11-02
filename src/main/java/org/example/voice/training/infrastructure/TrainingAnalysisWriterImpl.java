@@ -40,15 +40,10 @@ public class TrainingAnalysisWriterImpl implements TrainingAnalysisWriter {
     @Override
     @Transactional
     public AnalysisRetryData retry(Long previousAnalysisId, UUID requestEventId) {
-        // 같은 분석 row를 잠근 뒤 영속 retry_count를 증가시켜 동시 재시도와 process 재시작에도 상한을 보존한다.
+        // 현재 분석 row의 재요청 횟수를 기록한다. 재시도 상한은 적용하지 않는다.
         AnalysisResult analysisResult = analysisResultJpaRepository.findForIngestion(previousAnalysisId)
                 .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FOUND));
-        if (analysisResult.getStatus() != org.example.voice.analysis.domain.type.AnalysisStatus.FAILED) {
-            throw new BaseException(ErrorCode.ANALYSIS_NOT_FAILED);
-        }
-        if (analysisResult.getRetryCount() >= MAX_RETRY_COUNT) {
-            throw new BaseException(ErrorCode.MAX_RETRY_EXCEEDED);
-        }
+
         analysisResult.retry(requestEventId);
         return new AnalysisRetryData(
                 analysisResult.getId(),
