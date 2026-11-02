@@ -15,6 +15,10 @@ public class AdminMemberPersistence implements AdminMemberStore {
         return ((Number)em.createNativeQuery("select count(*) from users where id=:id and status='ACTIVE' and deleted_at is null")
                 .setParameter("id",userId).getSingleResult()).longValue()==1;
     }
+    public boolean visibleMember(long userId) {
+        return ((Number)em.createNativeQuery("select count(*) from users where id=:id and status<>'WITHDRAWN' and deleted_at is null")
+                .setParameter("id",userId).getSingleResult()).longValue()==1;
+    }
     public Optional<AccountDetails> accountDetails(long userId) {
         var user=em.find(org.example.voice.user.domain.entity.User.class,userId);
         if(user==null) return Optional.empty();
@@ -58,13 +62,22 @@ public class AdminMemberPersistence implements AdminMemberStore {
         return new Page<>(rows.stream().map(row->{var map=new LinkedHashMap<String,Object>();
             for(int i=0;i<names.length;i++)map.put(names[i],scalar(row[i]));return new RecordView(map);}).toList(),page,size,count(userId,p));
     }
-    public List<ResourceCount> counts(long userId) { return Arrays.stream(AdminUserResource.values()).map(r->new ResourceCount(r,count(userId,projection(r)))).toList(); }
+    @SuppressWarnings("unchecked") public List<ResourceCount> counts(long userId) {
+        // Keep the existing per-resource semantics in one DB round trip; no stale member-result cache.
+        var sql=new StringJoiner(" union all ");
+        for(var resource:AdminUserResource.values()) {
+            var p=projection(resource);
+            sql.add("select '"+resource.name()+"',count(*) from "+p.from()+" where "+p.where());
+        }
+        List<Object[]> rows=em.createNativeQuery(sql.toString()).setParameter("user",userId).getResultList();
+        return rows.stream().map(row->new ResourceCount(AdminUserResource.valueOf((String)row[0]),((Number)row[1]).longValue())).sorted(Comparator.comparing(ResourceCount::resource)).toList();
+    }
     private long count(long userId,Projection p) { return ((Number)em.createNativeQuery("select count(*) from "+p.from()+" where "+p.where()).setParameter("user",userId).getSingleResult()).longValue(); }
     @SuppressWarnings("unchecked") public List<IdentifierMatch> resolve(UUID id) {
         String query="select distinct s.user_id from analysis_results a join voice_recordings r on r.id=a.recording_id "
-                +"join training_sessions s on s.id=r.training_session_id where lower(a.active_request_event_id)=:id or lower(a.active_execution_id)=:id or cast(a.canonical_result_event_id as varchar)=:id";
+                +"join training_sessions s on s.id=r.training_session_id join users u on u.id=s.user_id where u.status<>'WITHDRAWN' and u.deleted_at is null and (lower(a.active_request_event_id)=:id or lower(a.active_execution_id)=:id or cast(a.canonical_result_event_id as varchar)=:id)";
         List<Number> analysis=em.createNativeQuery(query).setParameter("id",id.toString()).getResultList();
-        List<Number> direct=em.createNativeQuery("select distinct l.user_id from direct_analysis_history_links l left join direct_analysis_history h on h.job_id=l.job_id where cast(l.job_id as varchar)=:id or cast(h.execution_id as varchar)=:id")
+        List<Number> direct=em.createNativeQuery("select distinct l.user_id from direct_analysis_history_links l left join direct_analysis_history h on h.job_id=l.job_id join users u on u.id=l.user_id where u.status<>'WITHDRAWN' and u.deleted_at is null and (cast(l.job_id as varchar)=:id or cast(h.execution_id as varchar)=:id)")
                 .setParameter("id",id.toString()).getResultList();
         var result=new ArrayList<IdentifierMatch>();analysis.forEach(u->result.add(new IdentifierMatch(u.longValue(),"ANALYSIS")));
         direct.forEach(u->result.add(new IdentifierMatch(u.longValue(),"DIRECT_ANALYSIS")));return List.copyOf(result);

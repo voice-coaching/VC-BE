@@ -20,7 +20,8 @@ public class AdminReadService {
     public Page<Member> users(long actor,UserFilter f) {
         access.require(actor); query(f.query());
         var p=store.users(f);
-        return new Page<>(p.items().stream().map(u -> new Member(u,memberships.read(u.id()),List.of())).toList(),p.page(),p.size(),p.totalElements());
+        var levels=memberships.readAll(p.items().stream().map(UserView::id).toList());
+        return new Page<>(p.items().stream().map(u -> new Member(u,levels.getOrDefault(u.id(),Membership.free()),List.of())).toList(),p.page(),p.size(),p.totalElements());
     }
     public Member user(long actor,long id) {
         access.require(actor); var u=store.user(id).orElseThrow(AdminReadService::missing);

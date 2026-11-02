@@ -30,11 +30,11 @@ public class AdminPersistence implements AdminStore {
 
     @Override public Page<UserView> users(UserFilter f) {
         var p = new LinkedHashMap<String,Object>();
-        String where=" where 1=1" + keyword(f.query(),p,"u.email","u.nickname","cast(u.id as string)")
+        String where=" where u.status<>org.example.voice.user.domain.type.UserStatus.WITHDRAWN and u.deletedAt is null" + keyword(f.query(),p,"u.email","u.nickname","cast(u.id as string)")
                 + eq(p,"status",f.status(),"u.status") + eq(p,"role",f.role(),"u.role");
         return page("User","u",where,"u.createdAt desc,u.id desc",p,f.query(),User.class,this::userView);
     }
-    @Override public Optional<UserView> user(long id) { return Optional.ofNullable(em.find(User.class,id)).map(this::userView); }
+    @Override public Optional<UserView> user(long id) { return Optional.ofNullable(em.find(User.class,id)).filter(u->u.getStatus()!=UserStatus.WITHDRAWN && u.getDeletedAt()==null).map(this::userView); }
     private UserView userView(User u) {
         String email=u.getEmail();
         if(email!=null) { int at=email.indexOf('@'); email=at>0?email.substring(0,1)+"***"+email.substring(at):"***"; }

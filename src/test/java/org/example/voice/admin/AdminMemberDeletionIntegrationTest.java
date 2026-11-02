@@ -57,7 +57,7 @@ class AdminMemberDeletionIntegrationTest {
         });
     }
     @Test void deletesTheMemberAndRetriesUsingOnlyTheReceiptWithoutPublicWithdrawal() throws Exception {
-        String body=body(target,updated,"회원 요청 확인");
+        String body=body(updated,"회원 요청 확인");
         mvc.perform(delete("/api/admin/users/{id}",target).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"))
             .andExpect(jsonPath("$.data.userId").value(target)).andExpect(jsonPath("$.data.alreadyDeleted").value(false));
@@ -68,29 +68,29 @@ class AdminMemberDeletionIntegrationTest {
         verify(deletion,times(1)).deleteDatabaseRecords(target);verifyNoInteractions(publicWithdrawal);
         assertThat(em.createQuery("select count(a) from AdminAuditLog a where a.action='USER_DELETE' and a.targetId=:id",Long.class).setParameter("id",Long.toString(target)).getSingleResult()).isEqualTo(1);
     }
-    @Test void authenticationConfirmationFreshnessAndSelfGuardsPrecedeDeletion() throws Exception {
-        mvc.perform(delete("/api/admin/users/{id}",target).contentType(MediaType.APPLICATION_JSON).content(body(target,updated,"삭제"))).andExpect(status().isUnauthorized());
-        mvc.perform(delete("/api/admin/users/{id}",target).with(auth(target,"USER")).contentType(MediaType.APPLICATION_JSON).content(body(target,updated,"삭제"))).andExpect(status().isForbidden());
-        mvc.perform(delete("/api/admin/users/{id}",target).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body(actor,updated,"삭제"))).andExpect(status().isBadRequest());
-        mvc.perform(delete("/api/admin/users/{id}",target).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body(target,updated.minusSeconds(1),"삭제"))).andExpect(status().isConflict());
-        mvc.perform(delete("/api/admin/users/{id}",actor).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body(actor,updated,"삭제")))
+    @Test void authenticationReasonFreshnessAndSelfGuardsPrecedeDeletion() throws Exception {
+        mvc.perform(delete("/api/admin/users/{id}",target).contentType(MediaType.APPLICATION_JSON).content(body(updated,"삭제"))).andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/admin/users/{id}",target).with(auth(target,"USER")).contentType(MediaType.APPLICATION_JSON).content(body(updated,"삭제"))).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/admin/users/{id}",target).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body(updated," "))).andExpect(status().isBadRequest());
+        mvc.perform(delete("/api/admin/users/{id}",target).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body(updated.minusSeconds(1),"삭제"))).andExpect(status().isConflict());
+        mvc.perform(delete("/api/admin/users/{id}",actor).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body(updated,"삭제")))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ADMIN_SELF_DELETION_NOT_ALLOWED"));
-        mvc.perform(delete("/api/admin/users/{id}",Long.MAX_VALUE).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body(Long.MAX_VALUE,updated,"삭제"))).andExpect(status().isNotFound());
+        mvc.perform(delete("/api/admin/users/{id}",Long.MAX_VALUE).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body(updated,"삭제"))).andExpect(status().isNotFound());
         verify(deletion,never()).deleteDatabaseRecords(anyLong());verifyNoInteractions(publicWithdrawal);
     }
     @Test void legacyMemberWithoutUpdatedTimestampUsesAnExplicitNullPrecondition() throws Exception {
         em.createQuery("update User u set u.updatedAt=null where u.id=:id").setParameter("id",target).executeUpdate();em.refresh(em.find(User.class,target));
-        mvc.perform(delete("/api/admin/users/{id}",target).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body(target,null,"삭제")))
+        mvc.perform(delete("/api/admin/users/{id}",target).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body(null,"삭제")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.alreadyDeleted").value(false));
     }
     @Test @Transactional(propagation=Propagation.NOT_SUPPORTED)
     void auditFailureRollsBackDeletion() throws Exception {
         doThrow(new org.springframework.dao.DataAccessResourceFailureException("test")).when(audit).audit(argThat(a->"USER_DELETE".equals(a.getAction())));
-        mvc.perform(delete("/api/admin/users/{id}",target).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body(target,updated,"삭제"))).andExpect(status().isServiceUnavailable());
+        mvc.perform(delete("/api/admin/users/{id}",target).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body(updated,"삭제"))).andExpect(status().isServiceUnavailable());
         new TransactionTemplate(manager).executeWithoutResult(tx->{assertThat(em.find(User.class,target).getStatus()).isEqualTo(UserStatus.ACTIVE);});
     }
-    private String body(long confirm,OffsetDateTime at,String reason) throws Exception {
-        var data=new LinkedHashMap<String,Object>();data.put("confirmationUserId",confirm);data.put("expectedUpdatedAt",at==null?null:at.toString());data.put("reason",reason);
+    private String body(OffsetDateTime at,String reason) throws Exception {
+        var data=new LinkedHashMap<String,Object>();data.put("expectedUpdatedAt",at==null?null:at.toString());data.put("reason",reason);
         return new tools.jackson.databind.ObjectMapper().writeValueAsString(data);
     }
     private RequestPostProcessor auth(long id,String role) {

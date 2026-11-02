@@ -22,8 +22,24 @@ class TestMembershipServiceTest {
     private final UserReader users = mock(UserReader.class);
     private final TestMembershipGrantReader grants = mock(TestMembershipGrantReader.class);
     private final Clock clock = Clock.fixed(OffsetDateTime.parse("2026-10-28T00:00:00Z").toInstant(), ZoneOffset.UTC);
-    private final TestMembershipService service = new TestMembershipService(policy, orders, users, clock, grants);
+    private final org.example.voice.payment.domain.port.MembershipFactsReader facts=mock(org.example.voice.payment.domain.port.MembershipFactsReader.class);
+    private final TestMembershipService service = new TestMembershipService(policy, orders, users, clock, grants, facts);
 
+    @Test void batchPreservesGrantPriorityEligibilityInactiveAndMissingRulesWithoutPerUserReads() {
+        var until=OffsetDateTime.now(clock).plusDays(10);
+        when(facts.readAll(anyCollection(),any())).thenReturn(java.util.List.of(
+            new org.example.voice.payment.domain.model.MembershipFact(1,true,true,until),
+            new org.example.voice.payment.domain.model.MembershipFact(2,true,false,until),
+            new org.example.voice.payment.domain.model.MembershipFact(3,true,false,until),
+            new org.example.voice.payment.domain.model.MembershipFact(4,false,true,until)));
+        when(policy.eligible(2L)).thenReturn(true);
+        var levels=service.readAll(java.util.List.of(1L,2L,3L,4L,5L));
+        assertThat(levels.get(1L).type()).isEqualTo("admin");assertThat(levels.get(2L).type()).isEqualTo("paid");
+        assertThat(levels.get(2L).expiresAt()).isEqualTo(until);
+        assertThat(levels.get(3L).type()).isEqualTo("free");assertThat(levels.get(4L).type()).isEqualTo("free");assertThat(levels.get(5L).type()).isEqualTo("free");
+        verify(facts,times(1)).readAll(anyCollection(),any());verifyNoInteractions(users,grants,orders);
+        clearInvocations(facts);assertThat(service.readAll(java.util.List.of())).isEmpty();verifyNoInteractions(facts);
+    }
     @Test void existingGrantIsAdminUsageTierWithoutEnablingPaymentsOrChangingRole() {
         var user = User.createLocal("fixture@example.invalid", "hash", "fixture", OffsetDateTime.now(clock));
         when(users.findById(1L)).thenReturn(Optional.of(user));
