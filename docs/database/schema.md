@@ -2138,3 +2138,13 @@ PostgreSQL 18의 `pg_restore --schema-only --no-owner --no-privileges --file=<�
 
 - 테이블 60개, 컬럼 612개, FK 64개, 명시적 인덱스 41개, 트리거 33개를 백업 DDL과 대조했다.
 - 문서의 행 집계는 백업 시점의 데이터다. 현재 운영 DB나 인증된 HTTP 요청 결과를 직접 확인한 것으로 해석하지 않는다.
+
+
+## V66: 관리자 회원 DB 삭제
+
+- 신규 `admin_member_deletion_receipts`: admin 소유 최소 삭제 확인 기록. soft delete 없음. `user_id BIGINT PRIMARY KEY`(필수, FK 없음, 기본값 없음)와 `deleted_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP` 두 컬럼이다. 사용자 삭제 후에도 재요청의 처리 결과를 확인하며 개인정보·인증정보·업무 본문을 저장하지 않는다. PK 외 추가 인덱스/enum은 없다.
+- `admin_notification_campaigns.created_by`, `admin_popups.created_by`: BIGINT FK는 유지하고 NOT NULL만 해제한다. 해당 작성자 회원이 삭제되면 공용 게시물을 보존하며 참조를 null로 갱신한다. 전역 CASCADE 정책 변경은 없다.
+- `prevent_admin_audit_mutation`: 일반 불변 정책은 유지한다. DB 삭제 함수의 트랜잭션 설정이 가리키는 현재 회원의 작업·회원 대상 기록 DELETE만 허용하며 새 삭제 작업은 별도 최소 감사 기록으로 남긴다.
+- `admin_purge_member_database(BIGINT)`: 선택 회원의 연관 데이터를 하위 관계부터 지우는 PostgreSQL 함수. 트랜잭션 임시 실행 식별자 테이블은 함수 종료/커밋 때 제거하며, 외부 파일 삭제는 호출하지 않는다. 실패 시 전체 롤백한다.
+- V61이 기존 FK/불변 트리거를 제거한 현행 정책을 전제로 하며, 공유 개인 콘텐츠·다른 회원 데이터는 명시적으로 보호한다. 기존 마이그레이션은 수정하지 않는다.
+- [DB 삭제 범위와 보존 경계](../api/admin-communications-and-members.md)를 함께 확인한다.

@@ -16,7 +16,7 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
     CONFLICT(HttpStatus.CONFLICT, "요청이 기존 처리 내용과 충돌합니다."),
     ADMIN_STORE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "관리자 정보를 안전하게 처리할 수 없습니다. 잠시 후 다시 시도해 주세요."),
-    ADMIN_SELF_WITHDRAWAL_NOT_ALLOWED(HttpStatus.CONFLICT, "현재 로그인한 관리자 본인의 계정은 여기서 탈퇴 처리할 수 없습니다."),
+    ADMIN_SELF_DELETION_NOT_ALLOWED(HttpStatus.CONFLICT, "현재 로그인한 관리자 본인의 계정은 여기서 삭제할 수 없습니다."),
     ADMIN_EDIT_CONFLICT(HttpStatus.CONFLICT, "대상 상태가 변경되었거나 수정할 수 없습니다. 다시 조회해 주세요."),
     ADMIN_AUDIO_INVALID(HttpStatus.UNPROCESSABLE_ENTITY, "업로드한 음성 파일의 형식·해시·길이를 확인해 주세요."),
     ADMIN_AUDIO_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "기준 음성 저장소 또는 검증 기능을 사용할 수 없습니다."),

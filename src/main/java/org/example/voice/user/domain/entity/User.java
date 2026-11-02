@@ -112,8 +112,6 @@ public class User {
         this.status = UserStatus.WITHDRAWN;
         this.email = null;
         this.password = null;
-        this.nickname = "탈퇴한 회원";
-        this.profileImageUrl = null;
         this.deletedAt = now;
         this.updatedAt = now;
     }

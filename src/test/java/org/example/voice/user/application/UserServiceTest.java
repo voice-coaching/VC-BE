@@ -117,8 +117,6 @@ class UserServiceTest {
         assertThat(user.isWithdrawn()).isTrue();
         assertThat(user.getEmail()).isNull();
         assertThat(user.getPassword()).isNull();
-        assertThat(user.getNickname()).isEqualTo("탈퇴한 회원");
-        assertThat(user.getProfileImageUrl()).isNull();
         verify(userWriter).save(user);
         verify(loginIdentityRevoker).revokeForUser(1L);
         verify(userSessionRevoker).revokeAll(1L);

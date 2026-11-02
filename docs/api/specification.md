@@ -2164,3 +2164,8 @@ FE는 지원 범위를 녹음/업로드 전에 확인하고, 위 필드가 빠�
 ## 관리자 콘텐츠 수정·삭제 (이슈 #173)
 
 V65부터 공용 콘텐츠 전체 유형을 공개 상태와 관계없이 수정할 수 있다. `DELETE /api/admin/contents/{contentId}`는 `{version,reason}`을 받아 삭제 시각을 기록하고 일반/관리자 목록·상세와 신규 연습에서 제외한다. 기존 학습/분석/음성 DB 행은 보존한다. 원문 수정 시 예전 기준 음성을 제외하고 기존 공용 세션의 원문은 snapshot으로 유지한다. [상세 계약](../api/admin-content-edit-delete.md)을 따른다.
+
+
+## DELETE /api/admin/users/{userId}
+
+활성 관리자 전용 회원 DB 삭제. path userId는 양의 회원 번호이며 query는 없다. 요청 confirmationUserId(필수 양의 정수), expectedUpdatedAt(ISO 시각 또는 null), reason(필수 1~500자)을 받고 200 data {userId:number, deletedAt:ISO string, alreadyDeleted:boolean}을 반환한다. 확인 번호/사유 오류400, 미인증401, 권한없음403, 미존재404, 자기계정/수정시각 충돌409, 저장소 장애는 기존 관리자 오류 응답을 따른다. 다른 회원과 공용 콘텐츠, 외부 원본 파일은 삭제하지 않는다. 최소 삭제 확인·작업 기록은 보존한다. 필드·오류 코드·DB 관계의 상세 계약은 [회원 관리](admin-communications-and-members.md#6-회원-상세-보완-및-db-완전-삭제-175)를 따른다.
