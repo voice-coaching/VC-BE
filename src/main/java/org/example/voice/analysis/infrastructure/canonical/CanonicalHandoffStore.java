@@ -29,24 +29,60 @@ public class CanonicalHandoffStore {
     }
     private Snapshot receiveLocked(long analysis,UUID worker,CanonicalHandoffDocument doc,boolean deferred) {
         var id=doc.projection().identity();
-        jdbc.update("""
+        if (analysis != id.analysisId() || !Objects.equals(worker, id.workerId()))
+            throw new RunPodContractException(409, "WORKER_CONFLICT");
+        // Keep the analysis -> handoff lock order used by the commit worker.
+        if (jdbc.queryForList("SELECT id FROM analysis_results WHERE id=? FOR UPDATE", analysis).isEmpty())
+            throw new RunPodContractException(404, "TARGET_NOT_FOUND");
+        // V61 removed non-primary uniqueness; retain one immutable handoff per execution/event here.
+        var conflicts = jdbc.queryForList("""
+                SELECT handoff_id,handoff_sha256 FROM analysis_canonical_handoffs
+                WHERE execution_id=? OR event_id=? FOR UPDATE
+                """, id.executionId(), id.eventId());
+        for (var existing : conflicts) {
+            if (!doc.id().equals(existing.get("handoff_id")) || !doc.digest().equals(existing.get("handoff_sha256")))
+                throw new RunPodContractException(409, "RESULT_EVENT_CONFLICT");
+        }
+        int inserted = jdbc.update("""
             INSERT INTO analysis_canonical_handoffs(handoff_id,execution_id,event_id,request_id,analysis_id,worker_instance_id,
-                metadata_bytes,projection_bytes,handoff_sha256,reserved_bytes,state,received_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,'RECEIVED',CURRENT_TIMESTAMP)
-            ON CONFLICT(handoff_id) DO UPDATE SET execution_id=EXCLUDED.execution_id,event_id=EXCLUDED.event_id,
-                request_id=EXCLUDED.request_id,analysis_id=EXCLUDED.analysis_id,worker_instance_id=EXCLUDED.worker_instance_id,
-                metadata_bytes=EXCLUDED.metadata_bytes,projection_bytes=EXCLUDED.projection_bytes,handoff_sha256=EXCLUDED.handoff_sha256,
-                reserved_bytes=EXCLUDED.reserved_bytes,state='RECEIVED',received_at=CURRENT_TIMESTAMP,claim_id=NULL,claim_until=NULL,reason_code=NULL
+                metadata_bytes,projection_bytes,handoff_sha256,reserved_bytes,state)
+            VALUES (?,?,?,?,?,?,?,?,?,?,'STAGING') ON CONFLICT DO NOTHING
             """,doc.id(),id.executionId(),id.eventId(),id.requestId(),analysis,worker,doc.metadataBytes(),doc.projection().bytes(),doc.digest(),doc.reservedBytes());
+        if (inserted == 0) {
+            var rows = jdbc.queryForList("""
+                    SELECT handoff_id,handoff_sha256,state,execution_id,event_id,request_id,analysis_id,worker_instance_id
+                    FROM analysis_canonical_handoffs WHERE handoff_id=? FOR UPDATE
+                    """, doc.id());
+            if (rows.isEmpty()) throw new RunPodContractException(409, "RESULT_EVENT_CONFLICT");
+            var current = rows.getFirst();
+            if (!doc.digest().equals(current.get("handoff_sha256"))
+                    || !id.executionId().equals(current.get("execution_id"))
+                    || !id.eventId().equals(current.get("event_id"))
+                    || !id.requestId().equals(current.get("request_id"))
+                    || analysis != ((Number) current.get("analysis_id")).longValue()
+                    || !worker.equals(current.get("worker_instance_id")))
+                throw new RunPodContractException(409, "RESULT_EVENT_CONFLICT");
+            // Replaying a received/claimed/terminal handoff must never reset it to RECEIVED.
+            if (!"STAGING".equals(current.get("state"))) return snapshot(current);
+            return resumeStaging(doc, current, deferred);
+        }
+        var values = new ArrayList<String>();
+        var args = new ArrayList<Object>();
+        boolean complete = true;
         for(var item:doc.metadata().path("artifacts")) {
             String kind=item.path("kind").asText();
-            jdbc.update("""
-                INSERT INTO analysis_canonical_handoff_artifacts(handoff_id,kind,schema_version,sha256,byte_size,raw_bytes)
-                VALUES (?,?,?,?,?,?) ON CONFLICT(handoff_id,kind) DO UPDATE SET schema_version=EXCLUDED.schema_version,
-                    sha256=EXCLUDED.sha256,byte_size=EXCLUDED.byte_size,raw_bytes=EXCLUDED.raw_bytes
-                """,doc.id(),kind,item.path("schemaVersion").asText(),item.path("sha256").asText(),item.path("byteSize").asInt(),doc.inline().get(kind));
+            byte[] raw = doc.inline().get(kind);
+            complete &= raw != null;
+            values.add("(?,?,?,?,?,?)");
+            Collections.addAll(args, doc.id(), kind, item.path("schemaVersion").asText(),
+                    item.path("sha256").asText(), item.path("byteSize").asInt(), raw);
         }
-        return new Snapshot(doc.id(),doc.digest(),"RECEIVED");
+        if (!values.isEmpty()) jdbc.update("""
+                INSERT INTO analysis_canonical_handoff_artifacts(handoff_id,kind,schema_version,sha256,byte_size,raw_bytes)
+                VALUES
+                """ + String.join(",", values), args.toArray());
+        if (complete) return sealLocked(analysis, doc.id(), id.executionId(), doc.digest());
+        return new Snapshot(doc.id(), doc.digest(), "STAGING");
     }
     /** Resume a partial handoff with one ownership check and one update for all missing originals. */
     private Snapshot resumeStaging(CanonicalHandoffDocument doc,Map<String,Object> current,boolean deferred) {
@@ -60,10 +96,15 @@ public class CanonicalHandoffStore {
             String kind=(String)row.get("kind");present.add(kind);
             byte[] incoming=doc.inline().get(kind);byte[] stored=(byte[])row.get("raw_bytes");
             if(incoming!=null) {
-
+                if (incoming.length != ((Number) row.get("byte_size")).intValue()
+                        || !CanonicalCallbackDocument.sha256(incoming).equals(row.get("sha256")))
+                    throw new RunPodContractException(422, "VALIDATION_FAILED");
+                if (stored != null && !Arrays.equals(incoming, stored))
+                    throw new RunPodContractException(409, "PAYLOAD_DIGEST_MISMATCH");
                 if(stored==null) {values.add("(?::varchar(40),?::bytea)");Collections.addAll(args,kind,incoming);}
             } else if(stored==null)complete=false;
         }
+        if (!expected.equals(present)) throw new RunPodContractException(422, "VALIDATION_FAILED");
 
         if(!values.isEmpty() || complete) {
             long analysis=((Number)current.get("analysis_id")).longValue();
@@ -113,6 +154,7 @@ public class CanonicalHandoffStore {
     @Transactional(timeout=5)
     public Snapshot status(long analysis,UUID handoff,UUID worker){return snapshot(owned(analysis,handoff,worker));}
     private Map<String,Object> owned(long analysis,UUID handoff,UUID worker) {
+        jdbc.queryForList("SELECT id FROM analysis_results WHERE id=? FOR UPDATE",analysis);
         var rows=jdbc.queryForList("SELECT * FROM analysis_canonical_handoffs WHERE handoff_id=? AND analysis_id=?",handoff,analysis);
 
         var row=rows.getFirst();

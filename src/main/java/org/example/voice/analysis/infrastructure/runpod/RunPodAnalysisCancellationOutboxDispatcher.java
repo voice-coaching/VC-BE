@@ -1,6 +1,6 @@
 package org.example.voice.analysis.infrastructure.runpod;
 
-import lombok.RequiredArgsConstructor;
+import jakarta.annotation.PreDestroy;
 import org.example.voice.analysis.domain.type.AnalysisCancellationOutboxStatus;
 import org.example.voice.analysis.infrastructure.AnalysisCancellationOutboxJpaRepository;
 import org.example.voice.analysis.infrastructure.AnalysisRequestOutboxJpaRepository;
@@ -12,8 +12,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
+@lombok.extern.slf4j.Slf4j
 @ConditionalOnProperty(prefix = "analysis", name = "transport", havingValue = "runpod_http")
 public class RunPodAnalysisCancellationOutboxDispatcher {
     private final AnalysisCancellationOutboxJpaRepository cancellations;
@@ -21,6 +26,12 @@ public class RunPodAnalysisCancellationOutboxDispatcher {
     private final RunPodAnalysisClient client;
     private final RunPodAnalysisProperties properties;
     private final TransactionTemplate transactions;
+    private final AtomicBoolean running = new AtomicBoolean();
+    private final ExecutorService lane = Executors.newSingleThreadExecutor(task -> {
+        var thread = new Thread(task, "runpod-cancellation-delivery");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     public RunPodAnalysisCancellationOutboxDispatcher(AnalysisCancellationOutboxJpaRepository cancellations,
             AnalysisRequestOutboxJpaRepository requests, RunPodAnalysisClient client,
@@ -34,6 +45,22 @@ public class RunPodAnalysisCancellationOutboxDispatcher {
 
     @Scheduled(fixedDelayString = "${analysis.runpod.outbox-poll-interval:PT1S}")
     public void dispatchPending() {
+        if (!running.compareAndSet(false, true)) return;
+        try {
+            lane.execute(() -> {
+                try { dispatchBatch(); }
+                catch (RuntimeException failure) {
+                    log.warn("runpod_cancellation_deferred type={}", failure.getClass().getSimpleName());
+                }
+                finally { running.set(false); }
+            });
+        } catch (RejectedExecutionException shutdown) {
+            running.set(false);
+        }
+    }
+
+    /** Worker HTTP must never occupy the scheduler shared by admissions and timeouts. */
+    private void dispatchBatch() {
         for (int i = 0; i < properties.getBatchSize(); i++) {
             Delivery delivery = transactions.execute(status -> cancellations
                     .findFirstByStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(
@@ -62,6 +89,9 @@ public class RunPodAnalysisCancellationOutboxDispatcher {
                     }));
         }
     }
+
+    @PreDestroy
+    public void close() { lane.shutdownNow(); }
 
     private record Delivery(String requestId, String executionId) {}
 }

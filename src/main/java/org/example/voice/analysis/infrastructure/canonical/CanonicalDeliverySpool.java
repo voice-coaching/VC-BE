@@ -69,6 +69,22 @@ public final class CanonicalDeliverySpool {
     }
     public synchronized CanonicalHandoffStore.Snapshot receive(long analysis,UUID worker,CanonicalHandoffDocument doc){
         try {
+            var identity = doc.projection().identity();
+            if (identity.analysisId()!=analysis || !identity.workerId().equals(worker))
+                throw new RunPodContractException(409,"WORKER_CONFLICT");
+            var existing = entries.get(doc.id());
+            if (existing != null) {
+                if (!existing.document.digest().equals(doc.digest())
+                        || !existing.document.projection().identity().equals(identity))
+                    throw new RunPodContractException(409,"RESULT_EVENT_CONFLICT");
+                // Re-delivery must not replace the entry and lose submitted/committed/backoff state.
+                if (existing.receivedAt!=null || existing.rejected || existing.committed) return snapshot(existing);
+                for (var item:doc.inline().entrySet()) stage(analysis,doc.id(),worker,item.getKey(),item.getValue());
+                boolean complete=true;
+                for (var item:doc.metadata().path("artifacts"))
+                    complete &= Files.exists(existing.directory.resolve(item.path("kind").asText()));
+                return complete?seal(analysis,doc.id(),worker):snapshot(existing);
+            }
             Path directory=root.resolve(doc.id().toString());
             Files.createDirectories(directory);
             var node=json.createObjectNode();node.set("metadata",doc.metadata());node.put("handoffSha256",doc.digest());
@@ -79,11 +95,29 @@ public final class CanonicalDeliverySpool {
             boolean complete=true;
             for(var item:doc.metadata().path("artifacts"))complete &= Files.exists(directory.resolve(item.path("kind").asText()));
             return complete?seal(analysis,doc.id(),worker):snapshot(entry);
-        }catch(Exception error){throw unavailable();}
+        }catch(RunPodContractException error){throw error;}
+        catch(Exception error){throw unavailable();}
     }
     public synchronized void stage(long analysis,UUID id,UUID worker,String kind,byte[] raw){
-        var entry=entries.get(id);
-        try { atomic(entry.directory.resolve(kind),raw); }
+        var entry=owned(analysis,id,worker);
+        com.fasterxml.jackson.databind.JsonNode metadata=null;
+        for (var item:entry.document.metadata().path("artifacts"))
+            if (item.path("kind").asText().equals(kind)) metadata=item;
+        if (!KINDS.contains(kind) || metadata==null || raw.length!=metadata.path("byteSize").asInt()
+                || !CanonicalCallbackDocument.sha256(raw).equals(metadata.path("sha256").asText()))
+            throw new RunPodContractException(422,"VALIDATION_FAILED");
+        try {
+            var target=entry.directory.resolve(kind);
+            if (Files.exists(target)) {
+                if (!Arrays.equals(read(target,16*1024*1024),raw))
+                    throw new RunPodContractException(409,"PAYLOAD_DIGEST_MISMATCH");
+                return;
+            }
+            if (entry.receivedAt!=null || entry.rejected || entry.committed)
+                throw new RunPodContractException(409,"RESULT_ALREADY_FINALIZED");
+            atomic(target,raw);
+        }
+        catch(RunPodContractException error){throw error;}
         catch(Exception error){throw unavailable();}
     }
     public synchronized CanonicalHandoffStore.Snapshot seal(long analysis,UUID id,UUID worker){
@@ -120,7 +154,14 @@ public final class CanonicalDeliverySpool {
     public boolean verified(UUID handoff,String digest){ return entries.containsKey(handoff); }
     public boolean contains(UUID handoff){return entries.containsKey(handoff);}
     public void reject(Entry e){try{atomic(e.directory.resolve("rejected"),new byte[]{1});e.rejected=true;e.verified=false;}catch(Exception error){throw unavailable();}}
-    private Entry owned(long analysis,UUID id,UUID worker){var e=entries.get(id);return e;}
+    private Entry owned(long analysis,UUID id,UUID worker){
+        var e=entries.get(id);
+        if (e==null) throw new RunPodContractException(404,"TARGET_NOT_FOUND");
+        var identity=e.document.projection().identity();
+        if (identity.analysisId()!=analysis || !identity.workerId().equals(worker))
+            throw new RunPodContractException(409,"WORKER_CONFLICT");
+        return e;
+    }
 
     private static CanonicalHandoffStore.Snapshot snapshot(Entry e){return new CanonicalHandoffStore.Snapshot(e.document.id(),e.document.digest(),e.committed?"COMMITTED":e.rejected?"REJECTED":e.receivedAt==null?"STAGING":"RECEIVED");}
 
