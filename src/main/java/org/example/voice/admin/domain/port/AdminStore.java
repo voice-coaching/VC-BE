@@ -19,6 +19,7 @@ public interface AdminStore {
     boolean categoryExists(ContentType type, String code);
     PracticeContent lockContent(long id);
     void saveContent(PracticeContent content);
+    void retireReferenceAudios(long contentId, java.time.OffsetDateTime now);
     ContentView view(PracticeContent content);
     Page<NoticeView> notices(NoticeFilter filter);
     Optional<NoticeView> notice(long id);

@@ -14,8 +14,8 @@ public class AdminContentCacheInvalidation implements AdminContentInvalidation {
     @Override public void afterContentChange() {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() {
-                for(String name: java.util.List.of(PracticeContentCacheNames.DETAIL,PracticeContentCacheNames.NEXT,
-                        PracticeContentCacheNames.RECOMMENDATIONS,PracticeContentCacheNames.EXISTS,HomeCacheNames.RECOMMENDATIONS)) {
+                for(String name: java.util.List.of(PracticeContentCacheNames.LIST,PracticeContentCacheNames.REFERENCE_AUDIO_LIST,PracticeContentCacheNames.DETAIL,PracticeContentCacheNames.NEXT,
+                        PracticeContentCacheNames.RECOMMENDATIONS,PracticeContentCacheNames.EXISTS,org.example.voice.mypage.infrastructure.cache.MyPageCacheNames.RECOMMENDATIONS,HomeCacheNames.RECOMMENDATIONS)) {
                     try { var cache=caches.getCache(name); if(cache!=null)cache.clear(); }
                     catch(RuntimeException error) {
                         // The DB/audit transaction is already committed. Never imply a safe write retry.

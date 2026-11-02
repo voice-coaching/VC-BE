@@ -47,11 +47,13 @@ public class PracticeExamplePersistence implements PracticeExampleReader {
                     .setParameter("step", stepId).setParameter("now", OffsetDateTime.now(clock)).setMaxResults(1).getResultStream().findFirst().orElse(null)
                     : em.find(PracticeExampleSet.class, pinned.getFirst());
         }
+        if(set==null) throw PracticeExampleException.missing();
         var entries = entries(set);
         return new Examples(courseId, stepId, set.getRevision(), entries.stream().map(e -> new Item(e.getId(), e.getOrder(), e.getContent().getScriptText(), e.getHint(), e.getFocus(), e.getLocale(), e.getContent().getId())).toList());
     }
     public Snapshot published(String id) {
         var example = em.find(PracticeExample.class, id);
+        if(example==null || example.getContent().getDeletedAt()!=null) throw PracticeExampleException.missing();
 
         step(example.getSet().getStepId());
         entries(example.getSet());
@@ -67,7 +69,7 @@ public class PracticeExamplePersistence implements PracticeExampleReader {
     }
     private List<PracticeExample> entries(PracticeExampleSet set) {
 
-        var entries = em.createQuery("select e from PracticeExample e join fetch e.content where e.set.id=:set order by e.order", PracticeExample.class)
+        var entries = em.createQuery("select e from PracticeExample e join fetch e.content where e.set.id=:set and e.content.deletedAt is null order by e.order", PracticeExample.class)
                 .setParameter("set", set.getId()).getResultList();
 
         for (int i = 0; i < entries.size(); i++) {

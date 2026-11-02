@@ -10,4 +10,5 @@ public interface ReferenceAudioJpaRepository extends JpaRepository<ReferenceAudi
     List<ReferenceAudio> findByContentIdOrderByPrimaryDescIdAsc(Long contentId);
 
     boolean existsByContentId(Long contentId);
+    boolean existsByContentIdAndRetiredAtIsNull(Long contentId);
 }

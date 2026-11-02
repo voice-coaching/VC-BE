@@ -117,8 +117,29 @@ public class PracticeContent {
         customTitle=null; customScript=null; customDeletedAt=now; updatedAt=now;
     }
 
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
+
+    @Column(name = "tts_revision", nullable = false, columnDefinition = "integer default 1")
+    private int ttsRevision = 1;
+
+    public void delete(OffsetDateTime now) {
+        if (ownerId != null || deletedAt != null) throw new IllegalStateException("CONTENT_NOT_EDITABLE");
+        deletedAt = now; status = PublishStatus.HIDDEN; updatedAt = now;
+    }
+
+    /** Published public content remains editable; private ownership is a separate boundary. */
+    public void editPublic(LearningFocus focus, String category, Difficulty difficulty, String title,
+            String description, String script, List<String> targets, Integer seconds, OffsetDateTime now) {
+        if (ownerId != null || deletedAt != null) throw new IllegalStateException("CONTENT_NOT_EDITABLE");
+        if (!java.util.Objects.equals(scriptText, script)) ttsRevision++;
+        this.learningFocus = focus; this.category = category; this.difficulty = difficulty;
+        this.title = title; this.description = description; this.scriptText = script;
+        this.targetPronunciations = List.copyOf(targets); this.estimatedSeconds = seconds; this.updatedAt = now;
+    }
+
     public boolean isPublished() {
-        return ownerId == null && status == PublishStatus.PUBLISHED;
+        return ownerId == null && deletedAt == null && status == PublishStatus.PUBLISHED;
     }
 
     public static PracticeContent draft(ContentType type, LearningFocus focus, String category, Difficulty difficulty,
@@ -141,7 +162,7 @@ public class PracticeContent {
     }
 
     public void changePublication(PublishStatus target, OffsetDateTime now) {
-        if (ownerId != null || target == PublishStatus.DRAFT || target == null
+        if (ownerId != null || deletedAt != null || target == PublishStatus.DRAFT || target == null
                 || (target == PublishStatus.HIDDEN && status == PublishStatus.DRAFT))
             throw new IllegalStateException("INVALID_PUBLICATION_STATE");
         status = target;

@@ -2160,3 +2160,7 @@ FE는 지원 범위를 녹음/업로드 전에 확인하고, 위 필드가 빠�
 | GET | `/api/admin/users/{userId}/records` | resource enum 필수, page/size, 허용된 소유 기록 메타데이터 |
 
 일반/요금제 알림 kind는 GENERAL/PLAN이며 전체 ALL_ACTIVE 또는 개별 SELECTED_USERS 최대500명이다. user_notifications의 ADMIN_GENERAL/ADMIN_PLAN을 기존 GET /api/notifications로 조회한다. 외부 푸시·결제 자동 알림은 포함하지 않는다. 팝업 기간1~365일, 서버 endsAt 계산, 로그인 회원 게시 조건 검사. 회원 ID를 UUID로 바꾸거나 비밀정보를 전체 반환하지 않는다.
+
+## 관리자 콘텐츠 수정·삭제 (이슈 #173)
+
+V65부터 공용 콘텐츠 전체 유형을 공개 상태와 관계없이 수정할 수 있다. `DELETE /api/admin/contents/{contentId}`는 `{version,reason}`을 받아 삭제 시각을 기록하고 일반/관리자 목록·상세와 신규 연습에서 제외한다. 기존 학습/분석/음성 DB 행은 보존한다. 원문 수정 시 예전 기준 음성을 제외하고 기존 공용 세션의 원문은 snapshot으로 유지한다. [상세 계약](../api/admin-content-edit-delete.md)을 따른다.

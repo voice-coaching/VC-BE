@@ -51,7 +51,7 @@ public class NewsPopularityService {
                         JOIN practice_contents c ON c.id=t.content_id
                         WHERE t.status='COMPLETED' AND t.completed_at>=? AND t.completed_at<?
                           AND u.status='ACTIVE' AND u.deleted_at IS NULL
-                          AND c.content_type='NEWS' AND c.status='PUBLISHED' AND c.owner_id IS NULL
+                          AND c.content_type='NEWS' AND c.status='PUBLISHED' AND c.owner_id IS NULL AND c.deleted_at IS NULL
                           AND (c.published_at IS NULL OR c.published_at<=?)
                         GROUP BY t.content_id
                     )
@@ -61,7 +61,7 @@ public class NewsPopularityService {
                             c.published_at DESC NULLS LAST, c.created_at DESC, c.id DESC
                     ), COALESCE(u.usage_count,0)
                     FROM practice_contents c LEFT JOIN usage u ON u.content_id=c.id
-                    WHERE c.content_type='NEWS' AND c.status='PUBLISHED' AND c.owner_id IS NULL
+                    WHERE c.content_type='NEWS' AND c.status='PUBLISHED' AND c.owner_id IS NULL AND c.deleted_at IS NULL
                       AND (c.published_at IS NULL OR c.published_at<=?)
                     """, Timestamp.from(start), Timestamp.from(end), Timestamp.from(now), date, Timestamp.from(now));
             jdbc.update("""
@@ -79,7 +79,7 @@ public class NewsPopularityService {
                 SELECT c.*, COALESCE(i.usage_count,0) AS usage_count
                 FROM practice_contents c LEFT JOIN news_popularity_items i
                   ON i.content_id=c.id AND i.ranking_date=?
-                WHERE c.content_type='NEWS' AND c.status='PUBLISHED' AND c.owner_id IS NULL
+                WHERE c.content_type='NEWS' AND c.status='PUBLISHED' AND c.owner_id IS NULL AND c.deleted_at IS NULL
                   AND (c.published_at IS NULL OR c.published_at<=?)
                 ORDER BY CASE WHEN i.position IS NULL THEN 1 ELSE 0 END, i.position,
                     c.published_at DESC NULLS LAST, c.created_at DESC, c.id DESC LIMIT ?

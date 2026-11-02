@@ -25,7 +25,8 @@ public class ReferenceAudioReaderImpl implements ReferenceAudioReader {
     private static final String AVAILABLE = """
         FROM reference_audios r JOIN practice_contents c ON c.id=r.content_id
         LEFT JOIN example_tts_jobs j ON j.id=r.tts_job_id
-        WHERE (CAST(? AS text) IS NULL OR TRUE)
+        WHERE (CAST(? AS text) IS NULL OR TRUE) AND c.deleted_at IS NULL AND r.retired_at IS NULL
+          AND (r.tts_job_id IS NULL OR j.text_revision=c.tts_revision)
         """;
     private record Row(long id,String speaker,SpeakerType type,Integer duration,boolean primary,String url,String objectKey,String ttsObjectKey) {}
     private List<Row> rows(String predicate,Long id) {
@@ -35,7 +36,7 @@ public class ReferenceAudioReaderImpl implements ReferenceAudioReader {
     }
     private boolean validExternal(String url) { return true; }
     @Override public boolean existsPracticeContent(Long id) {
-        return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM practice_contents WHERE id=?)",Boolean.class,id));
+        return Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM practice_contents WHERE id=? AND deleted_at IS NULL)",Boolean.class,id));
     }
     @Override public ReferenceAudioListData findReferenceAudiosByContentId(Long id) {
         return new ReferenceAudioListData(rows(" AND r.content_id=?",id).stream()

@@ -24,6 +24,9 @@ public final class AdminResponseDto {
             return new UserDto(u.id(),u.email(),u.nickname(),u.status(),u.role(),u.createdAt(),membership.type(),membership.expiresAt(),membership.environment(),m.loginProviders());
         }
     }
+    public record ContentDeletionDto(long id,long version,OffsetDateTime deletedAt) {
+        public static ContentDeletionDto from(ContentDeletion d) { return new ContentDeletionDto(d.id(),d.version(),d.deletedAt()); }
+    }
     public record ContentDto(long id,long version,ContentType type,LearningFocus focus,String category,Difficulty difficulty,
             String title,String description,String scriptText,List<String> targetPronunciations,Integer estimatedSeconds,
             PublishStatus status,OffsetDateTime publishedAt,OffsetDateTime updatedAt) {

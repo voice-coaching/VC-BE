@@ -38,7 +38,7 @@ class NewsPopularitySnapshotRegressionTest {
         schema="popular_snapshot_"+UUID.randomUUID().toString().replace("-","");
         admin=new JdbcTemplate(new DriverManagerDataSource(url,user,password));
         var migration=Flyway.configure().dataSource(url,user,password).schemas(schema).defaultSchema(schema)
-                .locations("classpath:db/migration").target("61").load();
+                .locations("classpath:db/migration").target("65").load();
         migration.migrate();migration.validate();
         var db=new DriverManagerDataSource(url+(url.contains("?")?"&":"?")+"currentSchema="+schema,user,password);
         jdbc=new JdbcTemplate(db);tx=new TransactionTemplate(new DataSourceTransactionManager(db));

@@ -50,18 +50,22 @@ public class AdminPersistence implements AdminStore {
 
     @Override public Page<ContentView> contents(ContentFilter f) {
         var p=new LinkedHashMap<String,Object>();
-        String where=" where c.ownerId is null" + keyword(f.query(),p,"c.title")
+        String where=" where c.ownerId is null and c.deletedAt is null" + keyword(f.query(),p,"c.title")
                 + eq(p,"type",f.type(),"c.contentType") + eq(p,"category",f.category(),"c.category")
                 + eq(p,"status",f.status(),"c.status") + eq(p,"difficulty",f.difficulty(),"c.difficulty");
         return page("PracticeContent","c",where,"c.createdAt desc,c.id desc",p,f.query(),PracticeContent.class,this::view);
     }
     @Override public Optional<ContentView> content(long id) {
-        return em.createQuery("select c from PracticeContent c where c.id=:id and c.ownerId is null",PracticeContent.class)
+        return em.createQuery("select c from PracticeContent c where c.id=:id and c.ownerId is null and c.deletedAt is null",PracticeContent.class)
                 .setParameter("id",id).getResultStream().findFirst().map(this::view);
     }
     @Override public PracticeContent lockContent(long id) {
-        return em.createQuery("select c from PracticeContent c where c.id=:id and c.ownerId is null",PracticeContent.class)
+        return em.createQuery("select c from PracticeContent c where c.id=:id and c.ownerId is null and c.deletedAt is null",PracticeContent.class)
                 .setParameter("id",id).setLockMode(LockModeType.PESSIMISTIC_WRITE).getResultStream().findFirst().orElseThrow(AdminPersistence::missing);
+    }
+    @Override public void retireReferenceAudios(long contentId, java.time.OffsetDateTime now) {
+        em.createQuery("update ReferenceAudio r set r.retiredAt=:now, r.primary=false where r.content.id=:id and r.retiredAt is null")
+                .setParameter("now",now).setParameter("id",contentId).executeUpdate();
     }
     @Override public void saveContent(PracticeContent c) { em.persist(c); }
     @Override public ContentView view(PracticeContent c) {

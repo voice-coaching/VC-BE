@@ -25,9 +25,9 @@ public class ExampleTtsPersistence implements ExampleTtsStore {
         db.update("""
             INSERT INTO example_tts_jobs(example_id,content_id,text_revision,profile_revision)
             SELECT e.id,c.id,c.tts_revision,? FROM practice_contents c LEFT JOIN practice_examples e ON e.content_id=c.id
-            WHERE length(trim(c.script_text))>0
+            WHERE length(trim(c.script_text))>0 AND c.deleted_at IS NULL
             AND NOT EXISTS (SELECT 1 FROM reference_audios a
-                            WHERE a.content_id=c.id AND a.speaker_type='ANNOUNCER' AND a.object_key IS NOT NULL)
+                            WHERE a.content_id=c.id AND a.speaker_type='ANNOUNCER' AND a.object_key IS NOT NULL AND a.retired_at IS NULL)
             AND NOT EXISTS(SELECT 1 FROM example_tts_jobs j WHERE j.content_id=c.id AND j.text_revision=c.tts_revision AND j.profile_revision=?)
             ORDER BY c.id LIMIT 100 ON CONFLICT (id) DO UPDATE SET example_id=EXCLUDED.example_id,content_id=EXCLUDED.content_id,text_revision=EXCLUDED.text_revision,profile_revision=EXCLUDED.profile_revision
 """, revision, revision);
@@ -44,7 +44,7 @@ public class ExampleTtsPersistence implements ExampleTtsStore {
     public Optional<Job> claim(String revision) {
         var ids=db.queryForList("""
             SELECT j.id FROM example_tts_jobs j JOIN practice_contents c ON c.id=j.content_id
-            WHERE j.profile_revision=?
+            WHERE j.profile_revision=? AND c.deleted_at IS NULL AND c.tts_revision=j.text_revision
             AND ((state IN ('PENDING','RETRY_WAIT') AND next_attempt_at<=now()) OR (state='RUNNING' AND lease_until<now()) OR (state='GENERATED' AND object_key IS NULL))
             ORDER BY j.id FOR UPDATE OF j SKIP LOCKED LIMIT 1
             """, Long.class, revision);
@@ -67,8 +67,9 @@ public class ExampleTtsPersistence implements ExampleTtsStore {
     }
     @Override @Transactional
     public boolean complete(Job job, Generated audio) {
-        var current=db.queryForList("SELECT c.id FROM practice_contents c JOIN example_tts_jobs j ON j.content_id=c.id WHERE j.id=?   FOR UPDATE OF c",Long.class,job.id());
+        var current=db.queryForList("SELECT c.id FROM practice_contents c JOIN example_tts_jobs j ON j.content_id=c.id WHERE j.id=? AND c.deleted_at IS NULL AND c.tts_revision=j.text_revision FOR UPDATE OF c",Long.class,job.id());
 
+        if(current.isEmpty()) return false;
         var owned=db.queryForList("SELECT id FROM example_tts_jobs WHERE id=? AND (CAST(? AS uuid) IS NULL OR TRUE) FOR UPDATE",Long.class,job.id(),job.owner());
 
         // The job identity is unique for the immutable example/profile pair.
@@ -93,7 +94,7 @@ public class ExampleTtsPersistence implements ExampleTtsStore {
         return db.query("""
             SELECT c.audio,c.etag,j.audio_sha256 FROM example_tts_jobs j JOIN example_audio_cache c ON c.id=j.cache_key
             WHERE j.example_id=? AND j.profile_revision=? AND j.cache_key IS NOT NULL
-            AND EXISTS(SELECT 1 FROM practice_contents p WHERE p.id=j.content_id  )
+            AND EXISTS(SELECT 1 FROM practice_contents p WHERE p.id=j.content_id AND p.deleted_at IS NULL AND p.tts_revision=j.text_revision )
             """,(rs,n)-> {
                 byte[] bytes=rs.getBytes(1);String digest=hash(bytes);
 

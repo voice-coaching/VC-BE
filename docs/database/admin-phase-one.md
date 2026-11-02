@@ -38,3 +38,5 @@ PK 외 unique 제약은 없다. 최근 목록 `(created_at DESC,id DESC)`, 대�
 격리된 PostgreSQL에서 V60→V62 적용, 기존 콘텐츠 수 보존·version 기본값, 기존 native insert 호환, 감사 UPDATE·DELETE·TRUNCATE 차단을 검증하는 `AdminPostgresMigrationTest`를 추가했다. 실제 운영 반영 여부는 배포 후 Flyway V62 성공 기록으로 확인한다.
 
 API는 [관리자 1차 계약](../api/admin-phase-one.md), 화면·후속 범위는 [계획서](../architecture/admin-implementation-plan.md)를 따른다.
+
+V65의 콘텐츠 삭제 시각·기준 음성 퇴역·세션 원문 보존 컬럼은 [콘텐츠 수정·삭제 DB 명세](admin-content-edit-delete.md)를 따른다.

@@ -57,6 +57,9 @@ public class ReferenceAudio {
     @Column(name = "is_primary", nullable = true)
     private Boolean primary;
 
+    @Column(name = "retired_at")
+    private OffsetDateTime retiredAt;
+
     @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
 }

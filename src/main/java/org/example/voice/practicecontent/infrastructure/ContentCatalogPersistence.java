@@ -74,7 +74,7 @@ public class ContentCatalogPersistence implements ContentCatalogReader {
     }
 
     private String where(Filter filter) {
-        return " where c.status=org.example.voice.practicecontent.domain.type.PublishStatus.PUBLISHED and c.ownerId is null and (c.publishedAt is null or c.publishedAt<=:now)"
+        return " where c.status=org.example.voice.practicecontent.domain.type.PublishStatus.PUBLISHED and c.ownerId is null and c.deletedAt is null and (c.publishedAt is null or c.publishedAt<=:now)"
                 +(filter.type()==null?"":" and c.contentType=:type")
                 +(category(filter)?" and c.category=:category":"")
                 +(filter.difficulty()==null?"":" and c.difficulty=:difficulty")
