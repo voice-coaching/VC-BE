@@ -20,6 +20,7 @@ import jakarta.annotation.PreDestroy;
 
 /** Observe a confirmed worker failure without waiting for a lease timeout. Never re-submit inference. */
 @Component
+@lombok.extern.slf4j.Slf4j
 @ConditionalOnProperty(prefix="analysis", name="transport", havingValue="runpod_http")
 public class RunPodExecutionFailureReconciler {
     private final JdbcTemplate jdbc;
@@ -68,8 +69,11 @@ public class RunPodExecutionFailureReconciler {
     }
 
     private void apply(Attempt attempt) {
-        results.findForIngestion(attempt.analysisId()).ifPresent(result -> result.fail("runpod_execution_failed",
-                "분석 실행 중 오류가 발생했습니다.",null,null));
+        results.findForIngestion(attempt.analysisId()).ifPresent(result -> {
+            result.fail("runpod_execution_failed","분석 실행 중 오류가 발생했습니다.",null,null);
+            org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,"analysis_failed",result.getId(),
+                    result.getActiveRequestEventId(),result.getActiveExecutionId(),"runpod_execution_failed");
+        });
     }
 
     @PreDestroy public void close(){lane.shutdownNow();}
