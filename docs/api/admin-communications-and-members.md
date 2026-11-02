@@ -252,3 +252,26 @@ Content-Type: application/json
 **회원 행과 학습·평가·결제 기록은 보존한다. DB에서 회원 및 모든 연관 기록을 물리 삭제하는 기능이 아니다.** 탈퇴 회원도 관리자에서 보존 기록을 조회할 수 있다. 모든 기존 개인정보 컬럼을 일괄 삭제한다고 안내하지 않는다. 실제 운영 탈퇴는 별도 관리자의 명시적 화면 조작으로만 수행한다.
 
 프론트는 확인창에서 처리 범위와 보존 기록을 설명하고 회원 번호·사유를 받는다. 성공하면 회원 상세·목록 캐시를 갱신한다. 화면 용어만 한글화하며 API의 영문 상태·분류·필드 계약은 유지한다. 관리 권한 ADMIN과 시험 이용권 admin은 계속 구분한다.
+
+
+## 7. 추가 요구 반영 및 미완료 범위
+
+사용자가 회원 및 관련 데이터의 **완전 삭제**를 선택했다. 앞 절의 기록 보존형 탈퇴 API는 이 요구를 충족하지 않는다. BE PR #177과 FE PR #96은 초안으로 전환했으며, 완전 삭제 구현으로 안내하거나 배포하지 않는다.
+
+완전 삭제 범위에 AI 서버·별도 보관소의 원본 파일이 포함되는지 확인 중이다. Canonical 실행·수신·결과·이관·보관 기록에는 수정 및 삭제를 차단하는 트리거가 있고, 일부 원본은 사용자 FK 없이 보존된다. `users` 행만 삭제하거나 FK만 일괄 CASCADE로 바꾸면 완전 삭제가 되지 않는다. 삭제 방지 장치 해제나 운영 데이터 삭제는 실행하지 않았다.
+
+### 업무 기록 조회 확대
+
+기존 13개 구분에 아래 7개를 추가하여 총 20개 구분을 조회한다. 기존 `GET /api/admin/users/{userId}/records?resource=...`의 관리자 인증·회원별 조건·페이지 계약을 사용한다.
+
+| resource | 화면 | 반환 필드 |
+| --- | --- | --- |
+| ONBOARDING | 학습 목표 | id, currentLevel, goalText, dailyGoalMinutes, weeklyGoalCount, completedAt, updatedAt |
+| SCRIPT_LIBRARY | 내 문장 보관함 | contentId, topicId, createdAt, updatedAt, deletedAt |
+| NOTIFICATION_SETTINGS | 알림 설정 | userId, enabled, reminderTime, weekdays, timezone, updatedAt |
+| PROCESSING_CONSENTS | 정보 처리 동의 | id, sessionId, recordingId, scope, policyRevision, grantedAt, revokedAt |
+| MEMBERSHIP_GRANTS | 시험 이용권 부여 | userId, grantedAt |
+| PROFILE_IMAGES | 프로필 사진 내역 | id, sizeBytes, state, createdAt, activatedAt, cleanupAfter |
+| ANALYSIS_SEGMENTS | 구간별 평가 | id, analysisId, sequenceNo, startMs, endMs, matchType, resultStatus, errorType, pronunciationScore, intonationScore, feedback |
+
+회원 소유의 업무 기록을 조회하는 계약이며 내부 저장 테이블 전체를 그대로 덤프하지 않는다. 비밀번호·토큰·비밀키·동의 영수증 해시·푸시 전송 비밀·제공자 내부 ID·원본 저장 경로·암호문은 반환하지 않는다. 내부 처리용 outbox와 재시도 원장은 관리자 업무 기록으로 노출하지 않는다. 이 조회 확장에는 DB 마이그레이션이 필요하지 않다.
