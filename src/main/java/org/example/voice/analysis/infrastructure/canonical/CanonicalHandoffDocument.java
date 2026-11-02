@@ -38,7 +38,12 @@ public record CanonicalHandoffDocument(JsonNode metadata, byte[] metadataBytes,
     }
     public UUID id(){return uuid(metadata,"handoffId");}
     public long reservedBytes(){long size=metadataBytes.length+projection.bytes().length;for(var a:metadata.get("artifacts"))size+=a.path("byteSize").asLong();return size;}
-    public static void checkBytes(JsonNode meta,byte[] raw){}
+    public static void checkBytes(JsonNode meta,byte[] raw){
+        if (raw==null || !CanonicalDeliverySpool.KINDS.contains(meta.path("kind").asText())
+                || raw.length<1 || raw.length>16*1024*1024 || raw.length!=meta.path("byteSize").asLong()
+                || !CanonicalCallbackDocument.sha256(raw).equals(meta.path("sha256").asText()))
+            throw new RunPodContractException(422,"PAYLOAD_DIGEST_MISMATCH");
+    }
     public static byte[] bytes(JsonNode node){return node.toString().getBytes(StandardCharsets.UTF_8);}
     public static UUID uuid(JsonNode node,String key){return UUID.fromString(node.path(key).asText());}
 

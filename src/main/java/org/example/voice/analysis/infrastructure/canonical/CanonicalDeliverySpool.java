@@ -54,6 +54,7 @@ public final class CanonicalDeliverySpool {
 
         owner=FileChannel.open(root.resolve("owner.lock"),StandardOpenOption.CREATE,StandardOpenOption.WRITE);
         ownership=owner.tryLock();
+        if (ownership==null) throw new java.io.IOException("Delivery spool already owned");
         try(var children=Files.list(root)){
             for(var p:children.filter(x->Files.isDirectory(x,LinkOption.NOFOLLOW_LINKS) && !x.getFileName().toString().startsWith(".")).toList()){
                 UUID id=UUID.fromString(p.getFileName().toString());
@@ -61,7 +62,7 @@ public final class CanonicalDeliverySpool {
 
                 var entry=new Entry(doc,p);reserved+=doc.reservedBytes();
                 if(Files.exists(p.resolve("received")))entry.receivedAt=Instant.parse(new String(read(p.resolve("received"),100),java.nio.charset.StandardCharsets.UTF_8));
-                entry.rejected=false;
+                entry.rejected=Files.exists(p.resolve("rejected"),LinkOption.NOFOLLOW_LINKS);
                 entries.put(id,entry); // Recheck current execution ownership after every restart.
             }
         }
@@ -135,7 +136,10 @@ public final class CanonicalDeliverySpool {
     public List<byte[]> originals(Entry e){
         var bytes=new ArrayList<byte[]>();
         try{for(var meta:e.document.metadata().get("artifacts")){
+            if (!KINDS.contains(meta.path("kind").asText()))
+                throw new RunPodContractException(422,"VALIDATION_FAILED");
             var raw=read(e.directory.resolve(meta.path("kind").asText()),16*1024*1024);
+            CanonicalHandoffDocument.checkBytes(meta,raw);
             bytes.add(raw);
         }}catch(RunPodContractException error){throw error;}catch(Exception error){throw unavailable();}return bytes;
     }
@@ -146,12 +150,18 @@ public final class CanonicalDeliverySpool {
     }
     public Collection<Entry> entries(){return List.copyOf(entries.values());}
     public Entry current(AnalysisResult result){
-        return entries.values().stream().filter(e -> e.document.projection().identity().analysisId()==result.getId())
-                .reduce((a,b)->b).orElse(null);
+        return entries.values().stream()
+                .filter(e -> e.receivedAt!=null && e.verified && !e.rejected
+                        && CanonicalResultAttempt.visible(result,e.document.projection()))
+                .max(Comparator.comparing((Entry e)->e.receivedAt).thenComparing(e->e.document.id()))
+                .orElse(null);
     }
     public boolean resultAvailable(AnalysisResult result){var e=current(result);return e!=null && e.verified;}
     public boolean owns(long analysis,UUID execution){return ready && entries.values().stream().anyMatch(e->!e.rejected && e.receivedAt!=null && e.document.projection().identity().analysisId()==analysis && e.document.projection().identity().executionId().equals(execution));}
-    public boolean verified(UUID handoff,String digest){ return entries.containsKey(handoff); }
+    public boolean verified(UUID handoff,String digest){
+        var e=entries.get(handoff);
+        return e!=null && e.receivedAt!=null && e.verified && !e.rejected && e.document.digest().equals(digest);
+    }
     public boolean contains(UUID handoff){return entries.containsKey(handoff);}
     public void reject(Entry e){try{atomic(e.directory.resolve("rejected"),new byte[]{1});e.rejected=true;e.verified=false;}catch(Exception error){throw unavailable();}}
     private Entry owned(long analysis,UUID id,UUID worker){
@@ -165,7 +175,13 @@ public final class CanonicalDeliverySpool {
 
     private static CanonicalHandoffStore.Snapshot snapshot(Entry e){return new CanonicalHandoffStore.Snapshot(e.document.id(),e.document.digest(),e.committed?"COMMITTED":e.rejected?"REJECTED":e.receivedAt==null?"STAGING":"RECEIVED");}
 
-    private static byte[] read(Path p,int limit)throws Exception{return Files.readAllBytes(p);}
+    private static byte[] read(Path p,int limit)throws Exception{
+        try (var input=Files.newInputStream(p,StandardOpenOption.READ,LinkOption.NOFOLLOW_LINKS)) {
+            var bytes=input.readNBytes(limit+1);
+            if (bytes.length>limit) throw new RunPodContractException(422,"VALIDATION_FAILED");
+            return bytes;
+        }
+    }
     private static void atomic(Path target,byte[] bytes)throws Exception{
         Path temporary=Files.createTempFile(target.getParent(),".pending-","",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
         try{
