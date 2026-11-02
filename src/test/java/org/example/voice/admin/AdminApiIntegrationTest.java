@@ -6,7 +6,6 @@ import org.example.voice.admin.domain.model.AdminData.ContentDraft;
 import org.example.voice.admin.domain.port.AdminStore;
 import org.example.voice.admin.infrastructure.AdminPersistence;
 import org.example.voice.admin.domain.entity.AdminAuditLog;
-import org.example.voice.common.security.LoginUser;
 import org.example.voice.payment.domain.entity.TestMembershipGrant;
 import org.example.voice.practicecontent.domain.entity.*;
 import org.example.voice.practicecontent.domain.type.*;
@@ -21,8 +20,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.*;
@@ -35,7 +32,6 @@ import java.time.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -44,6 +40,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdminApiIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired EntityManager em;
+    @Autowired org.example.voice.auth.application.TokenService tokenService;
+    @Autowired org.example.voice.auth.domain.port.TokenProvider tokenProvider;
     @Autowired ObjectMapper json;
     @Autowired AdminContentService contents;
     @Autowired AdminReadService reads;
@@ -69,6 +67,20 @@ class AdminApiIntegrationTest {
             }
             em.flush();
         });
+    }
+    @Test void requestSelectorsAndUnsignedTokensCannotAuthorizeAdministrator() throws Exception {
+        mvc.perform(get("/api/admin/me").header("X-User-Id",actor)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/me").header("Authorization","Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0."))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/me").with(auth(owner,"USER")).header("X-User-Id",actor))
+                .andExpect(status().isForbidden());
+    }
+    @Test void revokedSessionCannotAccessAdministratorApi() throws Exception {
+        var issued = tokenService.issueSession(em.find(User.class,actor));
+        tokenService.revoke(actor,null);
+        em.flush();
+        mvc.perform(get("/api/admin/me").header("Authorization","Bearer "+issued.accessToken()))
+                .andExpect(status().isUnauthorized());
     }
     @Test void currentDatabaseRoleAndStatusAreRequiredEvenWithAdminToken() throws Exception {
         mvc.perform(get("/api/admin/me")).andExpect(status().isUnauthorized());
@@ -175,6 +187,8 @@ class AdminApiIntegrationTest {
         return json.writeValueAsString(data);
     }
     private RequestPostProcessor auth(long id,String role) {
-        return authentication(UsernamePasswordAuthenticationToken.authenticated(new LoginUser(id),null,List.of(new SimpleGrantedAuthority("ROLE_"+role))));
+        var issued = tokenService.issueSession(em.find(User.class,id));
+        String token = tokenProvider.reissue(id, UserRole.valueOf(role), issued.sessionId()).accessToken();
+        return request -> { request.addHeader("Authorization", "Bearer " + token); return request; };
     }
 }

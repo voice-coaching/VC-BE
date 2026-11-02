@@ -2,7 +2,7 @@
 
 ## 범위와 권한
 
-백엔드 API 구현이다. 프론트 UI와 운영 발송은 수행하지 않았다. 기본 관리자 API 및 아나운서 음성 관리에 이어 V63을 적용한다. 최신 develop `6ae98d1`의 코칭 사용량·인기 뉴스 기능을 보존한다.
+백엔드 API 구현이다. 프론트 UI와 운영 발송은 수행하지 않았다. 기본 관리자 API 및 아나운서 음성 관리에 이어 V64을 적용한다. 최신 develop `6ae98d1`의 코칭 사용량·인기 뉴스 기능을 보존한다.
 
 관리자 경로는 JWT `ROLE_ADMIN`과 현재 DB의 `users.role=ADMIN`, `status=ACTIVE`, `deleted_at IS NULL`을 모두 확인한다. 테스트 이용등급 `membershipType=admin`은 관리자 권한이 아니다. 모든 정상 응답은 `ApiResponse`와 `Cache-Control: no-store`를 사용한다. 생성 201, 나머지 200이다. 목록은 `page=0`, `size=20`, 최대 100이다.
 
@@ -179,4 +179,4 @@ PAYMENTS와 CANCELLATIONS는 현재 TEST 결제 원장이다. 운영 실결제 �
 
 ## 5. 반영 상태
 
-별도 브랜치 `feat/admin-phase-one-api`에서 구현했다. rebase 기준 원격 develop은 `6ae98d1`이다. 기존 사용자 문서 변경은 보존했고 프론트 수정·실제 발송·운영 DB 실행·배포는 수행하지 않았다. V61/V62/V63을 적용하는 백엔드 배포와 프론트 UI 연결 후 환경별 확인이 필요하다. 실제 관리자 계정 지정도 별도 관리 절차를 따른다.
+별도 브랜치 `feat/admin-phase-one-api`에서 구현했다. rebase 기준 원격 develop은 `6ae98d1`이다. 기존 사용자 문서 변경은 보존했고 프론트 수정·실제 발송·운영 DB 실행·배포는 수행하지 않았다. V62/V63/V64을 적용하는 백엔드 배포와 프론트 UI 연결 후 환경별 확인이 필요하다. 실제 관리자 계정 지정도 별도 관리 절차를 따른다.

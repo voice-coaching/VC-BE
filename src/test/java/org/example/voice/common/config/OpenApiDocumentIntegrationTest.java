@@ -140,7 +140,7 @@ class OpenApiDocumentIntegrationTest {
                 assertThat(field.getValue().path("tags").get(0).asText()).containsPattern("[가-힣]");
             }
         }
-        assertThat(operationCount).isEqualTo(136);
+        assertThat(operationCount).isEqualTo(139);
         var popularity = paths.path("/api/practice-contents/popular").path("get");
         assertThat(popularity.path("summary").asText()).isEqualTo("일별 인기 뉴스 순위 조회");
         assertThat(popularity.path("security").toString()).contains("bearerAuth");
@@ -206,13 +206,10 @@ class OpenApiDocumentIntegrationTest {
     }
 
     @Test
-    void productionDefaultDoesNotExposeTestHistoryEvenToAuthenticatedUser() throws Exception {
-        var authentication = org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
-                new org.example.voice.common.security.LoginUser(1L), null, java.util.List.of());
-        mockMvc.perform(get("/api/users/me/payment-orders").with(
-                        org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(authentication)))
-                .andExpect(status().isForbidden()).andExpect(
-                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("TEST_PAYMENT_DISABLED"));
+    void paymentHistoryRetainsMainReadPolicy() throws Exception {
+        mockMvc.perform(get("/api/users/me/payment-orders").header("X-User-Id","1"))
+                .andExpect(status().isOk()).andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.items").isArray());
     }
 
     @Test

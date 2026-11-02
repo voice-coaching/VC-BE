@@ -27,12 +27,12 @@ class AdminCommunicationsPostgresTest {
         var root=new JdbcTemplate(new DriverManagerDataSource(url,user,password));
         var factory=new LocalContainerEntityManagerFactoryBean();
         try {
-            var flyway=Flyway.configure().dataSource(url,user,password).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").target("62").load();
+            var flyway=Flyway.configure().dataSource(url,user,password).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").target("63").load();
             flyway.migrate();
             var db=new DriverManagerDataSource(url+(url.contains("?")?"&":"?")+"currentSchema="+schema,user,password);
             var jdbc=new JdbcTemplate(db);
             long before=jdbc.queryForObject("select count(*) from users",Long.class);
-            flyway=Flyway.configure().dataSource(url,user,password).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").target("63").load();
+            flyway=Flyway.configure().dataSource(url,user,password).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").target("64").load();
             flyway.migrate();flyway.validate();
             assertThat(jdbc.queryForObject("select count(*) from users",Long.class)).isEqualTo(before);
             factory.setDataSource(db);

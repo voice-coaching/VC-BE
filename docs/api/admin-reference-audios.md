@@ -4,7 +4,7 @@
 
 관리자가 한국어 문장과 직접 녹음한 아나운서 음성을 등록한다. 공용 `ANNOUNCER` 콘텐츠만 지원하며 일반 문장·클래스·회원 개인 원고에는 이 API를 사용하지 않는다. 프론트 UI·클래스 묶음·AI 비교 채점·TTS 생성 기능을 추가한 작업은 아니다.
 
-문장 생성·공개는 [관리자 1차 API](admin-phase-one.md)를 재사용한다. 배포에는 V61·V62이 필요하다. 권한은 JWT ROLE_ADMIN과 현재 DB ACTIVE ADMIN을 모두 요구한다. 테스트 이용등급 admin은 접근 권한이 아니다. 음성 파일은 private S3, DB에는 재생 URL 대신 object key를 저장한다.
+문장 생성·공개는 [관리자 1차 API](admin-phase-one.md)를 재사용한다. 배포에는 V62·V63이 필요하다. 권한은 JWT ROLE_ADMIN과 현재 DB ACTIVE ADMIN을 모두 요구한다. 테스트 이용등급 admin은 접근 권한이 아니다. 음성 파일은 private S3, DB에는 재생 URL 대신 object key를 저장한다.
 
 ## 등록 흐름
 
@@ -173,7 +173,7 @@ Path: audioId 필수. Query 없음. Body: `{version: long, reason: string}` 모�
 GET /api/admin/reference-audios/{audioId}/playback-url
 ```
 
-Path: audioId 필수. Query/body 없음. 성공 200. data는 `audioId:long`, `playbackUrl:string`, `expiresAt:offset datetime`이며 모두 non-null이다. private S3의 약 10분 재생 URL이다. 공개 전 초안·숨김 콘텐츠도 실제 관리자만 미리 들을 수 있다. 이 URL을 DB·감사 기록·영구 클라이언트 상태에 저장하지 않는다.
+Path: audioId 필수. Query/body 없음. 성공 200. data는 `audioId:long`, `playbackUrl:string`, `expiresAt:offset datetime`이며 모두 non-null이다. private S3의 약 10분 재생 URL이다. 이 관리자 경로는 공개 전 초안·숨김 콘텐츠도 실제 관리자에게 미리듣기를 제공한다. 다만 main의 기존 일반 기준 음성 조회에는 공개 상태 필터가 없어, 일반 경로를 통한 초안 접근까지 차단하는 계약은 아니다. 이 URL을 DB·감사 기록·영구 클라이언트 상태에 저장하지 않는다.
 
 공개 후 일반 사용자는 기존 API를 그대로 사용한다.
 

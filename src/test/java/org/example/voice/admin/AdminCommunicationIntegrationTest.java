@@ -4,7 +4,6 @@ import jakarta.persistence.EntityManager;
 import org.example.voice.admin.application.*;
 import org.example.voice.admin.domain.model.AdminCommunicationData.*;
 import org.example.voice.admin.domain.type.*;
-import org.example.voice.common.security.LoginUser;
 import org.example.voice.user.domain.entity.User;
 import org.example.voice.user.domain.type.*;
 import org.junit.jupiter.api.*;
@@ -12,8 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.*;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -21,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -30,6 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdminCommunicationIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired EntityManager em;
+    @Autowired org.example.voice.auth.application.TokenService tokenService;
+    @Autowired org.example.voice.auth.domain.port.TokenProvider tokenProvider;
     @Autowired AdminCommunicationService service;
     long actor,member,inactive;
     @BeforeEach void fixture() {
@@ -112,5 +110,7 @@ class AdminCommunicationIntegrationTest {
         ReflectionTestUtils.setField(user,"status",status);ReflectionTestUtils.setField(user,"role",role);em.persist(user);return user.getId();
     }
     private long inbox(long id) { em.flush();return em.createQuery("select count(n) from UserNotification n where n.userId=:id",Long.class).setParameter("id",id).getSingleResult(); }
-    private RequestPostProcessor auth(long id,String role) { return authentication(UsernamePasswordAuthenticationToken.authenticated(new LoginUser(id),null,List.of(new SimpleGrantedAuthority("ROLE_"+role)))); }
+    private RequestPostProcessor auth(long id,String role) { var issued = tokenService.issueSession(em.find(User.class,id));
+        String token = tokenProvider.reissue(id, UserRole.valueOf(role), issued.sessionId()).accessToken();
+        return request -> { request.addHeader("Authorization", "Bearer " + token); return request; }; }
 }

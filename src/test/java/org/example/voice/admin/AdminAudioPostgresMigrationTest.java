@@ -15,9 +15,9 @@ class AdminAudioPostgresMigrationTest {
         String schema="admin_audio_"+UUID.randomUUID().toString().replace("-","");
         try(var db=DriverManager.getConnection(url,user,password);var sql=db.createStatement()) {
             try {
-                migrate(url,user,password,schema,"61");db.setSchema(schema);
-                long before;try(var rows=sql.executeQuery("select count(*) from reference_audios")){rows.next();before=rows.getLong(1);}
                 migrate(url,user,password,schema,"62");db.setSchema(schema);
+                long before;try(var rows=sql.executeQuery("select count(*) from reference_audios")){rows.next();before=rows.getLong(1);}
+                migrate(url,user,password,schema,"63");db.setSchema(schema);
                 try(var rows=sql.executeQuery("select count(*) from reference_audios")){rows.next();assertThat(rows.getLong(1)).isEqualTo(before);}
                 sql.executeUpdate("insert into users(id,nickname,status,role,terms_agreed_at,privacy_agreed_at,created_at,updated_at) values(900001,'operator','ACTIVE','ADMIN',now(),now(),now(),now())");
                 var contents=new ArrayList<Long>();

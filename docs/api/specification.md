@@ -2142,7 +2142,7 @@ FE는 지원 범위를 녹음/업로드 전에 확인하고, 위 필드가 빠�
 
 ## 관리자 알림·팝업·회원 기록 확장
 
-[상세 계약](admin-communications-and-members.md). 관리자 경로는 실제 활성 ADMIN 전용이며 사용자 팝업은 활성 로그인 회원에게 제공한다. ApiResponse, no-store. V63 적용 필요.
+[상세 계약](admin-communications-and-members.md). 관리자 경로는 실제 활성 ADMIN 전용이며 사용자 팝업은 활성 로그인 회원에게 제공한다. ApiResponse, no-store. V64 적용 필요.
 
 | Method | Path | 기능 |
 | --- | --- | --- |

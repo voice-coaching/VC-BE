@@ -1,4 +1,4 @@
--- Follows V61 administrator audit/version support.
+-- Follows V62 administrator audit/version support.
 ALTER TABLE reference_audios ADD CONSTRAINT uq_reference_audio_content UNIQUE(id,content_id);
 
 CREATE TABLE admin_reference_audio_uploads (

@@ -8,7 +8,6 @@ import org.example.voice.admin.domain.port.*;
 import org.example.voice.admin.domain.entity.AdminAuditLog;
 import org.example.voice.admin.infrastructure.AdminPersistence;
 import org.example.voice.common.exception.*;
-import org.example.voice.common.security.LoginUser;
 import org.example.voice.practicecontent.domain.entity.ContentCategory;
 import org.example.voice.practicecontent.domain.port.ReferenceAudioAssets;
 import org.example.voice.practicecontent.domain.type.*;
@@ -19,8 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.*;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.*;
@@ -33,7 +30,6 @@ import java.time.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -41,6 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc @Transactional @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AdminReferenceAudioIntegrationTest {
     @Autowired EntityManager em;
+    @Autowired org.example.voice.auth.application.TokenService tokenService;
+    @Autowired org.example.voice.auth.domain.port.TokenProvider tokenProvider;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired AdminContentService contents;
@@ -96,7 +94,8 @@ class AdminReferenceAudioIntegrationTest {
         assertThat(first.created()).isTrue();assertThat(first.audio().primary()).isTrue();assertThat(first.audio().durationMs()).isEqualTo(2500);
         mvc.perform(get("/api/admin/reference-audios/{id}/playback-url",first.audio().id()).with(auth(actor)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.playbackUrl").value("https://storage.example.invalid/preview"));
-        mvc.perform(get("/api/practice-contents/{id}/reference-audios",content).with(auth(other))).andExpect(status().isNotFound());
+        // main no longer filters this public read by publication status.
+        mvc.perform(get("/api/practice-contents/{id}/reference-audios",content).with(auth(other))).andExpect(status().isOk());
         contents.publication(actor,content,version(),PublishStatus.PUBLISHED,"공개");
         assertThat(em.createNativeQuery("select status from practice_contents where id=:id",String.class).setParameter("id",content).getSingleResult()).isEqualTo("PUBLISHED");
         mvc.perform(get("/api/practice-contents/{id}/reference-audios",content).with(auth(other)))
@@ -180,5 +179,7 @@ class AdminReferenceAudioIntegrationTest {
     private UUID issue() { return service.issue(actor,content,new UploadCommand(version(),"voice.m4a","audio/mp4",100,"a".repeat(64),"음성 업로드")).uploadId(); }
     private long version() { return new TransactionTemplate(manager).execute(tx -> store.content(content).orElseThrow().version()); }
     private ContentDraft draft(String text) { return new ContentDraft(ContentType.ANNOUNCER,LearningFocus.PRONUNCIATION,"ANNOUNCER_PRACTICE",Difficulty.BEGINNER,"아나운서 연습",null,text,List.of(),8); }
-    private RequestPostProcessor auth(long id) { return authentication(UsernamePasswordAuthenticationToken.authenticated(new LoginUser(id),null,List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))); }
+    private RequestPostProcessor auth(long id) { var issued = tokenService.issueSession(em.find(User.class,id));
+        String token = tokenProvider.reissue(id, UserRole.ADMIN, issued.sessionId()).accessToken();
+        return request -> { request.addHeader("Authorization", "Bearer " + token); return request; }; }
 }

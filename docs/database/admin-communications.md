@@ -2,7 +2,7 @@
 
 ## 변경 기준
 
-V63__create_admin_communications.sql. develop의 V59(코칭 사용량)·V60(인기 뉴스), 관리자 V61·음성 V62 이후 적용한다. users/학습/결제 테이블 데이터는 변경하거나 삭제하지 않는다. 사용자 PK는 기존 bigint다. API 계약은 [관리자 확장](../api/admin-communications-and-members.md)을 따른다.
+V64__create_admin_communications.sql. develop의 V59(코칭 사용량)·V60(인기 뉴스), 관리자 V62·음성 V63 이후 적용한다. users/학습/결제 테이블 데이터는 변경하거나 삭제하지 않는다. 사용자 PK는 기존 bigint다. API 계약은 [관리자 확장](../api/admin-communications-and-members.md)을 따른다.
 
 ## 신규 테이블
 
@@ -30,4 +30,4 @@ UUID resolve는 analysis_results(active_request_event_id,active_execution_id,can
 
 ## 검증·운영
 
-격리 로컬 PostgreSQL에서 V62→V63 업그레이드, 기존 회원 수 보존, 동시 dispatch 중복 방지, 실패 rollback, 기간 경계, DB CHECK, 13개 projection SQL과 UUID 소유 연결을 검증한다. 운영 DB 변경과 실제 발송은 수행하지 않았다. ALL_ACTIVE 동기 발송은 회원 수 증가 시 별도 부하 검증 후 배치/비동기 확장을 검토한다.
+격리 로컬 PostgreSQL에서 V63→V64 업그레이드, 기존 회원 수 보존, 동시 dispatch 중복 방지, 실패 rollback, 기간 경계, DB CHECK, 13개 projection SQL과 UUID 소유 연결을 검증한다. 운영 DB 변경과 실제 발송은 수행하지 않았다. ALL_ACTIVE 동기 발송은 회원 수 증가 시 별도 부하 검증 후 배치/비동기 확장을 검토한다.

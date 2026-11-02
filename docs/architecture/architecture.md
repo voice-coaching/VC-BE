@@ -9,9 +9,9 @@ voice는 발음 및 억양 학습을 위한 Spring Boot 기반 백엔드 프로�
 
 ## 기본 정보
 
-관리자 1차 구현은 `admin/controller → application → domain/port → infrastructure` 경계를 따른다. 기존 콘텐츠·공지·문의 Entity를 재사용하며 현재 DB 관리자 권한을 검사하고 업무 변경과 감사 기록을 같은 트랜잭션으로 저장한다. 상세 API·DB 변경은 [관리자 API](../api/admin-phase-one.md), [V61 DB 문서](../database/admin-phase-one.md)를 참고한다. 프론트 UI와 후속 결제·AI 운영 기능은 포함하지 않는다.
+관리자 1차 구현은 `admin/controller → application → domain/port → infrastructure` 경계를 따른다. 기존 콘텐츠·공지·문의 Entity를 재사용하며 현재 DB 관리자 권한을 검사하고 업무 변경과 감사 기록을 같은 트랜잭션으로 저장한다. 상세 API·DB 변경은 [관리자 API](../api/admin-phase-one.md), [V62 DB 문서](../database/admin-phase-one.md)를 참고한다. 프론트 UI와 후속 결제·AI 운영 기능은 포함하지 않는다.
 
-아나운서 기준 음성 확장은 서버 발급 업로드 기록, 임시 S3 PUT, 실제 파일 검증, 서버 전용 final 객체 저장, DB 연결 순서로 처리한다. S3·디코더 I/O는 DB 트랜잭션 밖에서 수행하고 연결 시 권한·원문·버전을 다시 검증한다. [음성 API](../api/admin-reference-audios.md), [V62 DB 문서](../database/admin-reference-audios.md)를 따른다.
+아나운서 기준 음성 확장은 서버 발급 업로드 기록, 임시 S3 PUT, 실제 파일 검증, 서버 전용 final 객체 저장, DB 연결 순서로 처리한다. S3·디코더 I/O는 DB 트랜잭션 밖에서 수행하고 연결 시 권한·원문·버전을 다시 검증한다. [음성 API](../api/admin-reference-audios.md), [V63 DB 문서](../database/admin-reference-audios.md)를 따른다.
 
 - Language: Java 21
 - Framework: Spring Boot 4.1.0
@@ -254,4 +254,4 @@ Domain Entity / Domain Model
 
 ## 관리자 알림·회원 기록 추가 구현
 
-전체·개별 앱 내 알림, 수동 요금제 안내, 기간 지정 전체 팝업, 회원별 기록·분석 UUID 조회를 추가했다. API 12개(관리자11·사용자1), V63 신규 테이블3개이며 프론트는 수정하지 않았다. [API 계약](../api/admin-communications-and-members.md), [DB 구조](../database/admin-communications.md)를 따른다. 웹 푸시·결제 자동 알림·회원 PK UUID 전환은 포함하지 않는다.
+전체·개별 앱 내 알림, 수동 요금제 안내, 기간 지정 전체 팝업, 회원별 기록·분석 UUID 조회를 추가했다. API 12개(관리자11·사용자1), V64 신규 테이블3개이며 프론트는 수정하지 않았다. [API 계약](../api/admin-communications-and-members.md), [DB 구조](../database/admin-communications.md)를 따른다. 웹 푸시·결제 자동 알림·회원 PK UUID 전환은 포함하지 않는다.

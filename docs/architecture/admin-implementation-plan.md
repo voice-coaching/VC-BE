@@ -2,9 +2,9 @@
 
 작성일: 2026-11-01
 
-문서 상태: 단계별 계획. 1차 백엔드 API·V61 migration은 작업 브랜치에 구현했으며 실제 계약은 [관리자 1차 API](../api/admin-phase-one.md), [DB 변경](../database/admin-phase-one.md)을 따른다. 프론트 UI·운영 배포·실제 관리자 지정은 미진행이다. 아래 후속 단계와 설계 제안이 모두 구현됐다는 의미는 아니다.
+문서 상태: 단계별 계획. 1차 백엔드 API·V62 migration은 작업 브랜치에 구현했으며 실제 계약은 [관리자 1차 API](../api/admin-phase-one.md), [DB 변경](../database/admin-phase-one.md)을 따른다. 프론트 UI·운영 배포·실제 관리자 지정은 미진행이다. 아래 후속 단계와 설계 제안이 모두 구현됐다는 의미는 아니다.
 
-추가 구현 범위: 사용자의 후속 요청에 따라 공용 ANNOUNCER 콘텐츠의 수동 기준 음성 업로드·연결·대표 지정·미리듣기를 추가했다. [별도 계약](../api/admin-reference-audios.md), V62을 따른다. 아래 3차의 클래스 개정·TTS 운영 전체와는 구분한다.
+추가 구현 범위: 사용자의 후속 요청에 따라 공용 ANNOUNCER 콘텐츠의 수동 기준 음성 업로드·연결·대표 지정·미리듣기를 추가했다. [별도 계약](../api/admin-reference-audios.md), V63을 따른다. 아래 3차의 클래스 개정·TTS 운영 전체와는 구분한다.
 
 ## 1. 작업 유형과 적용 규칙
 
@@ -376,4 +376,4 @@ PR 제목 예시:
 
 ## 관리자 알림·회원 기록 추가 구현
 
-전체·개별 앱 내 알림, 수동 요금제 안내, 기간 지정 전체 팝업, 회원별 기록·분석 UUID 조회를 추가했다. API 12개(관리자11·사용자1), V63 신규 테이블3개이며 프론트는 수정하지 않았다. [API 계약](../api/admin-communications-and-members.md), [DB 구조](../database/admin-communications.md)를 따른다. 웹 푸시·결제 자동 알림·회원 PK UUID 전환은 포함하지 않는다.
+전체·개별 앱 내 알림, 수동 요금제 안내, 기간 지정 전체 팝업, 회원별 기록·분석 UUID 조회를 추가했다. API 12개(관리자11·사용자1), V64 신규 테이블3개이며 프론트는 수정하지 않았다. [API 계약](../api/admin-communications-and-members.md), [DB 구조](../database/admin-communications.md)를 따른다. 웹 푸시·결제 자동 알림·회원 PK UUID 전환은 포함하지 않는다.

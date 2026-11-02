@@ -15,10 +15,10 @@ class AdminPostgresMigrationTest {
         String schema="admin_test_"+UUID.randomUUID().toString().replace("-","");
         try(var db=DriverManager.getConnection(url,user,password);var sql=db.createStatement()) {
             try {
-                migrate(url,user,password,schema,"60");db.setSchema(schema);
+                migrate(url,user,password,schema,"61");db.setSchema(schema);
                 long before;try(var rows=sql.executeQuery("select count(*) from practice_contents")){rows.next();before=rows.getLong(1);}
                 sql.executeUpdate("insert into users(id,nickname,status,role,terms_agreed_at,privacy_agreed_at,created_at,updated_at) values(900001,'operator','ACTIVE','ADMIN',now(),now(),now(),now())");
-                migrate(url,user,password,schema,"61");db.setSchema(schema);
+                migrate(url,user,password,schema,"62");db.setSchema(schema);
                 try(var rows=sql.executeQuery("select count(*),count(*) filter(where version=0) from practice_contents")) {
                     rows.next();assertThat(rows.getLong(1)).isEqualTo(before);assertThat(rows.getLong(2)).isEqualTo(before);
                 }
