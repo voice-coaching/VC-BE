@@ -55,6 +55,33 @@ PortOne SDK 캐시 부재로 실패했으며, 의존성을 정상 저장소에�
 패키징된 세 클래스의 javap 결과에서 due-row 조회, deadline, isRetryable, 재시도 상한,
 현재 실행 필드 비교, claim/handoff 보호, sweeper 조회·실패·취소 예약을 확인했다.
 
-최종 JAR SHA-256: `7e85ddcc1075f048af5150c2b49fe9203a377aa1706e21efbddc720195acd872`.
-application.yaml, DB migration, 계약 schema는 운영 main 대비 변경하지 않았다.
-배포 결과는 활성화 후 별도 기록한다.
+Windows checkout의 SQL 줄바꿈을 LF로 정규화하여 다시 패키징했다. Git 내용 변경은
+없다. 실제 운영 JAR와 비교해 66개 migration 리소스 및 17개 계약 리소스 집합의
+이름·내용 해시가 각각 일치한다. 최종 패키지의 세 클래스도 앞서 확인한 바이트코드와
+동일함을 확인했다. application.yaml과 공개 계약, 신규 migration은 변경하지 않았다.
+
+## 실제 배포 결과
+
+- 배포 소스 커밋: `0b7262c569faca1fbf0114191dbe66119ad9836c`.
+- 최종 JAR SHA-256: `eabd8379c5fe7e1300e99ae7a5210d54714faa4d83bc8a84c2f6ec8e6955bc4c`.
+- 운영 링크: `/opt/alpha/releases/0b7262c569faca1fbf0114191dbe66119ad9836c.jar`.
+- 실제 Java 프로세스 PID는 2447633에서 2491934로 변경됐고, `-jar` 인자는
+  `/opt/alpha/app.jar`다. 시작 시각은 2026-11-02 16:36:38 UTC
+  (2026-11-03 01:36:38 KST)다. 기존 릴리스는 삭제하지 않았다.
+- 기존 배포 진입점을 실행하기 전 기존/신규 JAR 해시와 health를 확인하고,
+  배포 후 새 PID·링크·해시·내부 health UP·공개 OpenAPI 200을 확인했다.
+  health 실패 시 기존 JAR와 배포 상태를 되돌리는 별도 wrapper를 적용했으며,
+  이번 배포에서는 rollback이 발생하지 않았다.
+- 운영 증거는 `/var/lib/alpha-deploy/releases/0b7262c569faca1fbf0114191dbe66119ad9836c/`
+  아래 `before-activation.json`과 `activation-verification.json`에 남겼다.
+- 후속 읽기 전용 DB 조회에서 분석 106~114 모두 `FAILED`, failure_code는
+  `analysis_execution_timeout`, 해당 outbox도 모두 `FAILED`다. 기존 request/execution ID는
+  9건 모두 동일하다. 107~114의 attempt_count는 계속 0이다. 106의 최종 누적 시도는
+  14197로, 배포 준비 중 기존 바이너리에서 늘어난 횟수와 새 바이너리의 로컬 timeout
+  판정 1회를 포함한다. 새 바이너리에서는 만료 원본을 worker에 재전송하지 않는다.
+- 새 프로세스 로그 요약에 예외 타입이 없고, 실제 timeout 전이를 관측했다.
+  신규 분석/실추론, 자동 회귀 테스트, 최초 503 내부 원인 규명은 수행하지 않았다.
+
+소스는 별도 커밋에 보존했다. 사용자가 `voice-coaching/VC-BE`의
+`fix/outbox-timeout-production-20261103` 브랜치 push와 검토용 PR 생성을 명시 승인했다.
+GitHub main/develop 병합이나 CI 배포를 실행한 것으로 보고하지 않는다.
