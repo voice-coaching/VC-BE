@@ -52,6 +52,7 @@ public final class CanonicalDeliverySpool {
 
         for(Path p=root;p!=null;p=p.getParent()){}
 
+        owner=FileChannel.open(root.resolve("owner.lock"),StandardOpenOption.CREATE,StandardOpenOption.WRITE);
         ownership=owner.tryLock();
         try(var children=Files.list(root)){
             for(var p:children.filter(x->Files.isDirectory(x,LinkOption.NOFOLLOW_LINKS) && !x.getFileName().toString().startsWith(".")).toList()){
