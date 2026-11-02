@@ -1,5 +1,9 @@
 package org.example.voice.admin.controller;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import org.example.voice.admin.application.AdminMemberDeletionService;
+import org.example.voice.admin.controller.dto.AdminMemberDeletionRequestDto;
+import org.example.voice.admin.controller.dto.AdminMemberDeletionResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.voice.admin.application.AdminMemberService;
@@ -15,6 +19,7 @@ import java.util.List;
 @RestController @RequiredArgsConstructor @RequestMapping("/api/admin/users") @Tag(name="관리자")
 public class AdminMemberController {
     private final AdminMemberService service;
+    private final AdminMemberDeletionService deletion;
     @GetMapping("/resolve") @Operation(summary="회원 번호 또는 분석 UUID로 회원 찾기")
     public ResponseEntity<ApiResponse<List<IdentifierMatchDto>>> resolve(@AuthenticationPrincipal LoginUser actor,@RequestParam String identifier) {
         return ok(service.resolve(actor.id(),identifier).stream().map(IdentifierMatchDto::from).toList());
@@ -27,6 +32,13 @@ public class AdminMemberController {
     public ResponseEntity<ApiResponse<PageDto<MemberRecordDto>>> records(@AuthenticationPrincipal LoginUser actor,@PathVariable long userId,
             @RequestParam AdminUserResource resource,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {
         return ok(PageDto.from(service.records(actor.id(),userId,resource,page,size),MemberRecordDto::from));
+    }
+    @DeleteMapping("/{userId}") @Operation(summary="관리자 회원 및 업무 기록 삭제")
+    public ResponseEntity<ApiResponse<AdminMemberDeletionResponseDto>> delete(
+            @AuthenticationPrincipal LoginUser actor,@PathVariable long userId,
+            @Valid @RequestBody AdminMemberDeletionRequestDto request) {
+        var result=deletion.delete(actor.id(),userId,request.confirmationUserId(),request.expectedUpdatedAt(),request.reason());
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.success("회원 및 업무 기록을 삭제했습니다.",AdminMemberDeletionResponseDto.from(result)));
     }
     private static <T> ResponseEntity<ApiResponse<T>> ok(T data) { return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.success("회원 관련 기록을 조회했습니다.",data)); }
 }

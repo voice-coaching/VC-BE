@@ -151,12 +151,12 @@ records는 기존 페이지 envelope를 사용하며 items 각 항목은 `{field
 
 | resource | fields |
 | --- | --- |
-| TRAINING_SESSIONS | id, contentId, courseStepId, status, startedAt, completedAt |
-| RECORDINGS | id, sessionId, attemptNo, mimeType, durationMs, qualityStatus, createdAt, deletedAt |
-| ANALYSES | id, recordingId, status, failureCode, requestId, executionId, resultEventId, createdAt, analyzedAt |
+| TRAINING_SESSIONS | id, contentId, courseStepId, status, learningFocus, totalLearningSeconds, startedAt, completedAt |
+| RECORDINGS | id, sessionId, attemptNo, mimeType, durationMs, fileSizeBytes, qualityStatus, createdAt, deletedAt |
+| ANALYSES | id, recordingId, status, overallScore, pronunciationScore, intonationScore, failureCode, requestId, executionId, resultEventId, createdAt, analyzedAt |
 | PAYMENTS | id, product, amount, currency, status, createdAt, paidAt, expiresAt |
-| CANCELLATIONS | id, orderId, status, requestedAt, updatedAt (취소·전액 환불 공용 요청 원장) |
-| INQUIRIES | id, category, status, createdAt, answeredAt (본문은 기존 관리자 문의 상세에서 조회) |
+| CANCELLATIONS | id, orderId, status, reason, requestedAt, updatedAt (취소·전액 환불 공용 요청 원장) |
+| INQUIRIES | id, category, subject, status, createdAt, answeredAt (본문은 기존 관리자 문의 상세에서 조회) |
 | NOTIFICATIONS | id, type, title, readAt, createdAt |
 | COURSE_PROGRESS | id, courseId, lastStepId, status, progressPercent, updatedAt |
 | TITLES | userId, rank, minimumTrainingCount, updatedAt |
@@ -180,3 +180,112 @@ PAYMENTS와 CANCELLATIONS는 현재 TEST 결제 원장이다. 운영 실결제 �
 ## 5. 반영 상태
 
 별도 브랜치 `feat/admin-phase-one-api`에서 구현했다. rebase 기준 원격 develop은 `6ae98d1`이다. 기존 사용자 문서 변경은 보존했고 프론트 수정·실제 발송·운영 DB 실행·배포는 수행하지 않았다. V62/V63/V64을 적용하는 백엔드 배포와 프론트 UI 연결 후 환경별 확인이 필요하다. 실제 관리자 계정 지정도 별도 관리 절차를 따른다.
+
+
+## 6. 회원 상세 보완 및 DB 완전 삭제 (#175)
+
+회원·학습·평가·결제·문의 등 백엔드 DB의 회원 업무 기록을 삭제한다. AI 서버·S3/B2 등 별도 보관소의 원본 파일은 이번 범위에서 제외한다. 일반 회원의 기존 탈퇴 API는 변경하지 않으며 관리자 작업에서 재사용하지 않는다.
+
+### 회원 상세
+
+`GET /api/admin/users/{userId}/overview`의 기존 응답에 nullable `account`를 추가한다. 목록 이메일은 계속 마스킹하고 관리자 상세에만 원래 이메일을 제공한다.
+
+```ts
+type AccountDetails = {
+  email: string | null;
+  lastLoginAt: string | null;
+  updatedAt: string | null;
+  withdrawnAt: string | null;
+  termsAgreedAt: string | null;
+  privacyAgreedAt: string | null;
+  loginConnections: Array<{
+    provider: string;
+    email: string | null;
+    connectedAt: string;
+  }>;
+};
+```
+
+카카오 등 제공자 이메일과 회원 이메일은 다르거나 없을 수 있다. 내부 제공자 회원 식별자·비밀번호·토큰·비밀키는 반환하지 않는다.
+
+### 회원 및 업무 기록 삭제
+
+```http
+DELETE /api/admin/users/{userId}
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+
+```json
+{
+  "confirmationUserId": 14,
+  "expectedUpdatedAt": "2026-11-03T00:00:00.123456+09:00",
+  "reason": "회원 요청에 따른 DB 기록 삭제"
+}
+```
+
+| 요청 필드 | 형식 | 계약 |
+| --- | --- | --- |
+| confirmationUserId | 양의 정수, 필수 | 경로 userId와 일치하는 직접 입력 확인 번호 |
+| expectedUpdatedAt | ISO 시각 또는 null | account.updatedAt을 정밀도 변환 없이 전송. null/생략은 DB 값도 null인 기존 회원에만 일치 |
+| reason | 문자열, 필수 | 공백만 허용하지 않으며 최대 500자. 비밀·개인정보를 기재하지 않음 |
+
+인증된 활성 관리자만 실행한다. 자신의 관리자 계정은 삭제하지 못한다. 현재 관리자 권한은 서비스에서 다시 확인하고 회원 행을 잠근 뒤 시각을 비교한다. 세션 캐시 변경 장벽을 포함한 기존 로그인 세션 해제 절차를 먼저 적용한다.
+
+성공은 200 및 `Cache-Control: no-store`다. `data` 형식:
+
+```ts
+type MemberDeletion = {
+  userId: number;
+  deletedAt: string;
+  alreadyDeleted: boolean;
+};
+```
+
+이미 삭제한 회원은 최소 삭제 확인 기록으로 같은 삭제 시각과 `alreadyDeleted=true`를 반환한다. 재요청으로 중복 삭제·성공 작업 기록을 만들지 않는다. 삭제 확인 기록도 없고 회원도 없으면 404다.
+
+| 상황 | 응답 |
+| --- | --- |
+| 확인 번호·사유 오류 | 400 VALIDATION_ERROR |
+| 미인증 | 401 |
+| 일반 회원·권한이 회수된 관리자 | 403 |
+| 회원 및 삭제 확인 기록 없음 | 404 RESOURCE_NOT_FOUND |
+| 관리자 자신의 계정 | 409 ADMIN_SELF_DELETION_NOT_ALLOWED |
+| 최신 수정 시각 불일치 | 409 ADMIN_EDIT_CONFLICT |
+| 저장·관계 오류 | 기존 관리자 저장소 오류 응답. 전체 DB 삭제 및 작업 기록을 롤백하고 최신 관계 확인 후 재시도 |
+
+### DB 삭제 범위와 보존 경계
+
+- 회원·소셜 로그인·리프레시 세션·온보딩·이용권 부여·결제 주문·취소/환불·문의·학습 진도·칭호·승급 심사 기록을 삭제한다.
+- 회원 학습 세션의 녹음·분석 결과·구간 평가·분석 요청/취소 원장·동의·업로드/삭제 예약·코칭 사용량을 삭제한다.
+- 녹음 관계 또는 결과 처리 기록에서 해당 회원 소유가 확인되는 Canonical 실행·콜백·결과·영수증·이관·보관 메타데이터를 삭제한다. 식별 가능한 다른 회원 소유 원본은 포함하지 않는다.
+- 개인 문장과 문장 보관함, 프로필 사진 DB 행, 알림·푸시 등록·알림 설정·개별 발송 대상 연결을 삭제한다. 외부 파일 삭제 호출이나 신규 삭제 예약은 하지 않는다.
+- 직접 분석은 회원 연결을 삭제하고 다른 회원과 공유되지 않은 결과 DB 행만 삭제한다. 다른 회원의 연결이 있는 결과와 사용자 소유를 식별할 수 없는 독립 AI 자료는 보존한다.
+- 공용 콘텐츠·클래스·다른 회원·공용 집계·소유자 없는 결제 웹훅 중복 방지 영수증은 보존한다. 삭제 대상이 작성했던 공용 팝업/알림은 게시물을 유지하고 작성자 참조만 비운다.
+- 삭제 대상 회원이 수행했거나 해당 회원 자체를 대상으로 한 과거 관리자 작업 기록은 정리한다. 다른 관리자 기록은 수정하지 않는다. 새 삭제 작업의 관리자·대상 번호·사유·시각과 `admin_member_deletion_receipts`의 번호·시각은 최소 확인 기록으로 보존한다.
+
+V61에서 이미 기존 애플리케이션 FK·불변 원본 트리거를 제거했다. V66은 이를 복원하거나 전체 CASCADE를 추가하지 않는다. 새 관리자 감사 기록의 삭제 예외는 트랜잭션 내 선택 회원과 관련된 DELETE에만 적용하고, 일반 UPDATE·DELETE·TRUNCATE 보호는 유지한다.
+
+V61 이후의 잘못된 개인 콘텐츠 공유 참조를 발견하면 삭제 전체를 중단한다. 일부만 삭제한 상태로 성공하지 않는다. DB 삭제 후 외부 파일을 자동 추적·복구하는 기능은 제공하지 않는다.
+
+### 프론트 연결
+
+확인창에 DB 기록 삭제, 복구 불가, 외부 원본 파일 제외, 최소 작업 기록 보존을 명시한다. 확인 번호·사유를 입력하고 성공 응답을 검증한 뒤 회원 상세 캐시를 제거하고 회원 목록으로 이동한다. 충돌 시 입력을 유지하며 자동 재요청하지 않는다. 서버의 영문 상태·필드는 API 값으로 유지하고 화면에 한글 표시명을 사용한다. 관리자 권한 ADMIN과 시험 이용권 admin은 별개다.
+
+## 7. 업무 기록 조회
+
+### 업무 기록 조회 확대
+
+기존 13개 구분에 아래 7개를 추가하여 총 20개 구분을 조회한다. 기존 `GET /api/admin/users/{userId}/records?resource=...`의 관리자 인증·회원별 조건·페이지 계약을 사용한다.
+
+| resource | 화면 | 반환 필드 |
+| --- | --- | --- |
+| ONBOARDING | 학습 목표 | id, currentLevel, goalText, dailyGoalMinutes, weeklyGoalCount, completedAt, updatedAt |
+| SCRIPT_LIBRARY | 내 문장 보관함 | contentId, topicId, createdAt, updatedAt, deletedAt |
+| NOTIFICATION_SETTINGS | 알림 설정 | userId, enabled, reminderTime, weekdays, timezone, updatedAt |
+| PROCESSING_CONSENTS | 정보 처리 동의 | id, sessionId, recordingId, scope, policyRevision, grantedAt, revokedAt |
+| MEMBERSHIP_GRANTS | 시험 이용권 부여 | userId, grantedAt |
+| PROFILE_IMAGES | 프로필 사진 내역 | id, sizeBytes, state, createdAt, activatedAt, cleanupAfter |
+| ANALYSIS_SEGMENTS | 구간별 평가 | id, analysisId, sequenceNo, startMs, endMs, matchType, resultStatus, errorType, pronunciationScore, intonationScore, feedback |
+
+회원 소유의 업무 기록을 조회하는 계약이며 내부 저장 테이블 전체를 그대로 덤프하지 않는다. 비밀번호·토큰·비밀키·동의 영수증 해시·푸시 전송 비밀·제공자 내부 ID·원본 저장 경로·암호문은 반환하지 않는다. 내부 처리용 outbox와 재시도 원장은 관리자 업무 기록으로 노출하지 않는다. 이 조회 확장에는 DB 마이그레이션이 필요하지 않다.

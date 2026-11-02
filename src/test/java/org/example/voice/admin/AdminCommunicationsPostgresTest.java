@@ -70,10 +70,19 @@ class AdminCommunicationsPostgresTest {
             long recording=jdbc.queryForObject("insert into voice_recordings(training_session_id,attempt_no,audio_url,quality_status,created_at) values(?,1,'s3://secret/private.wav','PENDING',now()) returning id",Long.class,session);
             UUID request=UUID.randomUUID(),execution=UUID.randomUUID();
             long analysis=jdbc.queryForObject("insert into analysis_results(recording_id,status,active_request_event_id,active_execution_id,created_at) values(?,'PROCESSING',?,?,now()) returning id",Long.class,recording,request.toString(),execution.toString());
+            jdbc.update("insert into onboarding_profiles(user_id,current_level,goal_text,survey_answers,completed_at,updated_at) values(?,'BEGINNER','target-goal','{}',now(),now())",target);
+            jdbc.update("insert into onboarding_profiles(user_id,current_level,goal_text,survey_answers,completed_at,updated_at) values(?,'ADVANCED','other-goal','{}',now(),now())",other);
+            jdbc.update("insert into profile_images(user_id,object_key,image_url,original_file_name,size_bytes,request_digest,state,created_at,cleanup_after) values(?,?,'https://private.invalid/profile','private-name.png',1024,?,'ACTIVE',now(),now()+interval '1 day')",target,"private/"+target,"b".repeat(64));
+            jdbc.update("insert into user_test_membership_grants(user_id,granted_at) values(?,now())",target);
             UUID direct=UUID.randomUUID();
             jdbc.update("insert into direct_analysis_history_links(user_id,job_id,claim_sha256) values(?,?,?)",target,direct,"a".repeat(64));
             tx.executeWithoutResult(s->{
                 assertThat(members.activeMember(target)).isTrue();
+                assertThat(members.records(target,AdminUserResource.ONBOARDING,0,20).items()).singleElement().satisfies(r->assertThat(r.fields().get("goalText")).isEqualTo("target-goal"));
+                assertThat(members.records(other,AdminUserResource.ONBOARDING,0,20).items()).singleElement().satisfies(r->assertThat(r.fields().get("goalText")).isEqualTo("other-goal"));
+                assertThat(members.records(target,AdminUserResource.PROFILE_IMAGES,0,20).items()).singleElement().satisfies(r->assertThat(r.fields()).containsEntry("sizeBytes",1024L).doesNotContainKeys("objectKey","imageUrl","originalFileName","requestDigest"));
+                assertThat(members.records(target,AdminUserResource.MEMBERSHIP_GRANTS,0,20).totalElements()).isEqualTo(1);
+
                 assertThat(members.resolve(request)).anySatisfy(m->{assertThat(m.userId()).isEqualTo(target);assertThat(m.source()).isEqualTo("ANALYSIS");});
                 assertThat(members.resolve(execution)).hasSize(1);assertThat(members.resolve(direct)).hasSize(1);
                 assertThat(members.counts(target)).hasSize(AdminUserResource.values().length);

@@ -29,6 +29,8 @@ class AdminCommunicationIntegrationTest {
     @Autowired org.example.voice.auth.application.TokenService tokenService;
     @Autowired org.example.voice.auth.domain.port.TokenProvider tokenProvider;
     @Autowired AdminCommunicationService service;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean org.example.voice.admin.infrastructure.AdminMemberPersistence memberStore;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean org.example.voice.coaching.application.CoachingUsageService coaching;
     long actor,member,inactive;
     @BeforeEach void fixture() {
         actor=user(UserStatus.ACTIVE,UserRole.ADMIN);member=user(UserStatus.ACTIVE,UserRole.USER);inactive=user(UserStatus.SUSPENDED,UserRole.USER);em.flush();
@@ -104,6 +106,20 @@ class AdminCommunicationIntegrationTest {
     @Test void deletedAccountCannotReadActivePopupEvenWithStaleToken() throws Exception {
         em.createQuery("update User u set u.deletedAt=:at where u.id=:id").setParameter("at",OffsetDateTime.now()).setParameter("id",member).executeUpdate();
         mvc.perform(get("/api/users/me/popup").with(auth(member,"USER"))).andExpect(status().isForbidden());
+    }
+    @Test void memberAccountDetailsAreAdministratorOnlyAndNeverExposeAuthenticationSecrets() throws Exception {
+        org.mockito.Mockito.doReturn(List.of()).when(memberStore).counts(org.mockito.ArgumentMatchers.anyLong());
+        em.persist(org.example.voice.auth.domain.entity.SocialAccount.create(member,org.example.voice.auth.domain.type.OAuthProvider.KAKAO,"private-provider-id","social@example.invalid",OffsetDateTime.now()));
+        em.flush();
+        String body=mvc.perform(get("/api/admin/users/{id}/overview",member).with(auth(actor,"ADMIN")))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"))
+                .andExpect(jsonPath("$.data.account.email").isNotEmpty())
+                .andExpect(jsonPath("$.data.account.updatedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.account.loginConnections[0].provider").value("KAKAO"))
+                .andExpect(jsonPath("$.data.account.loginConnections[0].email").value("social@example.invalid"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(body).doesNotContain("private-provider-id","test-only","password","tokenHash","providerUserId");
+        mvc.perform(get("/api/admin/users/{id}/overview",member).with(auth(member,"USER"))).andExpect(status().isForbidden());
     }
     private long user(UserStatus status,UserRole role) {
         var user=User.createLocal(UUID.randomUUID()+"@example.invalid","test-only","member",OffsetDateTime.now(ZoneOffset.UTC));

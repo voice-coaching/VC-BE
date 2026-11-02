@@ -15,7 +15,7 @@ public class AdminPopup {
     @Column(nullable=false) private OffsetDateTime startsAt;
     @Column(nullable=false) private OffsetDateTime endsAt;
     @Column(nullable=false) private boolean enabled;
-    @Column(nullable=false) private long createdBy;
+    private Long createdBy;
     @Column(nullable=false) private OffsetDateTime createdAt;
     public static AdminPopup create(long actor,OffsetDateTime now) {
         var p=new AdminPopup();p.createdBy=actor;p.createdAt=now;return p;

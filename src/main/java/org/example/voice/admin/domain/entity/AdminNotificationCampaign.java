@@ -18,7 +18,7 @@ public class AdminNotificationCampaign {
     @Column(nullable=false,length=255) private String deepLink;
     @ElementCollection @CollectionTable(name="admin_notification_recipients",joinColumns=@JoinColumn(name="campaign_id"))
     @Column(name="user_id",nullable=false) private Set<Long> userIds=new HashSet<>();
-    @Column(nullable=false) private long createdBy;
+    private Long createdBy;
     @Column(nullable=false) private OffsetDateTime createdAt;
     private OffsetDateTime sentAt;
     @Column(nullable=false) private long sentCount;
