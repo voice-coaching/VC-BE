@@ -45,10 +45,10 @@ public class RunPodAnalysisRequestOutboxDispatcher {
         if (!properties.isConfigured()) return;
         var claim = gate.acquire(properties.normalizedEndpointUrl());
         if (claim == null) return;
-        var next = OffsetDateTime.now(ZoneOffset.UTC);
         try {
             Delivery delivery = transactions.execute(status -> outboxRepository
-                    .findFirstByTransportAndStatusOrderByIdAsc("RUNPOD_HTTP", AnalysisRequestOutboxStatus.PENDING)
+                    .findFirstByTransportAndStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(
+                            "RUNPOD_HTTP", AnalysisRequestOutboxStatus.PENDING, OffsetDateTime.now(ZoneOffset.UTC))
                     .map(event -> {
                         var now = OffsetDateTime.now(ZoneOffset.UTC);
                         var analysis = event.getAnalysisResult();
@@ -59,15 +59,12 @@ public class RunPodAnalysisRequestOutboxDispatcher {
                             event.cancelPending("stale_or_terminal_execution");
                             return null;
                         }
-                        if (event.getNextAttemptAt().isAfter(now))
-                            return new Delivery(event.getId(), event.getAnalysisResult().getId(), null, event.getNextAttemptAt(),event.getEventId(),event.getExecutionId());
                         event.reserveDeliveryUntil(now.plusSeconds(60));
                         org.example.voice.common.logging.AnalysisLogEvents.event(log,"analysis_dispatch_attempt",analysis.getId(),event.getEventId(),event.getExecutionId(),null)
                                 .addKeyValue("queue_age_ms",java.time.Duration.between(event.getCreatedAt(),now).toMillis()).log("Analysis dispatch attempt");
-                        return new Delivery(event.getId(), event.getAnalysisResult().getId(), event.getPayload(), now,event.getEventId(),event.getExecutionId());
+                        return new Delivery(event.getId(), event.getAnalysisResult().getId(), event.getPayload(),event.getEventId(),event.getExecutionId());
                     }).orElse(null));
             if (delivery == null) return;
-            if (delivery.payload() == null) { next = delivery.readyAt(); return; }
             String error = null;
             boolean retryable = true;
             int retryAfter = 1;
@@ -91,11 +88,13 @@ public class RunPodAnalysisRequestOutboxDispatcher {
             final String outcome = error;
             final boolean retry = retryable;
             final int delay = retryAfter;
-            next = transactions.execute(status -> finish(delivery, outcome, retry, delay));
+            transactions.execute(status -> finish(delivery, outcome, retry, delay));
             org.example.voice.common.logging.AnalysisLogEvents.event(log,"analysis_dispatch_finished",delivery.analysisId(),delivery.requestId(),delivery.executionId(),outcome)
                     .addKeyValue("duration_ms",(System.nanoTime()-started)/1_000_000).log("Analysis dispatch finished");
         } finally {
-            gate.release(claim, next == null ? OffsetDateTime.now(ZoneOffset.UTC).plusSeconds(1) : next);
+            // Backoff belongs to the individual outbox row. Holding the endpoint
+            // until that row is due would block unrelated, ready requests.
+            gate.release(claim, OffsetDateTime.now(ZoneOffset.UTC));
         }
     }
 
@@ -123,7 +122,7 @@ public class RunPodAnalysisRequestOutboxDispatcher {
             event.markDelivered(event.getExecutionId());
         } else {
             org.example.voice.common.logging.AnalysisLogEvents.event(log,"analysis_dispatch_failed",delivery.analysisId(),event.getEventId(),event.getExecutionId(),error).log("Analysis dispatch failed");
-            if (event.recordDispatchFailure(error, retryable ? properties.getDispatchMaxAttempts() : 1)) {
+            if (event.recordDispatchFailure(error, retryable ? properties.getDispatchMaxAttempts() : 1, retryAfter)) {
                 boolean expired = "analysis_execution_timeout".equals(error);
                 result.fail(expired ? error : FAILURE, expired ? "분석 제한 시간이 지났습니다. 다시 시도해 주세요."
                         : "분석 작업을 전달하지 못했습니다. 다시 시도해 주세요.", null, null);
@@ -134,5 +133,5 @@ public class RunPodAnalysisRequestOutboxDispatcher {
                 ? event.getNextAttemptAt() : OffsetDateTime.now(ZoneOffset.UTC);
     }
 
-    private record Delivery(Long id, Long analysisId, String payload, OffsetDateTime readyAt,String requestId,String executionId) {}
+    private record Delivery(Long id, Long analysisId, String payload,String requestId,String executionId) {}
 }

@@ -171,4 +171,19 @@ public class AnalysisRequestOutbox {
                 .plusSeconds(Math.min(300L, 30L * attemptCount));
         return false;
     }
+
+    /** HTTP delivery retries are bounded and honor the worker's Retry-After. */
+    public boolean recordDispatchFailure(String errorCode, int maxAttempts, int retryAfterSeconds) {
+        int previous = attemptCount == null ? 0 : attemptCount;
+        this.attemptCount = Math.min(Integer.MAX_VALUE - 1, Math.max(0, previous)) + 1;
+        this.lastErrorCode = errorCode;
+        if (attemptCount >= Math.max(1, maxAttempts)) {
+            this.status = AnalysisRequestOutboxStatus.FAILED;
+            return true;
+        }
+        long backoffSeconds = Math.min(300L, 30L << Math.min(attemptCount - 1, 4));
+        long delaySeconds = Math.max(backoffSeconds, Math.min(300, Math.max(1, retryAfterSeconds)));
+        this.nextAttemptAt = OffsetDateTime.now(ZoneOffset.UTC).plusSeconds(delaySeconds);
+        return false;
+    }
 }
