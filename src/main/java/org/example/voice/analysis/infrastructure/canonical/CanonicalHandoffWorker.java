@@ -67,13 +67,21 @@ public final class CanonicalHandoffWorker {
                     .addKeyValue("duration_ms",TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started)).log("Analysis handoff processing");
             var doc=CanonicalCallbackDocument.parse((byte[])job.get("projection_bytes"),contract);
             tx.executeWithoutResult(t->{
+                // main's active() hook does not lock; enforce the real analysis -> handoff order here.
+                jdbc.queryForList("SELECT id FROM analysis_results WHERE id=? FOR UPDATE",current.get("analysis_id"));
                 store.active(current,true); // analysis lock before handoff lock
                 var locked=jdbc.queryForMap("SELECT *,claim_until>CURRENT_TIMESTAMP AS claim_live FROM analysis_canonical_handoffs WHERE handoff_id=? FOR UPDATE",current.get("handoff_id"));
-
+                if (!"VERIFYING".equals(locked.get("state"))
+                        || !Objects.equals(current.get("claim_id"), locked.get("claim_id"))
+                        || !Boolean.TRUE.equals(locked.get("claim_live"))) return;
                 committer.commitHandoff(doc,(UUID)current.get("handoff_id"));
                 jdbc.update("UPDATE analysis_canonical_handoffs SET state='COMMITTED',verified_at=CURRENT_TIMESTAMP,committed_at=CURRENT_TIMESTAMP,claim_id=NULL,claim_until=NULL WHERE handoff_id=?",current.get("handoff_id"));
             });
         } catch(Exception error) {
+            // Persisted reason codes remain stable; logs add safe failure classification only.
+            log.warn("canonical_handoff_failed analysisId={} type={} sqlState={}",
+                    job==null?null:job.get("analysis_id"), error.getClass().getSimpleName(),
+                    CanonicalDeliveryWorker.sqlState(error));
             if(job!=null)try {
                 var failed=job;
                 boolean revoked=false;
@@ -82,7 +90,7 @@ public final class CanonicalHandoffWorker {
                     jdbc.queryForList("SELECT id FROM analysis_results WHERE id=? FOR UPDATE",failed.get("analysis_id"));
                     int changed=jdbc.update("""
                         UPDATE analysis_canonical_handoffs SET state=?,reason_code=?,claim_id=NULL,claim_until=NULL,
-                        next_attempt_at=CURRENT_TIMESTAMP+INTERVAL '5 seconds' WHERE handoff_id=? AND (CAST(? AS uuid) IS NULL OR TRUE) AND state='VERIFYING'
+                        next_attempt_at=CURRENT_TIMESTAMP+INTERVAL '5 seconds' WHERE handoff_id=? AND claim_id=CAST(? AS uuid) AND state='VERIFYING'
                         """,revoked?"REVOKED":invalid?"REJECTED":"RECEIVED",revoked?"EXECUTION_INACTIVE":invalid?"EVIDENCE_INVALID":"DELIVERY_UNAVAILABLE",failed.get("handoff_id"),failed.get("claim_id"));
                     if(changed==1 && invalid){
                         int failedAnalysis=jdbc.update("""
