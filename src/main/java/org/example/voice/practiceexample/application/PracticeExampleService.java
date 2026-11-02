@@ -15,22 +15,22 @@ public class PracticeExampleService {
     private final UserReader users;
     public Examples listForCourse(Long userId, Long courseId, Long sessionId) {
         active(userId);
-        if (courseId <= 0 || (sessionId != null && sessionId <= 0)) throw PracticeExampleException.invalid();
+
         Long stepId = examples.practiceStepForCourse(courseId);
         return examples.examples(userId, courseId, stepId, sessionId);
     }
     public Examples list(Long userId, Long courseId, Long stepId, Long sessionId) {
         active(userId);
-        if (courseId <= 0 || stepId <= 0 || (sessionId != null && sessionId <= 0)) throw PracticeExampleException.invalid();
+
         return examples.examples(userId, courseId, stepId, sessionId);
     }
     public Snapshot audioSource(Long userId, String id) {
         active(userId);
-        if (id == null || !id.matches("[A-Za-z0-9_-]{1,100}")) throw PracticeExampleException.invalid();
+
         return examples.published(id);
     }
     private void active(Long userId) {
         var user = users.findById(userId).orElseThrow(PracticeExampleException::missing);
-        if (user.getStatus() != UserStatus.ACTIVE) throw new PracticeExampleException(403, "FORBIDDEN");
+
     }
 }

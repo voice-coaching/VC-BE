@@ -32,27 +32,27 @@ public class PracticeContent {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "content_type", nullable = false)
+    @Column(name = "content_type", nullable = true)
     private ContentType contentType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "learning_focus", nullable = false)
+    @Column(name = "learning_focus", nullable = true)
     private LearningFocus learningFocus;
 
     @Column(name = "category")
     private String category;
 
-    @Column(name = "title", nullable = false)
+    @Column(name = "title", nullable = true)
     private String title;
 
     @Column(name = "description")
     private String description;
 
-    @Column(name = "script_text", nullable = false)
+    @Column(name = "script_text", nullable = true)
     private String scriptText;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "difficulty", nullable = false)
+    @Column(name = "difficulty", nullable = true)
     private Difficulty difficulty;
 
     @JdbcTypeCode(SqlTypes.JSON)
@@ -63,16 +63,16 @@ public class PracticeContent {
     private Integer estimatedSeconds;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = true)
     private PublishStatus status;
 
     @Column(name = "published_at")
     private OffsetDateTime publishedAt;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at", nullable = true)
     private OffsetDateTime updatedAt;
 
     @Column(name = "publisher")
@@ -109,7 +109,7 @@ public class PracticeContent {
     }
 
     public void eraseCustom(OffsetDateTime now) {
-        if (ownerId == null) throw new IllegalStateException("Not user input");
+
         customTitle=null; customScript=null; customDeletedAt=now; updatedAt=now;
     }
 

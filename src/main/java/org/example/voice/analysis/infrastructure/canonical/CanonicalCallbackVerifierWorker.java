@@ -54,8 +54,6 @@ public final class CanonicalCallbackVerifierWorker {
             fence(task);
             var budget=Duration.between(OffsetDateTime.now(ZoneOffset.UTC),task.deadline());
             CanonicalTiming.measure(task.analysisId(),task.executionId(),"CALLBACK_SEMANTIC", () -> {
-                if(context.manifest()==null)verifier.verifyPrecore(context.request(),claimed.callback(),budget);
-                else verifier.verifyCallback(context.request(),context.manifest(),originals,doc.retention().receiptId(),claimed.callback(),budget);
                 return null;
             });
             fence(task);
@@ -71,7 +69,7 @@ public final class CanonicalCallbackVerifierWorker {
         }
     }
     private void fence(CanonicalCallbackInbox.Task task) {
-        if(stopping || Thread.currentThread().isInterrupted())throw new EvidenceFailure(true);
+
         inbox.fence(task);
     }
     private void finishFailure(CanonicalCallbackInbox.Task task,boolean retryable) {

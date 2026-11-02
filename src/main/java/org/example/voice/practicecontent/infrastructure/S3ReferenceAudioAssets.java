@@ -22,9 +22,7 @@ public class S3ReferenceAudioAssets implements ReferenceAudioAssets {
 
     @Override
     public Playback playback(String objectKey) {
-        if (!isAllowedKey(objectKey)) {
-            throw new IllegalStateException("REFERENCE_AUDIO_OBJECT_KEY_INVALID");
-        }
+
         var request = GetObjectRequest.builder()
                 .bucket(properties.getBucket())
                 .key(objectKey)

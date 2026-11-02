@@ -64,8 +64,6 @@ public class CourseProgressWriterImpl implements CourseProgressWriter {
             )
     })
     public CourseProgressData updateCourseProgress(Long courseId, Long userId, CourseProgressUpdateRequestDto request) {
-        validateProgressPercent(request);
-        validateLastStep(request.lastStepId(), courseId);
 
         UserCourseProgress progress = userCourseProgressJpaRepository.findByUserIdAndCourseId(userId, courseId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
@@ -89,45 +87,14 @@ public class CourseProgressWriterImpl implements CourseProgressWriter {
     public CourseProgressData completeCourse(Long courseId, Long userId) {
         UserCourseProgress progress = userCourseProgressJpaRepository.findByUserIdAndCourseId(userId, courseId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
-        validateRequiredStepsCompleted(progress, courseId);
+
         progress.complete(OffsetDateTime.now());
         return toData(progress);
     }
 
-    private void validateProgressPercent(CourseProgressUpdateRequestDto request) {
-        if (request == null || request.progressPercent() == null
-                || request.progressPercent() < 0.0 || request.progressPercent() > 100.0) {
-            throw new BaseException(ErrorCode.INVALID_PROGRESS_PERCENT);
-        }
-    }
-
     private CourseProgressData validateAndReturnStartedProgress(UserCourseProgress progress, Long courseId) {
-        if (progress.getStatus() == CourseProgressStatus.COMPLETED) {
-            throw new CourseAlreadyCompletedException();
-        }
-        validateLastStep(progress.getLastStepId(), courseId);
+
         return toData(progress);
-    }
-
-    private void validateLastStep(Long lastStepId, Long courseId) {
-        if (lastStepId != null && !courseStepJpaRepository.existsByIdAndCourseId(lastStepId, courseId)) {
-            throw new BaseException(ErrorCode.INVALID_COURSE_STEP);
-        }
-    }
-
-    private void validateRequiredStepsCompleted(UserCourseProgress progress, Long courseId) {
-        CourseStep lastRequiredStep = courseStepJpaRepository.findFirstByCourseIdAndRequiredTrueOrderByStepOrderDescIdDesc(courseId)
-                .orElse(null);
-        if (lastRequiredStep == null) {
-            return;
-        }
-
-        CourseStep currentStep = progress.getLastStepId() == null
-                ? null
-                : courseStepJpaRepository.findByIdAndCourseId(progress.getLastStepId(), courseId).orElse(null);
-        if (currentStep == null || currentStep.getStepOrder() < lastRequiredStep.getStepOrder()) {
-            throw new BaseException(ErrorCode.REQUIRED_STEP_NOT_COMPLETED);
-        }
     }
 
     private CourseProgressData createProgress(Course course, Long userId) {

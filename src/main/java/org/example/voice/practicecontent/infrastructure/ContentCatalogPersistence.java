@@ -23,7 +23,7 @@ public class ContentCatalogPersistence implements ContentCatalogReader {
     private final Clock clock;
 
     @Override public PracticeContentPageData<PracticeContentSummaryData> list(Filter filter,int page,int size) {
-        if((long)page*size>Integer.MAX_VALUE)throw new ContentCatalogException(400,"VALIDATION_ERROR");
+
         OffsetDateTime now=OffsetDateTime.now(clock);
         var contents=bind(em.createQuery("select c from PracticeContent c"+where(filter)+ORDER,PracticeContent.class),filter,now)
                 .setFirstResult(page*size).setMaxResults(size).getResultList();

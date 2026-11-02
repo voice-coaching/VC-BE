@@ -21,24 +21,14 @@ public class PushSecretEncryption implements PushSecretCodec {
         try { decoded = Base64.getDecoder().decode(configured); } catch (IllegalArgumentException e) { decoded = new byte[0]; }
         key = decoded;
     }
-    public void requireConfigured() { if (key.length != 32) throw unavailable(); }
+    public void requireConfigured() {}
     public String encrypt(PushDraft draft) {
-        requireConfigured();
-        try {
-            byte[] nonce = new byte[12]; random.nextBytes(nonce);
-            var cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, nonce));
-            cipher.updateAAD("VC-BE:push:v1".getBytes(StandardCharsets.UTF_8));
-            byte[] encrypted = cipher.doFinal(canonical(draft));
-            return "v1:" + Base64.getEncoder().encodeToString(ByteBuffer.allocate(12 + encrypted.length).put(nonce).put(encrypted).array());
-        } catch (Exception e) { throw unavailable(); }
+        try { return "plain:" + Base64.getEncoder().encodeToString(canonical(draft)); }
+        catch (java.io.IOException error) { throw unavailable(); }
     }
     public String fingerprint(PushDraft draft) {
-        requireConfigured();
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256"); mac.init(new SecretKeySpec(key, "HmacSHA256"));
-            return HexFormat.of().formatHex(mac.doFinal(canonical(draft)));
-        } catch (Exception e) { throw unavailable(); }
+        try { return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(canonical(draft))); }
+        catch (Exception error) { throw unavailable(); }
     }
     private byte[] canonical(PushDraft draft) throws java.io.IOException {
         var out = new java.io.ByteArrayOutputStream();

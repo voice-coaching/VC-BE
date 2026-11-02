@@ -1,6 +1,5 @@
 package org.example.voice.analysis.domain.model;
 
-
 import java.util.UUID;
 
 public record AnalysisRunPodHeartbeatCommand(

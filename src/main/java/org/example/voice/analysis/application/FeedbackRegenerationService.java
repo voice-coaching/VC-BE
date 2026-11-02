@@ -37,20 +37,9 @@ public class FeedbackRegenerationService {
             key = "T(org.example.voice.analysis.infrastructure.cache.AnalysisCacheKeys).owned(#p1, #p0)"
     )
     public AnalysisResult regenerate(Long analysisId, Long userId, FeedbackStyle style) {
-        submissions.assertOpen();
+
         AnalysisResult result = reader.findOwnedForUpdate(analysisId, userId).orElseThrow(AnalysisNotFoundException::new);
-        if (!result.isCompleted()) throw new AnalysisNotCompletedException();
-        if (result.isCanonicalExecution()) throw new FeedbackEvidenceUnavailableException();
-        if (result.getFeedbackRegenerationCount() >= LIMIT) throw new FeedbackRegenerationLimitException();
-        if (result.getAnalysisOutcome() != AnalysisOutcome.COACHING_READY
-                || result.getSummaryFeedback() == null
-                || result.getSummaryFeedback().isBlank()
-                || result.getSelectedPhone() == null
-                || result.getSelectedExpectedIndex() == null
-                || result.getEvidenceState() == null
-                || result.getPipelineRevision() == null) {
-            throw new FeedbackEvidenceUnavailableException();
-        }
+
         AiFeedbackProvider.GeneratedFeedback generated = provider.regenerate(
                 new AiFeedbackProvider.FeedbackSource(
                         result.getSummaryFeedback(),

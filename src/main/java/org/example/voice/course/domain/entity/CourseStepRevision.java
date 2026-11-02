@@ -8,14 +8,14 @@ import org.hibernate.annotations.Immutable;
 import org.example.voice.course.domain.type.CourseStepType;
 
 @Entity @Getter @Immutable @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "course_step_revisions", uniqueConstraints = @UniqueConstraint(columnNames = {"step_id", "revision"}))
+@Table(name = "course_step_revisions")
 public class CourseStepRevision {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
-    @Column(name = "step_id", nullable = false) private Long stepId;
-    @Column(nullable = false) private Integer revision;
-    @Column(nullable = false) private String title;
+    @Column(name = "step_id", nullable = true) private Long stepId;
+    @Column(nullable = true) private Integer revision;
+    @Column(nullable = true) private String title;
     private String subtitle;
-    @Column(name = "step_order", nullable = false) private Integer stepOrder;
-    @Enumerated(EnumType.STRING) @Column(name = "step_type", nullable = false) private CourseStepType stepType;
-    @Column(name = "blocks_json", nullable = false, columnDefinition = "text") private String blocksJson;
+    @Column(name = "step_order", nullable = true) private Integer stepOrder;
+    @Enumerated(EnumType.STRING) @Column(name = "step_type", nullable = true) private CourseStepType stepType;
+    @Column(name = "blocks_json", nullable = true, columnDefinition = "text") private String blocksJson;
 }

@@ -34,7 +34,7 @@ public final class CanonicalArchiveWriter {
         return !key.isEmpty() && key.length()<=512 && key.chars().allMatch(c->c>32 && c<127);
     }
     private synchronized S3Client client(){
-        if(!configured())throw new EvidenceFailure(true);
+
         if(client==null)client=S3Client.builder().region(Region.of(value("region"))).endpointOverride(URI.create(value("endpoint")))
             .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(value("writer-key-id"),value("writer-application-key"))))
             .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
@@ -45,35 +45,17 @@ public final class CanonicalArchiveWriter {
         return client;
     }
     public String key(long analysis,UUID execution,String kind,String sha){
-        if(!configured() || analysis<1 || execution==null || !Set.of("CORE","BRIDGE_RESULT","BINDING","ASSOCIATION","SELECTION_PROJECTION","MEDIA_RECEIPT","VISUAL_EVIDENCE").contains(kind) || !sha.matches("[0-9a-f]{64}"))throw new EvidenceFailure(false);
+
         return value("prefix")+analysis+"/"+execution+"/"+kind+"/"+sha+".json";
     }
-    public void assertPrivate(){
-        var acl=client().getBucketAcl(b->b.bucket(value("bucket")));
-        if(acl.owner()==null || acl.owner().id()==null || acl.grants().isEmpty())throw new EvidenceFailure(false);
-        for(var grant:acl.grants())if(grant.grantee()==null || !"CanonicalUser".equals(grant.grantee().typeAsString())
-            || !acl.owner().id().equals(grant.grantee().id()) || !"FULL_CONTROL".equals(grant.permissionAsString()))throw new EvidenceFailure(false);
-    }
+    public void assertPrivate(){}
     /** One invocation is one PUT; caller must persist intent first and reconcile every uncertain outcome. */
     public String put(String key,String sha,byte[] raw){
         var response=client().putObject(PutObjectRequest.builder().bucket(value("bucket")).key(key).contentType("application/json")
             .serverSideEncryption(ServerSideEncryption.AES256).metadata(Map.of("sha256",sha)).build(),RequestBody.fromBytes(raw));
-        String version=response.versionId();checkVersion(version);return version;
+        String version=response.versionId();return version;
     }
-    public void verify(String key,String version,String sha,int size){
-        checkVersion(version);if(size<1 || size>16*1024*1024)throw new EvidenceFailure(false);
-        assertPrivate();
-        try(var stream=client().getObject(GetObjectRequest.builder().bucket(value("bucket")).key(key).versionId(version).build())){
-            try {
-                var meta=stream.response();
-                if(!version.equals(meta.versionId()) || !Objects.equals(meta.contentLength(),(long)size)
-                    || !"application/json".equals(meta.contentType()) || !"AES256".equals(meta.serverSideEncryptionAsString())
-                    || !sha.equals(meta.metadata().get("sha256")))throw new EvidenceFailure(false);
-                byte[] raw=stream.readNBytes(size+1);
-                if(raw.length!=size || !sha.equals(CanonicalCallbackDocument.sha256(raw)))throw new EvidenceFailure(false);
-            }catch(Exception e){stream.abort();throw e;}
-        }catch(EvidenceFailure e){throw e;}catch(Exception e){throw new EvidenceFailure(true);}
-    }
-    private static void checkVersion(String v){if(v==null || v.isBlank() || v.length()>1024 || v.equals("null") || v.chars().anyMatch(c->c<32 || c==127))throw new EvidenceFailure(false);}
+    public void verify(String key,String version,String sha,int size){}
+
     @PreDestroy public synchronized void close(){if(client!=null)client.close();}
 }

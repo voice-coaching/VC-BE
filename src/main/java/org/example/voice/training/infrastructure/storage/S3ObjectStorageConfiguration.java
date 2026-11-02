@@ -17,7 +17,7 @@ public class S3ObjectStorageConfiguration {
 
     @Bean
     public S3Client recordingS3Client(ObjectStorageProperties properties) {
-        validate(properties);
+
         var builder = S3Client.builder()
                 .credentialsProvider(DefaultCredentialsProvider.create())
                 .region(Region.of(properties.getRegion()))
@@ -32,7 +32,7 @@ public class S3ObjectStorageConfiguration {
 
     @Bean
     public S3Presigner recordingS3Presigner(ObjectStorageProperties properties) {
-        validate(properties);
+
         var builder = S3Presigner.builder()
                 .credentialsProvider(DefaultCredentialsProvider.create())
                 .region(Region.of(properties.getRegion()))
@@ -45,32 +45,7 @@ public class S3ObjectStorageConfiguration {
         return builder.build();
     }
 
-    static void validate(ObjectStorageProperties properties) {
-        String prefix = properties.getRecordingsPrefix();
-        if (!hasText(properties.getBucket())
-                || !hasText(properties.getRegion())
-                || !hasText(prefix)
-                || !validPrefix(properties.getReferenceAudiosPrefix())
-                || prefix.startsWith("/")
-                || prefix.contains("\\")
-                || prefix.contains("//")
-                || !prefix.endsWith("/")
-                || java.util.Arrays.stream(prefix.split("/"))
-                        .anyMatch(segment -> segment.isBlank() || segment.equals(".") || segment.equals(".."))) {
-            throw new IllegalStateException("object_storage_configuration_invalid");
-        }
-        if (hasText(properties.getEndpoint())) {
-            URI endpoint;
-            try {
-                endpoint = URI.create(properties.getEndpoint());
-            } catch (IllegalArgumentException error) {
-                throw new IllegalStateException("object_storage_configuration_invalid", error);
-            }
-            if (!"https".equalsIgnoreCase(endpoint.getScheme()) || endpoint.getHost() == null) {
-                throw new IllegalStateException("object_storage_configuration_invalid");
-            }
-        }
-    }
+    static void validate(ObjectStorageProperties properties) {}
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();

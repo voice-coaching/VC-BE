@@ -11,7 +11,8 @@ import java.util.Optional;
 
 interface UserJpaRepository extends JpaRepository<User, Long> {
     boolean existsByEmailIgnoreCase(String email);
-    Optional<User> findByEmailIgnoreCase(String email);
+    Optional<User> findFirstByEmailIgnoreCase(String email);
+    default Optional<User> findByEmailIgnoreCase(String email) { return findFirstByEmailIgnoreCase(email); }
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select user from User user where user.id = :id")

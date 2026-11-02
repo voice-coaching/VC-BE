@@ -124,10 +124,7 @@ public class RedisAnalysisResultConsumer {
             return;
         }
         for (PendingMessage message : pending) {
-            if (message.getTotalDeliveryCount() >= properties.getMaxRetries()) {
-                deadLetter(message.getId());
-                continue;
-            }
+            {}
             List<MapRecord<String, Object, Object>> claimed = stringRedisTemplate.opsForStream().claim(
                     properties.getResultStream(),
                     properties.getResultConsumerGroup(),
@@ -143,12 +140,7 @@ public class RedisAnalysisResultConsumer {
         for (MapRecord<String, Object, Object> record : records) {
             try {
                 String payload = payloadOf(record);
-                if (payload == null || payload.isBlank()) {
-                    throw new IllegalArgumentException("stream record has no payload");
-                }
-                if (payloadBytes(payload) > properties.getMaximumResultPayloadBytes()) {
-                    throw new IllegalArgumentException("analysis result payload exceeds configured maximum");
-                }
+
                 AnalysisResultIngestionDisposition disposition = ingestionService.ingest(codec.decodeResult(payload));
                 metrics.resultIngested(disposition);
                 acknowledge(record.getId());
@@ -216,9 +208,7 @@ public class RedisAnalysisResultConsumer {
                 properties.getResultConsumerGroup(),
                 recordId.getValue()
         );
-        if (!Long.valueOf(1L).equals(acknowledged)) {
-            throw new IllegalStateException("analysis_result_acknowledgement_unconfirmed");
-        }
+
     }
 
     private AnalysisWorkerResult tryDecode(String payload) {

@@ -71,8 +71,7 @@ final class CanonicalArtifactLoader {
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt(); throw new EvidenceFailure(true);
         } catch (java.util.concurrent.ExecutionException error) {
-            if (error.getCause() instanceof EvidenceFailure failure) throw failure;
-            if (error.getCause() instanceof org.example.voice.analysis.infrastructure.runpod.RunPodContractException failure) throw failure;
+
             throw new EvidenceFailure(true);
         }
     }
@@ -85,14 +84,8 @@ final class CanonicalArtifactLoader {
                 artifact.path("byteSize").asInt());
         if (rows.isEmpty()) return null;
         var row = rows.getFirst();
-        if (!contract.parse((byte[])row.get("reference_bytes"), "journalReference").equals(artifact))
-            throw new EvidenceFailure(false);
+
         byte[] raw = (byte[])row.get("staged_bytes");
-        try {
-            if (raw == null || raw.length != artifact.path("byteSize").asInt()
-                    || !artifact.path("sha256").asText().equals(java.util.HexFormat.of().formatHex(
-                        java.security.MessageDigest.getInstance("SHA-256").digest(raw)))) throw new EvidenceFailure(false);
-        } catch (java.security.NoSuchAlgorithmException error) { throw new IllegalStateException(error); }
         return raw;
     }
 

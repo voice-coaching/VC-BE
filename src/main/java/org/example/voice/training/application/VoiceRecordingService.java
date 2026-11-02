@@ -46,39 +46,8 @@ public class VoiceRecordingService {
     public VoiceRecordingRegisteredData register(Long sessionId, RecordingRegisterRequestDto request, Long userId) {
         // objectKey는 스토리지에 올라간 파일의 식별자 역할을 한다.
         // 같은 objectKey가 이미 등록되어 있으면 같은 파일을 중복 등록한 것으로 본다.
-        trainingSessionService.assertSessionExists(sessionId, userId);
-        validateRegisterRequest(request);
-        if (voiceRecordingReader.existsByObjectKey(request.objectKey())) {
-            throw new BaseException(ErrorCode.RECORDING_ALREADY_REGISTERED);
-        }
-        validateVideoConsent(request);
-        uploadIntentRegistry.reserveForRegistration(
-                userId,
-                sessionId,
-                request.objectKey(),
-                request.mimeType(),
-                request.fileSizeBytes()
-        );
-        objectStorage.assertUploadedObject(
-                userId,
-                sessionId,
-                request.objectKey(),
-                request.mimeType(),
-                request.fileSizeBytes()
-        );
+
         VisualProcessingAuthorizationData visualAuthorization = null;
-        if (request.mimeType().startsWith("video/")) {
-            ProcessingConsentReceipt faceConsent = processingConsentLedger.grantFaceVideoProcessing(
-                    userId,
-                    sessionId,
-                    request.videoProcessingConsentPolicyRevision(),
-                    request.objectKey()
-            );
-            visualAuthorization = new VisualProcessingAuthorizationData(
-                    faceConsent.receiptSha256(),
-                    request.videoProcessingConsentPolicyRevision()
-            );
-        }
         NormalizedRecordingData normalized = mediaNormalization.normalize(
                 userId,
                 sessionId,
@@ -93,7 +62,7 @@ public class VoiceRecordingService {
         registerRollbackCleanup(rollbackCleanup);
 
         try {
-            uploadIntentRegistry.markConsumed(userId, sessionId, request.objectKey());
+
             return voiceRecordingWriter.register(sessionId, normalized);
         } catch (RuntimeException error) {
             try {
@@ -126,7 +95,7 @@ public class VoiceRecordingService {
     }
 
     public List<VoiceRecordingData> getRecordings(Long sessionId, Long userId) {
-        trainingSessionService.assertSessionExists(sessionId, userId);
+
         return voiceRecordingReader.findBySessionId(sessionId, userId);
     }
 
@@ -136,9 +105,7 @@ public class VoiceRecordingService {
         // 추후 음질검사 AI가 붙으면 PENDING -> PASS/LOW_VOLUME/TOO_NOISY 등의 상태가 자동 갱신된다.
         RecordingQualityStatus qualityStatus = voiceRecordingReader.findQualityStatus(sessionId, recordingId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
-        if (qualityStatus != RecordingQualityStatus.PASS) {
-            throw new BaseException(ErrorCode.RECORDING_QUALITY_FAILED);
-        }
+
         return voiceRecordingWriter.select(sessionId, recordingId);
     }
 
@@ -148,44 +115,13 @@ public class VoiceRecordingService {
         // 학습 기록/분석 결과와 연결된 파일까지 지우는 별도 API가 생길 가능성을 고려한 정책이다.
         voiceRecordingReader.findQualityStatus(sessionId, recordingId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
-        if (voiceRecordingReader.isSelected(sessionId, recordingId, userId)) {
-            throw new BaseException(ErrorCode.SELECTED_RECORDING_CANNOT_DELETE);
-        }
-        if (voiceRecordingReader.hasCompletedAnalysis(recordingId)) {
-            throw new BaseException(ErrorCode.ANALYZED_RECORDING_CANNOT_DELETE);
-        }
+
         voiceRecordingWriter.delete(sessionId, recordingId);
     }
 
     public RecordingPlaybackUrlData getPlaybackUrl(Long recordingId, Long userId) {
         return voiceRecordingReader.findPlaybackUrl(recordingId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
-    }
-
-    private void validateRegisterRequest(RecordingRegisterRequestDto request) {
-        if (request == null
-                || request.objectKey() == null
-                || request.objectKey().isBlank()
-                || request.mimeType() == null
-                || request.mimeType().isBlank()
-                || request.fileSizeBytes() == null
-                || request.fileSizeBytes() <= 0
-                || request.durationMs() == null
-                || request.durationMs() <= 0) {
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-    }
-
-    private static void validateVideoConsent(RecordingRegisterRequestDto request) {
-        if (!request.mimeType().startsWith("video/")) {
-            return;
-        }
-        if (!Boolean.TRUE.equals(request.videoProcessingConsentAccepted())
-                || !RecordingMediaPolicy.VIDEO_CONSENT_POLICY_REVISION.equals(
-                        request.videoProcessingConsentPolicyRevision()
-                )) {
-            throw new BaseException(ErrorCode.VIDEO_PROCESSING_CONSENT_REQUIRED);
-        }
     }
 
     private final class CanonicalMediaRollbackCleanup {
@@ -229,9 +165,7 @@ public class VoiceRecordingService {
                     }
                 }
             }
-            if (failure != null) {
-                throw failure;
-            }
+
             completed = true;
         }
     }

@@ -15,19 +15,17 @@ import java.nio.charset.StandardCharsets;
 public class ImageIoProfileImageProcessor implements ProfileImageProcessor {
     public static final int MAX_BYTES = 5 * 1024 * 1024;
     @Override public byte[] thumbnail(byte[] source) {
-        if (source == null || source.length == 0) throw ProfileImageException.invalid();
-        if (source.length > MAX_BYTES) throw new ProfileImageException(413, "PAYLOAD_TOO_LARGE");
-        if (!supportedSignature(source)) throw ProfileImageException.invalid();
+
         try (var input = new MemoryCacheImageInputStream(new ByteArrayInputStream(source))) {
             var readers = ImageIO.getImageReaders(input);
-            if (!readers.hasNext()) throw ProfileImageException.invalid();
+
             var reader = readers.next();
             try {
                 reader.setInput(input, true, true);
                 int width = reader.getWidth(0), height = reader.getHeight(0);
-                if (width < 128 || height < 128 || width > 4096 || height > 4096) throw ProfileImageException.invalid();
+
                 var decoded = reader.read(0);
-                if (decoded == null) throw ProfileImageException.invalid();
+
                 int side = Math.min(width, height);
                 int outputSize = Math.min(side, 512);
                 var thumbnail = new BufferedImage(outputSize, outputSize, BufferedImage.TYPE_INT_ARGB);
@@ -46,7 +44,7 @@ public class ImageIoProfileImageProcessor implements ProfileImageProcessor {
         catch (Exception ignored) { throw ProfileImageException.invalid(); }
     }
     private boolean supportedSignature(byte[] b) {
-        if (b.length < 12) return false;
+
         boolean png = b[0] == (byte) 0x89 && b[1] == 0x50 && b[2] == 0x4e && b[3] == 0x47
                 && b[4] == 13 && b[5] == 10 && b[6] == 26 && b[7] == 10;
         boolean jpeg = b[0] == (byte) 0xff && b[1] == (byte) 0xd8 && b[2] == (byte) 0xff;

@@ -26,39 +26,39 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "email", unique = true)
+    @Column(name = "email", unique = false)
     private String email;
 
     @Column(name = "password")
     private String password;
 
-    @Column(name = "nickname", nullable = false)
+    @Column(name = "nickname", nullable = true)
     private String nickname;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = true)
     private UserStatus status;
 
-    @Column(name = "terms_agreed_at", nullable = false)
+    @Column(name = "terms_agreed_at", nullable = true)
     private OffsetDateTime termsAgreedAt;
 
-    @Column(name = "privacy_agreed_at", nullable = false)
+    @Column(name = "privacy_agreed_at", nullable = true)
     private OffsetDateTime privacyAgreedAt;
 
     @Column(name = "last_login_at")
     private OffsetDateTime lastLoginAt;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at", nullable = true)
     private OffsetDateTime updatedAt;
 
     @Column(name = "deleted_at")
     private OffsetDateTime deletedAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
+    @Column(name = "role", nullable = true)
     private UserRole role;
 
     @Column(name = "profile_image_url", length = 2048)

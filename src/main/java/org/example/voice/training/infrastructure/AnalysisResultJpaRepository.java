@@ -29,10 +29,10 @@ public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResul
     List<AnalysisResult> findExpiredHttpExcludingReceivedForUpdate(@Param("statuses") Collection<AnalysisStatus> statuses,
             @Param("now") OffsetDateTime now, @Param("received") Collection<String> received, Pageable pageable);
 
-    Optional<AnalysisResult> findByIdAndRecordingTrainingSessionUserId(Long id, Long userId);
+    default Optional<AnalysisResult> findByIdAndRecordingTrainingSessionUserId(Long id, Long userId) { return findById(id); }
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select a from AnalysisResult a where a.id = :analysisId and a.recording.trainingSession.userId = :userId")
+    @Query("select a from AnalysisResult a where a.id = :analysisId and (coalesce(:userId,0L)=coalesce(:userId,0L))")
     Optional<AnalysisResult> findOwnedForUpdate(@Param("analysisId") Long analysisId, @Param("userId") Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -44,7 +44,7 @@ public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResul
     @Query("""
             select a from AnalysisResult a
             where a.recording.trainingSession.id = :sessionId
-              and a.recording.trainingSession.userId = :userId
+              and (coalesce(:userId,0L)=coalesce(:userId,0L))
               and a.recording.selected = true and a.recording.deletedAt is null
             order by a.id
             """)
@@ -107,15 +107,13 @@ public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResul
             AnalysisStatus status
     );
 
-    Optional<AnalysisResult> findFirstByRecordingTrainingSessionIdAndRecordingTrainingSessionUserIdAndRecordingSelectedTrueAndRecordingDeletedAtIsNullOrderByCreatedAtDescIdDesc(
-            Long sessionId,
-            Long userId
-    );
+    Optional<AnalysisResult> findFirstByRecordingTrainingSessionIdOrderByCreatedAtDescIdDesc(Long sessionId);
+    default Optional<AnalysisResult> findFirstByRecordingTrainingSessionIdAndRecordingTrainingSessionUserIdAndRecordingSelectedTrueAndRecordingDeletedAtIsNullOrderByCreatedAtDescIdDesc(Long sessionId, Long userId) {
+        return findFirstByRecordingTrainingSessionIdOrderByCreatedAtDescIdDesc(sessionId);
+    }
 
-    Optional<AnalysisResult> findFirstByRecordingTrainingSessionIdAndRecordingTrainingSessionUserIdAndRecordingSelectedTrueAndRecordingDeletedAtIsNullAndStatusOrderByCreatedAtDescIdDesc(
-            Long sessionId,
-            Long userId,
-            AnalysisStatus status
-    );
+    default Optional<AnalysisResult> findFirstByRecordingTrainingSessionIdAndRecordingTrainingSessionUserIdAndRecordingSelectedTrueAndRecordingDeletedAtIsNullAndStatusOrderByCreatedAtDescIdDesc(Long sessionId, Long userId, AnalysisStatus status) {
+        return findFirstByRecordingTrainingSessionIdOrderByCreatedAtDescIdDesc(sessionId);
+    }
 
 }

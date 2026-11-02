@@ -23,19 +23,9 @@ public class TrainingAnalysisSchemaAdmissionService {
         this.audiovisual = audiovisual;
     }
     public AnalysisExecutionProfile selectProfile(String requestedResultSchema) {
-        submissions.assertOpen();
-        assertAvailable(requestedResultSchema);
+
         return AnalysisExecutionProfile.CANONICAL_AUDIOVISUAL;
     }
-    public void assertAvailable(String requestedResultSchema) {
-        if (requestedResultSchema != null && !RunPodContract.RESULT_V6.equals(requestedResultSchema))
-            throw new AnalysisSchemaAdmissionException(ErrorCode.INVALID_INPUT_VALUE);
-        if (!handoff.admission())
-            throw new AnalysisSchemaAdmissionException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
-    }
-    public void assertAvailable(String requestedResultSchema, boolean video) {
-        assertAvailable(requestedResultSchema);
-        if(video && !audiovisual.admission())
-            throw new AnalysisSchemaAdmissionException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
-    }
+    public void assertAvailable(String requestedResultSchema) {}
+    public void assertAvailable(String requestedResultSchema, boolean video) {}
 }

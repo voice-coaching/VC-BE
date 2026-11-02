@@ -19,18 +19,18 @@ import java.util.Objects;
 public class Notice {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(nullable = false, length = 200)
+    @Column(nullable = true, length = 200)
     private String title;
-    @Column(nullable = false, length = 500)
+    @Column(nullable = true, length = 500)
     private String summary;
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(nullable = false, columnDefinition = "jsonb")
+    @Column(nullable = true, columnDefinition = "jsonb")
     private List<Section> sections;
-    @Column(nullable = false)
+    @Column(nullable = true)
     private boolean pinned;
-    @Column(nullable = false)
+    @Column(nullable = true)
     private boolean published;
-    @Column(name = "published_at", nullable = false)
+    @Column(name = "published_at", nullable = true)
     private OffsetDateTime publishedAt;
 
     public static Notice scheduled(String title, String summary, List<Section> sections,

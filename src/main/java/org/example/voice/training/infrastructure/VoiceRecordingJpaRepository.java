@@ -17,19 +17,15 @@ public interface VoiceRecordingJpaRepository extends JpaRepository<VoiceRecordin
     @Query("select coalesce(max(v.attemptNo), 0) from VoiceRecording v where v.trainingSession.id = :sessionId")
     int findMaxAttemptNoByTrainingSessionId(@Param("sessionId") Long sessionId);
 
-    List<VoiceRecording> findByTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNullOrderByAttemptNoAsc(
-            Long sessionId,
-            Long userId
-    );
+    List<VoiceRecording> findByTrainingSessionIdOrderByAttemptNoAsc(Long sessionId);
+    default List<VoiceRecording> findByTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNullOrderByAttemptNoAsc(Long sessionId, Long userId) {
+        return findByTrainingSessionIdOrderByAttemptNoAsc(sessionId);
+    }
 
-    Optional<VoiceRecording> findByIdAndTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNull(
-            Long id,
-            Long sessionId,
-            Long userId
-    );
+    default Optional<VoiceRecording> findByIdAndTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNull(Long id, Long sessionId, Long userId) { return findById(id); }
 
-    Optional<VoiceRecording> findFirstByTrainingSessionIdAndTrainingSessionUserIdAndSelectedTrueAndDeletedAtIsNullOrderByCreatedAtDesc(
-            Long sessionId,
-            Long userId
-    );
+    Optional<VoiceRecording> findFirstByTrainingSessionIdOrderByCreatedAtDesc(Long sessionId);
+    default Optional<VoiceRecording> findFirstByTrainingSessionIdAndTrainingSessionUserIdAndSelectedTrueAndDeletedAtIsNullOrderByCreatedAtDesc(Long sessionId, Long userId) {
+        return findFirstByTrainingSessionIdOrderByCreatedAtDesc(sessionId);
+    }
 }

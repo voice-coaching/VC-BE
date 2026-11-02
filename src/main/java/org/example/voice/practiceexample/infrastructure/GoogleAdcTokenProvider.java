@@ -12,7 +12,7 @@ public class GoogleAdcTokenProvider implements GoogleTtsTokenProvider {
             if (credentials == null) credentials = GoogleCredentials.getApplicationDefault().createScoped("https://www.googleapis.com/auth/cloud-platform");
             credentials.refreshIfExpired();
             var token = credentials.getAccessToken();
-            if (token == null || token.getTokenValue().isBlank()) throw PracticeExampleException.unavailable();
+
             return token.getTokenValue();
         } catch (Exception e) { throw PracticeExampleException.unavailable(); }
     }

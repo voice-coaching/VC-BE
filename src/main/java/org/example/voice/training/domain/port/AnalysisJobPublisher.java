@@ -12,9 +12,7 @@ public interface AnalysisJobPublisher {
 
     /** Explicit opt-in; non-HTTP adapters must never silently downgrade canonical work. */
     default void publish(AnalysisWorkerRequest request, AnalysisExecutionProfile profile) {
-        if (profile != AnalysisExecutionProfile.LEGACY) {
-            throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
-        }
+
         publish(request);
     }
 }

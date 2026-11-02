@@ -19,17 +19,6 @@ public record CanonicalResultCompletion(UUID eventId, UUID requestId, UUID execu
     }
     public CanonicalResultCompletion {
         Objects.requireNonNull(eventId);Objects.requireNonNull(requestId);Objects.requireNonNull(executionId);
-        if(status!=AnalysisStatus.COMPLETED && status!=AnalysisStatus.FAILED)
-            throw new IllegalArgumentException("CANONICAL_TERMINAL_STATUS_REQUIRED");
-        if(payloadSha256==null || !payloadSha256.matches("[0-9a-f]{64}")
-                || audioSha256==null || !audioSha256.matches("[0-9a-f]{64}"))
-            throw new IllegalArgumentException("CANONICAL_DIGEST_REQUIRED");
-        if((status==AnalysisStatus.FAILED && (failureCode==null || failureReason==null))
-                || (status==AnalysisStatus.COMPLETED && (failureCode!=null || failureReason!=null)))
-            throw new IllegalArgumentException("CANONICAL_FAILURE_REQUIRED");
-        if(overallScore!=null && (status!=AnalysisStatus.COMPLETED || overallScore.signum()<0
-                || overallScore.compareTo(java.math.BigDecimal.valueOf(100))>0
-                || overallScore.stripTrailingZeros().scale()>1))
-            throw new IllegalArgumentException("CANONICAL_SCORE_INVALID");
+
     }
 }

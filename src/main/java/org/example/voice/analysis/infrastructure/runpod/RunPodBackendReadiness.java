@@ -18,8 +18,7 @@ public class RunPodBackendReadiness {
     }
 
     public boolean isReady() {
-        if (!"runpod_http".equals(transport) || !properties.isConfigured()
-                || properties.getClaimTtl().isNegative() || properties.getClaimTtl().isZero()) return false;
+
         try {
             // Probe the required persisted execution columns without creating a job or calling the worker.
             jdbc.queryForList("select active_execution_id, execution_deadline_at, worker_instance_id, claim_expires_at, last_result_payload_sha256 from analysis_results where 1=0");

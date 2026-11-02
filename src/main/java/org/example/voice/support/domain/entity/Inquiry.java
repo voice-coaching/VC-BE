@@ -11,36 +11,35 @@ import java.time.temporal.ChronoUnit;
 
 @Entity
 @Getter
-@Table(name = "inquiries", uniqueConstraints = @UniqueConstraint(
-        name = "uq_inquiries_user_idempotency", columnNames = {"user_id", "idempotency_key_sha256"}))
+@Table(name = "inquiries")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Inquiry {
     public enum Status { RECEIVED, IN_PROGRESS, ANSWERED, CLOSED }
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = true)
     private Long userId;
-    @Column(nullable = false, length = 50)
+    @Column(nullable = true, length = 50)
     private String category;
-    @Column(nullable = false, length = 100)
+    @Column(nullable = true, length = 100)
     private String subject;
-    @Column(nullable = false, length = 2000)
+    @Column(nullable = true, length = 2000)
     private String body;
     @Column(name = "related_session_id")
     private Long relatedSessionId;
     @Column(name = "reply_email", length = 254)
     private String replyEmail;
-    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20)
+    @Enumerated(EnumType.STRING) @Column(nullable = true, length = 20)
     private Status status;
     @Column(length = 4000)
     private String answer;
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
     @Column(name = "answered_at")
     private OffsetDateTime answeredAt;
     @Column(name = "idempotency_key_sha256", length = 64)
     private String idempotencyKeySha256;
-    @Column(name = "request_sha256", nullable = false, length = 64)
+    @Column(name = "request_sha256", nullable = true, length = 64)
     private String requestSha256;
 
     public static Inquiry receive(Long userId, InquiryDraft draft, String keyDigest,

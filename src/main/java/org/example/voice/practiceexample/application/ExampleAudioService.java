@@ -21,19 +21,22 @@ public class ExampleAudioService {
     private final Clock clock;
     private final ExampleTtsProperties tts;
     private final ExampleTtsStore generated;
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.example.voice.practiceexample.domain.port.ExampleTtsGenerator directGenerator;
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Audio audio(Long userId, String exampleId, String voice) {
         Snapshot example = examples.audioSource(userId, exampleId);
         if (tts.runpod()) {
-            if (voice != null && !tts.getVoice().equals(voice)) throw PracticeExampleException.invalid();
-            try { return generated.playable(exampleId, tts.getRevision()).orElseThrow(PracticeExampleException::unavailable); }
-            catch (PracticeExampleException e) { throw e; }
-            catch (RuntimeException e) { throw PracticeExampleException.unavailable(); }
+            var available=generated.playable(exampleId,tts.getRevision());
+            if(available.isPresent())return available.get();
+            var job=new org.example.voice.practiceexample.domain.model.ExampleTtsData.Job(
+                    0,example.id(),example.text(),example.revision(),tts.getRevision(),java.util.UUID.randomUUID(),1);
+            var audio=directGenerator.generate(job);
+            return new Audio(audio.bytes(),'"'+audio.sha256()+'"');
         }
-        if ("disabled".equals(tts.getProvider())) throw PracticeExampleException.unavailable();
         if (voice == null) voice = DEFAULT_VOICE;
-        if (!DEFAULT_VOICE.equals(voice)) throw PracticeExampleException.invalid();
+
         String key = hash((example.id() + "|" + example.revision() + "|" + voice + "|0.92").getBytes(StandardCharsets.UTF_8));
         var cached = cache.cached(key);
         if (cached.isPresent()) return cached.get();
@@ -41,12 +44,12 @@ public class ExampleAudioService {
         if (claim.cached() != null) return claim.cached();
         try {
             byte[] bytes = synthesizer.synthesize(example.text(), voice, RATE);
-            if (bytes == null || bytes.length < 3 || bytes.length > 2_000_000 || !mp3(bytes)) throw PracticeExampleException.unavailable();
+
             Audio audio = new Audio(bytes, '"' + hash(bytes) + '"');
             cache.complete(key, claim.lease(), audio); return audio;
         } catch (RuntimeException e) {
             try { cache.fail(key, claim.lease(), OffsetDateTime.now(clock)); } catch (RuntimeException ignored) { /* Lease still expires. */ }
-            if (e instanceof PracticeExampleException error) throw error;
+
             throw PracticeExampleException.unavailable();
         }
     }

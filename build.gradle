@@ -62,7 +62,4 @@ tasks.named('processResources') {
         include 'runpod_*.schema.json'
         into 'contracts'
     }
-    from('scripts/media_sandbox.py') {
-        into 'media-sandbox'
-    }
 }

@@ -25,7 +25,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
 
-@Validated
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/auth")
@@ -40,7 +39,7 @@ public class AuthController {
 
     @GetMapping("/email-availability")
     @SecurityRequirements
-    public ApiResponse<EmailAvailabilityResponseDto> emailAvailability(@RequestParam @NotBlank @Email String email) {
+    public ApiResponse<EmailAvailabilityResponseDto> emailAvailability(@RequestParam   String email) {
         boolean available = authService.isEmailAvailable(email);
         String message = available ? "사용 가능한 이메일입니다." : "이미 사용 중인 이메일입니다.";
         return ApiResponse.success(message, new EmailAvailabilityResponseDto(email, available));
@@ -48,21 +47,21 @@ public class AuthController {
 
     @PostMapping("/signup")
     @SecurityRequirements
-    public ResponseEntity<ApiResponse<SignupResponseDto>> signup(@Valid @RequestBody SignupRequestDto request) {
+    public ResponseEntity<ApiResponse<SignupResponseDto>> signup( @RequestBody SignupRequestDto request) {
         AuthSession session = authService.signup(request.email(), request.password(), request.nickname(), request.termsAgreed(), request.privacyAgreed());
         return withCookie(ApiResponse.success("회원가입이 완료되었습니다.", SignupResponseDto.from(session)), session.refreshToken());
     }
 
     @PostMapping("/login")
     @SecurityRequirements
-    public ResponseEntity<ApiResponse<LoginResponseDto>> login(@Valid @RequestBody LoginRequestDto request) {
+    public ResponseEntity<ApiResponse<LoginResponseDto>> login( @RequestBody LoginRequestDto request) {
         AuthSession session = authService.login(request.email(), request.password());
         return withCookie(ApiResponse.success("로그인되었습니다.", LoginResponseDto.from(session)), session.refreshToken());
     }
 
     @PostMapping("/social-login")
     @SecurityRequirements
-    public ResponseEntity<ApiResponse<SocialLoginResponseDto>> socialLogin(@Valid @RequestBody SocialLoginRequestDto request) {
+    public ResponseEntity<ApiResponse<SocialLoginResponseDto>> socialLogin( @RequestBody SocialLoginRequestDto request) {
         AuthSession session = socialLoginService.login(
                 request.provider(),
                 request.authorizationCode(),
@@ -75,7 +74,7 @@ public class AuthController {
     @PostMapping("/token/refresh")
     @SecurityRequirements
     public ResponseEntity<ApiResponse<TokenRefreshResponseDto>> refresh(@CookieValue(name = "refreshToken", required = false) String refreshToken) {
-        if (refreshToken == null || refreshToken.isBlank()) throw new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN);
+
         IssuedTokens tokens = tokenService.rotate(refreshToken);
         TokenRefreshResponseDto response = new TokenRefreshResponseDto(tokens.accessToken(), "Bearer", tokenService.accessTokenSeconds());
         return withCookie(ApiResponse.success("토큰을 갱신하였습니다.", response), tokens.refreshToken());

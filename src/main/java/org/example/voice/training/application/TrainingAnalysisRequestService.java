@@ -60,40 +60,20 @@ public class TrainingAnalysisRequestService {
     public AnalysisRequestData requestAnalysis(Long sessionId, Long userId, AnalysisConsentData consent,
                                               AnalysisExecutionProfile profile) {
         java.util.Objects.requireNonNull(profile, "profile");
-        // 1. 분석 요청은 "사용자 소유 세션 + 최종 선택 녹음 + 통과한 음질"이 모두 만족될 때만 가능하다.
-        trainingSessionService.assertSessionExists(sessionId, userId);
-        analysisAdmissionGuard.acquireAndAssertAvailable(userId);
-        validateConsent(consent);
+        // 선택된 세션의 녹음으로 요청을 구성한다. 별도의 접수·동의·품질 제한은 적용하지 않는다.
+
         trainingSessionWriter.lockAnalysisSelection(sessionId, userId);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.SELECTED_RECORDING_NOT_FOUND));
-        validateSupportedFocus(source);
-        if (source.qualityStatus() != RecordingQualityStatus.PASS) {
-            throw new BaseException(ErrorCode.AUDIO_QUALITY_NOT_ACCEPTABLE);
-        }
-        if (trainingAnalysisReader.existsRunningAnalysis(source.recordingId())) {
-            throw new BaseException(ErrorCode.ANALYSIS_ALREADY_RUNNING);
-        }
-        if (trainingAnalysisReader.existsAnalysis(source.recordingId())) {
-            throw new BaseException(ErrorCode.ANALYSIS_ALREADY_REQUESTED);
-        }
 
         UUID requestEventId = UUID.randomUUID();
-        ProcessingConsentReceipt consentReceipt = processingConsentLedger.grantVoiceAnalysis(
-                userId,
-                sessionId,
-                source.recordingId(),
-                requestEventId,
-                consent.policyRevision(),
-                source.audioSha256()
-        );
+
         trainingSessionWriter.startAnalysis(sessionId);
         AnalysisRequestData result = trainingAnalysisWriter.createPending(source.recordingId(), requestEventId);
-        coachingUsageService.reserve(userId, result.analysisId(), source.recordingId(), requestEventId,
-                source.scriptText(), source.durationMs());
+
         publish(toWorkerRequest(
                 result.analysisId(), requestEventId, userId, sessionId, source,
-                consent.policyRevision(), consentReceipt.receiptSha256()
+                null, null
         ), profile);
         return result;
     }
@@ -101,7 +81,7 @@ public class TrainingAnalysisRequestService {
     public AnalysisProgressData getStatus(Long sessionId, Long userId) {
         // 현재 스키마에는 stage/progress 컬럼이 없어서 Reader에서 status 기반 임시 진행값을 계산한다.
         // AI 작업자가 진행률을 DB에 저장하게 되면 Reader 구현만 바꾸면 된다.
-        trainingSessionService.assertSessionExists(sessionId, userId);
+
         return trainingAnalysisReader.findLatestBySelectedRecording(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FOUND));
     }
@@ -115,40 +95,26 @@ public class TrainingAnalysisRequestService {
     public AnalysisRetryData retry(Long sessionId, Long userId, AnalysisConsentData consent,
                                    AnalysisExecutionProfile profile) {
         java.util.Objects.requireNonNull(profile, "profile");
-        // 재시도는 실패한 분석만 대상으로 한다.
+        // 재시도 상태·횟수 제한 없이 현재 분석을 다시 요청한다.
         // 실패 row를 새 request event id의 PENDING 상태로 전환하고 outbox에 다시 기록한다.
-        trainingSessionService.assertSessionExists(sessionId, userId);
-        analysisAdmissionGuard.acquireAndAssertAvailable(userId);
-        validateConsent(consent);
+
         trainingSessionWriter.lockAnalysisSelection(sessionId, userId);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
-        validateSupportedFocus(source);
+
         AnalysisProgressData failed = trainingAnalysisReader.findLatestFailedBySelectedRecording(sessionId, userId)
-                .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FAILED));
-        if (source.qualityStatus() != RecordingQualityStatus.PASS) {
-            throw new BaseException(ErrorCode.AUDIO_QUALITY_NOT_ACCEPTABLE);
-        }
+                .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FOUND));
 
         UUID requestEventId = UUID.randomUUID();
-        ProcessingConsentReceipt consentReceipt = processingConsentLedger.grantVoiceAnalysis(
-                userId,
-                sessionId,
-                source.recordingId(),
-                requestEventId,
-                consent.policyRevision(),
-                source.audioSha256()
-        );
-        trainingSessionWriter.assertAnalysisRetryAllowed(sessionId);
+
         AnalysisRetryData result = trainingAnalysisWriter.retry(
                 failed.analysisId(),
                 requestEventId
         );
-        coachingUsageService.reserve(userId, result.analysisId(), source.recordingId(), requestEventId,
-                source.scriptText(), source.durationMs());
+
         publish(toWorkerRequest(
                 result.analysisId(), requestEventId, userId, sessionId, source,
-                consent.policyRevision(), consentReceipt.receiptSha256()
+                null, null
         ), profile);
         return result;
     }
@@ -190,25 +156,7 @@ public class TrainingAnalysisRequestService {
                             source.recordingId()
                     )
                     : null;
-            AnalysisAuthorizationGrant grant = analysisAuthorizationIssuer.issue(
-                    new AnalysisAuthorizationIssue(
-                            requestEventId,
-                            analysisId,
-                            source.contentId(),
-                            source.promptRevision(),
-                            scriptSha256,
-                            source.audioObjectKey(),
-                            source.audioSha256(),
-                            source.mimeType(),
-                            source.fileSizeBytes(),
-                            source.durationMs(),
-                            source.learningFocus(),
-                            consentReceiptSha256,
-                            consentPolicyRevision,
-                            closedBetaContext,
-                            visualInput
-                    )
-            );
+            AnalysisAuthorizationGrant grant = null;
             return new AnalysisWorkerRequest(
                     closedBetaContext == null
                             ? AnalysisWorkerRequest.LEGACY_SCHEMA_VERSION
@@ -231,22 +179,6 @@ public class TrainingAnalysisRequestService {
             );
         } catch (IllegalArgumentException error) {
             throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
-        }
-    }
-
-    private static void validateConsent(AnalysisConsentData consent) {
-        if (consent == null
-                || !Boolean.TRUE.equals(consent.accepted())
-                || consent.policyRevision() == null
-                || consent.policyRevision().isBlank()
-                || consent.policyRevision().length() > 100) {
-            throw new BaseException(ErrorCode.ANALYSIS_CONSENT_REQUIRED);
-        }
-    }
-
-    private static void validateSupportedFocus(SelectedRecordingAnalysisData source) {
-        if (source.learningFocus() != LearningFocus.PRONUNCIATION) {
-            throw new BaseException(ErrorCode.ANALYSIS_FOCUS_NOT_SUPPORTED);
         }
     }
 
