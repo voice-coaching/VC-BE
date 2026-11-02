@@ -18,6 +18,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 @ConditionalOnProperty(prefix = "analysis", name = "transport", havingValue = "runpod_http")
 public class RunPodExecutionTimeoutSweeper {
     private final AnalysisResultJpaRepository results;
@@ -28,5 +29,26 @@ public class RunPodExecutionTimeoutSweeper {
 
     @Transactional
     @Scheduled(fixedDelayString = "${analysis.runpod.timeout-sweep-interval:PT15S}")
-    public void expire() {}
+    public void expire() {
+        var now = OffsetDateTime.now(ZoneOffset.UTC);
+        var statuses = List.of(AnalysisStatus.PENDING, AnalysisStatus.PROCESSING);
+        var page = PageRequest.of(0, properties.getBatchSize());
+        var received = delivery.enabled() ? delivery.entries().stream()
+                .filter(entry -> entry.receivedAt != null && !entry.rejected)
+                .map(entry -> entry.document.projection().identity().executionId().toString()).toList()
+                : List.<String>of();
+        var expired = received.isEmpty() ? results.findExpiredHttpForUpdate(statuses, now, page)
+                : results.findExpiredHttpExcludingReceivedForUpdate(statuses, now, received, page);
+        for (var result : expired) {
+            // Match the exact execution; main's broader current(result) also sees old/staging entries.
+            if (result.getHandoffReceivedAt() != null
+                    || delivery.owns(result.getId(), UUID.fromString(result.getActiveExecutionId()))) continue;
+            result.fail("analysis_execution_timeout", "분석 실행 시간이 만료되었습니다. 다시 시도해 주세요.", null, null);
+            org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log, "analysis_failed", result.getId(),
+                    result.getActiveRequestEventId(), result.getActiveExecutionId(), "analysis_execution_timeout");
+            outboxes.findByAnalysisResultIdAndStatus(result.getId(), AnalysisRequestOutboxStatus.PENDING)
+                    .forEach(event -> event.cancelPending("analysis_execution_timeout"));
+            cancellations.schedule(UUID.fromString(result.getActiveRequestEventId()));
+        }
+    }
 }
