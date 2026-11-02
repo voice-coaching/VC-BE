@@ -277,6 +277,23 @@ class AdminApiIntegrationTest {
                 .content(json.writeValueAsString(Map.of("version",published.version(),"reason","삭제")))).andExpect(status().isOk());
         mvc.perform(get("/api/practice-contents/{id}",created.id()).with(auth(owner,"USER"))).andExpect(status().isNotFound());
     }
+    @Test void withdrawnAndDeletedMembersAreAbsentFromListsDetailsAndIdentifierSearch() throws Exception {
+        String prefix="visible-"+UUID.randomUUID();
+        var active=User.createLocal(UUID.randomUUID()+"@example.invalid","hash",prefix+"-active",NOW);em.persist(active);
+        var suspended=User.createLocal(UUID.randomUUID()+"@example.invalid","hash",prefix+"-suspended",NOW);ReflectionTestUtils.setField(suspended,"status",UserStatus.SUSPENDED);em.persist(suspended);
+        var withdrawn=User.createLocal(UUID.randomUUID()+"@example.invalid","hash",prefix+"-withdrawn",NOW);withdrawn.withdraw(NOW);em.persist(withdrawn);
+        var deleted=User.createLocal(UUID.randomUUID()+"@example.invalid","hash",prefix+"-deleted",NOW);ReflectionTestUtils.setField(deleted,"deletedAt",NOW);em.persist(deleted);
+        em.flush();
+        mvc.perform(get("/api/admin/users").param("keyword",prefix).with(auth(actor,"ADMIN")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(2))
+            .andExpect(jsonPath("$.data.items.length()").value(2));
+        mvc.perform(get("/api/admin/users").param("keyword",prefix).param("status","WITHDRAWN").with(auth(actor,"ADMIN")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        for(String suffix:List.of("","/overview","/records?resource=TRAINING_SESSIONS"))
+            mvc.perform(get("/api/admin/users/"+withdrawn.getId()+suffix).with(auth(actor,"ADMIN"))).andExpect(status().isNotFound());
+        mvc.perform(get("/api/admin/users/resolve").param("identifier",withdrawn.getId().toString()).with(auth(actor,"ADMIN"))).andExpect(status().isNotFound());
+        mvc.perform(get("/api/admin/users/{id}",deleted.getId()).with(auth(actor,"ADMIN"))).andExpect(status().isNotFound());
+    }
     private RequestPostProcessor auth(long id,String role) {
         var issued = tokenService.issueSession(em.find(User.class,id));
         String token = tokenProvider.reissue(id, UserRole.valueOf(role), issued.sessionId()).accessToken();

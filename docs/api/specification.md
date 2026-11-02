@@ -2168,4 +2168,9 @@ V65부터 공용 콘텐츠 전체 유형을 공개 상태와 관계없이 수정
 
 ## DELETE /api/admin/users/{userId}
 
-활성 관리자 전용 회원 DB 삭제. path userId는 양의 회원 번호이며 query는 없다. 요청 confirmationUserId(필수 양의 정수), expectedUpdatedAt(ISO 시각 또는 null), reason(필수 1~500자)을 받고 200 data {userId:number, deletedAt:ISO string, alreadyDeleted:boolean}을 반환한다. 확인 번호/사유 오류400, 미인증401, 권한없음403, 미존재404, 자기계정/수정시각 충돌409, 저장소 장애는 기존 관리자 오류 응답을 따른다. 다른 회원과 공용 콘텐츠, 외부 원본 파일은 삭제하지 않는다. 최소 삭제 확인·작업 기록은 보존한다. 필드·오류 코드·DB 관계의 상세 계약은 [회원 관리](admin-communications-and-members.md#6-회원-상세-보완-및-db-완전-삭제-175)를 따른다.
+활성 관리자 전용 회원 DB 삭제. path userId는 양의 회원 번호이며 query는 없다. 요청 expectedUpdatedAt(ISO 시각 또는 null), reason(필수 1~500자)을 받고 200 data {userId:number, deletedAt:ISO string, alreadyDeleted:boolean}을 반환한다. 사유 오류400, 미인증401, 권한없음403, 미존재404, 자기계정/수정시각 충돌409, 저장소 장애는 기존 관리자 오류 응답을 따른다. 다른 회원과 공용 콘텐츠, 외부 원본 파일은 삭제하지 않는다. 최소 삭제 확인·작업 기록은 보존한다. 필드·오류 코드·DB 관계의 상세 계약은 [회원 관리](admin-communications-and-members.md#6-회원-상세-보완-및-db-완전-삭제-175)를 따른다.
+
+
+## 관리자 회원 가시성 및 조회 갱신 (#180)
+
+GET /api/admin/users와 개별 상세·overview·records·resolve는 탈퇴(WITHDRAWN)/deleted_at 회원을 반환하지 않는다. 목록 합계에도 포함하지 않으며 상세/기록/숫자 식별자 직접 조회는404, UUID 검색은 해당 회원을 제외한다. status=WITHDRAWN 목록은 빈 배열이다. SUSPENDED 회원은 조회 가능하다. DELETE는 사유만 직접 입력하고 expectedUpdatedAt은 클라이언트가 최신 상세에서 자동 전송한다. 상세 계약과 API별 캐시 정책은 [회원 관리](admin-communications-and-members.md), [조회 정책](../architecture/admin-read-performance.md)을 따른다.
