@@ -84,4 +84,5 @@ Windows checkout의 SQL 줄바꿈을 LF로 정규화하여 다시 패키징했�
 
 소스는 별도 커밋에 보존했다. 사용자가 `voice-coaching/VC-BE`의
 `fix/outbox-timeout-production-20261103` 브랜치 push와 검토용 PR 생성을 명시 승인했다.
-GitHub main/develop 병합이나 CI 배포를 실행한 것으로 보고하지 않는다.
+해당 브랜치 push와 [검토용 PR #178](https://github.com/voice-coaching/VC-BE/pull/178)
+생성을 완료했다. PR은 draft이며 main/develop 병합이나 CI 배포는 수행하지 않았다.
