@@ -377,3 +377,7 @@ PR 제목 예시:
 ## 관리자 알림·회원 기록 추가 구현
 
 전체·개별 앱 내 알림, 수동 요금제 안내, 기간 지정 전체 팝업, 회원별 기록·분석 UUID 조회를 추가했다. API 12개(관리자11·사용자1), V64 신규 테이블3개이며 프론트는 수정하지 않았다. [API 계약](../api/admin-communications-and-members.md), [DB 구조](../database/admin-communications.md)를 따른다. 웹 푸시·결제 자동 알림·회원 PK UUID 전환은 포함하지 않는다.
+
+## 관리자 콘텐츠 수정·삭제 (이슈 #173)
+
+V65부터 공용 콘텐츠 전체 유형을 공개 상태와 관계없이 수정할 수 있다. `DELETE /api/admin/contents/{contentId}`는 `{version,reason}`을 받아 삭제 시각을 기록하고 일반/관리자 목록·상세와 신규 연습에서 제외한다. 기존 학습/분석/음성 DB 행은 보존한다. 원문 수정 시 예전 기준 음성을 제외하고 기존 공용 세션의 원문은 snapshot으로 유지한다. [상세 계약](../api/admin-content-edit-delete.md)을 따른다.

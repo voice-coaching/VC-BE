@@ -19,7 +19,7 @@ public class AdminAudioPersistence implements AdminAudioStore {
     private static final String AUDIO="""
             select r.id,r.content.id,r.speakerName,r.speakerType,r.durationMs,r.primary,r.objectKey,r.createdAt
             from ReferenceAudio r where r.content.ownerId is null and r.content.contentType=:type
-            and r.speakerType=:speaker and r.objectKey is not null
+            and r.content.deletedAt is null and r.retiredAt is null and r.speakerType=:speaker and r.objectKey is not null
             """;
     @Override public void save(ReferenceAudioUpload upload) { em.persist(upload); }
     @Override public Optional<Upload> upload(UUID id,long actor,long content) {

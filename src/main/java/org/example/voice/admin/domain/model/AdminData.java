@@ -23,6 +23,7 @@ public final class AdminData {
                               String targetId, OffsetDateTime from, OffsetDateTime to) {}
     public record Access(long id, String nickname, String role) {}
     public record UserView(long id, String email, String nickname, String status, String role, OffsetDateTime createdAt) {}
+    public record ContentDeletion(long id,long version,OffsetDateTime deletedAt) {}
     public record ContentView(long id, long version, ContentType type, LearningFocus focus, String category,
                               Difficulty difficulty, String title, String description, String scriptText,
                               List<String> targetPronunciations, Integer estimatedSeconds,

@@ -4,7 +4,7 @@
 
 백엔드 구현 문서다. 프론트 UI·관리자 권한 부여·회원 정지/탈퇴·결제 처리·AI 재분석은 포함하지 않는다. 배포 시 V62가 필요하다.
 
-추가 구현: 아나운서 문장에 수동 기준 음성을 업로드·연결하는 API 5개와 V63을 추가했다. [기준 음성 계약](admin-reference-audios.md)을 따른다. 아래 표는 기본 18개 API이며 TTS·클래스 예문 편집 전체를 구현한 것은 아니다.
+추가 구현: 아나운서 문장에 수동 기준 음성을 업로드·연결하는 API 5개와 V63을 추가했다. [기준 음성 계약](admin-reference-audios.md)을 따른다. 아래 표는 기본 API (콘텐츠 DELETE 추가 포함)이며 TTS·클래스 예문 편집 전체를 구현한 것은 아니다.
 
 모든 경로는 `Authorization: Bearer <accessToken>`을 요구한다. JWT 권한 `ROLE_ADMIN`과 현재 DB의 `users.role=ADMIN`, `status=ACTIVE`, `deleted_at IS NULL` 조건을 모두 만족해야 한다. 테스트 이용등급 `membershipType=admin`은 접근 권한이 아니다. DB 역할 변경은 이전 JWT에 즉시 반영되지 않으므로 최초 권한 부여 후 다시 로그인한다. 권한 회수·정지는 현재 DB 검사로 기존 ADMIN 토큰도 차단한다.
 
@@ -22,6 +22,7 @@
 | GET | `/api/admin/contents/{contentId}` | 없음 | Content |
 | POST | `/api/admin/contents` | `{content: ContentBody, reason}` | Content |
 | PATCH | `/api/admin/contents/{contentId}` | `{version, content: ContentBody, reason}` | Content |
+| DELETE | `/api/admin/contents/{contentId}` | `{version, reason}` | ContentDeletion |
 | PATCH | `/api/admin/contents/{contentId}/publication` | `{version, status, reason}` | Content |
 | GET | `/api/admin/notices` | keyword, published, page, size | Page<Notice> |
 | GET | `/api/admin/notices/{noticeId}` | 없음 | Notice |
@@ -67,7 +68,7 @@
 | targetPronunciations | string[], 필수 | 빈 배열 가능, 최대 100개, 항목별 공백 불가·200자 이하 |
 | estimatedSeconds | integer, 필수 | 1~3,600 |
 
-생성은 owner가 없는 공용 DRAFT로 저장한다. 수정은 공용·DRAFT·publishedAt=null인 항목만 허용한다. 공개 또는 공개 후 숨김 항목은 원문 직접 편집을 거절한다. 기존 내용을 수정하려면 새 초안을 만든다. 회원 전용 콘텐츠는 관리자 목록·상세·변경에서 제외하고 직접 ID로 접근해도 404다.
+생성은 owner가 없는 공용 DRAFT로 저장한다. V65 적용 후 NEWS·SENTENCE·ANNOUNCER·CLASS_PRACTICE는 DRAFT·PUBLISHED·HIDDEN 상태 모두에서 수정·삭제할 수 있다. 유형 자체의 전환은 허용하지 않으며 수정은 기존 status와 publishedAt을 유지한다. 회원 전용 콘텐츠는 관리자 목록·상세·변경에서 제외하고 직접 ID로 접근해도 404다.
 
 publication.status는 PUBLISHED/HIDDEN만 허용한다. DRAFT→HIDDEN과 DRAFT로의 복귀는 409다. 공개 시 필수값·분류를 다시 검증하고 최초 공개 시각을 기록한다. 숨김·재공개는 기존 공개 시각을 보존한다. TTS 생성 완료를 공개 성공으로 보장하지 않는다.
 

@@ -265,7 +265,7 @@ public class OpenApiKoreanDocumentation {
                 {"GET", "/api/admin/contents", "공용 콘텐츠 목록 조회"},
                 {"GET", "/api/admin/contents/{contentId}", "공용 콘텐츠 상세 조회"},
                 {"POST", "/api/admin/contents", "공용 콘텐츠 초안 생성"},
-                {"PATCH", "/api/admin/contents/{contentId}", "공용 콘텐츠 초안 수정"},
+                {"PATCH", "/api/admin/contents/{contentId}", "공용 콘텐츠 수정"},
                 {"PATCH", "/api/admin/contents/{contentId}/publication", "공용 콘텐츠 공개·숨김"},
                 {"GET", "/api/admin/notices", "관리자 공지 목록 조회"},
                 {"GET", "/api/admin/notices/{noticeId}", "관리자 공지 상세 조회"},
@@ -317,6 +317,8 @@ public class OpenApiKoreanDocumentation {
         }
         add(map, PathItem.HttpMethod.GET, "/api/users/me/popup", "사용자", "현재 노출할 전체 팝업 조회",
                 "활성 로그인 회원에게 서버 시각 기준으로 게시 중인 팝업 한 개를 반환합니다. 우선순위·시작 시각·ID 내림차순이며 없으면 data=null입니다. 캐시하지 않습니다.", false);
+        add(map, PathItem.HttpMethod.DELETE, "/api/admin/contents/{contentId}", "관리자", "공용 콘텐츠 삭제",
+                "활성 관리자만 version과 작업 사유를 제출해 콘텐츠를 삭제합니다. 기존 학습 기록은 보존하고 신규 조회·연습에서 제외합니다.", false);
         return Map.copyOf(map);
     }
 

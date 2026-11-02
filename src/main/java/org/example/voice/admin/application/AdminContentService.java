@@ -29,9 +29,11 @@ public class AdminContentService {
         access.require(actor);validate(draft,reason);
         var content=store.lockContent(id);AdminValidation.version(content.getVersion(),version);
         if(content.getContentType()!=draft.type())AdminValidation.conflict();
-        try { content.editDraft(draft.focus(),draft.category(),draft.difficulty(),draft.title(),draft.description(),draft.scriptText(),draft.targets(),draft.seconds(),OffsetDateTime.now(clock)); }
+        boolean scriptChanged=!java.util.Objects.equals(content.getScriptText(),draft.scriptText());
+        if(scriptChanged) store.retireReferenceAudios(id,OffsetDateTime.now(clock));
+        try { content.editPublic(draft.focus(),draft.category(),draft.difficulty(),draft.title(),draft.description(),draft.scriptText(),draft.targets(),draft.seconds(),OffsetDateTime.now(clock)); }
         catch(IllegalStateException error) { AdminValidation.conflict(); }
-        audit(actor,"CONTENT_EDIT",content,reason,"focus,category,difficulty,title,description,scriptText,targetPronunciations,estimatedSeconds");
+        audit(actor,"CONTENT_EDIT",content,reason,"focus,category,difficulty,title,description,scriptText,targetPronunciations,estimatedSeconds"+(scriptChanged?",referenceAudios,ttsRevision":""));
         store.flush();invalidation.afterContentChange();return store.view(content);
     }
     public ContentView publication(long actor,long id,long version,PublishStatus status,String reason) {
@@ -45,6 +47,14 @@ public class AdminContentService {
         catch(IllegalStateException error) { AdminValidation.conflict(); }
         audit(actor,"CONTENT_PUBLICATION",content,reason,"status,publishedAt");
         store.flush();invalidation.afterContentChange();return store.view(content);
+    }
+    public ContentDeletion delete(long actor,long id,long version,String reason) {
+        access.require(actor);AdminValidation.text(reason,500,true);
+        var content=store.lockContent(id);AdminValidation.version(content.getVersion(),version);
+        var now=OffsetDateTime.now(clock);
+        content.delete(now);store.retireReferenceAudios(id,now);
+        audit(actor,"CONTENT_DELETE",content,reason,"deletedAt,status,referenceAudios");
+        store.flush();invalidation.afterContentChange();return new ContentDeletion(content.getId(),content.getVersion(),content.getDeletedAt());
     }
     private void validate(ContentDraft d,String reason) {
         AdminValidation.text(reason,500,true);

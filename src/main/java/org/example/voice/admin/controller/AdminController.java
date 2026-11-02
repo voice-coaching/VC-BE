@@ -70,9 +70,14 @@ public class AdminController {
     public ResponseEntity<ApiResponse<ContentDto>> createContent(@AuthenticationPrincipal LoginUser actor,@Valid @RequestBody ContentCreateDto request) {
         return created(ContentDto.from(contents.create(actor.id(),request.content().command(),request.reason())));
     }
-    @PatchMapping("/contents/{contentId}") @Operation(summary="공개 이력이 없는 콘텐츠 초안 수정")
+    @PatchMapping("/contents/{contentId}") @Operation(summary="공용 콘텐츠 수정")
     public ResponseEntity<ApiResponse<ContentDto>> editContent(@AuthenticationPrincipal LoginUser actor,@PathVariable long contentId,@Valid @RequestBody ContentEditDto request) {
         return ok(ContentDto.from(contents.edit(actor.id(),contentId,request.version(),request.content().command(),request.reason())));
+    }
+    @DeleteMapping("/contents/{contentId}") @Operation(summary="공용 콘텐츠 삭제")
+    public ResponseEntity<ApiResponse<ContentDeletionDto>> deleteContent(@AuthenticationPrincipal LoginUser actor,@PathVariable long contentId,
+            @Valid @RequestBody ContentDeleteDto request) {
+        return ok(ContentDeletionDto.from(contents.delete(actor.id(),contentId,request.version(),request.reason())));
     }
     @PatchMapping("/contents/{contentId}/publication") @Operation(summary="콘텐츠 공개·숨김")
     public ResponseEntity<ApiResponse<ContentDto>> publication(@AuthenticationPrincipal LoginUser actor,@PathVariable long contentId,@Valid @RequestBody PublicationDto request) {

@@ -33,7 +33,10 @@ public class TitlePersistence implements TitleRepository {
                 .setParameter("user", userId).setParameter("digest", digest).getResultStream().findFirst();
     }
     public void remember(TitleExamRequest request) { em.persist(request); }
-    public boolean availableContent(Long id) { return true; }
+    public boolean availableContent(Long id) {
+        return em.createQuery("select count(c) from PracticeContent c where c.id=:id and c.deletedAt is null",Long.class)
+                .setParameter("id",id).getSingleResult()>0;
+    }
     public Optional<BigDecimal> score(Long analysisId, Long userId, Long sessionId, Long contentId) {
         var result = em.find(org.example.voice.analysis.domain.entity.AnalysisResult.class, analysisId);
         if (result == null) return Optional.empty();

@@ -49,10 +49,13 @@ class AdminApiIntegrationTest {
     @Autowired ContentCatalogReader catalog;
     @Autowired PlatformTransactionManager transactions;
     @MockitoSpyBean AdminPersistence store;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean org.springframework.cache.CacheManager caches;
     long actor,owner;
     static final OffsetDateTime NOW=OffsetDateTime.now(ZoneOffset.UTC);
 
     @BeforeEach void fixture() {
+        var localCaches=new java.util.concurrent.ConcurrentHashMap<String,org.springframework.cache.Cache>();
+        when(caches.getCache(anyString())).thenAnswer(call -> localCaches.computeIfAbsent(call.getArgument(0),org.springframework.cache.concurrent.ConcurrentMapCache::new));
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {
             var a=User.createLocal(UUID.randomUUID()+"@example.invalid","not-a-real-password","operator",NOW);
             ReflectionTestUtils.setField(a,"role",UserRole.ADMIN);em.persist(a);
@@ -94,7 +97,7 @@ class AdminApiIntegrationTest {
                 .setParameter("status",UserStatus.SUSPENDED).setParameter("id",actor).executeUpdate();
         mvc.perform(get("/api/admin/me").with(auth(actor,"ADMIN"))).andExpect(status().isForbidden());
     }
-    @Test void createsEditsPublishesAndHidesContentWithoutMutatingPublishedScript() throws Exception {
+    @Test void createsEditsAndPublishesContentThenAllowsPublishedScriptEdits() throws Exception {
         var draft=contents.create(actor,draft("admin-content-flow"),"테스트 등록");
         assertThat(catalog.list(new Filter(ContentType.SENTENCE,"FINAL_CONSONANT",null,null),0,100).items())
                 .noneMatch(c -> c.id().equals(draft.id()));
@@ -105,16 +108,18 @@ class AdminApiIntegrationTest {
         var published=contents.publication(actor,draft.id(),edited.version(),PublishStatus.PUBLISHED,"공개");
         assertThat(catalog.list(new Filter(ContentType.SENTENCE,"FINAL_CONSONANT",null,null),0,100).items())
                 .anyMatch(c -> c.id().equals(draft.id()));
-        assertThatThrownBy(() -> contents.edit(actor,draft.id(),published.version(),draft("forbidden"),"원문 변경"))
-                .hasMessageContaining("수정할 수 없습니다");
+        var revised=contents.edit(actor,draft.id(),published.version(),draft("updated-published"),"원문 변경");
+        assertThat(revised.status()).isEqualTo(PublishStatus.PUBLISHED);
+        assertThat(revised.publishedAt()).isEqualTo(published.publishedAt());
+        assertThat(revised.title()).isEqualTo("updated-published");
     }
-    @Test void publishedThenHiddenContentRemainsImmutableAndPrivateContentIsInaccessible() throws Exception {
+    @Test void publishedThenHiddenContentIsEditableAndPrivateContentIsInaccessible() throws Exception {
         var d=contents.create(actor,draft("hidden-original"),"등록");
         var p=contents.publication(actor,d.id(),d.version(),PublishStatus.PUBLISHED,"공개");
         var h=contents.publication(actor,p.id(),p.version(),PublishStatus.HIDDEN,"숨김");
         assertThat(h.publishedAt()).isEqualTo(p.publishedAt());
         mvc.perform(patch("/api/admin/contents/{id}",h.id()).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON)
-                .content(contentEdit(h.version()))).andExpect(status().isConflict());
+                .content(contentEdit(h.version()))).andExpect(status().isOk());
         var privateContent=PracticeContent.custom(owner,"private title","private script",LearningFocus.PRONUNCIATION,NOW);em.persist(privateContent);em.flush();
         mvc.perform(get("/api/admin/contents/{id}",privateContent.getId()).with(auth(actor,"ADMIN"))).andExpect(status().isNotFound());
         mvc.perform(patch("/api/admin/contents/{id}/publication",privateContent.getId()).with(auth(actor,"ADMIN"))
@@ -185,6 +190,92 @@ class AdminApiIntegrationTest {
         var data=new LinkedHashMap<String,Object>();data.put("reason","공지 변경");if(version!=null)data.put("version",version);
         data.put("notice",Map.of("title","운영 공지","summary","요약","sections",List.of(Map.of("title","안내","paragraphs",List.of("본문"))),"pinned",false,"published",published,"publishedAt",at.toString()));
         return json.writeValueAsString(data);
+    }
+    @Test void allPublicContentTypesCanBeEditedAndDeletedInEveryPublicationState() throws Exception {
+        for (ContentType type : ContentType.values()) {
+            if(em.createQuery("select count(c) from ContentCategory c where c.contentType=:type and c.code='ADMIN_CRUD'",Long.class).setParameter("type",type).getSingleResult()==0) {
+                var category=org.springframework.beans.BeanUtils.instantiateClass(ContentCategory.class);
+                ReflectionTestUtils.setField(category,"contentType",type);ReflectionTestUtils.setField(category,"code","ADMIN_CRUD");
+                ReflectionTestUtils.setField(category,"label","관리 테스트");ReflectionTestUtils.setField(category,"sortOrder",1);em.persist(category);
+            }
+            for (PublishStatus state : PublishStatus.values()) {
+                var body=new ContentDraft(type,LearningFocus.PRONUNCIATION,"ADMIN_CRUD",Difficulty.BEGINNER,"original",null,"첫 번째 문장입니다.",List.of(),5);
+                var current=contents.create(actor,body,"등록");
+                if(state!=PublishStatus.DRAFT) current=contents.publication(actor,current.id(),current.version(),PublishStatus.PUBLISHED,"공개");
+                if(state==PublishStatus.HIDDEN) current=contents.publication(actor,current.id(),current.version(),PublishStatus.HIDDEN,"숨김");
+                var revised=contents.edit(actor,current.id(),current.version(),new ContentDraft(type,body.focus(),body.category(),body.difficulty(),"changed",null,"변경한 문장입니다.",List.of(),6),"수정");
+                assertThat(revised.status()).isEqualTo(state);
+                assertThat(revised.publishedAt()).isEqualTo(current.publishedAt());
+                mvc.perform(delete("/api/admin/contents/{id}",revised.id()).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("version",revised.version(),"reason","삭제"))))
+                        .andExpect(status().isOk()).andExpect(jsonPath("$.data.deletedAt").isNotEmpty());
+                mvc.perform(get("/api/admin/contents/{id}",revised.id()).with(auth(actor,"ADMIN"))).andExpect(status().isNotFound());
+                assertThat(em.find(PracticeContent.class,revised.id()).getDeletedAt()).isNotNull();
+                mvc.perform(get("/api/practice-contents/{id}",revised.id()).with(auth(owner,"USER"))).andExpect(status().isNotFound());
+                mvc.perform(post("/api/training-sessions").with(auth(owner,"USER")).contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("contentId",revised.id(),"learningFocus","PRONUNCIATION"))))
+                        .andExpect(status().isNotFound());
+            }
+        }
+    }
+    @Test void changingScriptRetiresOldAudioAndKeepsExistingSessionTranscript() {
+        var created=contents.create(actor,draft("snapshot"),"등록");
+        var content=em.find(PracticeContent.class,created.id());
+        var session=org.example.voice.training.domain.entity.TrainingSession.create(owner,content,null,LearningFocus.PRONUNCIATION);em.persist(session);
+        String transcript=session.analysisScriptText(),prompt=session.analysisPromptRevision();
+        var audio=ReferenceAudio.announcer(content,"화자","reference-audios/announcer/test.m4a",1000,true,NOW);em.persist(audio);em.flush();
+        var edited=contents.edit(actor,created.id(),created.version(),new ContentDraft(ContentType.SENTENCE,LearningFocus.PRONUNCIATION,"FINAL_CONSONANT",Difficulty.BEGINNER,"changed",null,"새로운 평가 문장입니다.",List.of(),5),"원문 수정");
+        em.refresh(audio);
+        assertThat(audio.getRetiredAt()).isNotNull();assertThat(audio.getPrimary()).isFalse();
+        assertThat(session.analysisScriptText()).isEqualTo(transcript);assertThat(session.analysisPromptRevision()).isEqualTo(prompt);
+        assertThat(content.getTtsRevision()).isGreaterThan(1);
+        contents.delete(actor,edited.id(),edited.version(),"삭제");
+        assertThat(em.find(org.example.voice.training.domain.entity.TrainingSession.class,session.getId())).isNotNull();
+        assertThat(session.analysisScriptText()).isEqualTo(transcript);
+        assertThat(catalog.list(new Filter(ContentType.SENTENCE,"FINAL_CONSONANT",null,null),0,100).items()).noneMatch(i->i.id().equals(edited.id()));
+    }
+    @Test void deletionRequiresAdminCurrentVersionAndPublicOwnership() throws Exception {
+        var created=contents.create(actor,draft("delete-guard"),"등록");
+        String body=json.writeValueAsString(Map.of("version",created.version(),"reason","삭제"));
+        mvc.perform(delete("/api/admin/contents/{id}",created.id()).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/admin/contents/{id}",created.id()).with(auth(owner,"USER")).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/admin/contents/{id}",created.id()).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content("{}" )).andExpect(status().isBadRequest());
+        var edited=contents.edit(actor,created.id(),created.version(),draft("edit-before-delete"),"수정");
+        mvc.perform(delete("/api/admin/contents/{id}",created.id()).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isConflict());
+        var privateContent=PracticeContent.custom(owner,"private","private",LearningFocus.PRONUNCIATION,NOW);em.persist(privateContent);em.flush();
+        mvc.perform(delete("/api/admin/contents/{id}",privateContent.getId()).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isNotFound());
+    }
+    @Test @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    void failedAuditRollsBackDeletion() {
+        var template=new TransactionTemplate(transactions);
+        // Execute mutation in its own transaction so rollback is observed, not only marked rollback-only.
+        var created=template.execute(tx -> contents.create(actor,draft("audit-delete"),"등록"));
+        doThrow(new org.springframework.dao.DataAccessResourceFailureException("test")).when(store).audit(argThat(a->"CONTENT_DELETE".equals(a.getAction())));
+        assertThatThrownBy(()->template.execute(tx->contents.delete(actor,created.id(),created.version(),"삭제")))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        template.executeWithoutResult(tx -> {
+            assertThat(em.find(PracticeContent.class,created.id()).getDeletedAt()).isNull();
+            assertThat(em.createQuery("select count(a) from AdminAuditLog a where a.action='CONTENT_DELETE' and a.targetId=:id",Long.class)
+                    .setParameter("id",Long.toString(created.id())).getSingleResult()).isZero();
+        });
+    }
+    @Test void metadataOnlyEditKeepsTheExistingReferenceAudio() {
+        var created=contents.create(actor,draft("metadata-before"),"등록");
+        var content=em.find(PracticeContent.class,created.id());
+        var audio=ReferenceAudio.announcer(content,"화자","reference-audios/announcer/test.m4a",1000,true,NOW);em.persist(audio);em.flush();
+        contents.edit(actor,created.id(),created.version(),draft("metadata-after"),"제목 변경");
+        em.refresh(audio);
+        assertThat(audio.getRetiredAt()).isNull();assertThat(audio.getPrimary()).isTrue();
+        assertThat(content.getTtsRevision()).isEqualTo(1);
+    }
+    @Test @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    void deletionEvictsPreviouslyCachedPublicDetailAfterCommit() throws Exception {
+        var created=contents.create(actor,draft("cached-delete"),"등록");
+        var published=contents.publication(actor,created.id(),created.version(),PublishStatus.PUBLISHED,"공개");
+        mvc.perform(get("/api/practice-contents/{id}",created.id()).with(auth(owner,"USER"))).andExpect(status().isOk());
+        mvc.perform(delete("/api/admin/contents/{id}",created.id()).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("version",published.version(),"reason","삭제")))).andExpect(status().isOk());
+        mvc.perform(get("/api/practice-contents/{id}",created.id()).with(auth(owner,"USER"))).andExpect(status().isNotFound());
     }
     private RequestPostProcessor auth(long id,String role) {
         var issued = tokenService.issueSession(em.find(User.class,id));

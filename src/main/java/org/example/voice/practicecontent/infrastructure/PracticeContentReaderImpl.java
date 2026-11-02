@@ -60,7 +60,7 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
                         content.getDifficulty(),
                         content.getTargetPronunciations() == null ? List.of() : content.getTargetPronunciations(),
                         content.getEstimatedSeconds(),
-                        referenceAudioJpaRepository.existsByContentId(content.getId())
+                        referenceAudioJpaRepository.existsByContentIdAndRetiredAtIsNull(content.getId())
                 ));
     }
 
@@ -109,6 +109,7 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
         return (root, query, criteriaBuilder) -> {
             var predicate = criteriaBuilder.and(
                     criteriaBuilder.equal(root.get("status"), PublishStatus.PUBLISHED),
+                    criteriaBuilder.isNull(root.get("deletedAt")),
                     criteriaBuilder.equal(root.get("contentType"), condition.type())
             );
             if (condition.category() != null && !condition.category().isBlank()) {
@@ -127,6 +128,7 @@ public class PracticeContentReaderImpl implements PracticeContentReader {
     private Specification<PracticeContent> recommendationSpec(PracticeContent content) {
         return (root, query, criteriaBuilder) -> criteriaBuilder.and(
                 criteriaBuilder.equal(root.get("status"), PublishStatus.PUBLISHED),
+                    criteriaBuilder.isNull(root.get("deletedAt")),
                 criteriaBuilder.notEqual(root.get("id"), content.getId()),
                 criteriaBuilder.equal(root.get("difficulty"), content.getDifficulty()),
                 criteriaBuilder.equal(root.get("learningFocus"), content.getLearningFocus())

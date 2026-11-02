@@ -22,6 +22,7 @@ public final class AdminRequestDto {
             @NotNull @Min(1) @Max(3600) Integer estimatedSeconds) {
         public ContentDraft command() { return new ContentDraft(type,focus,category,difficulty,title,description,scriptText,targetPronunciations,estimatedSeconds); }
     }
+    public record ContentDeleteDto(@NotNull @PositiveOrZero Long version, @NotBlank @Size(max=500) String reason) {}
     public record PublicationDto(@NotNull @PositiveOrZero Long version, @NotNull PublishStatus status,
                                   @NotBlank @Size(max=500) String reason) {}
     public record NoticeCreateDto(@NotNull @Valid NoticeBodyDto notice, @NotBlank @Size(max=500) String reason) {}

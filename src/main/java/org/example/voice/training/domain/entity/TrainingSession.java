@@ -66,9 +66,15 @@ public class TrainingSession {
     @Column(name = "sentence_text_sha256", length = 64) private String sentenceTextSha256;
     @Column(name = "sentence_prompt_revision", length = 128) private String sentencePromptRevision;
 
+    @Column(name = "content_script_snapshot", columnDefinition = "text")
+    private String contentScriptSnapshot;
+    @Column(name = "content_updated_at_snapshot")
+    private OffsetDateTime contentUpdatedAtSnapshot;
+    private String sourceScript() { return contentScriptSnapshot != null ? contentScriptSnapshot : content.getScriptText(); }
+
     public void pinSentence(Integer index, String expectedText) {
 
-        String selected = org.example.voice.training.domain.model.SentenceTranscript.at(content.getScriptText(), index);
+        String selected = org.example.voice.training.domain.model.SentenceTranscript.at(sourceScript(), index);
 
         sentenceIndex = index;
         sentenceTextSha256 = org.example.voice.training.domain.model.SentenceTranscript.sha256(selected);
@@ -76,14 +82,14 @@ public class TrainingSession {
     }
 
     public String analysisScriptText() {
-        if (sentenceIndex == null) return content.getScriptText();
-        String selected = org.example.voice.training.domain.model.SentenceTranscript.at(content.getScriptText(), sentenceIndex);
+        if (sentenceIndex == null) return sourceScript();
+        String selected = org.example.voice.training.domain.model.SentenceTranscript.at(sourceScript(), sentenceIndex);
 
         return selected;
     }
 
     public String analysisPromptRevision() {
-        return sentenceIndex == null ? content.getUpdatedAt().toInstant().toString() : sentencePromptRevision;
+        return sentenceIndex == null ? (contentUpdatedAtSnapshot != null ? contentUpdatedAtSnapshot : content.getUpdatedAt()).toInstant().toString() : sentencePromptRevision;
     }
 
     @Enumerated(EnumType.STRING)
@@ -109,6 +115,10 @@ public class TrainingSession {
     private TrainingSession(Long userId, PracticeContent content, Long courseStepId, LearningFocus learningFocus) {
         this.userId = userId;
         this.content = content;
+        if (content.getOwnerId() == null) {
+            this.contentScriptSnapshot = content.getScriptText();
+            this.contentUpdatedAtSnapshot = content.getUpdatedAt();
+        }
         this.courseStepId = courseStepId;
         this.learningFocus = learningFocus;
         this.status = TrainingSessionStatus.RECORDING;

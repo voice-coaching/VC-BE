@@ -48,7 +48,8 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     @CacheEvict(cacheNames = HomeCacheNames.RECENT_TRAINING, allEntries = true)
     public TrainingSessionCreatedData createSentence(Long userId, Long contentId, Long courseStepId, LearningFocus learningFocus,
             Integer sentenceIndex, String expectedText) {
-        PracticeContent content = practiceContentJpaRepository.findById(contentId)
+        PracticeContent content = practiceContentJpaRepository.findLiveForSession(contentId)
+                .filter(c -> c.getDeletedAt() == null)
                 .orElseThrow(() -> new BaseException(ErrorCode.CONTENT_NOT_FOUND));
         var example = examples.forSession(contentId, courseStepId);
         Long revisionId = example != null && courseStepId != null ? example.educationRevisionId() : courseEducation.revisionForSession(courseStepId, contentId);
