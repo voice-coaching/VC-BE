@@ -1,3 +1,20 @@
+logging:
+  structured:
+    format:
+      console: logstash
+      file: logstash
+    json:
+      customizer: org.example.voice.common.logging.SafeLoggingJsonCustomizer
+      add:
+        service_name: ${OBSERVABILITY_SERVICE_NAME:alpha-backend}
+      stacktrace:
+        printer: org.example.voice.common.logging.SafeStackTracePrinter
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 7
+      total-size-cap: 200MB
+
 spring:
 
   servlet:

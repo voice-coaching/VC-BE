@@ -44,7 +44,13 @@ public class RunPodAnalysisRequestOutboxDispatcher {
     public void dispatchPending() {
         Delivery delivery=transactions.execute(tx -> outboxRepository
                 .findFirstByTransportAndStatusOrderByIdAsc("RUNPOD_HTTP",AnalysisRequestOutboxStatus.PENDING)
-                .map(event -> new Delivery(event.getId(),event.getAnalysisResult().getId(),event.getPayload(),OffsetDateTime.now(ZoneOffset.UTC)))
+                .map(event -> {
+                    org.example.voice.common.logging.AnalysisLogEvents.event(log,"analysis_dispatch_attempt",
+                            event.getAnalysisResult().getId(),event.getEventId(),event.getExecutionId(),null)
+                            .addKeyValue("queue_age_ms",java.time.Duration.between(event.getCreatedAt(),OffsetDateTime.now(ZoneOffset.UTC)).toMillis())
+                            .log("Analysis dispatch attempt");
+                    return new Delivery(event.getId(),event.getAnalysisResult().getId(),event.getPayload(),OffsetDateTime.now(ZoneOffset.UTC));
+                })
                 .orElse(null));
         if(delivery==null)return;
         String error=null;
@@ -58,8 +64,15 @@ public class RunPodAnalysisRequestOutboxDispatcher {
     private OffsetDateTime finish(Delivery delivery, String error, boolean retryable, int retryAfter) {
         var event=outboxRepository.findForDeliveryUpdate(delivery.id()).orElse(null);
         if(event==null)return OffsetDateTime.now(ZoneOffset.UTC);
-        if(error==null) event.markDelivered(event.getExecutionId());
-        else event.recordDispatchFailure(error,Integer.MAX_VALUE);
+        if(error==null) {
+            event.markDelivered(event.getExecutionId());
+            org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,"analysis_dispatch_finished",
+                    delivery.analysisId(),event.getEventId(),event.getExecutionId(),null);
+        } else {
+            event.recordDispatchFailure(error,Integer.MAX_VALUE);
+            org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,"analysis_dispatch_failed",
+                    delivery.analysisId(),event.getEventId(),event.getExecutionId(),error);
+        }
         return OffsetDateTime.now(ZoneOffset.UTC);
     }
 

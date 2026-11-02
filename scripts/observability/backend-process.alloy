@@ -1,0 +1,52 @@
+// Replace only the existing backend processor. Keep sources, positions, labels and nginx pipelines.
+loki.process "backend" {
+  stage.json {
+    expressions = {
+      timestamp = "\"@timestamp\"",
+      level = "level",
+      event = "event",
+      request_id = "request_id",
+      http_method = "http_method",
+      route = "route",
+      http_status = "http_status",
+      duration_ms = "duration_ms",
+      error_code = "error_code",
+      exception_type = "exception_type",
+      analysis_id = "analysis_id",
+      analysis_request_id = "analysis_request_id",
+      execution_id = "execution_id",
+    }
+    drop_malformed = false
+  }
+  stage.regex {
+    expression = "^\\d{4}-\\d{2}-\\d{2}T\\S+\\s+(?P<legacy_level>TRACE|DEBUG|INFO|WARN|ERROR)\\b"
+  }
+  stage.template {
+    source = "level"
+    template = "{{ if .Value }}{{ .Value }}{{ else if .legacy_level }}{{ .legacy_level }}{{ else }}UNKNOWN{{ end }}"
+  }
+  stage.labels {
+    values = { level = "" }
+  }
+  stage.timestamp {
+    source = "timestamp"
+    format = "RFC3339Nano"
+    action_on_failure = "skip"
+  }
+  stage.structured_metadata {
+    values = {
+      event = "",
+      request_id = "",
+      http_method = "",
+      route = "",
+      http_status = "",
+      duration_ms = "",
+      error_code = "",
+      exception_type = "",
+      analysis_id = "",
+      analysis_request_id = "",
+      execution_id = "",
+    }
+  }
+  forward_to = [loki.write.local.receiver]
+}
