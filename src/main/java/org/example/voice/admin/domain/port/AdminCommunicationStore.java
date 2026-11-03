@@ -5,6 +5,7 @@ import org.example.voice.admin.domain.entity.*;
 import org.example.voice.admin.domain.model.AdminData.Page;
 public interface AdminCommunicationStore {
     void save(AdminNotificationCampaign campaign);
+    void delete(AdminNotificationCampaign campaign);
     Optional<AdminNotificationCampaign> campaign(long id,boolean lock);
     Page<AdminNotificationCampaign> campaigns(int page,int size);
     long activeRecipients(Set<Long> ids,boolean all);

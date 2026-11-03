@@ -210,3 +210,7 @@ GET /api/reference-audios/{audioId}/playback-url
 - S3 저장 후 DB 등록 충돌·실패가 나면 연결되지 않은 최종 객체가 남을 수 있다. 같은 uploadId 재시도는 동일 final 객체를 재사용하며 다른 바이트로 덮어쓰지 않는다. 미연결 객체 정리 자동화는 이번 구현 범위가 아니므로 DB 업로드 상태·연결 여부를 대조해 운영자가 정리한다.
 
 운영 S3 업로드·CORS·실제 서버 디코더·브라우저 미리듣기는 배포 후 검증해야 한다. 로컬 mock 검증을 실제 S3 연동 성공으로 안내하지 않는다.
+
+## 개별 음성 삭제 (#188)
+
+DELETE `/api/admin/reference-audios/{audioId}`에 콘텐츠 버전과 사유를 전달한다. retired_at으로 제외하며 원본과 학습 기록을 보존한다. 대표 삭제 시 남은 활성 음성의 대표 승계, 콘텐츠 버전 증가, 캐시 갱신을 수행한다. [계약](admin-management-completion.md)을 따른다.

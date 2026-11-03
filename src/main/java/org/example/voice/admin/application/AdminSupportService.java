@@ -28,6 +28,12 @@ public class AdminSupportService {
         audit(actor,"NOTICE_EDIT","NOTICE",id,reason,"title,summary,sections,pinned,published,publishedAt");
         store.flush();return store.view(n);
     }
+    public void deleteNotice(long actor,long id,long version,String reason) {
+        access.require(actor);AdminValidation.text(reason,500,true);
+        var notice=store.lockNotice(id);AdminValidation.version(notice.getVersion(),version);
+        store.deleteNotice(notice);
+        audit(actor,"NOTICE_DELETE","NOTICE",id,reason,"deleted");store.flush();
+    }
     public InquiryView answer(long actor,long id,long version,String answer,String reason) {
         access.require(actor);AdminValidation.text(reason,500,true);AdminValidation.text(answer,4000,true);
         var i=store.lockInquiry(id);AdminValidation.version(i.getVersion(),version);

@@ -13,6 +13,12 @@ public final class AdminCommunicationRequestDto {
         public CampaignDraft command() { return new CampaignDraft(audience,kind,title,body,deepLink,userIds); }
     }
     public record CampaignDispatchDto(@Min(0) long version,@NotBlank @Size(max=500) String reason) {}
+    public record CampaignEditDto(@NotNull @PositiveOrZero Long version,@NotNull AdminAudience audience,@NotNull AdminNotificationKind kind,
+            @NotBlank @Size(max=200) String title,@NotBlank @Size(max=1000) String body,@NotBlank String deepLink,
+            @Size(max=500) List<@NotNull @Positive Long> userIds,@NotBlank @Size(max=500) String reason) {
+        public CampaignDraft command() { return new CampaignDraft(audience,kind,title,body,deepLink,userIds); }
+    }
+    public record CampaignDeleteDto(@NotNull @PositiveOrZero Long version,@NotBlank @Size(max=500) String reason) {}
     public record PopupFieldsDto(@NotBlank @Size(max=200) String title,@NotBlank @Size(max=1000) String body,
             String deepLink,@Min(0) @Max(100) int priority,@NotNull OffsetDateTime startsAt,
             @Min(1) @Max(365) int durationDays,boolean enabled) {

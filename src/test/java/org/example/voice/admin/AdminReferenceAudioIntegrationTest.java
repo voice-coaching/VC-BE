@@ -176,6 +176,54 @@ class AdminReferenceAudioIntegrationTest {
         assertThatThrownBy(() -> service.issue(actor,sentence.getId(),new UploadCommand(0,"voice.m4a","audio/mp4",100,"a".repeat(64),"등록")))
                 .isInstanceOfSatisfying(BaseException.class,e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.RESOURCE_NOT_FOUND));
     }
+    @Test void deletingSelectedAudioRetiresItAndPromotesRemainingWithoutRemovingFiles() throws Exception {
+        var first=service.complete(actor,content,issue(),version(),"화자 1",true,"등록");
+        var next=service.complete(actor,content,issue(),version(),"화자 2",false,"등록");
+        long before=version();
+        mvc.perform(delete("/api/admin/reference-audios/{id}",first.audio().id()).with(auth(actor)).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("version",before,"reason","잘못된 음성 정리"))))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"))
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].audioId").value(next.audio().id()))
+                .andExpect(jsonPath("$.data.items[0].primary").value(true));
+        assertThat(version()).isGreaterThan(before);
+        assertThat(em.createNativeQuery("select retired_at from reference_audios where id=:id").setParameter("id",first.audio().id()).getSingleResult()).isNotNull();
+        assertThat(em.createNativeQuery("select object_key from reference_audios where id=:id").setParameter("id",first.audio().id()).getSingleResult()).isEqualTo(first.audio().objectKey());
+        mvc.perform(get("/api/admin/reference-audios/{id}/playback-url",first.audio().id()).with(auth(actor))).andExpect(status().isNotFound());
+        mvc.perform(get("/api/reference-audios/{id}/playback-url",first.audio().id()).with(auth(other))).andExpect(status().isNotFound());
+        mvc.perform(patch("/api/admin/reference-audios/{id}/primary",first.audio().id()).with(auth(actor)).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("version",version(),"reason","복구 시도")))).andExpect(status().isNotFound());
+        verify(storage,never()).playback(any());
+        audioTransactions.delete(actor,next.audio().id(),version(),"마지막 음성 정리");
+        assertThat(audioTransactions.list(actor,content).items()).isEmpty();
+        assertThat(em.createQuery("select count(a) from AdminAuditLog a where a.action='REFERENCE_AUDIO_DELETE' and a.targetId in :ids",Long.class)
+                .setParameter("ids",List.of(Long.toString(first.audio().id()),Long.toString(next.audio().id()))).getSingleResult()).isEqualTo(2);
+    }
+    @Test void audioDeleteRejectsUserMissingVersionAndStaleContentVersion() throws Exception {
+        var a=service.complete(actor,content,issue(),version(),"화자",true,"등록");
+        String path="/api/admin/reference-audios/"+a.audio().id();
+        String body=json.writeValueAsString(Map.of("version",version(),"reason","정리"));
+        mvc.perform(delete(path).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isUnauthorized());
+        em.createQuery("update User u set u.role=:role where u.id=:id").setParameter("role",UserRole.USER).setParameter("id",other).executeUpdate();
+        mvc.perform(delete(path).with(auth(other)).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+        mvc.perform(delete(path).with(auth(actor)).contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"정리\"}")).andExpect(status().isBadRequest());
+        mvc.perform(delete(path).with(auth(actor)).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("version",version()+1,"reason","정리")))).andExpect(status().isConflict());
+        assertThat(audioTransactions.list(actor,content).items()).hasSize(1);
+    }
+
+    @Test @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    void audioDeleteAuditFailureRollsBackRetirementPrimaryAndVersion() {
+        var first=service.complete(actor,content,issue(),version(),"화자 1",true,"등록");
+        service.complete(actor,content,issue(),version(),"화자 2",false,"등록");long before=version();
+        doThrow(new org.springframework.dao.DataAccessResourceFailureException("audit unavailable"))
+                .when(store).audit(argThat(log->"REFERENCE_AUDIO_DELETE".equals(log.getAction())));
+        assertThatThrownBy(()->audioTransactions.delete(actor,first.audio().id(),before,"삭제"))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(version()).isEqualTo(before);
+        assertThat(audioTransactions.list(actor,content).items()).hasSize(2).filteredOn(Audio::primary)
+                .extracting(Audio::id).containsExactly(first.audio().id());
+    }
     private UUID issue() { return service.issue(actor,content,new UploadCommand(version(),"voice.m4a","audio/mp4",100,"a".repeat(64),"음성 업로드")).uploadId(); }
     private long version() { return new TransactionTemplate(manager).execute(tx -> store.content(content).orElseThrow().version()); }
     private ContentDraft draft(String text) { return new ContentDraft(ContentType.ANNOUNCER,LearningFocus.PRONUNCIATION,"ANNOUNCER_PRACTICE",Difficulty.BEGINNER,"아나운서 연습",null,text,List.of(),8); }

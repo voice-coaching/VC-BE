@@ -26,6 +26,7 @@ public final class AdminRequestDto {
     public record PublicationDto(@NotNull @PositiveOrZero Long version, @NotNull PublishStatus status,
                                   @NotBlank @Size(max=500) String reason) {}
     public record NoticeCreateDto(@NotNull @Valid NoticeBodyDto notice, @NotBlank @Size(max=500) String reason) {}
+    public record NoticeDeleteDto(@NotNull @PositiveOrZero Long version, @NotBlank @Size(max=500) String reason) {}
     public record NoticeEditDto(@NotNull @PositiveOrZero Long version, @NotNull @Valid NoticeBodyDto notice,
                                 @NotBlank @Size(max=500) String reason) {}
     public record AdminSectionRequestDto(@NotBlank @Size(max=200) String title,

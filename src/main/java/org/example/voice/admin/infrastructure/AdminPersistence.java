@@ -89,6 +89,7 @@ public class AdminPersistence implements AdminStore {
     @Override public Optional<NoticeView> notice(long id) { return Optional.ofNullable(em.find(Notice.class,id)).map(this::view); }
     @Override public Notice lockNotice(long id) { var n=em.find(Notice.class,id,LockModeType.PESSIMISTIC_WRITE);if(n==null)throw missing();return n; }
     @Override public void saveNotice(Notice n) { em.persist(n); }
+    @Override public void deleteNotice(Notice n) { em.remove(n); }
     @Override public NoticeView view(Notice n) { return new NoticeView(n.getId(),n.getVersion(),n.getTitle(),n.getSummary(),n.getSections(),n.isPinned(),n.isPublished(),n.getPublishedAt()); }
     @Override public Page<InquiryView> inquiries(InquiryFilter f) {
         var p=new LinkedHashMap<String,Object>();

@@ -49,6 +49,11 @@ public class AdminReferenceAudioController {
             @Valid @RequestBody AdminAudioRequestDto.PrimaryDto request) {
         return response(200,AdminAudioResponseDto.AudioDto.from(transactions.primary(actor.id(),audioId,request.version(),request.reason())));
     }
+    @DeleteMapping("/reference-audios/{audioId}") @Operation(summary="기준 음성 개별 삭제")
+    public ResponseEntity<ApiResponse<AdminAudioResponseDto.ListDto>> delete(@AuthenticationPrincipal LoginUser actor,@PathVariable long audioId,
+            @Valid @RequestBody AdminAudioRequestDto.AudioDeleteDto request) {
+        return response(200,AdminAudioResponseDto.ListDto.from(transactions.delete(actor.id(),audioId,request.version(),request.reason())));
+    }
     @GetMapping("/reference-audios/{audioId}/playback-url") @Operation(summary="관리자 기준 음성 미리듣기 URL 발급")
     public ResponseEntity<ApiResponse<AdminAudioResponseDto.PlaybackDto>> playback(@AuthenticationPrincipal LoginUser actor,@PathVariable long audioId) {
         return response(200,AdminAudioResponseDto.PlaybackDto.from(service.playback(actor.id(),audioId)));

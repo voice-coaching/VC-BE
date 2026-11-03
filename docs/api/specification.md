@@ -2174,3 +2174,7 @@ V65부터 공용 콘텐츠 전체 유형을 공개 상태와 관계없이 수정
 ## 관리자 회원 가시성 및 조회 갱신 (#180)
 
 GET /api/admin/users와 개별 상세·overview·records·resolve는 탈퇴(WITHDRAWN)/deleted_at 회원을 반환하지 않는다. 목록 합계에도 포함하지 않으며 상세/기록/숫자 식별자 직접 조회는404, UUID 검색은 해당 회원을 제외한다. status=WITHDRAWN 목록은 빈 배열이다. SUSPENDED 회원은 조회 가능하다. DELETE는 사유만 직접 입력하고 expectedUpdatedAt은 클라이언트가 최신 상세에서 자동 전송한다. 상세 계약과 API별 캐시 정책은 [회원 관리](admin-communications-and-members.md), [조회 정책](../architecture/admin-read-performance.md)을 따른다.
+
+## 기존 관리자 기능 보완 (#188)
+
+DELETE `/api/admin/notices/{noticeId}`, DELETE `/api/admin/reference-audios/{audioId}`, PATCH·DELETE `/api/admin/notification-campaigns/{campaignId}`를 추가한다. 활성 ADMIN 전용이며 query는 없다. 요청 필드·응답 타입·null·상태 전이·HTTP 오류 전체 계약은 [관리자 기능 보완](admin-management-completion.md)을 따른다. 기존 경로와 사용자 API 계약은 유지한다.
