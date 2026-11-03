@@ -92,9 +92,27 @@ public class AdminReferenceAudioTransactions {
         access.require(actor);AdminValidation.text(reason,500,true);
         var target=audio.audio(audioId).orElseThrow(AdminReferenceAudioTransactions::missing);
         var content=announcer(store.lockContent(target.contentId()));AdminValidation.version(content.getVersion(),version);
+        // Another request may have retired this audio while the parent lock was being acquired.
+        audio.audio(audioId).orElseThrow(AdminReferenceAudioTransactions::missing);
         audio.clearPrimaries(content.getId());audio.makePrimary(audioId);audio.advanceVersion(content);
         audit(actor,"REFERENCE_AUDIO_PRIMARY",audioId,reason,"primary");store.flush();invalidation.afterContentChange();
         return new AudioResult(audio.audio(audioId).orElseThrow(AdminReferenceAudioTransactions::missing),content.getVersion(),false);
+    }
+    @Transactional
+    public AudioList delete(long actor,long audioId,long version,String reason) {
+        access.require(actor);AdminValidation.text(reason,500,true);
+        var target=audio.audio(audioId).orElseThrow(AdminReferenceAudioTransactions::missing);
+        var content=announcer(store.lockContent(target.contentId()));AdminValidation.version(content.getVersion(),version);
+        target=audio.audio(audioId).orElseThrow(AdminReferenceAudioTransactions::missing);
+        audio.retire(audioId,OffsetDateTime.now(clock));
+        // Keep a usable representative when deleting the selected audio; never delete stored files or history.
+        var remaining=audio.audios(content.getId());
+        if(target.primary()&&!remaining.isEmpty()) {
+            audio.clearPrimaries(content.getId());audio.makePrimary(remaining.getFirst().id());
+        }
+        audio.advanceVersion(content);audit(actor,"REFERENCE_AUDIO_DELETE",audioId,reason,"retiredAt,primary");
+        store.flush();invalidation.afterContentChange();
+        return new AudioList(audio.audios(content.getId()),content.getVersion());
     }
     @Transactional(readOnly=true)
     public AudioList list(long actor,long contentId) {

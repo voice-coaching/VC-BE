@@ -24,16 +24,31 @@ public class AdminCommunicationService {
     }
     public CampaignView campaign(long actor,long id) { access.require(actor);return view(campaign(id,false)); }
     @Transactional public CampaignView create(long actor,CampaignDraft d,String reason) {
-        access.require(actor);reason(reason);if(d==null||d.audience()==null||d.kind()==null)AdminValidation.invalid();
+        access.require(actor);reason(reason);var unique=validateCampaign(d);
+        var c=AdminNotificationCampaign.create(d.audience(),d.kind(),d.title(),d.body(),d.deepLink(),unique,actor,now());
+        communications.save(c);audit(actor,"NOTIFICATION_CREATE","NOTIFICATION_CAMPAIGN",c.getId(),reason,"audience,kind,title,body,deepLink,recipients");
+        store.flush();return view(c);
+    }
+    @Transactional public CampaignView edit(long actor,long id,long version,CampaignDraft d,String reason) {
+        access.require(actor);reason(reason);var c=campaign(id,true);requireDraft(c);AdminValidation.version(c.getVersion(),version);
+        var recipients=validateCampaign(d);c.edit(d.audience(),d.kind(),d.title(),d.body(),d.deepLink(),recipients);
+        audit(actor,"NOTIFICATION_EDIT","NOTIFICATION_CAMPAIGN",id,reason,"audience,kind,title,body,deepLink,recipients");
+        store.flush();return view(c);
+    }
+    @Transactional public void delete(long actor,long id,long version,String reason) {
+        access.require(actor);reason(reason);var c=campaign(id,true);requireDraft(c);AdminValidation.version(c.getVersion(),version);
+        communications.delete(c);audit(actor,"NOTIFICATION_DELETE","NOTIFICATION_CAMPAIGN",id,reason,"deleted");store.flush();
+    }
+    private void requireDraft(AdminNotificationCampaign campaign) { if(campaign.getSentAt()!=null)AdminValidation.conflict(); }
+    private Set<Long> validateCampaign(CampaignDraft d) {
+        if(d==null||d.audience()==null||d.kind()==null)AdminValidation.invalid();
         message(d.title(),d.body(),d.deepLink(),true);
         List<Long> ids=d.userIds()==null?List.of():d.userIds();
         if(ids.size()>500||ids.stream().anyMatch(id->id==null||id<1)||new HashSet<>(ids).size()!=ids.size())AdminValidation.invalid();
         if((d.audience()==AdminAudience.ALL_ACTIVE&&!ids.isEmpty())||(d.audience()==AdminAudience.SELECTED_USERS&&ids.isEmpty()))AdminValidation.invalid();
         Set<Long> unique=new HashSet<>(ids);
         if(d.audience()==AdminAudience.SELECTED_USERS&&communications.activeRecipients(unique,false)!=ids.size())AdminValidation.invalid();
-        var c=AdminNotificationCampaign.create(d.audience(),d.kind(),d.title(),d.body(),d.deepLink(),unique,actor,now());
-        communications.save(c);audit(actor,"NOTIFICATION_CREATE","NOTIFICATION_CAMPAIGN",c.getId(),reason,"audience,kind,title,body,deepLink,recipients");
-        store.flush();return view(c);
+        return unique;
     }
     @Transactional public CampaignView dispatch(long actor,long id,long version,String reason) {
         access.require(actor);reason(reason);var c=campaign(id,true);

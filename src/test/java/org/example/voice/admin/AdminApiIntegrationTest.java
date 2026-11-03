@@ -45,6 +45,7 @@ class AdminApiIntegrationTest {
     @Autowired ObjectMapper json;
     @Autowired AdminContentService contents;
     @Autowired AdminReadService reads;
+    @Autowired AdminSupportService adminSupport;
     @Autowired SupportService support;
     @Autowired ContentCatalogReader catalog;
     @Autowired PlatformTransactionManager transactions;
@@ -293,6 +294,42 @@ class AdminApiIntegrationTest {
             mvc.perform(get("/api/admin/users/"+withdrawn.getId()+suffix).with(auth(actor,"ADMIN"))).andExpect(status().isNotFound());
         mvc.perform(get("/api/admin/users/resolve").param("identifier",withdrawn.getId().toString()).with(auth(actor,"ADMIN"))).andExpect(status().isNotFound());
         mvc.perform(get("/api/admin/users/{id}",deleted.getId()).with(auth(actor,"ADMIN"))).andExpect(status().isNotFound());
+    }
+    @Test void noticeDeletionRemovesPublicAndAdminReadsButPreservesAudit() throws Exception {
+        var notice=org.example.voice.support.domain.entity.Notice.scheduled("삭제할 안내", "요약",
+                List.of(new org.example.voice.support.domain.model.SupportData.Section("안내",List.of("내용"))),false,NOW.minusDays(1));
+        em.persist(notice);em.flush();long id=notice.getId();
+        mvc.perform(delete("/api/admin/notices/{id}",id).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("version",notice.getVersion(),"reason","지난 안내 정리"))))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"));
+        mvc.perform(get("/api/admin/notices/{id}",id).with(auth(actor,"ADMIN"))).andExpect(status().isNotFound());
+        mvc.perform(get("/api/notices/{id}",id).with(auth(owner,"USER"))).andExpect(status().isNotFound());
+        assertThat(em.createQuery("select count(a) from AdminAuditLog a where a.action='NOTICE_DELETE' and a.targetId=:id",Long.class)
+                .setParameter("id",Long.toString(id)).getSingleResult()).isEqualTo(1);
+        assertThat(em.find(org.example.voice.support.domain.entity.Notice.class,id)).isNull();
+    }
+    @Test void noticeDeletionRequiresCurrentAdminVersionAndReason() throws Exception {
+        var n=org.example.voice.support.domain.entity.Notice.scheduled("안내","요약",
+                List.of(new org.example.voice.support.domain.model.SupportData.Section("제목",List.of("내용"))),false,NOW);
+        em.persist(n);em.flush();String path="/api/admin/notices/"+n.getId();
+        mvc.perform(delete(path).contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"reason\":\"정리\"}")).andExpect(status().isUnauthorized());
+        mvc.perform(delete(path).with(auth(owner,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"reason\":\"정리\"}")).andExpect(status().isForbidden());
+        for(String body:List.of("{\"reason\":\"정리\"}","{\"version\":null,\"reason\":\"정리\"}","{\"version\":-1,\"reason\":\"정리\"}","{\"version\":0,\"reason\":\" \"}"))
+            mvc.perform(delete(path).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
+        mvc.perform(delete(path).with(auth(actor,"ADMIN")).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("version",n.getVersion()+1,"reason","정리")))).andExpect(status().isConflict());
+        assertThat(em.find(org.example.voice.support.domain.entity.Notice.class,n.getId())).isNotNull();
+    }
+
+    @Test @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    void noticeDeleteAuditFailureRollsBackTheRemoval() {
+        var notice=adminSupport.createNotice(actor,new org.example.voice.admin.domain.model.AdminData.NoticeDraft("안내","요약",
+                List.of(new org.example.voice.support.domain.model.SupportData.Section("제목",List.of("내용"))),false,true,NOW),"등록");
+        doThrow(new org.springframework.dao.DataAccessResourceFailureException("audit unavailable"))
+                .when(store).audit(argThat(log->"NOTICE_DELETE".equals(log.getAction())));
+        assertThatThrownBy(()->adminSupport.deleteNotice(actor,notice.id(),notice.version(),"삭제"))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(reads.notice(actor,notice.id()).title()).isEqualTo("안내");
     }
     private RequestPostProcessor auth(long id,String role) {
         var issued = tokenService.issueSession(em.find(User.class,id));
