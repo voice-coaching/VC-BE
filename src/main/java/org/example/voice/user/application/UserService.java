@@ -81,9 +81,6 @@ public class UserService {
     @Transactional
     public WithdrawalResult withdraw(Long userId) {
         User user = userReader.findByIdForUpdate(userId).orElseThrow(UserNotFoundException::new);
-        if (user.isWithdrawn()) {
-            throw new WithdrawalAlreadyProcessedException();
-        }
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         user.withdraw(now);

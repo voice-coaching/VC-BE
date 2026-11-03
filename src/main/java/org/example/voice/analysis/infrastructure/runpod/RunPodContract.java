@@ -49,14 +49,15 @@ public class RunPodContract {
     private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules()
             .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     private final Map<String, JsonSchema> schemas = new ConcurrentHashMap<>();
     private final Map<String, JsonNode> documents = new ConcurrentHashMap<>();
     private final ObjectMapper canonicalMapper;
 
     public RunPodContract() {
         mapper.getFactory().setStreamReadConstraints(com.fasterxml.jackson.core.StreamReadConstraints.builder()
-                .maxNestingDepth(64).maxStringLength(2*RESULT_LIMIT).build());
+                .maxNestingDepth(Integer.MAX_VALUE).maxStringLength(Integer.MAX_VALUE).build());
         canonicalMapper = mapper.copy().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
     }
 
@@ -119,7 +120,7 @@ public class RunPodContract {
     /** SHA-256 of the packaged schema bytes, distinct from the JCS payload digest. */
     public String schemaSha256(String filename) {
         try (var input = getClass().getResourceAsStream("/contracts/" + filename)) {
-            if (input == null) throw new IllegalStateException("RunPod contract resource missing");
+
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(input.readAllBytes()));
         } catch (IOException | java.security.NoSuchAlgorithmException error) {
             throw new IllegalStateException("RunPod contract digest unavailable", error);
@@ -169,7 +170,7 @@ public class RunPodContract {
 
     private JsonNode readDocument(String name) {
         try (var input = getClass().getResourceAsStream("/contracts/" + name)) {
-            if (input == null) throw new IllegalStateException("RunPod contract resource missing");
+
             return mapper.readTree(input);
         } catch (IOException error) { throw new IllegalStateException("RunPod contract unreadable", error); }
     }

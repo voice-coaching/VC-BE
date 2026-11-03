@@ -11,8 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CourseEducationService {
     private final CourseEducationReader education;
     public CourseEducationData detail(Long courseId, Long stepId, Long userId, Long sessionId) {
-        if (courseId <= 0 || stepId <= 0 || (sessionId != null && sessionId <= 0))
-            throw new CourseEducationException(400, "VALIDATION_ERROR");
+
         return education.detail(courseId, stepId, userId, sessionId);
     }
 }

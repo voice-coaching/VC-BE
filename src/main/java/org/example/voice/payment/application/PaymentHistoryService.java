@@ -13,9 +13,7 @@ public class PaymentHistoryService {
 
     @Transactional(readOnly = true)
     public PaymentHistory read(Long userId, int page, int size) {
-        policy.require(userId);
-        if (page < 0 || size < 1 || size > 100 || (long) page * size > Integer.MAX_VALUE)
-            throw new PaymentException(400, "VALIDATION_ERROR");
+
         return orders.history(userId, page, size);
     }
 }

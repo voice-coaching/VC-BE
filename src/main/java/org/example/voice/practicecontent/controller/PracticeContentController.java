@@ -50,7 +50,7 @@ public class PracticeContentController {
     @GetMapping("/{contentId}/recommendations")
     public ApiResponse<PracticeContentRecommendationsResponseDto> getPracticeContentRecommendations(
             @PathVariable Long contentId,
-            @Valid @ModelAttribute PracticeContentRecommendationConditionDto condition
+             @ModelAttribute PracticeContentRecommendationConditionDto condition
     ) {
         PracticeContentRecommendationsResponseDto response =
                 practiceContentService.getPracticeContentRecommendations(contentId, condition.limit());

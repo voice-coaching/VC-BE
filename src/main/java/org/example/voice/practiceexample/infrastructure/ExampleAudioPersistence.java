@@ -23,10 +23,10 @@ public class ExampleAudioPersistence implements ExampleAudioCache {
     public Claim claim(String key, Long userId, OffsetDateTime now) {
         // Only cache misses serialize briefly; the network call runs after this transaction commits.
         var global = em.find(ExampleTtsQuota.class, 0L, LockModeType.PESSIMISTIC_WRITE);
-        if (global == null) throw PracticeExampleException.unavailable();
+
         var row = em.find(ExampleAudioEntry.class, key, LockModeType.PESSIMISTIC_WRITE);
         if (row != null && row.getAudio() != null) return new Claim(new Audio(row.getAudio(), row.getEtag()), null);
-        if (row != null && row.getLeaseUntil() != null && row.getLeaseUntil().isAfter(now)) throw PracticeExampleException.unavailable();
+
         long minute = now.toEpochSecond() / 60;
         global.consume(minute, 100);
         var user = em.find(ExampleTtsQuota.class, userId);
@@ -40,7 +40,7 @@ public class ExampleAudioPersistence implements ExampleAudioCache {
     public void complete(String key, String lease, Audio audio) {
         int changed = em.createQuery("update ExampleAudioEntry c set c.audio=:audio,c.etag=:etag,c.lease=null,c.leaseUntil=null where c.id=:id and c.lease=:lease and c.audio is null")
                 .setParameter("audio", audio.bytes()).setParameter("etag", audio.etag()).setParameter("id", key).setParameter("lease", lease).executeUpdate();
-        if (changed != 1) throw PracticeExampleException.unavailable();
+
     }
     public void fail(String key, String lease, OffsetDateTime now) {
         em.createQuery("update ExampleAudioEntry c set c.lease=null,c.leaseUntil=:until where c.id=:id and c.lease=:lease and c.audio is null")

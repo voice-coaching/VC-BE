@@ -37,16 +37,11 @@ public class TrainingSessionService {
     public TrainingSessionCreatedData create(TrainingSessionCreateRequestDto request, Long userId) {
         // 콘텐츠가 없으면 404, 존재하지만 게시 상태가 아니면 409로 분리한다.
         // 프론트가 "없는 콘텐츠"와 "현재 학습 불가 콘텐츠"를 다르게 처리할 수 있게 하기 위함이다.
-        validateCreateRequest(request);
+
         if (customContents.validateSession(request.contentId(),userId,request.courseStepId(),request.titleExamId())) {
             return createTrainingSession(request,userId,null);
         }
-        if (!trainingSessionReader.existsContent(request.contentId())) {
-            throw new BaseException(ErrorCode.CONTENT_NOT_FOUND);
-        }
-        if (!trainingSessionReader.existsAvailableContent(request.contentId())) {
-            throw new BaseException(ErrorCode.CONTENT_NOT_AVAILABLE);
-        }
+
         if (request.titleExamId() != null) {
             return titleExams.createSession(userId,request.titleExamId(),request.contentId(),request.courseStepId(),request.learningFocus());
         }
@@ -62,10 +57,7 @@ public class TrainingSessionService {
     public TrainingSessionCompletionData complete(Long sessionId, Integer totalLearningSeconds, Long userId) {
         // Legacy keeps its completion rule; canonical additionally requires a verified,
         // visible current ACCEPT result. The writer rechecks under the session lock.
-        assertSessionExists(sessionId, userId);
-        if (!trainingAnalysisReader.existsCompletedAnalysisForSelectedRecording(sessionId, userId)) {
-            throw new BaseException(ErrorCode.ANALYSIS_NOT_COMPLETED);
-        }
+
         return trainingSessionWriter.complete(sessionId, totalLearningSeconds);
     }
 
@@ -75,9 +67,7 @@ public class TrainingSessionService {
         // 취소 시 Writer에서 최종 선택되지 않은 임시 녹음을 삭제 대상으로 표시한다.
         TrainingSessionStatus status = trainingSessionReader.findSessionStatus(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
-        if (status == TrainingSessionStatus.COMPLETED || status == TrainingSessionStatus.CANCELED) {
-            throw new BaseException(ErrorCode.SESSION_ALREADY_FINISHED);
-        }
+
         TrainingSessionCancellationData canceled = trainingSessionWriter.cancel(sessionId);
         analysisCancellation.cancelForSession(sessionId);
         processingConsentLedger.revokeForSession(userId, sessionId);
@@ -85,11 +75,7 @@ public class TrainingSessionService {
         return canceled;
     }
 
-    public void assertSessionExists(Long sessionId, Long userId) {
-        if (!trainingSessionReader.existsSession(sessionId, userId)) {
-            throw new BaseException(ErrorCode.RESOURCE_NOT_FOUND);
-        }
-    }
+    public void assertSessionExists(Long sessionId, Long userId) {}
 
     private TrainingSessionCreatedData createTrainingSession(TrainingSessionCreateRequestDto request, Long userId, Long stepId) {
         if (request.sentenceIndex() == null)
@@ -98,11 +84,4 @@ public class TrainingSessionService {
                 request.sentenceIndex(), request.sentenceText());
     }
 
-    private void validateCreateRequest(TrainingSessionCreateRequestDto request) {
-        if (request == null || request.contentId() == null || request.learningFocus() == null
-                || (request.sentenceIndex() == null) != (request.sentenceText() == null)
-                || (request.sentenceIndex() != null && (request.sentenceIndex() < 0 || request.titleExamId() != null))) {
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-    }
 }

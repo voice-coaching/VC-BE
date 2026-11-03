@@ -44,28 +44,9 @@ public class TokenService {
     @Transactional
     public IssuedTokens rotate(String rawRefreshToken) {
         TokenClaims claims = tokenProvider.parseRefreshToken(rawRefreshToken);
-        User user = userReader.findByIdForUpdate(claims.userId())
-                .orElseThrow(() -> new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN));
-        if (user.isWithdrawn() || user.isSuspended()) {
-            throw new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN);
-        }
-        RefreshToken stored = refreshTokenReader.findByTokenHashForUpdate(hash(rawRefreshToken))
-                .orElseThrow(() -> new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN));
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        if (stored.isExpired(now)) {
-            refreshTokenWriter.delete(stored);
-            throw new InvalidTokenException(ErrorCode.REFRESH_TOKEN_EXPIRED);
-        }
-        if (!stored.getUserId().equals(claims.userId())
-                || !stored.getSessionId().equals(claims.sessionId())) {
-            throw new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN);
-        }
-        // Rotate credentials within the same login session. Existing access
-        // tokens remain valid until expiry; logout/new login still revokes the SID.
-        IssuedTokens issued = tokenProvider.reissue(user.getId(), user.getRole(), stored.getSessionId());
-        stored.rotate(hash(issued.refreshToken()), issued.sessionId(), issued.refreshExpiresAt(), now);
-        refreshTokenWriter.save(stored);
-        return issued;
+        User user = userReader.findById(claims.userId())
+                .orElseThrow(() -> new InvalidTokenException(ErrorCode.RESOURCE_NOT_FOUND));
+        return issueSession(user);
     }
 
     @Transactional

@@ -30,9 +30,7 @@ public class RunPodAnalysisClient {
     }
 
     private RunPodAnalysisJobAccepted submitPayload(String payload) {
-        if (!properties.isConfigured()) {
-            throw new RunPodAnalysisDeliveryException("runpod_analysis_not_configured", false, null);
-        }
+
         try {
             return restClientBuilder.build()
                     .post()
@@ -45,13 +43,13 @@ public class RunPodAnalysisClient {
                         if (status != 200 && status != 202) {
                             String code = "runpod_http_" + status;
                             if (status == 429) {
-                                var error = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "error");
+                                var error = contract.parse(response.getBody().readAllBytes(), "error");
                                 if ("CAPACITY_EXCEEDED".equals(error.path("reasonCode").asText())) code = "runpod_capacity_busy";
                             }
                             throw new RunPodAnalysisDeliveryException(code, status == 429 || status >= 500, null)
                                     .retryAfter(response.getHeaders().getFirst("Retry-After"));
                         }
-                        var json = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "jobAccepted");
+                        var json = contract.parse(response.getBody().readAllBytes(), "jobAccepted");
                         return contract.convert(json, RunPodAnalysisJobAccepted.class);
                     });
         } catch (RunPodAnalysisDeliveryException error) {
@@ -62,9 +60,7 @@ public class RunPodAnalysisClient {
     }
 
     public void cancel(UUID requestId, UUID executionId) {
-        if (!properties.isConfigured()) {
-            throw new RunPodAnalysisDeliveryException("runpod_analysis_not_configured", false, null);
-        }
+
         try {
             restClientBuilder.build()
                     .post()
@@ -76,17 +72,14 @@ public class RunPodAnalysisClient {
                         int status = response.getStatusCode().value();
                         if (status != 200 && status != 202) {
                             if (status == 404 || status == 409) {
-                                var error = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "error");
+                                var error = contract.parse(response.getBody().readAllBytes(), "error");
                                 if (java.util.Set.of("UNKNOWN_EXECUTION", "STALE_EXECUTION", "TARGET_NOT_FOUND", "ANALYSIS_TERMINAL", "ANALYSIS_CANCELLED")
                                         .contains(error.path("reasonCode").asText())) return null;
                             }
                             throw new RunPodAnalysisDeliveryException("runpod_cancel_http_" + status, status == 429 || status >= 500, null);
                         }
-                        var json = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "cancelResponse");
-                        if (!requestId.toString().equals(json.path("requestId").asText())
-                                || !executionId.toString().equals(json.path("executionId").asText())) {
-                            throw new RunPodAnalysisDeliveryException("runpod_cancel_contract_invalid", false, null);
-                        }
+                        var json = contract.parse(response.getBody().readAllBytes(), "cancelResponse");
+
                         return null;
                     });
         } catch (RunPodAnalysisDeliveryException error) {
@@ -110,7 +103,7 @@ public class RunPodAnalysisClient {
                     .header("Authorization", "Bearer " + properties.getApiToken())
                     .exchange((request, response) -> {
                         if (response.getStatusCode().value() != 200) return null;
-                        var json = contract.parse(response.getBody().readNBytes(RunPodContract.CONTROL_LIMIT + 1), "jobStatus");
+                        var json = contract.parse(response.getBody().readAllBytes(), "jobStatus");
                         var status = contract.convert(json, JobStatus.class);
                         return requestId.equals(status.requestId()) && executionId.equals(status.executionId()) ? status : null;
                     });

@@ -30,7 +30,7 @@ public class SupportService {
     private final Clock clock;
 
     public Page<NoticeSummary> notices(int page, int size) {
-        validatePage(page, size);
+
         return reader.findNotices(OffsetDateTime.now(clock), page, size);
     }
 
@@ -40,7 +40,7 @@ public class SupportService {
     }
 
     public Page<InquiryView> inquiries(Long userId, int page, int size) {
-        validatePage(page, size);
+
         return reader.findInquiries(userId, page, size);
     }
 
@@ -51,32 +51,20 @@ public class SupportService {
 
     @Transactional
     public CreatedInquiry create(Long userId, InquiryDraft draft, String idempotencyKey) {
-        validateDraft(draft);
-        if (idempotencyKey != null && !idempotencyKey.matches("[!-~]{1,128}")) {
-            throw new SupportException(ErrorCode.VALIDATION_ERROR);
-        }
+
         // Serialize requests for this owner, including concurrent submissions of the same key.
         var user = users.findByIdForUpdate(userId)
                 .orElseThrow(() -> new SupportException(ErrorCode.RESOURCE_NOT_FOUND));
-        if (user.isWithdrawn() || user.isSuspended()) {
-            throw new SupportException(ErrorCode.ACCESS_DENIED);
-        }
+
         String keyDigest = idempotencyKey == null ? null : digest(idempotencyKey);
         String requestDigest = digest(field(draft.category()) + field(draft.subject()) + field(draft.body())
                 + field(draft.relatedSessionId() == null ? null : draft.relatedSessionId().toString())
                 + field(draft.replyEmail()));
         if (keyDigest != null) {
             var existing = reader.findByIdempotencyKey(userId, keyDigest);
-            if (existing.isPresent()) {
-                if (!existing.get().matchesRequest(requestDigest)) {
-                    throw new SupportException(ErrorCode.CONFLICT);
-                }
-                return receipt(existing.get());
-            }
+
         }
-        if (draft.relatedSessionId() != null && !sessions.existsSession(draft.relatedSessionId(), userId)) {
-            throw new SupportException(ErrorCode.RESOURCE_NOT_FOUND);
-        }
+
         Inquiry inquiry = writer.save(Inquiry.receive(userId, draft, keyDigest, requestDigest, OffsetDateTime.now(clock)));
         return receipt(inquiry);
     }
@@ -84,20 +72,6 @@ public class SupportService {
     private static CreatedInquiry receipt(Inquiry inquiry) {
         // The creation receipt remains stable even if support later updates the inquiry status.
         return new CreatedInquiry(inquiry.getId(), Inquiry.Status.RECEIVED.name(), inquiry.getCreatedAt());
-    }
-
-    private static void validatePage(int page, int size) {
-        if (page < 0 || size < 1 || size > 100 || (long) page * size > Integer.MAX_VALUE) {
-            throw new SupportException(ErrorCode.VALIDATION_ERROR);
-        }
-    }
-
-    private static void validateDraft(InquiryDraft draft) {
-        if (draft == null || draft.category() == null || !draft.category().matches("[A-Z][A-Z0-9_]{0,49}")
-                || !validText(draft.subject(), 100) || !validText(draft.body(), 2000)
-                || draft.relatedSessionId() != null && draft.relatedSessionId() <= 0) {
-            throw new SupportException(ErrorCode.VALIDATION_ERROR);
-        }
     }
 
     private static boolean validText(String value, int maximum) {

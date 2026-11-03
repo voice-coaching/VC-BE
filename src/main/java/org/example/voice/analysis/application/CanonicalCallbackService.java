@@ -25,16 +25,16 @@ public class CanonicalCallbackService {
     @org.springframework.transaction.annotation.Transactional(timeout=5)
     public org.example.voice.analysis.controller.dto.RunPodAnalysisResultCallbackResponseDto acknowledgement(
             long analysisId,CanonicalCallbackDocument document,String disposition) {
-        if(document.identity().analysisId()!=analysisId)throw new RunPodContractException(422,"VALIDATION_FAILED");
+
         inbox.confirmApplied(document);
         return journal.acknowledgement(document,disposition);
     }
     public void confirmApplied(long analysisId,CanonicalCallbackDocument document) {
-        if(document.identity().analysisId()!=analysisId)throw new RunPodContractException(422,"VALIDATION_FAILED");
+
         inbox.confirmApplied(document);
     }
     public AnalysisResultIngestionDisposition ingest(long analysisId,CanonicalCallbackDocument document) {
-        if(document.identity().analysisId()!=analysisId)throw new RunPodContractException(422,"VALIDATION_FAILED");
+
         return switch(inbox.register(document)) {
             case APPLIED -> AnalysisResultIngestionDisposition.IGNORED_DUPLICATE;
             case VERIFIED -> committer.commit(document);

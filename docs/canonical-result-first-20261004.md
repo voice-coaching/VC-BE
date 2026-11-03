@@ -53,3 +53,41 @@ Java 21 `compileJava compileTestJava` 범위로 컴파일 확인한다. 기존 t
 후속 수정은 기존 `STAGING`의 원본 메타데이터를 한 번 잠가 읽고, 전달된 원본의 크기·SHA와 이미 저장된 bytes의 동일성을 확인한 뒤 누락 원본을 한 SQL 문으로 채운다. 직접 인계는 기존 실행·lease 검사를 유지하고, 검증된 영속 수신의 DB 재시도는 파일 큐 소유권과 현재 사용자·녹음·시도를 검사한다. 전체 원본이 모이면 같은 트랜잭션에서 `RECEIVED`로 전이한다. URL·schema·응답·보존 정책과 DB migration은 바뀌지 않는다. 이 재개 경로의 운영 실행·부하 수용과 새 소요 시간은 아직 확인되지 않았다.
 
 영속 파일 큐의 원본을 다시 읽을 때 크기·SHA 검증 실패는 422로 유지해 해당 항목을 거절한다. 파일 접근 실패는 기존 503 재시도 경로에 둔다. DB handoff 검증 worker에서도 계약 파싱·원본 검증의 확정적인 422 오류를 `REJECTED`와 `canonical_handoff_invalid`로 마감한다. 일시적인 저장소·검증기 장애는 계속 재시도한다. 이 분류의 운영 재현과 결과 품질 QA는 아직 수행하지 않았다.
+
+## 2026-11-03 재전달과 저장 대기열 보완
+
+완료 인계 재등록과 선행 항목의 반복 처리로 후속 결과가 DB에 인계되지 않는 문제가
+운영 main에서 관측됐다. 추가 수정은 같은 ID/identity/digest의 파일 큐·DB handoff를
+재사용하고 terminal 상태·claim·수신 시각·원본을 보존한다. 이미 저장된 동일 결과는
+점수·완료 후처리를 재적용하지 않으며 archive 예약도 멱등 처리한다.
+
+저장 worker는 재시작 시 DB terminal 상태를 먼저 확인하고 대기·실패 항목을 건너뛰어
+순환 처리한다. 회차당 최대 25개를 확인하고 신규 DB 인계는 한 건이며 save backoff를
+verifier가 초기화하지 않는다. 취소 HTTP는 공용 scheduler와 분리된 단일 executor에서
+실행한다. 공개 API/schema/DB migration과 원본 보존 정책은 변경하지 않는다.
+
+운영 근거·파일별 변경·개발자 확인 범위는
+[추가 장애 수정 기록](troubleshooting/canonical-result-head-blocking-20261103.md)을 따른다.
+
+## 2026-11-03 현재 실행 조회와 거절 상태 복원
+
+PUBLISHED·DB·파일 큐 조회는 현재 request/execution/worker와 녹음·콘텐츠 identity를
+비교한다. Backend timeout·취소 이후 미저장 preview와 재시도 이전 결과를 반환하지
+않는다. 신규 commit도 같은 분석 잠금 아래 현재 실행을 확인하며 이미 저장된 동일
+결과의 멱등 ACK는 유지한다.
+
+파일 큐는 rejected marker를 복원하고 원본의 제한 크기·SHA를 확인한 뒤 preview를
+연다. 확정적인 계약/충돌 오류는 REJECTED, 비활성 DB 인계는 REVOKED로 마감한다.
+일시 I/O·DB 장애는 재시도하고 원본은 보존한다. 구현 범위·운영 관측·검증 제한은
+[현재 실행·큐 복원 기록](troubleshooting/canonical-generation-recovery-20261103.md)을 따른다.
+
+## 2026-11-03 시작 시 과거 계약 오류 격리
+
+영속 큐 복원은 각 문서에 현재 계약 검증을 적용한다. 과거 문서 하나의 확정적인
+400/413/422가 전체 Spring 시작을 중단하지 않도록 원본 디렉터리에 `quarantined`
+marker를 영속화하고 해당 항목만 격리한다. 정상 문서 복원은 계속하며 같은 격리 ID의
+수신·자동 재처리·덮어쓰기는 거절한다. 원본·기존 DB 결과는 변경하거나 삭제하지 않는다.
+I/O·인프라 오류와 다른 초기화 오류는 이 경계에서 숨기지 않는다.
+
+실제 운영 원인과 AI peer의 별도 접수 차단 조건은
+[시작 장애 기록](troubleshooting/startup-contract-regression-20261103.md)에 구분했다.

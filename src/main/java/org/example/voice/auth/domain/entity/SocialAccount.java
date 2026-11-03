@@ -19,28 +19,27 @@ import java.time.OffsetDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "social_accounts", uniqueConstraints = @UniqueConstraint(
-        name = "uk_social_accounts_provider_user", columnNames = {"provider", "provider_user_id"}))
+@Table(name = "social_accounts")
 public class SocialAccount {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = true)
     private Long userId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "provider", nullable = false)
+    @Column(name = "provider", nullable = true)
     private OAuthProvider provider;
 
-    @Column(name = "provider_user_id", nullable = false)
+    @Column(name = "provider_user_id", nullable = true)
     private String providerUserId;
 
     @Column(name = "provider_email")
     private String providerEmail;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
 
     private SocialAccount(Long userId, OAuthProvider provider, String providerUserId, String providerEmail, OffsetDateTime now) {

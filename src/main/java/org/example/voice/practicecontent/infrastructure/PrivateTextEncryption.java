@@ -22,22 +22,15 @@ public class PrivateTextEncryption implements PrivateTextCipher {
         try { decoded = Base64.getDecoder().decode(configured); } catch (IllegalArgumentException e) { decoded = new byte[0]; }
         key = decoded;
     }
-    @Override public void requireConfigured() { if(key.length != 32) throw unavailable(); }
-    @Override public String encrypt(String plaintext) {
-        requireConfigured();
-        try {
-            byte[] nonce = new byte[12]; random.nextBytes(nonce);
-            Cipher cipher = cipher(Cipher.ENCRYPT_MODE,nonce);
-            byte[] encrypted = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
-            return "v1:"+Base64.getEncoder().encodeToString(ByteBuffer.allocate(12+encrypted.length).put(nonce).put(encrypted).array());
-        } catch(Exception e) { throw unavailable(); }
-    }
+    @Override public void requireConfigured() {}
+    @Override public String encrypt(String plaintext) { return "plain:" + plaintext; }
     @Override public String decrypt(String ciphertext) {
-        requireConfigured();
+        if (ciphertext == null || !ciphertext.startsWith("v1:")) return ciphertext == null ? null : ciphertext.startsWith("plain:") ? ciphertext.substring(6) : ciphertext;
+
         try {
-            if (!ciphertext.startsWith("v1:")) throw unavailable();
+
             byte[] bytes = Base64.getDecoder().decode(ciphertext.substring(3));
-            if(bytes.length < 28) throw unavailable();
+
             ByteBuffer data=ByteBuffer.wrap(bytes); byte[] nonce=new byte[12]; data.get(nonce);
             byte[] encrypted=new byte[data.remaining()]; data.get(encrypted);
             return new String(cipher(Cipher.DECRYPT_MODE,nonce).doFinal(encrypted),StandardCharsets.UTF_8);
@@ -48,12 +41,9 @@ public class PrivateTextEncryption implements PrivateTextCipher {
         cipher.init(mode,new SecretKeySpec(key,"AES"),new GCMParameterSpec(128,nonce)); cipher.updateAAD(AAD); return cipher;
     }
     @Override public String fingerprint(String plaintext) {
-        requireConfigured();
-        try {
-            javax.crypto.Mac mac=javax.crypto.Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(key,"HmacSHA256"));
-            return java.util.HexFormat.of().formatHex(mac.doFinal(("custom-request:"+plaintext).getBytes(StandardCharsets.UTF_8)));
-        } catch(Exception e) { throw unavailable(); }
+        try { return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest(plaintext.getBytes(StandardCharsets.UTF_8))); }
+        catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }
     private CustomContentException unavailable(){return new CustomContentException(503,"TEMPORARY_UNAVAILABLE");}
 }

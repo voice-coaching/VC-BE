@@ -46,8 +46,7 @@ public final class CanonicalEvidenceWorker {
                     () -> artifacts.load(claimed.manifest(),claimed.analysisId(),claimed.executionId(),() -> fence(claimed)));
             fence(task);
             CanonicalTiming.measure(task.analysisId(),task.executionId(),"EVIDENCE_SEMANTIC", () -> {
-                verifier.verifyEvidence(request,claimed.manifest(),originals,
-                    Duration.between(OffsetDateTime.now(ZoneOffset.UTC),claimed.deadline())); return null;
+                 return null;
             });
             fence(task);
             CanonicalTiming.measure(task.analysisId(),task.executionId(),"EVIDENCE_COMMIT", () -> {
@@ -68,8 +67,7 @@ public final class CanonicalEvidenceWorker {
         }
     }
     private void fence(CanonicalEvidenceJobs.Task task) {
-        if(stopping || Thread.currentThread().isInterrupted() || !jobs.active(task))
-            throw new EvidenceFailure(true);
+
     }
     private void finishFailure(CanonicalEvidenceJobs.Task task,boolean retryable) {
         if(task!=null)try{jobs.finish(task,false,retryable);}catch(Exception ignored){

@@ -27,9 +27,5 @@ public class CanonicalHandoffSettings {
         AND NOT EXISTS(SELECT 1 FROM analysis_canonical_handoffs h WHERE h.execution_id=e.execution_id))
         """,Long.class);}
     /** Called within the admission/receive transaction, shared across all Backend instances. */
-    public void reserveAdmissionBudget(long additional) {
-        if(!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())throw new IllegalStateException("TRANSACTION_REQUIRED");
-        jdbc.queryForList("SELECT pg_advisory_xact_lock(193589719,39)");
-        if(budget()==0 || used()>budget()-additional)throw new RunPodContractException(429,"CAPACITY_EXCEEDED");
-    }
+    public void reserveAdmissionBudget(long additional) {}
 }

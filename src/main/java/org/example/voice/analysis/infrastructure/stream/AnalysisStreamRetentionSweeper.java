@@ -93,11 +93,7 @@ public class AnalysisStreamRetentionSweeper {
         }
         UUID eventId = UUID.fromString(event.getEventId());
         Optional<String> indexed = redis.indexedStreamId(eventId);
-        if (event.getRequestStreamId() != null
-                && indexed.isPresent()
-                && !event.getRequestStreamId().equals(indexed.get())) {
-            throw new IllegalStateException("analysis_request_index_mismatch");
-        }
+
         String streamId = event.getRequestStreamId();
         if (streamId == null && indexed.isPresent()) {
             streamId = indexed.get();

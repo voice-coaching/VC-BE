@@ -8,9 +8,9 @@ import java.time.OffsetDateTime;
 @Table(name="script_library_entries")
 public class ScriptLibraryEntry {
     @Id @Column(name="content_id") private Long contentId;
-    @Column(name="user_id",nullable=false) private Long userId;
+    @Column(name="user_id",nullable = true) private Long userId;
     @Column(name="topic_id") private Long topicId;
-    @Column(name="created_at",nullable=false) private OffsetDateTime createdAt;
+    @Column(name="created_at",nullable = true) private OffsetDateTime createdAt;
     public ScriptLibraryEntry(Long contentId,Long userId,Long topicId,OffsetDateTime now) {
         this.contentId=contentId;this.userId=userId;this.topicId=topicId;this.createdAt=now;
     }

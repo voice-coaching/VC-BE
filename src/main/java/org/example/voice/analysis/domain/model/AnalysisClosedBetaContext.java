@@ -8,7 +8,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /** Personal identifiers intentionally transported during the closed beta. */
-@JsonIgnoreProperties(ignoreUnknown = false)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record AnalysisClosedBetaContext(
         String schemaVersion,
         Long userId,
@@ -18,12 +18,7 @@ public record AnalysisClosedBetaContext(
     public static final String SCHEMA_VERSION = "voice-coaching.closed-beta-context.v1";
 
     public AnalysisClosedBetaContext {
-        if (!SCHEMA_VERSION.equals(schemaVersion)
-                || userId == null || userId <= 0
-                || sessionId == null || sessionId <= 0
-                || recordingId == null || recordingId <= 0) {
-            throw new IllegalArgumentException("closed beta context is invalid");
-        }
+
     }
 
     public byte[] canonicalBindingInput() {

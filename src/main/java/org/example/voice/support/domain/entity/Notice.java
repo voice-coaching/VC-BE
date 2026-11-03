@@ -17,20 +17,22 @@ import java.util.Objects;
 @Table(name = "notices")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Notice {
+    @Version @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long version;
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(nullable = false, length = 200)
+    @Column(nullable = true, length = 200)
     private String title;
-    @Column(nullable = false, length = 500)
+    @Column(nullable = true, length = 500)
     private String summary;
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(nullable = false, columnDefinition = "jsonb")
+    @Column(nullable = true, columnDefinition = "jsonb")
     private List<Section> sections;
-    @Column(nullable = false)
+    @Column(nullable = true)
     private boolean pinned;
-    @Column(nullable = false)
+    @Column(nullable = true)
     private boolean published;
-    @Column(name = "published_at", nullable = false)
+    @Column(name = "published_at", nullable = true)
     private OffsetDateTime publishedAt;
 
     public static Notice scheduled(String title, String summary, List<Section> sections,
@@ -46,4 +48,13 @@ public class Notice {
     }
 
     public void hide() { published = false; }
+
+    public void edit(String title, String summary, List<Section> sections,
+                     boolean pinned, boolean published, OffsetDateTime publishedAt) {
+        this.title = Objects.requireNonNull(title);
+        this.summary = Objects.requireNonNull(summary);
+        this.sections = List.copyOf(sections);
+        this.pinned = pinned; this.published = published;
+        this.publishedAt = Objects.requireNonNull(publishedAt);
+    }
 }

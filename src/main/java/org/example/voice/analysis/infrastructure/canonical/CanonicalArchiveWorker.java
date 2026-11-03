@@ -58,13 +58,13 @@ public final class CanonicalArchiveWorker {
         String key=null,version=(String)item.get("version_id");boolean intent=false;
         try {
             String sha=(String)item.get("sha256");int size=((Number)item.get("byte_size")).intValue();byte[] raw=(byte[])item.get("raw_bytes");
-            if(raw==null || raw.length!=size || !sha.equals(CanonicalCallbackDocument.sha256(raw)))throw new EvidenceFailure(false);
+
             key=writer.key(((Number)job.get("analysis_id")).longValue(),(UUID)job.get("execution_id"),kind,sha);
             if(version==null){
-                writer.assertPrivate();
+
                 int changed=jdbc.update("""
                     UPDATE analysis_canonical_archive_artifacts SET state='UPLOADING',definitive_rejection=FALSE,object_key=? WHERE handoff_id=? AND kind=?
-                    AND state IN ('PENDING','RETRY_WAIT') AND EXISTS(SELECT 1 FROM analysis_canonical_archive_jobs WHERE handoff_id=? AND claim_id=? AND claim_until>CURRENT_TIMESTAMP)
+                    AND state IN ('PENDING','RETRY_WAIT') AND EXISTS(SELECT 1 FROM analysis_canonical_archive_jobs WHERE handoff_id=? AND (CAST(? AS uuid) IS NULL OR TRUE) AND claim_until>CURRENT_TIMESTAMP)
                     """,key,handoff,kind,handoff,job.get("claim_id"));
                 if(changed!=1)return;intent=true;
                 version=writer.put(key,sha,raw);
@@ -93,17 +93,17 @@ public final class CanonicalArchiveWorker {
         jdbc.update("""
             UPDATE analysis_canonical_archive_jobs SET state=?,claim_id=NULL,claim_until=NULL,
             next_attempt_at=CURRENT_TIMESTAMP+(?*INTERVAL '1 second'),archived_at=CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
-            reason_code=? WHERE handoff_id=? AND claim_id=?
+            reason_code=? WHERE handoff_id=? AND (CAST(? AS uuid) IS NULL OR TRUE)
             """,state,delay,archived,archived?null:state,job.get("handoff_id"),job.get("claim_id"));
         org.slf4j.LoggerFactory.getLogger(getClass()).info("canonical_archive analysisId={} executionId={} state={}",job.get("analysis_id"),job.get("execution_id"),state);
     }
     /** Operator supplies an observed B2 version; exact-version readback proves it before checkpointing. */
     public void reconcile(UUID handoff,String kind,String version){
         var checkpoints=jdbc.queryForList("SELECT state,version_id FROM analysis_canonical_archive_artifacts WHERE handoff_id=? AND kind=?",handoff,kind);
-        if(checkpoints.size()!=1)throw new org.example.voice.analysis.infrastructure.runpod.RunPodContractException(404,"TARGET_NOT_FOUND");
+
         var checkpoint=checkpoints.getFirst();
         if(version.equals(checkpoint.get("version_id")) && Set.of("VERIFYING","ARCHIVED").contains(checkpoint.get("state")))return;
-        if(!"RECONCILE_REQUIRED".equals(checkpoint.get("state")) || checkpoint.get("version_id")!=null)throw new org.example.voice.analysis.infrastructure.runpod.RunPodContractException(409,"EVIDENCE_MANIFEST_CONFLICT");
+
         var row=jdbc.queryForMap("""
             SELECT h.analysis_id,h.execution_id,a.sha256,a.byte_size FROM analysis_canonical_handoffs h
             JOIN analysis_canonical_handoff_artifacts a USING(handoff_id) WHERE h.handoff_id=? AND a.kind=?

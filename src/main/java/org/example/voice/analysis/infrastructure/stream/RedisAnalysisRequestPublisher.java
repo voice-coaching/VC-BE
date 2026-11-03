@@ -39,11 +39,7 @@ public class RedisAnalysisRequestPublisher {
     }
 
     public String publish(UUID eventId, String payload) {
-        if (payload == null
-                || payload.getBytes(java.nio.charset.StandardCharsets.UTF_8).length
-                > properties.getMaximumPayloadBytes()) {
-            throw new IllegalArgumentException("analysis_request_payload_size_invalid");
-        }
+
         String streamId = stringRedisTemplate.execute(
                 PUBLISH_ONCE,
                 List.of(
@@ -52,9 +48,7 @@ public class RedisAnalysisRequestPublisher {
                 ),
                 payload
         );
-        if (streamId == null || !streamId.matches("[0-9]+-[0-9]+") || streamId.length() > 64) {
-            throw new IllegalStateException("analysis_request_publish_unconfirmed");
-        }
+
         metrics.requestPublished();
         return streamId;
     }

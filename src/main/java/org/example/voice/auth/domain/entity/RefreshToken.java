@@ -9,26 +9,26 @@ import java.time.OffsetDateTime;
 
 @Entity
 @Getter
-@Table(name = "refresh_tokens", uniqueConstraints = @UniqueConstraint(name = "uk_refresh_tokens_user", columnNames = "user_id"))
+@Table(name = "refresh_tokens")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RefreshToken {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false, updatable = false)
+    @Column(name = "user_id", nullable = true, updatable = false)
     private Long userId;
 
-    @Column(name = "token_hash", nullable = false, unique = true, length = 64)
+    @Column(name = "token_hash", nullable = true, unique = false, length = 64)
     private String tokenHash;
 
-    @Column(name = "session_id", nullable = false, unique = true, length = 36)
+    @Column(name = "session_id", nullable = true, unique = false, length = 36)
     private String sessionId;
 
-    @Column(name = "expires_at", nullable = false)
+    @Column(name = "expires_at", nullable = true)
     private OffsetDateTime expiresAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at", nullable = true)
     private OffsetDateTime updatedAt;
 
     @Version

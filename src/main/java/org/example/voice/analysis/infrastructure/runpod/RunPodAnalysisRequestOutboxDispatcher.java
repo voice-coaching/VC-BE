@@ -2,6 +2,7 @@ package org.example.voice.analysis.infrastructure.runpod;
 
 import lombok.extern.slf4j.Slf4j;
 import org.example.voice.analysis.domain.entity.AnalysisRequestOutbox;
+import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.type.AnalysisRequestOutboxStatus;
 import org.example.voice.analysis.infrastructure.AnalysisRequestOutboxJpaRepository;
 import org.example.voice.training.infrastructure.AnalysisResultJpaRepository;
@@ -12,7 +13,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 
 @Slf4j
 @Component
@@ -54,9 +54,12 @@ public class RunPodAnalysisRequestOutboxDispatcher {
                         var analysis = event.getAnalysisResult();
                         if (analysis.getStatus() == org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
                                 || analysis.getStatus() == org.example.voice.analysis.domain.type.AnalysisStatus.FAILED
-                                || !analysis.isForActiveRequest(UUID.fromString(event.getEventId()))
-                                || !analysis.isForActiveExecution(UUID.fromString(event.getExecutionId()))) {
+                                || !matchesCurrentExecution(analysis, event.getEventId(), event.getExecutionId())) {
                             event.cancelPending("stale_or_terminal_execution");
+                            return null;
+                        }
+                        if (analysis.getWorkerInstanceId() != null || analysis.getHandoffReceivedAt() != null) {
+                            event.markDelivered(event.getExecutionId());
                             return null;
                         }
                         event.reserveDeliveryUntil(now.plusSeconds(60));
@@ -103,8 +106,9 @@ public class RunPodAnalysisRequestOutboxDispatcher {
         var result = analysisResultRepository.findForIngestion(delivery.analysisId()).orElse(null);
         var event = outboxRepository.findForDeliveryUpdate(delivery.id()).orElse(null);
         if (result == null || event == null || event.getStatus() != AnalysisRequestOutboxStatus.PENDING) return OffsetDateTime.now(ZoneOffset.UTC);
-        if (!result.isForActiveRequest(UUID.fromString(event.getEventId()))
-                || !result.isForActiveExecution(UUID.fromString(event.getExecutionId()))) {
+        if (!matchesCurrentExecution(result, delivery.requestId(), delivery.executionId())
+                || !delivery.requestId().equals(event.getEventId())
+                || !delivery.executionId().equals(event.getExecutionId())) {
             event.cancelPending("stale_execution");
             return OffsetDateTime.now(ZoneOffset.UTC);
         }
@@ -118,7 +122,7 @@ public class RunPodAnalysisRequestOutboxDispatcher {
             return event.deferCapacity(retryAfter);
         }
         // A claim proves delivery even if its HTTP acknowledgment was lost; never fail live inference.
-        if (error == null || result.getWorkerInstanceId() != null) {
+        if (error == null || result.getWorkerInstanceId() != null || result.getHandoffReceivedAt() != null) {
             event.markDelivered(event.getExecutionId());
         } else {
             org.example.voice.common.logging.AnalysisLogEvents.event(log,"analysis_dispatch_failed",delivery.analysisId(),event.getEventId(),event.getExecutionId(),error).log("Analysis dispatch failed");
@@ -131,6 +135,13 @@ public class RunPodAnalysisRequestOutboxDispatcher {
         }
         return event.getStatus() == AnalysisRequestOutboxStatus.PENDING
                 ? event.getNextAttemptAt() : OffsetDateTime.now(ZoneOffset.UTC);
+    }
+
+    /** Scope the restored delivery fence without changing unrelated main-branch policies. */
+    private boolean matchesCurrentExecution(AnalysisResult result, String requestId, String executionId) {
+        return requestId != null && executionId != null
+                && requestId.equals(result.getActiveRequestEventId())
+                && executionId.equals(result.getActiveExecutionId());
     }
 
     private record Delivery(Long id, Long analysisId, String payload,String requestId,String executionId) {}

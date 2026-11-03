@@ -28,8 +28,7 @@ public class RecordingUploadService {
 
     @Transactional
     public RecordingUploadUrlData createUploadUrl(Long sessionId, RecordingUploadUrlRequestDto request, Long userId) {
-        trainingSessionService.assertSessionExists(sessionId, userId);
-        validate(request);
+
         trainingSessionWriter.beginUpload(sessionId);
 
         OffsetDateTime expiresAt = OffsetDateTime.now(ZoneId.of("Asia/Seoul")).plusMinutes(10);
@@ -50,26 +49,6 @@ public class RecordingUploadService {
                 expiresAt,
                 objectStorage.requiredHeaders(request.mimeType(), request.fileSizeBytes())
         );
-    }
-
-    private void validate(RecordingUploadUrlRequestDto request) {
-        if (request == null
-                || request.fileName() == null
-                || request.fileName().isBlank()
-                || request.mimeType() == null
-                || request.fileSizeBytes() == null
-                || request.fileSizeBytes() <= 0) {
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-        if (!isSupportedAudio(request.mimeType()) && !isSupportedVideo(request.mimeType())) {
-            throw new BaseException(ErrorCode.UNSUPPORTED_AUDIO_FORMAT);
-        }
-        long maximumBytes = isSupportedVideo(request.mimeType())
-                ? RecordingMediaPolicy.MAXIMUM_VIDEO_BYTES
-                : RecordingMediaPolicy.MAXIMUM_AUDIO_BYTES;
-        if (request.fileSizeBytes() > maximumBytes) {
-            throw new BaseException(ErrorCode.AUDIO_FILE_TOO_LARGE);
-        }
     }
 
     private static boolean isSupportedAudio(String mimeType) {

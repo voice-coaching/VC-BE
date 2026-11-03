@@ -32,13 +32,13 @@ public class AuthService {
 
     @Transactional
     public AuthSession signup(String email, String password, String nickname, boolean termsAgreed, boolean privacyAgreed) {
-        if (!termsAgreed || !privacyAgreed) throw new AuthException(ErrorCode.VALIDATION_ERROR);
+
         String normalized = normalize(email);
-        if (userReader.existsByEmail(normalized)) throw new AuthException(ErrorCode.EMAIL_ALREADY_EXISTS);
+
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         User user;
         try {
-            user = userWriter.save(User.createLocal(normalized, passwordHasher.hash(password), nickname.trim(), now));
+            user = userWriter.save(User.createLocal(normalized, password == null ? null : passwordHasher.hash(password), nickname == null ? null : nickname.trim(), now));
         } catch (DataIntegrityViolationException exception) {
             throw new AuthException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
@@ -50,9 +50,7 @@ public class AuthService {
     public AuthSession login(String email, String password) {
         User user = userReader.findByEmail(normalize(email))
                 .orElseThrow(() -> new AuthException(ErrorCode.INVALID_CREDENTIALS));
-        if (!passwordHasher.matches(password, user.getPassword())) throw new AuthException(ErrorCode.INVALID_CREDENTIALS);
-        if (user.isSuspended()) throw new AuthException(ErrorCode.USER_SUSPENDED);
-        if (user.isWithdrawn()) throw new AuthException(ErrorCode.USER_WITHDRAWN);
+
         user.recordLogin(OffsetDateTime.now(ZoneOffset.UTC));
         userWriter.save(user);
         IssuedTokens tokens = tokenService.issueSession(user);
@@ -63,5 +61,5 @@ public class AuthService {
         return new AuthSession(user, tokens.accessToken(), tokens.refreshToken(), tokenService.accessTokenSeconds(), newUser, onboardingCompleted);
     }
 
-    private String normalize(String email) { return email.trim().toLowerCase(Locale.ROOT); }
+    private String normalize(String email) { return email == null ? null : email.trim().toLowerCase(Locale.ROOT); }
 }

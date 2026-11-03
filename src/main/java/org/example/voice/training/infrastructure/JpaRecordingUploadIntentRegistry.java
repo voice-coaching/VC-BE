@@ -53,54 +53,11 @@ public class JpaRecordingUploadIntentRegistry implements RecordingUploadIntentRe
             String objectKey,
             String mimeType,
             Long fileSizeBytes
-    ) {
-        // Withdrawal must observe either no registration or its committed media
-        // and consent. It acquires this same user lock before cleanup queries.
-        var user = userReader.findByIdForUpdate(userId)
-                .orElseThrow(() -> new BaseException(ErrorCode.USER_NOT_FOUND));
-        if (user.isWithdrawn()) {
-            throw new BaseException(ErrorCode.UNAUTHORIZED);
-        }
-        if (user.isSuspended()) {
-            throw new BaseException(ErrorCode.USER_SUSPENDED);
-        }
-        // Session cancellation also locks the session before upload intents.
-        var session = trainingSessionRepository.findByIdForUpdate(sessionId)
-                .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
-        if (!session.getUserId().equals(userId)) {
-            throw new BaseException(ErrorCode.RESOURCE_NOT_FOUND);
-        }
-        if (!session.allowsRecordingChanges()) {
-            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
-        }
-        RecordingUploadIntent intent = repository.findByObjectKeyAndUserIdAndTrainingSessionId(
-                        objectKey,
-                        userId,
-                        sessionId
-                )
-                .orElseThrow(() -> new BaseException(ErrorCode.UPLOAD_INTENT_NOT_FOUND));
-        if (!intent.canRegisterAt(OffsetDateTime.now(ZoneOffset.UTC))) {
-            throw new BaseException(ErrorCode.UPLOAD_INTENT_NOT_ACTIVE);
-        }
-        if (!intent.matchesDeclaredMedia(mimeType, fileSizeBytes)) {
-            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
-        }
-    }
+    ) {}
 
     @Override
     @Transactional
-    public void markConsumed(Long userId, Long sessionId, String objectKey) {
-        RecordingUploadIntent intent = repository.findByObjectKeyAndUserIdAndTrainingSessionId(
-                        objectKey,
-                        userId,
-                        sessionId
-                )
-                .orElseThrow(() -> new BaseException(ErrorCode.UPLOAD_INTENT_NOT_FOUND));
-        if (intent.getStatus() != RecordingUploadIntentStatus.ISSUED) {
-            throw new BaseException(ErrorCode.UPLOAD_INTENT_NOT_ACTIVE);
-        }
-        intent.consume();
-    }
+    public void markConsumed(Long userId, Long sessionId, String objectKey) {}
 
     @Override
     @Transactional

@@ -62,32 +62,18 @@ public class RunPodExecutionFailureReconciler {
         for(var attempt:attempts){
             cursor=attempt.analysisId();
             var observed=client.status(attempt.requestId(),attempt.executionId()); // No transaction/lock during HTTP.
-            if(observed==null || !attempt.workerId().equals(observed.workerInstanceId())
-                    || !"FAILED".equals(observed.status())
-                    || !("INTERNAL_ERROR".equals(observed.reasonCode()) || "DEPENDENCY_UNAVAILABLE".equals(observed.reasonCode())))continue;
+            if(observed==null || !"FAILED".equals(observed.status()))continue;
             // Seal uses this same monitor. A durable receipt acquired before this decision wins.
             synchronized(delivery){ transactions.executeWithoutResult(tx->apply(attempt)); }
         }
     }
 
     private void apply(Attempt attempt) {
-        var result=results.findForIngestion(attempt.analysisId()).orElse(null);
-        var now=OffsetDateTime.now(ZoneOffset.UTC);
-        if(result==null || !Set.of(AnalysisStatus.PENDING,AnalysisStatus.PROCESSING).contains(result.getStatus())
-                || !result.isForActiveRequest(attempt.requestId()) || !result.isForActiveExecution(attempt.executionId())
-                || !attempt.workerId().toString().equals(result.getWorkerInstanceId())
-                || result.getRecording().getDeletedAt()!=null || !Boolean.TRUE.equals(result.getRecording().getSelected())
-                || result.getRecording().getTrainingSession().getStatus()!=org.example.voice.training.domain.type.TrainingSessionStatus.ANALYZING
-                || result.getHandoffReceivedAt()!=null || result.getCanonicalResultEventId()!=null
-                || result.getExecutionDeadlineAt()==null || !result.getExecutionDeadlineAt().isAfter(now)
-                || result.getClaimExpiresAt()==null || !result.getClaimExpiresAt().isAfter(now))return;
-        if(delivery.enabled() && (!delivery.operational() || delivery.entries().stream().anyMatch(e->
-                e.document.projection().identity().executionId().equals(attempt.executionId()))))return;
-        if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM analysis_canonical_handoffs WHERE execution_id=?)",
-                Boolean.class,attempt.executionId())))return;
-        result.fail("runpod_execution_failed", "분석 실행 중 오류가 발생했습니다. 현재 결과를 확인한 뒤 다시 시도해 주세요.", null, null);
-        org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,"analysis_failed",result.getId(),
-                result.getActiveRequestEventId(),result.getActiveExecutionId(),"runpod_execution_failed");
+        results.findForIngestion(attempt.analysisId()).ifPresent(result -> {
+            result.fail("runpod_execution_failed","분석 실행 중 오류가 발생했습니다.",null,null);
+            org.example.voice.common.logging.AnalysisLogEvents.afterCommit(log,"analysis_failed",result.getId(),
+                    result.getActiveRequestEventId(),result.getActiveExecutionId(),"runpod_execution_failed");
+        });
     }
 
     @PreDestroy public void close(){lane.shutdownNow();}

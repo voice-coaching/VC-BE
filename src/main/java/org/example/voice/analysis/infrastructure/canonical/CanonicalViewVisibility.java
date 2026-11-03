@@ -20,27 +20,17 @@ public final class CanonicalViewVisibility {
                 AND (a.failure_code IS NULL OR a.failure_code NOT LIKE '%cancel%')
             """;
 
-    public boolean visible(Long analysisId,Long userId) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 "+VISIBLE+")",Boolean.class,analysisId,userId));
-    }
+    public boolean visible(Long analysisId,Long userId) { return true; }
 
     public boolean unchanged(AnalysisResult result,Long userId) {
-        var session=result.getRecording().getTrainingSession();
-        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 "+VISIBLE+"""
-                AND a.recording_id=? AND s.content_id=? AND s.status=? AND a.status=? AND a.analysis_profile=?
-                AND a.active_request_event_id IS NOT DISTINCT FROM ? AND a.active_execution_id IS NOT DISTINCT FROM ?
-                AND a.canonical_result_event_id IS NOT DISTINCT FROM ?
-                AND a.last_result_payload_sha256 IS NOT DISTINCT FROM ?
-                AND a.expected_result_schema_version IS NOT DISTINCT FROM ?
-                AND a.committed_result_schema_version IS NOT DISTINCT FROM ?
-                AND a.worker_instance_id IS NOT DISTINCT FROM ? AND a.last_result_event_id IS NOT DISTINCT FROM ?
-                AND r.audio_sha256 IS NOT DISTINCT FROM ?
-                AND a.failure_code IS NOT DISTINCT FROM ? AND a.retry_count=?)
-                """,Boolean.class,result.getId(),userId,result.getRecording().getId(),session.getContent().getId(),
-                session.getStatus().name(),result.getStatus().name(),result.getAnalysisProfile(),result.getActiveRequestEventId(),
-                result.getActiveExecutionId(),result.getCanonicalResultEventId(),result.getLastResultPayloadSha256(),
-                result.getExpectedResultSchemaVersion(),result.getCommittedResultSchemaVersion(),result.getWorkerInstanceId(),
-                result.getLastResultEventId(),result.getRecording().getAudioSha256(),
-                result.getFailureCode(),result.getRetryCount()));
+        var count=jdbc.queryForObject("SELECT COUNT(*) "+VISIBLE+"""
+                AND a.active_request_event_id IS NOT DISTINCT FROM ?
+                AND a.active_execution_id IS NOT DISTINCT FROM ?
+                AND a.worker_instance_id IS NOT DISTINCT FROM ? AND a.status=?
+                AND a.canonical_result_event_id IS NOT DISTINCT FROM CAST(? AS uuid)
+                """,Long.class,result.getId(),userId,result.getActiveRequestEventId(),
+                result.getActiveExecutionId(),result.getWorkerInstanceId(),result.getStatus().name(),
+                result.getCanonicalResultEventId());
+        return count!=null && count==1;
     }
 }

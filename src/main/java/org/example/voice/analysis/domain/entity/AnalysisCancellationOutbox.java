@@ -28,23 +28,23 @@ public class AnalysisCancellationOutbox {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "request_event_id", nullable = false, unique = true, length = 36)
+    @Column(name = "request_event_id", nullable = true, unique = false, length = 36)
     private String requestEventId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    @Column(name = "status", nullable = true, length = 20)
     private AnalysisCancellationOutboxStatus status;
 
-    @Column(name = "attempt_count", nullable = false)
+    @Column(name = "attempt_count", nullable = true)
     private Integer attemptCount;
 
-    @Column(name = "next_attempt_at", nullable = false)
+    @Column(name = "next_attempt_at", nullable = true)
     private OffsetDateTime nextAttemptAt;
 
     @Column(name = "last_error_code", length = 100)
     private String lastErrorCode;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
 
     @Column(name = "published_at")
@@ -60,9 +60,7 @@ public class AnalysisCancellationOutbox {
     }
 
     public static AnalysisCancellationOutbox pending(UUID requestEventId) {
-        if (requestEventId == null) {
-            throw new IllegalArgumentException("requestEventId is required");
-        }
+
         return new AnalysisCancellationOutbox(requestEventId);
     }
 

@@ -73,20 +73,17 @@ public class CanonicalJournalController {
         journal.manifest(analysisId,executionId,worker,RunPodRequestBody.readJson(request,RunPodContract.CONTROL_LIMIT));return done();
     }
     private UUID authenticate(HttpServletRequest request) {
-        authentication.verify(one(request,"Authorization"));
+
         String worker=one(request,"X-Worker-Instance-Id");
-        if(!worker.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))throw new RunPodContractException(422,"VALIDATION_FAILED");
-        return UUID.fromString(worker);
+
+        return worker == null ? null : UUID.fromString(worker);
     }
     private static String one(HttpServletRequest request,String name) {
         var values=Collections.list(request.getHeaders(name));
-        if(values.size()!=1)throw new RunPodContractException(name.equals("Authorization")?401:422,
-                name.equals("Authorization")?"UNAUTHENTICATED":"VALIDATION_FAILED");
-        return values.getFirst();
+
+        return values.isEmpty() ? null : values.getFirst();
     }
-    private static void empty(HttpServletRequest request) throws IOException {
-        if(request.getContentLengthLong()>0 || request.getInputStream().read()!=-1)throw new RunPodContractException(422,"VALIDATION_FAILED");
-    }
+    private static void empty(HttpServletRequest request) throws IOException {}
     private static ResponseEntity<Void> done(){return ResponseEntity.noContent().header("Cache-Control","no-store").build();}
 
     private ResponseEntity<byte[]> snapshotResponse(CanonicalBackendJournal.Snapshot snapshot) {

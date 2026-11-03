@@ -11,6 +11,8 @@ import org.springframework.transaction.*;
 import org.springframework.transaction.support.*;
 import java.time.OffsetDateTime;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import static org.example.voice.analysis.infrastructure.runpod.RunPodContractTest.*;
 import static org.mockito.Mockito.*;
 import static org.assertj.core.api.Assertions.*;
@@ -46,7 +48,7 @@ class RunPodDispatchTest {
         result.assignExecution(EXECUTION);
         var event = AnalysisRequestOutbox.pendingHttp(REQUEST, EXECUTION, result, payload(OffsetDateTime.now().plusMinutes(5)));
         ReflectionTestUtils.setField(event, "id", 4L);
-        when(requests.findFirstByTransportAndStatusOrderByIdAsc("RUNPOD_HTTP", AnalysisRequestOutboxStatus.PENDING))
+        when(requests.findFirstByTransportAndStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(eq("RUNPOD_HTTP"), eq(AnalysisRequestOutboxStatus.PENDING), any()))
                 .thenReturn(Optional.of(event), Optional.empty());
         when(requests.findForDeliveryUpdate(4L)).thenReturn(Optional.of(event));
         when(results.findForIngestion(1L)).thenReturn(Optional.of(result));
@@ -65,7 +67,7 @@ class RunPodDispatchTest {
     }
 
     @Test
-    void cancellationUsesOriginalExecutionAndDoesNotHoldTransactionDuringHttp() {
+    void cancellationUsesOriginalExecutionAndDoesNotHoldTransactionDuringHttp() throws Exception {
         var requests = mock(AnalysisRequestOutboxJpaRepository.class);
         var cancellations = mock(AnalysisCancellationOutboxJpaRepository.class);
         var client = mock(RunPodAnalysisClient.class);
@@ -73,7 +75,13 @@ class RunPodDispatchTest {
         var original = AnalysisRequestOutbox.pendingHttp(REQUEST, EXECUTION, result, "{}");
         result.retry(UUID.randomUUID());
         result.assignExecution(UUID.randomUUID());
-        var event = AnalysisCancellationOutbox.pending(REQUEST);
+        var event = spy(AnalysisCancellationOutbox.pending(REQUEST));
+        var published = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            invocation.callRealMethod();
+            published.countDown();
+            return null;
+        }).when(event).markPublished();
         when(cancellations.findFirstByStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(any(), any()))
                 .thenReturn(Optional.of(event), Optional.empty());
         when(cancellations.findByRequestEventId(REQUEST.toString())).thenReturn(Optional.of(event));
@@ -82,9 +90,15 @@ class RunPodDispatchTest {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
             return null;
         }).when(client).cancel(REQUEST, EXECUTION);
-        new RunPodAnalysisCancellationOutboxDispatcher(cancellations, requests, client, new RunPodAnalysisProperties(),
-                new Transactions()).dispatchPending();
-        verify(client).cancel(REQUEST, EXECUTION);
-        assertThat(event.getStatus()).isEqualTo(AnalysisCancellationOutboxStatus.PUBLISHED);
+        var dispatcher = new RunPodAnalysisCancellationOutboxDispatcher(cancellations, requests, client, new RunPodAnalysisProperties(),
+                new Transactions());
+        try {
+            dispatcher.dispatchPending();
+            assertThat(published.await(5, TimeUnit.SECONDS)).isTrue();
+            verify(client).cancel(REQUEST, EXECUTION);
+            assertThat(event.getStatus()).isEqualTo(AnalysisCancellationOutboxStatus.PUBLISHED);
+        } finally {
+            dispatcher.close();
+        }
     }
 }

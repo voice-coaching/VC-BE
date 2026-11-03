@@ -28,29 +28,29 @@ public class Course {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "course_type", nullable = false)
+    @Column(name = "course_type", nullable = true)
     private CourseType courseType;
 
-    @Column(name = "title", nullable = false)
+    @Column(name = "title", nullable = true)
     private String title;
 
     @Column(name = "description")
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "difficulty", nullable = false)
+    @Column(name = "difficulty", nullable = true)
     private Difficulty difficulty;
 
     @Column(name = "estimated_minutes")
     private Integer estimatedMinutes;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = true)
     private PublishStatus status;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at", nullable = true)
     private OffsetDateTime updatedAt;
 }

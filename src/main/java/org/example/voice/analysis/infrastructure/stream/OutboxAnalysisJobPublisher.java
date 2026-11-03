@@ -30,13 +30,9 @@ public class OutboxAnalysisJobPublisher implements AnalysisJobPublisher {
     public void publish(AnalysisWorkerRequest request) {
         AnalysisResult analysisResult = analysisResultRepository.findById(request.analysisId())
                 .orElseThrow(() -> new IllegalStateException("analysis result disappeared before outbox write"));
-        if (!analysisResult.isForActiveRequest(request.eventId())) {
-            throw new IllegalStateException("analysis request event does not match active analysis request");
-        }
+
         String payload = codec.encodeRequest(request);
-        if (RedisAnalysisResultConsumer.payloadBytes(payload) > properties.getMaximumPayloadBytes()) {
-            throw new IllegalStateException("analysis_request_payload_size_invalid");
-        }
+
         outboxRepository.save(AnalysisRequestOutbox.pending(
                 request.eventId(),
                 analysisResult,

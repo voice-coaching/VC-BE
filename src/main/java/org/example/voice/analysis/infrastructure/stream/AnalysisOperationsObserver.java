@@ -93,17 +93,13 @@ public class AnalysisOperationsObserver {
 
     private long size(String stream) {
         Long size = redis.opsForStream().size(stream);
-        if (size == null || size < 0) {
-            throw new IllegalStateException("analysis_stream_size_unavailable");
-        }
+
         return size;
     }
 
     private long pending(String stream, String group) {
         PendingMessagesSummary summary = redis.opsForStream().pending(stream, group);
-        if (summary == null || summary.getTotalPendingMessages() < 0) {
-            throw new IllegalStateException("analysis_stream_pending_unavailable");
-        }
+
         return summary.getTotalPendingMessages();
     }
 

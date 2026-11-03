@@ -22,16 +22,16 @@ public class PaymentCancellation {
     @Id
     @Column(length = 36)
     private String id;
-    @Column(name = "order_id", nullable = false, unique = true, length = 64)
+    @Column(name = "order_id", nullable = true, unique = false, length = 64)
     private String orderId;
-    @Column(nullable = false, length = 200)
+    @Column(nullable = true, length = 200)
     private String reason;
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 16)
+    @Column(nullable = true, length = 16)
     private PaymentCancellationStatus status;
-    @Column(name = "requested_at", nullable = false)
+    @Column(name = "requested_at", nullable = true)
     private OffsetDateTime requestedAt;
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at", nullable = true)
     private OffsetDateTime updatedAt;
 
     public static PaymentCancellation create(String orderId, String reason, OffsetDateTime now) {

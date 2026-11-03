@@ -30,25 +30,10 @@ public class AnalysisCapabilitiesReaderImpl implements AnalysisCapabilitiesReade
 
     @Override
     public AnalysisCapabilitiesData read() {
-        boolean uploadConfigured = storage.isEnabled() && normalization.isEnabled();
-        String policyRevision = authorization.getConsentPolicyRevision();
-        return new AnalysisCapabilitiesData(
-                status(uploadConfigured),
-                status(uploadConfigured && policyRevision != null && !policyRevision.isBlank()
-                        && (stream.isEnabled() || isRunPodHttpConfigured())),
-                List.of(LearningFocus.PRONUNCIATION),
-                RecordingMediaPolicy.AUDIO_MIME_TYPES,
-                RecordingMediaPolicy.VIDEO_MIME_TYPES,
-                Math.min(RecordingMediaPolicy.MAXIMUM_AUDIO_BYTES, normalization.getMaximumInputBytes()),
-                Math.min(RecordingMediaPolicy.MAXIMUM_VIDEO_BYTES, normalization.getMaximumInputBytes()),
-                normalization.getMinimumDurationMs(),
-                normalization.getMaximumDurationMs(),
-                true,
-                true,
-                true,
-                policyRevision == null || policyRevision.isBlank() ? null : policyRevision,
-                RecordingMediaPolicy.VIDEO_CONSENT_POLICY_REVISION
-        );
+        boolean uploadConfigured=storage.isEnabled() && normalization.isEnabled();
+        return new AnalysisCapabilitiesData(status(uploadConfigured),status(uploadConfigured && (stream.isEnabled() || isRunPodHttpConfigured())),
+                List.of(LearningFocus.PRONUNCIATION),List.of("audio/*"),List.of("video/*"),Long.MAX_VALUE,Long.MAX_VALUE,0,Integer.MAX_VALUE,
+                false,false,false,null,null);
     }
 
     private static AnalysisConfigurationStatus status(boolean configured) {
