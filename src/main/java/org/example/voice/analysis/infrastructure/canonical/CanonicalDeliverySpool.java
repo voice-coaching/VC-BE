@@ -32,6 +32,7 @@ public final class CanonicalDeliverySpool {
     private final RunPodContract contract;
     private final ObjectMapper json=new ObjectMapper();
     private final Map<UUID,Entry> entries=new ConcurrentHashMap<>();
+    private final Set<UUID> quarantined=ConcurrentHashMap.newKeySet();
     private Path root;
     private FileChannel owner;
     private FileLock ownership;
@@ -58,12 +59,28 @@ public final class CanonicalDeliverySpool {
         try(var children=Files.list(root)){
             for(var p:children.filter(x->Files.isDirectory(x,LinkOption.NOFOLLOW_LINKS) && !x.getFileName().toString().startsWith(".")).toList()){
                 UUID id=UUID.fromString(p.getFileName().toString());
-                var doc=CanonicalHandoffDocument.parse(read(p.resolve("document.json"),2*1024*1024),contract);
-
-                var entry=new Entry(doc,p);reserved+=doc.reservedBytes();
-                if(Files.exists(p.resolve("received")))entry.receivedAt=Instant.parse(new String(read(p.resolve("received"),100),java.nio.charset.StandardCharsets.UTF_8));
-                entry.rejected=Files.exists(p.resolve("rejected"),LinkOption.NOFOLLOW_LINKS);
-                entries.put(id,entry); // Recheck current execution ownership after every restart.
+                if (Files.exists(p.resolve("quarantined"),LinkOption.NOFOLLOW_LINKS)) {
+                    quarantined.add(id);
+                    org.slf4j.LoggerFactory.getLogger(getClass()).warn(
+                            "canonical_delivery_quarantined handoffId={} code=PREVIOUSLY_QUARANTINED",id);
+                    continue;
+                }
+                try {
+                    var doc=CanonicalHandoffDocument.parse(read(p.resolve("document.json"),2*1024*1024),contract);
+                    if (!id.equals(doc.id())) throw new RunPodContractException(422,"VALIDATION_FAILED");
+                    var entry=new Entry(doc,p);
+                    if(Files.exists(p.resolve("received")))entry.receivedAt=Instant.parse(new String(read(p.resolve("received"),100),java.nio.charset.StandardCharsets.UTF_8));
+                    entry.rejected=Files.exists(p.resolve("rejected"),LinkOption.NOFOLLOW_LINKS);
+                    entries.put(id,entry);reserved+=doc.reservedBytes();
+                } catch (RunPodContractException invalid) {
+                    if (!Set.of(400,413,422).contains(invalid.status())) throw invalid;
+                    // Strict validation of one historical document must not stop the whole API.
+                    // Keep the original evidence in place; a durable marker prevents automatic replay.
+                    atomic(p.resolve("quarantined"),Integer.toString(invalid.status()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    quarantined.add(id);
+                    org.slf4j.LoggerFactory.getLogger(getClass()).warn(
+                            "canonical_delivery_quarantined handoffId={} status={} code={}",id,invalid.status(),invalid.reason());
+                }
             }
         }
         ready=true;
@@ -73,6 +90,8 @@ public final class CanonicalDeliverySpool {
             var identity = doc.projection().identity();
             if (identity.analysisId()!=analysis || !identity.workerId().equals(worker))
                 throw new RunPodContractException(409,"WORKER_CONFLICT");
+            if (quarantined.contains(doc.id()))
+                throw new RunPodContractException(409,"RESULT_EVENT_CONFLICT");
             var existing = entries.get(doc.id());
             if (existing != null) {
                 if (!existing.document.digest().equals(doc.digest())
