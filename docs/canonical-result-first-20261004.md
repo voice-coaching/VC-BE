@@ -80,3 +80,14 @@ PUBLISHED·DB·파일 큐 조회는 현재 request/execution/worker와 녹음·�
 연다. 확정적인 계약/충돌 오류는 REJECTED, 비활성 DB 인계는 REVOKED로 마감한다.
 일시 I/O·DB 장애는 재시도하고 원본은 보존한다. 구현 범위·운영 관측·검증 제한은
 [현재 실행·큐 복원 기록](troubleshooting/canonical-generation-recovery-20261103.md)을 따른다.
+
+## 2026-11-03 시작 시 과거 계약 오류 격리
+
+영속 큐 복원은 각 문서에 현재 계약 검증을 적용한다. 과거 문서 하나의 확정적인
+400/413/422가 전체 Spring 시작을 중단하지 않도록 원본 디렉터리에 `quarantined`
+marker를 영속화하고 해당 항목만 격리한다. 정상 문서 복원은 계속하며 같은 격리 ID의
+수신·자동 재처리·덮어쓰기는 거절한다. 원본·기존 DB 결과는 변경하거나 삭제하지 않는다.
+I/O·인프라 오류와 다른 초기화 오류는 이 경계에서 숨기지 않는다.
+
+실제 운영 원인과 AI peer의 별도 접수 차단 조건은
+[시작 장애 기록](troubleshooting/startup-contract-regression-20261103.md)에 구분했다.
