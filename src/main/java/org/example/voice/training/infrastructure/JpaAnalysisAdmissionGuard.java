@@ -22,17 +22,5 @@ public class JpaAnalysisAdmissionGuard implements AnalysisAdmissionGuard {
     private final AnalysisStreamProperties properties;
 
     @Override
-    public void acquireAndAssertAvailable(Long userId) {
-        User user = entityManager.find(User.class, userId, LockModeType.PESSIMISTIC_WRITE);
-        if (user == null) {
-            throw new BaseException(ErrorCode.USER_NOT_FOUND);
-        }
-        long running = analysisResultRepository.countByRecordingTrainingSessionUserIdAndStatusIn(
-                userId,
-                List.of(AnalysisStatus.PENDING, AnalysisStatus.PROCESSING)
-        );
-        if (running >= properties.getMaxConcurrentPerUser()) {
-            throw new BaseException(ErrorCode.ANALYSIS_CONCURRENT_LIMIT_EXCEEDED);
-        }
-    }
+    public void acquireAndAssertAvailable(Long userId) {}
 }

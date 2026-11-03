@@ -44,25 +44,5 @@ public class AnalysisExecutionTimeoutSweeper {
             @CacheEvict(cacheNames = AnalysisCacheNames.SESSION_RESULT, allEntries = true),
             @CacheEvict(cacheNames = AnalysisCacheNames.SEGMENTS, allEntries = true)
     })
-    public void failStaleAnalyses() {
-        OffsetDateTime cutoff = OffsetDateTime.now(ZoneOffset.UTC).minus(properties.getExecutionTimeout());
-        List<AnalysisResult> stale = resultRepository.findStaleForUpdate(
-                List.of(AnalysisStatus.PENDING, AnalysisStatus.PROCESSING),
-                cutoff,
-                PageRequest.of(0, properties.getTimeoutSweepBatchSize())
-        );
-        for (AnalysisResult result : stale) {
-            cancellationSignal.schedule(UUID.fromString(result.getActiveRequestEventId()));
-            outboxRepository.findByAnalysisResultIdAndStatus(
-                    result.getId(), AnalysisRequestOutboxStatus.PENDING
-            ).forEach(outbox -> outbox.cancelPending(TIMEOUT_CODE));
-            if (result.fail(TIMEOUT_CODE, TIMEOUT_REASON, null, null)) {
-                metrics.executionTimedOut();
-                consentLedger.revokeForSession(
-                        result.getRecording().getTrainingSession().getUserId(),
-                        result.getRecording().getTrainingSession().getId()
-                );
-            }
-        }
-    }
+    public void failStaleAnalyses() {}
 }

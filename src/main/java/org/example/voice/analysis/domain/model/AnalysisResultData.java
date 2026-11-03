@@ -54,7 +54,6 @@ public record AnalysisResultData(
         this(id, status, outcome, transcript, sttConfidence, overallScore, pronunciationScore, intonationScore, speedWpm, speedStatus, stressScore, pauseScore, strengthsText, weaknessesText, summaryFeedback, pronunciationEvidence, visualSupplement, analyzedAt, scoreBreakdown, scoreHierarchy, null);
     }
 
-
     public AnalysisResultData(Long id,
         AnalysisStatus status,
         AnalysisOutcome outcome,

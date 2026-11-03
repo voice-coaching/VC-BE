@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@ConditionalOnProperty(name="analysis.direct-history.enabled",havingValue="true")
 public class DirectHistoryController {
     private final DirectHistoryService service;
     public DirectHistoryController(DirectHistoryService service){

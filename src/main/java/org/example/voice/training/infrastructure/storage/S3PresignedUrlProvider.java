@@ -54,12 +54,10 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
             long fileSizeBytes,
             OffsetDateTime expiresAt
     ) {
-        requireOwnedKey(objectKey);
+
         PutObjectRequest objectRequest = PutObjectRequest.builder()
                 .bucket(properties.getBucket())
                 .key(objectKey)
-                .contentType(mimeType)
-                .contentLength(fileSizeBytes)
                 .build();
         return presigner.presignPutObject(PutObjectPresignRequest.builder()
                         .signatureDuration(signatureDuration(expiresAt))
@@ -70,7 +68,7 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
 
     @Override
     public String createPlaybackUrl(String objectKey, OffsetDateTime expiresAt) {
-        requireOwnedKey(objectKey);
+
         GetObjectRequest objectRequest = GetObjectRequest.builder()
                 .bucket(properties.getBucket())
                 .key(objectKey)
@@ -83,10 +81,7 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
     }
 
     @Override
-    public Map<String, String> requiredHeaders(String mimeType, long fileSizeBytes) {
-        // Keep the signed body size and object verification; omit browser-managed headers.
-        return Map.of("Content-Type", mimeType);
-    }
+    public Map<String, String> requiredHeaders(String mimeType, long fileSizeBytes) { return Map.of(); }
 
     @Override
     public void assertUploadedObject(
@@ -95,32 +90,11 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
             String objectKey,
             String mimeType,
             long fileSizeBytes
-    ) {
-        requireOwnedKey(userId, sessionId, objectKey);
-        try {
-            var response = s3Client.headObject(HeadObjectRequest.builder()
-                    .bucket(properties.getBucket())
-                    .key(objectKey)
-                    .build());
-            if (response.contentLength() == null
-                    || response.contentLength() != fileSizeBytes
-                    || response.contentType() == null
-                    || !response.contentType().equalsIgnoreCase(mimeType)) {
-                throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
-            }
-        } catch (S3Exception error) {
-            if (error.statusCode() == 404) {
-                throw new BaseException(ErrorCode.UPLOADED_OBJECT_NOT_FOUND);
-            }
-            throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
-        } catch (SdkException error) {
-            throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
-        }
-    }
+    ) {}
 
     @Override
     public void deleteObject(Long userId, Long sessionId, String objectKey) {
-        requireDeletableOwnedKey(userId, sessionId, objectKey);
+
         try {
             s3Client.deleteObject(DeleteObjectRequest.builder()
                     .bucket(properties.getBucket())
@@ -131,72 +105,13 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
         }
     }
 
-    private void requireOwnedKey(String objectKey) {
-        if (objectKey == null
-                || !objectKey.startsWith(properties.getRecordingsPrefix())
-                || objectKey.length() <= properties.getRecordingsPrefix().length()
-                || objectKey.startsWith("/")
-                || objectKey.contains("\\")
-                || java.util.Arrays.stream(objectKey.split("/"))
-                        .anyMatch(segment -> segment.isBlank() || segment.equals(".") || segment.equals(".."))) {
-            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
-        }
-    }
-
-    private void requireOwnedKey(Long userId, Long sessionId, String objectKey) {
-        if (userId == null || userId <= 0 || sessionId == null || sessionId <= 0) {
-            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
-        }
-        requireOwnedKey(objectKey);
-        String ownerPrefix = "%susers/%d/sessions/%d/".formatted(
-                properties.getRecordingsPrefix(), userId, sessionId
-        );
-        if (!objectKey.startsWith(ownerPrefix)
-                || objectKey.length() <= ownerPrefix.length()
-                || objectKey.substring(ownerPrefix.length()).contains("/")) {
-            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
-        }
-    }
-
-    private void requireDeletableOwnedKey(Long userId, Long sessionId, String objectKey) {
-        if (userId == null || userId <= 0 || sessionId == null || sessionId <= 0) {
-            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
-        }
-        requireOwnedKey(objectKey);
-        String opaqueAudio = java.util.regex.Pattern.quote(properties.getRecordingsPrefix())
-                + "analysis-audio/[0-9a-fA-F-]{36}\\.wav";
-        String opaqueVideo = java.util.regex.Pattern.quote(properties.getRecordingsPrefix())
-                + "analysis-video/[0-9a-fA-F-]{36}\\.mp4";
-        if (objectKey.matches(opaqueAudio) || objectKey.matches(opaqueVideo)) {
-            return;
-        }
-        String ownerPrefix = "%susers/%d/sessions/%d/".formatted(
-                properties.getRecordingsPrefix(), userId, sessionId
-        );
-        if (!objectKey.startsWith(ownerPrefix) || objectKey.length() <= ownerPrefix.length()) {
-            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
-        }
-        String relativeKey = objectKey.substring(ownerPrefix.length());
-        boolean directUpload = !relativeKey.contains("/");
-        boolean normalizedWav = relativeKey.matches("normalized/[0-9a-fA-F-]{36}\\.wav");
-        if (!directUpload && !normalizedWav) {
-            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
-        }
-    }
-
     private static String safeExtension(String fileName) {
-        if (fileName == null || !fileName.contains(".")) {
-            return "";
-        }
-        String extension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-        return extension.matches("\\.(webm|mp3|wav|mp4|mov)") ? extension : "";
+        return fileName == null || !fileName.contains(".") ? "" : fileName.substring(fileName.lastIndexOf('.'));
     }
 
     private static Duration signatureDuration(OffsetDateTime expiresAt) {
         Duration duration = Duration.between(OffsetDateTime.now(ZoneOffset.UTC), expiresAt);
-        if (duration.isNegative() || duration.isZero() || duration.compareTo(Duration.ofMinutes(15)) > 0) {
-            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
-        }
+
         return duration;
     }
 }

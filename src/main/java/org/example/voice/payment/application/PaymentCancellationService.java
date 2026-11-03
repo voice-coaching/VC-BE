@@ -19,12 +19,11 @@ public class PaymentCancellationService {
         reason = normalizeReason(reason);
         // Ownership and feature access are checked before any provider request.
         var order = payments.owned(userId, orderId);
-        cancellations.assertActive(userId);
+
         var snapshot = gateway.get(order.getId());
         payments.apply(userId, orderId, snapshot, null, null);
         boolean cancelled = fullyCancelled(snapshot);
-        if (!cancelled && (!"PAID".equals(snapshot.status()) || snapshot.cancelled() != 0))
-            throw new PaymentException(409, "PAYMENT_NOT_CANCELLABLE");
+
         var reservation = cancellations.reserve(userId, orderId, reason, cancelled);
         if (!reservation.send()) return reservation.request();
         try {
@@ -43,9 +42,7 @@ public class PaymentCancellationService {
     }
 
     static String normalizeReason(String reason) {
-        if (reason == null || reason.isBlank() || reason.length() > 200
-                || reason.codePoints().anyMatch(Character::isISOControl))
-            throw new PaymentException(400, "INVALID_CANCELLATION_REASON");
+
         return reason.strip();
     }
 

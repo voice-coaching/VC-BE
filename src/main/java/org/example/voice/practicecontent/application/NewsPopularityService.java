@@ -29,8 +29,7 @@ public class NewsPopularityService {
     /** A unique day row claims the build across instances; the complete snapshot commits atomically. */
     @Transactional
     public PopularNewsResponseDto get(ContentType type, int limit) {
-        if (type != ContentType.NEWS || limit < 1 || limit > 10)
-            throw new BaseException(ErrorCode.INVALID_INPUT_VALUE);
+
         var now = clock.instant();
         var day = now.atZone(SEOUL).toLocalDate();
         var end = day.atStartOfDay(SEOUL).toInstant();
@@ -42,6 +41,8 @@ public class NewsPopularityService {
                     (ranking_date, period_start, period_end, generated_at, next_update_at, ranking_basis)
                 VALUES (?, ?, ?, ?, ?, 'CATALOG_ORDER') ON CONFLICT (ranking_date) DO NOTHING
                 """, date, Timestamp.from(start), Timestamp.from(end), Timestamp.from(now), Timestamp.from(next));
+        // A conflicting date is an existing completed snapshot, not a claim to rebuild its items.
+        // DO UPDATE would also report one affected row and duplicate the (date, content) primary key.
         if (claimed == 1) {
             jdbc.update("""
                     WITH usage AS (
@@ -50,7 +51,7 @@ public class NewsPopularityService {
                         JOIN practice_contents c ON c.id=t.content_id
                         WHERE t.status='COMPLETED' AND t.completed_at>=? AND t.completed_at<?
                           AND u.status='ACTIVE' AND u.deleted_at IS NULL
-                          AND c.content_type='NEWS' AND c.status='PUBLISHED' AND c.owner_id IS NULL
+                          AND c.content_type='NEWS' AND c.status='PUBLISHED' AND c.owner_id IS NULL AND c.deleted_at IS NULL
                           AND (c.published_at IS NULL OR c.published_at<=?)
                         GROUP BY t.content_id
                     )
@@ -60,7 +61,7 @@ public class NewsPopularityService {
                             c.published_at DESC NULLS LAST, c.created_at DESC, c.id DESC
                     ), COALESCE(u.usage_count,0)
                     FROM practice_contents c LEFT JOIN usage u ON u.content_id=c.id
-                    WHERE c.content_type='NEWS' AND c.status='PUBLISHED' AND c.owner_id IS NULL
+                    WHERE c.content_type='NEWS' AND c.status='PUBLISHED' AND c.owner_id IS NULL AND c.deleted_at IS NULL
                       AND (c.published_at IS NULL OR c.published_at<=?)
                     """, Timestamp.from(start), Timestamp.from(end), Timestamp.from(now), date, Timestamp.from(now));
             jdbc.update("""
@@ -78,7 +79,7 @@ public class NewsPopularityService {
                 SELECT c.*, COALESCE(i.usage_count,0) AS usage_count
                 FROM practice_contents c LEFT JOIN news_popularity_items i
                   ON i.content_id=c.id AND i.ranking_date=?
-                WHERE c.content_type='NEWS' AND c.status='PUBLISHED' AND c.owner_id IS NULL
+                WHERE c.content_type='NEWS' AND c.status='PUBLISHED' AND c.owner_id IS NULL AND c.deleted_at IS NULL
                   AND (c.published_at IS NULL OR c.published_at<=?)
                 ORDER BY CASE WHEN i.position IS NULL THEN 1 ELSE 0 END, i.position,
                     c.published_at DESC NULLS LAST, c.created_at DESC, c.id DESC LIMIT ?

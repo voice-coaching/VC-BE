@@ -10,22 +10,22 @@ import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 
 @Entity
-@Table(name = "profile_images", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "key_digest"}))
+@Table(name = "profile_images")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProfileImage {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
-    @Column(name = "user_id", nullable = false) private Long userId;
-    @Column(name = "object_key", nullable = false, unique = true, length = 100) private String objectKey;
-    @Column(name = "image_url", nullable = false, length = 2048) private String imageUrl;
-    @Column(name = "original_file_name", nullable = false) private String originalFileName;
-    @Column(name = "size_bytes", nullable = false) private long sizeBytes;
+    @Column(name = "user_id", nullable = true) private Long userId;
+    @Column(name = "object_key", nullable = true, unique = false, length = 100) private String objectKey;
+    @Column(name = "image_url", nullable = true, length = 2048) private String imageUrl;
+    @Column(name = "original_file_name", nullable = true) private String originalFileName;
+    @Column(name = "size_bytes", nullable = true) private long sizeBytes;
     @Column(name = "key_digest", length = 64) private String keyDigest;
-    @Column(name = "request_digest", nullable = false, length = 64) private String requestDigest;
-    @Column(nullable = false, length = 20) private String state;
-    @Column(name = "created_at", nullable = false) private OffsetDateTime createdAt;
+    @Column(name = "request_digest", nullable = true, length = 64) private String requestDigest;
+    @Column(nullable = true, length = 20) private String state;
+    @Column(name = "created_at", nullable = true) private OffsetDateTime createdAt;
     @Column(name = "activated_at") private OffsetDateTime activatedAt;
-    @Column(name = "cleanup_after", nullable = false) private OffsetDateTime cleanupAfter;
+    @Column(name = "cleanup_after", nullable = true) private OffsetDateTime cleanupAfter;
 
     public static ProfileImage reserve(Long userId, String objectKey, String imageUrl, String fileName,
                                        long size, String keyDigest, String digest, OffsetDateTime now) {
@@ -38,8 +38,7 @@ public class ProfileImage {
         return image;
     }
     public void activate(OffsetDateTime now) {
-        if (!state.equals("UPLOADING") || !cleanupAfter.isAfter(now))
-            throw new ProfileImageException(409, "CONFLICT");
+
         state = "ACTIVE";
         activatedAt = now.truncatedTo(ChronoUnit.MICROS);
     }

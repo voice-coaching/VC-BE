@@ -19,7 +19,7 @@ public record AnalysisScoreHierarchy(String rubricRevision, int leafCount, List<
         if (audit == null || overallScore == null || !ClovaScoreEvidence.HIERARCHICAL_RUBRIC.equals(audit.get("rubricRevision"))) return null;
         try {
             var evidence = MAPPER.convertValue(audit, ClovaScoreEvidence.class);
-            evidence.validate(overallScore);
+
             var groups = new ArrayList<Group>();
             var rules = HierarchicalScorePolicy.POLICY;
             var breakdown = evidence.breakdown(overallScore);

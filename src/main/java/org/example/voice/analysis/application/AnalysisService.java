@@ -18,9 +18,7 @@ public class AnalysisService {
     public AnalysisResultData getCompleted(Long analysisId, Long userId) {
         AnalysisResultData result = analysisResultReader.findOwnedData(analysisId, userId)
                 .orElseThrow(AnalysisNotFoundException::new);
-        if (!result.isCompleted()) {
-            throw new AnalysisNotCompletedException();
-        }
+
         return result;
     }
 

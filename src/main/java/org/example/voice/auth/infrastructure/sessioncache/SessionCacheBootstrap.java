@@ -14,7 +14,7 @@ public class SessionCacheBootstrap {
     public boolean awaitOlderTransactions(Duration timeout) {
         OffsetDateTime cutoff = jdbc.queryForObject(
                 "SELECT CASE WHEN current_setting('track_activities')='on' THEN clock_timestamp() ELSE NULL END", OffsetDateTime.class);
-        if (cutoff == null) return false;
+
         long deadline = System.nanoTime() + timeout.toNanos();
         do {
             // Exclude this connection: a first login may initialize the cache inside its own transaction.

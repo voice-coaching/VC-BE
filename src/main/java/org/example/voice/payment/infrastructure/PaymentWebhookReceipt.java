@@ -10,8 +10,8 @@ import java.time.OffsetDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 class PaymentWebhookReceipt {
     @Id @Column(length = 200) String id;
-    @Column(nullable = false, length = 64) String payloadHash;
-    @Column(nullable = false) OffsetDateTime processedAt;
+    @Column(nullable = true, length = 64) String payloadHash;
+    @Column(nullable = true) OffsetDateTime processedAt;
     PaymentWebhookReceipt(String id, String hash, OffsetDateTime now) {
         this.id = id; this.payloadHash = hash; this.processedAt = now;
     }

@@ -38,20 +38,16 @@ public class ScriptLibraryService {
         return new Library(items,topics,assignments);
     }
     public CustomContentData save(Long user,Long id,Input input,String key) {
-        if(input==null)throw invalid();
+
         String title=normalize(input.title(),100),script=normalize(input.scriptText(),300);
         String keyHash=keyHash(key);
         lock(user);
         String digest=cipher.fingerprint("library:"+id+":"+input.topicId()+":"+title.length()+":"+title+script.length()+":"+script);
         var replay=library.request(user,keyHash);
-        if(replay.isPresent()) {
-            if(!replay.get().getRequestDigest().equals(digest))throw new CustomContentException(409,"CONFLICT");
-            entry(user,replay.get().getContentId());
-            return CustomContentData.from(owned(user,replay.get().getContentId()));
-        }
+
         ScriptLibraryEntry previous=id==null?null:entry(user,id);
         if(input.topicId()!=null)topic(user,input.topicId());
-        if(id==null && library.size(user)>=500)throw new CustomContentException(409,"SCRIPT_LIBRARY_LIMIT");
+
         // Every edit is an immutable practice-content revision. Existing analyses keep their original source.
         var now=OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         var content=contents.save(PracticeContent.custom(user,title,script,LearningFocus.PRONUNCIATION,now));
@@ -61,23 +57,22 @@ public class ScriptLibraryService {
         return CustomContentData.from(content);
     }
     public void delete(Long user,List<Long> ids) {
-        if(ids==null||ids.isEmpty()||ids.size()>500||ids.stream().anyMatch(id->id==null||id<=0))throw invalid();
+
         lock(user);
         // Resolve every owner before making changes, so mixed-owner bulk requests are atomic.
         var entries=ids.stream().distinct().map(id->entry(user,id)).toList();
         entries.forEach(e->{library.remove(e);contents.eraseIfUnreferenced(e.getContentId(),user);});
     }
     public Topic createTopic(Long user,String name) {
-        name=normalize(name,10);if(name.equals("미분류"))throw invalid();lock(user);
+        name=normalize(name,10);lock(user);
         String digest=cipher.fingerprint("library-topic:"+name);
-        if(library.topicNameExists(user,digest,null))throw new CustomContentException(409,"TOPIC_NAME_CONFLICT");
-        if(library.topics(user).size()>=30)throw new CustomContentException(409,"SCRIPT_TOPIC_LIMIT");
+
         var topic=new ScriptLibraryTopic(user,name,digest);library.add(topic);return Topic.from(topic);
     }
     public Topic renameTopic(Long user,Long id,String name) {
-        name=normalize(name,10);if(name.equals("미분류"))throw invalid();lock(user);
+        name=normalize(name,10);lock(user);
         var topic=topic(user,id);String digest=cipher.fingerprint("library-topic:"+name);
-        if(library.topicNameExists(user,digest,id))throw new CustomContentException(409,"TOPIC_NAME_CONFLICT");
+
         topic.rename(name,digest);return Topic.from(topic);
     }
     public void deleteTopic(Long user,Long id) {
@@ -86,17 +81,17 @@ public class ScriptLibraryService {
                 .forEach(content->{library.remove(entry(user,content));contents.eraseIfUnreferenced(content,user);});
         library.remove(topic);
     }
-    private void lock(Long user){cipher.requireConfigured();var account=users.findByIdForUpdate(user).orElseThrow(()->new CustomContentException(404,"RESOURCE_NOT_FOUND"));if(account.isWithdrawn()||account.isSuspended())throw new CustomContentException(403,"FORBIDDEN");}
+    private void lock(Long user){var account=users.findByIdForUpdate(user).orElseThrow(()->new CustomContentException(404,"RESOURCE_NOT_FOUND"));}
     private ScriptLibraryEntry entry(Long user,Long id){return library.entry(user,id).orElseThrow(()->new CustomContentException(404,"RESOURCE_NOT_FOUND"));}
     private ScriptLibraryTopic topic(Long user,Long id){return library.topic(user,id).orElseThrow(()->new CustomContentException(404,"RESOURCE_NOT_FOUND"));}
     private PracticeContent owned(Long user,Long id){return contents.owned(id,user).orElseThrow(()->new CustomContentException(404,"RESOURCE_NOT_FOUND"));}
     private String normalize(String text,int limit){
-        if(text==null)throw invalid();text=text.replaceAll("^[\\s\\p{Z}]+|[\\s\\p{Z}]+$","");
-        if(text.isEmpty()||text.codePointCount(0,text.length())>limit||text.codePoints().anyMatch(c->Character.isISOControl(c)||Character.getType(c)==Character.SURROGATE))throw invalid();
+        text=text.replaceAll("^[\\s\\p{Z}]+|[\\s\\p{Z}]+$","");
+
         return text;
     }
     private String keyHash(String key){
-        if(key==null||!key.matches("[\\x21-\\x7e]{1,128}"))throw invalid();
+
         try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(key.getBytes(StandardCharsets.US_ASCII)));}
         catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}
     }

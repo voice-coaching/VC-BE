@@ -41,26 +41,6 @@ public record NormalizedRecordingData(
     }
 
     public NormalizedRecordingData {
-        if (preparation != null && !preparation.binds(audioSha256, visual == null ? null : visual.visualSha256())) {
-            throw new IllegalArgumentException("normalized preparation does not bind media");
-        }
-        if (objectKey == null || objectKey.isBlank() || objectKey.length() > 1_000) {
-            throw new IllegalArgumentException("normalized object key is invalid");
-        }
-        if (!CANONICAL_MIME_TYPE.equals(mimeType)) {
-            throw new IllegalArgumentException("normalized media must be canonical WAV");
-        }
-        if (fileSizeBytes == null || fileSizeBytes <= 0) {
-            throw new IllegalArgumentException("normalized file size is invalid");
-        }
-        if (durationMs == null || durationMs <= 0) {
-            throw new IllegalArgumentException("normalized duration is invalid");
-        }
-        if (audioSha256 == null || !audioSha256.matches("[0-9a-f]{64}")) {
-            throw new IllegalArgumentException("normalized digest is invalid");
-        }
-        if (qualityStatus == null || qualityStatus == RecordingQualityStatus.PENDING) {
-            throw new IllegalArgumentException("normalized quality result must be terminal");
-        }
+
     }
 }

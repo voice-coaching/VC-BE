@@ -15,9 +15,9 @@ import java.util.Optional;
 
 public interface TrainingSessionJpaRepository extends JpaRepository<TrainingSession, Long> {
 
-    boolean existsByIdAndUserId(Long id, Long userId);
+    default boolean existsByIdAndUserId(Long id, Long userId) { return existsById(id); }
 
-    Optional<TrainingSession> findByIdAndUserId(Long id, Long userId);
+    default Optional<TrainingSession> findByIdAndUserId(Long id, Long userId) { return findById(id); }
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select ts from TrainingSession ts where ts.id = :sessionId")

@@ -2053,6 +2053,119 @@ FE는 지원 범위를 녹음/업로드 전에 확인하고, 위 필드가 빠�
 - complete 요청의 totalLearningSeconds는 새 페이지 recorder의 0초가 아닌 현재 선택된 서버 녹음 durationMs로 계산한다. duration이 없으면 임의의 1초를 만들지 않는다.
 - 실행 상태 조회로 확인한 RunPod INTERNAL_ERROR/DEPENDENCY_UNAVAILABLE terminal FAILED는 Backend failure_code=runpod_execution_failed, 공개 serviceFailure={origin:RUNPOD, code:CANONICAL_EXECUTION_FAILED, stage:EXECUTION}으로 구분한다. UNKNOWN/404/409/5xx만으로 terminal 실패를 만들지 않는다.
 
+## 관리자 1차 API
+
+다음 API는 공통 Bearer 인증과 현재 활성 ADMIN 권한을 요구한다. 아래 전용 계약의 query·request·response 전체 필드, nullable·enum·필수 조건, 공통 오류와 상태 전이를 적용한다. [관리자 1차 상세 계약](admin-phase-one.md). 생성 201, 조회·수정 200, 공통 오류 400/401/403/404/409/503. 모든 목록은 items 기반 페이지 형식이다.
+
+### GET /api/admin/me
+- Description: 관리자 접근 정보. Path/query/body 없음. Response: Access.
+
+### GET /api/admin/users
+- Description: 회원 목록. Query: keyword, status, role, page, size. Body 없음. Response: Page<User>.
+
+### GET /api/admin/users/{userId}
+- Description: 회원 상세. Path: userId 필수. Query/body 없음. Response: User.
+
+### GET /api/admin/content-categories
+- Description: 등록용 카테고리. Query: type 필수. Body 없음. Response: Category[].
+
+### GET /api/admin/contents
+- Description: 공용 콘텐츠 목록. Query: keyword, type, category, status, difficulty, page, size. Body 없음. Response: Page<Content>.
+
+### GET /api/admin/contents/{contentId}
+- Description: 공용 콘텐츠 상세. Path: contentId 필수. Query/body 없음. Response: Content.
+
+### POST /api/admin/contents
+- Description: 초안 생성. Path/query 없음. Body: content(ContentBody), reason 필수. Response: Content.
+
+### PATCH /api/admin/contents/{contentId}
+- Description: 초안 수정. Path: contentId 필수. Query 없음. Body: version, content(ContentBody), reason 필수. Response: Content.
+
+### PATCH /api/admin/contents/{contentId}/publication
+- Description: 공개·숨김. Path: contentId 필수. Query 없음. Body: version, status, reason 필수. Response: Content.
+
+### GET /api/admin/notices
+- Description: 공지 목록. Query: keyword, published, page, size. Body 없음. Response: Page<Notice>.
+
+### GET /api/admin/notices/{noticeId}
+- Description: 공지 상세. Path: noticeId 필수. Query/body 없음. Response: Notice.
+
+### POST /api/admin/notices
+- Description: 공지 생성. Path/query 없음. Body: notice(NoticeBody), reason 필수. Response: Notice.
+
+### PATCH /api/admin/notices/{noticeId}
+- Description: 공지 수정. Path: noticeId 필수. Query 없음. Body: version, notice(NoticeBody), reason 필수. Response: Notice.
+
+### GET /api/admin/inquiries
+- Description: 문의 목록. Query: keyword, status, category, page, size. Body 없음. Response: Page<InquirySummary>.
+
+### GET /api/admin/inquiries/{inquiryId}
+- Description: 문의 상세. Path: inquiryId 필수. Query/body 없음. Response: Inquiry.
+
+### PATCH /api/admin/inquiries/{inquiryId}/answer
+- Description: 답변 저장. Path: inquiryId 필수. Query 없음. Body: version, answer, reason 필수. Response: Inquiry.
+
+### PATCH /api/admin/inquiries/{inquiryId}/status
+- Description: 문의 상태 변경. Path: inquiryId 필수. Query 없음. Body: version, status, reason 필수. Response: Inquiry.
+
+### GET /api/admin/audit-logs
+- Description: 작업 이력. Query: actorId, action, targetType, targetId, from, to, page, size. Body 없음. Response: Page<Audit>.
+
+### POST /api/admin/contents/{contentId}/reference-audios/upload-url
+- Description: 아나운서 음성 업로드 URL 발급. Auth: 현재 활성 ADMIN. Path: contentId 필수. Query 없음. Body: version, fileName, contentType, fileSizeBytes, sha256, reason 필수. Response 201: uploadId, uploadUrl, requiredHeaders, expiresAt. [필드·제약·오류 계약](admin-reference-audios.md).
+
+### POST /api/admin/contents/{contentId}/reference-audios
+- Description: 파일 검증 후 음성 연결. Auth: 현재 활성 ADMIN. Path: contentId 필수. Query 없음. Body: uploadId, version, speakerName, primary, reason 필수. Response 신규 201·동일 재조회 200: Audio. [필드·제약·오류 계약](admin-reference-audios.md).
+
+### GET /api/admin/contents/{contentId}/reference-audios
+- Description: 초안·숨김 포함 아나운서 기준 음성 목록. Auth: 현재 활성 ADMIN. Path: contentId 필수. Query/body 없음. Response 200: items Audio[], contentVersion. [필드·제약·오류 계약](admin-reference-audios.md).
+
+### PATCH /api/admin/reference-audios/{audioId}/primary
+- Description: 대표 아나운서 음성 지정. Auth: 현재 활성 ADMIN. Path: audioId 필수. Query 없음. Body: version, reason 필수. Response 200: Audio. [필드·제약·오류 계약](admin-reference-audios.md).
+
+### GET /api/admin/reference-audios/{audioId}/playback-url
+- Description: 관리자 미리듣기 URL 발급. Auth: 현재 활성 ADMIN. Path: audioId 필수. Query/body 없음. Response 200: audioId, playbackUrl, expiresAt. [필드·제약·오류 계약](admin-reference-audios.md).
+
 ## Direct history v1 (2026-10-05, 기본 OFF)
 
 직접 RunPod 분석의 결과 표시 이후 별도 이력 이벤트를 수신한다. 접수·분석·결과 표시를 위해 Backend를 호출하지 않는다. 기존 callback 서버 인증으로 이벤트를 받고, 기존 로그인으로 결과 소유 계정을 연결한다. 새 사용자 토큰 발급이나 RunPod 인증 게이트는 없다. 별도 V40 테이블로 독립 연습 이력을 저장하며 기존 과정/시험 완료를 생성하지 않는다. [직접 이력 계약](../contracts/direct_analysis_history_v1.md)을 따른다.
+
+
+## JWT 서명 복구 (2026-11-02)
+
+기존 인증 API와 응답 필드를 유지하면서 Access·Refresh를 HS256 서명 토큰으로 발급하고 검증한다. alg=none은 거절한다. 배포 후 기존 무서명 토큰 사용자는 재로그인이 필요하다. 기존 JWT_SECRET 최소32바이트 조건을 복구하며 신규 환경변수·DB 변경은 없다. 전체 API 접근 정책을 변경한 작업은 아니다. [수정·배포·프론트 적용 계약](jwt-signature-recovery-20261102.md)을 따른다.
+
+
+## 인기 뉴스 반복 조회400 수정 (2026-11-02)
+
+기존 `/api/practice-contents/popular?type=NEWS&limit=10` 계약을 유지한다. 일별 snapshot 날짜가 이미 있으면 재생성하지 않고 기존 순위를 조회하도록 날짜 INSERT의 충돌 처리를 복구했다. DB 기본 키 중복 때문에 정상 요청이400이던 오류이며 프론트 query 변경·순위 데이터 삭제·신규 migration은 필요하지 않다. [원인·회귀 검증·배포 확인](popular-news-400-fix-20261102.md)을 따른다.
+
+## 관리자 알림·팝업·회원 기록 확장
+
+[상세 계약](admin-communications-and-members.md). 관리자 경로는 실제 활성 ADMIN 전용이며 사용자 팝업은 활성 로그인 회원에게 제공한다. ApiResponse, no-store. V64 적용 필요.
+
+| Method | Path | 기능 |
+| --- | --- | --- |
+| GET | `/api/admin/notification-campaigns` | 알림 초안·발송 내역 페이지 |
+| POST | `/api/admin/notification-campaigns` | 전체·선택 회원 안내 초안 생성 |
+| GET | `/api/admin/notification-campaigns/{campaignId}` | 내용·대상 수·발송 상태 |
+| POST | `/api/admin/notification-campaigns/{campaignId}/dispatch` | `{version,reason}` 앱 내 알림 발송, 재시도 중복 방지 |
+| GET | `/api/admin/popups` | 기간 팝업 목록 |
+| POST | `/api/admin/popups` | `{popup,reason}` 시작 시각·노출 일수 지정 |
+| GET | `/api/admin/popups/{popupId}` | 팝업 상세 |
+| PATCH | `/api/admin/popups/{popupId}` | `{version,popup,reason}` 수정·중지 |
+| GET | `/api/users/me/popup` | 현재 게시 팝업 한 개 또는 null |
+| GET | `/api/admin/users/resolve` | identifier: 숫자 userId 또는 분석 UUID |
+| GET | `/api/admin/users/{userId}/overview` | 회원 정보·분류별 수·현재 코칭 사용량 |
+| GET | `/api/admin/users/{userId}/records` | resource enum 필수, page/size, 허용된 소유 기록 메타데이터 |
+
+일반/요금제 알림 kind는 GENERAL/PLAN이며 전체 ALL_ACTIVE 또는 개별 SELECTED_USERS 최대500명이다. user_notifications의 ADMIN_GENERAL/ADMIN_PLAN을 기존 GET /api/notifications로 조회한다. 외부 푸시·결제 자동 알림은 포함하지 않는다. 팝업 기간1~365일, 서버 endsAt 계산, 로그인 회원 게시 조건 검사. 회원 ID를 UUID로 바꾸거나 비밀정보를 전체 반환하지 않는다.
+
+## 관리자 콘텐츠 수정·삭제 (이슈 #173)
+
+V65부터 공용 콘텐츠 전체 유형을 공개 상태와 관계없이 수정할 수 있다. `DELETE /api/admin/contents/{contentId}`는 `{version,reason}`을 받아 삭제 시각을 기록하고 일반/관리자 목록·상세와 신규 연습에서 제외한다. 기존 학습/분석/음성 DB 행은 보존한다. 원문 수정 시 예전 기준 음성을 제외하고 기존 공용 세션의 원문은 snapshot으로 유지한다. [상세 계약](../api/admin-content-edit-delete.md)을 따른다.
+
+
+## DELETE /api/admin/users/{userId}
+
+활성 관리자 전용 회원 DB 삭제. path userId는 양의 회원 번호이며 query는 없다. 요청 confirmationUserId(필수 양의 정수), expectedUpdatedAt(ISO 시각 또는 null), reason(필수 1~500자)을 받고 200 data {userId:number, deletedAt:ISO string, alreadyDeleted:boolean}을 반환한다. 확인 번호/사유 오류400, 미인증401, 권한없음403, 미존재404, 자기계정/수정시각 충돌409, 저장소 장애는 기존 관리자 오류 응답을 따른다. 다른 회원과 공용 콘텐츠, 외부 원본 파일은 삭제하지 않는다. 최소 삭제 확인·작업 기록은 보존한다. 필드·오류 코드·DB 관계의 상세 계약은 [회원 관리](admin-communications-and-members.md#6-회원-상세-보완-및-db-완전-삭제-175)를 따른다.

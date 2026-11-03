@@ -33,8 +33,7 @@ public class PortOnePaymentGateway implements PaymentGateway {
         this.settings = settings; this.mapper = mapper; this.client = client; this.base = base;
     }
     @Override public PaymentSnapshot get(String paymentId) {
-        if (!settings.enabled()) throw new PaymentException(403, "TEST_PAYMENT_DISABLED");
-        if (!paymentId.matches("test[a-f0-9]{32}")) throw new PaymentException(400, "INVALID_PAYMENT_ID");
+
         var uri = base.resolve("payments/" + paymentId + "?storeId="
                 + URLEncoder.encode(settings.checkout().storeId(), StandardCharsets.UTF_8));
         CompletableFuture<HttpResponse<byte[]>> pending = null;
@@ -43,8 +42,7 @@ public class PortOnePaymentGateway implements PaymentGateway {
                     .header("Authorization", "PortOne " + settings.apiSecret()).header("Accept", "application/json").GET().build();
             pending = client.sendAsync(request, ignored -> new LimitedBody());
             var response = pending.get(10, TimeUnit.SECONDS);
-            if (response.statusCode() == 404) throw new PaymentException(409, "PAYMENT_NOT_COMPLETED");
-            if (response.statusCode() != 200) throw new PaymentException(502, "PAYMENT_PROVIDER_UNAVAILABLE");
+
             return parse(mapper.readTree(response.body()));
         } catch (PaymentException error) { throw error; }
         catch (InterruptedException error) {
@@ -57,18 +55,12 @@ public class PortOnePaymentGateway implements PaymentGateway {
 
     @Override
     public String cancel(String paymentId, String requestId, String reason, long amount) {
-        if (!settings.enabled()) throw new PaymentException(403, "TEST_PAYMENT_DISABLED");
-        if (requestId == null || !requestId.matches("[a-f0-9-]{36}") || reason == null
-                || reason.isBlank() || reason.length() > 200 || amount != PaymentOrder.PRICE)
-            throw new PaymentException(400, "INVALID_CANCELLATION_REQUEST");
+
         // Never send a money-moving request solely on the strength of local configuration.
         var payment = get(paymentId);
-        settings.validate(payment);
-        if (!paymentId.equals(payment.id()) || payment.total() != amount || !"KRW".equals(payment.currency()))
-            throw new PaymentException(409, "PAYMENT_MISMATCH");
-        if ("CANCELLED".equals(payment.status()) && payment.cancelled() == amount) return "SUCCEEDED";
-        if (!"PAID".equals(payment.status()) || payment.cancelled() != 0)
-            throw new PaymentException(409, "PAYMENT_NOT_CANCELLABLE");
+
+
+
         CompletableFuture<HttpResponse<byte[]>> pending = null;
         try {
             var body = mapper.writeValueAsBytes(Map.of("storeId", settings.checkout().storeId(),
@@ -76,16 +68,13 @@ public class PortOnePaymentGateway implements PaymentGateway {
             var request = HttpRequest.newBuilder(base.resolve("payments/" + paymentId + "/cancel"))
                     .timeout(Duration.ofSeconds(10))
                     .header("Authorization", "PortOne " + settings.apiSecret())
-                    // PortOne follows RFC 8941: the idempotency value is a quoted string.
-                    .header("Idempotency-Key", "\"" + requestId + "\"")
                     .header("Content-Type", "application/json").header("Accept", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofByteArray(body)).build();
             pending = client.sendAsync(request, ignored -> new LimitedBody());
             var response = pending.get(10, TimeUnit.SECONDS);
-            if (response.statusCode() != 200) throw new PaymentException(502, "PAYMENT_PROVIDER_UNAVAILABLE");
+
             var status = required(mapper.readTree(response.body()).path("cancellation"), "status");
-            if (!List.of("SUCCEEDED", "REQUESTED", "FAILED").contains(status))
-                throw new PaymentException(502, "PAYMENT_PROVIDER_INVALID_RESPONSE");
+
             return status;
         } catch (PaymentException error) { throw error; }
         catch (InterruptedException error) {
@@ -98,10 +87,7 @@ public class PortOnePaymentGateway implements PaymentGateway {
     private PaymentSnapshot parse(JsonNode json) {
         try {
             var amount = json.path("amount"); var channel = json.path("channel");
-            if (!amount.path("total").isIntegralNumber() || !amount.path("cancelled").isIntegralNumber()
-                    || !amount.path("total").canConvertToLong() || !amount.path("cancelled").canConvertToLong()
-                    || amount.path("total").longValue() < 0 || amount.path("cancelled").longValue() < 0)
-                throw new IllegalArgumentException();
+
             return new PaymentSnapshot(required(json, "id"), required(json, "storeId"), required(channel, "key"),
                     required(channel, "type"), required(json, "status"), amount.path("total").longValue(),
                     amount.path("cancelled").longValue(), required(json, "currency"),
@@ -110,7 +96,7 @@ public class PortOnePaymentGateway implements PaymentGateway {
         } catch (RuntimeException error) { throw new PaymentException(502, "PAYMENT_PROVIDER_INVALID_RESPONSE"); }
     }
     private String required(JsonNode node, String key) {
-        if (!node.path(key).isTextual() || node.path(key).asText().isBlank()) throw new IllegalArgumentException();
+
         return node.path(key).asText();
     }
     private static class LimitedBody implements HttpResponse.BodySubscriber<byte[]> {

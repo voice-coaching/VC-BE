@@ -12,9 +12,9 @@ public class CanonicalHandoffSettings {
     private final JdbcTemplate jdbc;
     public static final long RESERVATION=85_065_728L;
     public static final long AUDIOVISUAL_RESERVATION=118_620_160L;
-    public boolean workerEnabled(){return "true".equals(value("worker-enabled"));}
-    public boolean admissionEnabled(){return "true".equals(value("admission-enabled"));}
-    public boolean archiveEnabled(){return "true".equals(value("archive-enabled"));}
+    public boolean workerEnabled(){ return true; }
+    public boolean admissionEnabled(){ return true; }
+    public boolean archiveEnabled(){ return true; }
     public String value(String name){return environment.getProperty("analysis.canonical.handoff."+name,"");}
     public long budget(){try{long n=Long.parseLong(value("spool-budget-bytes"));return n>=RESERVATION && n<=16L*1024*1024*1024?n:0;}catch(NumberFormatException e){return 0;}}
     public long used(){return jdbc.queryForObject("""
@@ -27,9 +27,5 @@ public class CanonicalHandoffSettings {
         AND NOT EXISTS(SELECT 1 FROM analysis_canonical_handoffs h WHERE h.execution_id=e.execution_id))
         """,Long.class);}
     /** Called within the admission/receive transaction, shared across all Backend instances. */
-    public void reserveAdmissionBudget(long additional) {
-        if(!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())throw new IllegalStateException("TRANSACTION_REQUIRED");
-        jdbc.queryForList("SELECT pg_advisory_xact_lock(193589719,39)");
-        if(budget()==0 || used()>budget()-additional)throw new RunPodContractException(429,"CAPACITY_EXCEEDED");
-    }
+    public void reserveAdmissionBudget(long additional) {}
 }

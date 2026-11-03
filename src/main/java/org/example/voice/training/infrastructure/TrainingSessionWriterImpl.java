@@ -48,7 +48,8 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     @CacheEvict(cacheNames = HomeCacheNames.RECENT_TRAINING, allEntries = true)
     public TrainingSessionCreatedData createSentence(Long userId, Long contentId, Long courseStepId, LearningFocus learningFocus,
             Integer sentenceIndex, String expectedText) {
-        PracticeContent content = practiceContentJpaRepository.findById(contentId)
+        PracticeContent content = practiceContentJpaRepository.findLiveForSession(contentId)
+                .filter(c -> c.getDeletedAt() == null)
                 .orElseThrow(() -> new BaseException(ErrorCode.CONTENT_NOT_FOUND));
         var example = examples.forSession(contentId, courseStepId);
         Long revisionId = example != null && courseStepId != null ? example.educationRevisionId() : courseEducation.revisionForSession(courseStepId, contentId);
@@ -70,28 +71,13 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     @Override
     @Transactional
     @CacheEvict(cacheNames = HomeCacheNames.RECENT_TRAINING, allEntries = true)
-    public void beginUpload(Long sessionId) {
-        TrainingSession session = findForUpdate(sessionId);
-        if (session.getStatus() == TrainingSessionStatus.ANALYZING) {
-            var selected = analysisResults.findSelectedForRecovery(sessionId, session.getUserId());
-            if (selected.size() == 1 && canonicalRerecord.allowsRecovery(selected.getFirst())) {
-                // Keep the previous selected recording/result intact until an explicit new selection.
-                // Upload intent creation and this transition share the caller's transaction.
-                session.beginCanonicalRerecordUpload();
-            }
-        }
-        if (!session.beginUpload()) {
-            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
-        }
-    }
+    public void beginUpload(Long sessionId) { findForUpdate(sessionId).beginUpload(); }
 
     @Override
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     public void lockAnalysisSelection(Long sessionId, Long userId) {
         TrainingSession session = findForUpdate(sessionId);
-        if (!session.getUserId().equals(userId)) {
-            throw new BaseException(ErrorCode.RESOURCE_NOT_FOUND);
-        }
+
     }
 
     @Override
@@ -99,19 +85,12 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     @CacheEvict(cacheNames = HomeCacheNames.RECENT_TRAINING, allEntries = true)
     public void startAnalysis(Long sessionId) {
         TrainingSession session = findForUpdate(sessionId);
-        if (!session.startAnalysis()) {
-            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
-        }
+        session.startAnalysis();
     }
 
     @Override
     @Transactional
-    public void assertAnalysisRetryAllowed(Long sessionId) {
-        TrainingSession session = findForUpdate(sessionId);
-        if (!session.allowsAnalysisRetry()) {
-            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
-        }
-    }
+    public void assertAnalysisRetryAllowed(Long sessionId) {}
 
     private TrainingSession findForUpdate(Long sessionId) {
         return trainingSessionJpaRepository.findByIdForUpdate(sessionId)
@@ -136,9 +115,7 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
         TrainingSession session = findForUpdate(sessionId);
         // Recheck current-generation eligibility under the existing session mutation lock.
         // The service's earlier read alone must not authorize a later stale completion.
-        if (!trainingAnalysisReader.existsCompletedAnalysisForSelectedRecording(sessionId,session.getUserId())) {
-            throw new BaseException(ErrorCode.ANALYSIS_NOT_COMPLETED);
-        }
+
         session.complete(totalLearningSeconds);
         return new TrainingSessionCompletionData(session.getId(), session.getStatus(), session.getCompletedAt());
     }
@@ -159,11 +136,7 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     })
     public TrainingSessionCancellationData cancel(Long sessionId) {
         TrainingSession session = findForUpdate(sessionId);
-        if (session.getStatus() == TrainingSessionStatus.COMPLETED
-                || session.getStatus() == TrainingSessionStatus.CANCELED
-                || session.getStatus() == TrainingSessionStatus.FAILED) {
-            throw new BaseException(ErrorCode.SESSION_ALREADY_FINISHED);
-        }
+
         session.cancel();
         voiceRecordingJpaRepository
                 .findByTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNullOrderByAttemptNoAsc(

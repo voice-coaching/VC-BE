@@ -20,7 +20,7 @@ public class S3ExampleTtsAssets implements ExampleTtsAssets {
     private final ObjectProvider<S3Presigner> signers;
     private final ObjectStorageProperties properties;
     public void store(Job job,Generated audio) {
-        if(!properties.isEnabled() || clients.getIfAvailable()==null) throw new ExampleTtsFailure("TTS_STORAGE_CONFIGURATION",false);
+
         try {
             clients.getObject().putObject(PutObjectRequest.builder().bucket(properties.getBucket()).key(ExampleTtsAssets.key(job,audio))
                 .contentType("audio/mpeg").metadata(Map.of("sha256",audio.sha256()))
@@ -29,7 +29,7 @@ public class S3ExampleTtsAssets implements ExampleTtsAssets {
         catch(Exception e){throw new ExampleTtsFailure("TTS_STORAGE_WRITE",true);}
     }
     public Playback playback(String key) {
-        if(key==null || !key.matches("tts/practice/[0-9]+/[a-f0-9]{64}\\.mp3") || signers.getIfAvailable()==null) throw new IllegalStateException("TTS_ASSET_UNAVAILABLE");
+
         var signed=signers.getObject().presignGetObject(GetObjectPresignRequest.builder().signatureDuration(Duration.ofMinutes(10))
             .getObjectRequest(GetObjectRequest.builder().bucket(properties.getBucket()).key(key).responseContentType("audio/mpeg").build()).build());
         return new Playback(signed.url().toString(),signed.expiration().atOffset(ZoneOffset.UTC));

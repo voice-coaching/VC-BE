@@ -17,7 +17,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-@Validated
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/analyses")
@@ -36,15 +35,15 @@ public class AnalysisController {
 
     @GetMapping("/{analysisId}/segments")
     public ApiResponse<AnalysisSegmentResponseDto> getSegments(@PathVariable Long analysisId,
-            @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "100") @Min(1) @Max(200) int size,
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "100")   int size,
             @AuthenticationPrincipal LoginUser user) {
         return ApiResponse.success("음절별 분석 결과를 조회했습니다.", AnalysisSegmentResponseDto.from(segmentService.getSegments(analysisId, user.id(), page, size)));
     }
 
     @PostMapping("/{analysisId}/feedback/regenerate")
     public ApiResponse<FeedbackRegenerateResponseDto> regenerate(@PathVariable Long analysisId,
-            @Valid @RequestBody FeedbackRegenerateRequestDto request,
+             @RequestBody FeedbackRegenerateRequestDto request,
             @AuthenticationPrincipal LoginUser user) {
         return ApiResponse.success("종합 피드백을 다시 생성했습니다.", FeedbackRegenerateResponseDto.from(feedbackService.regenerate(analysisId, user.id(), request.feedbackStyle())));
     }

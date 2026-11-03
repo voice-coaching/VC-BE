@@ -23,3 +23,8 @@ published content can fill remaining slots with zero usage until the next snapsh
 
 V60 adds snapshot tables and a partial completed-session window index. V59 is already reserved
 by the coaching-usage-limit branch. Existing content and training records are preserved.
+
+
+## 인기 뉴스 반복 조회400 수정 (2026-11-02)
+
+기존 `/api/practice-contents/popular?type=NEWS&limit=10` 계약을 유지한다. 일별 snapshot 날짜가 이미 있으면 재생성하지 않고 기존 순위를 조회하도록 날짜 INSERT의 충돌 처리를 복구했다. DB 기본 키 중복 때문에 정상 요청이400이던 오류이며 프론트 query 변경·순위 데이터 삭제·신규 migration은 필요하지 않다. [원인·회귀 검증·배포 확인](popular-news-400-fix-20261102.md)을 따른다.

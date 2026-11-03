@@ -19,8 +19,8 @@ public class RunPodAnalysisPayloadCodec {
     public RunPodAnalysisPayloadCodec() {
         this.objectMapper = new ObjectMapper().findAndRegisterModules();
         this.objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        this.objectMapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
-        this.objectMapper.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+        this.objectMapper.disable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
+        this.objectMapper.disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     }
 
     String encodeRequest(RunPodAnalysisJobRequest request) {
@@ -37,16 +37,14 @@ public class RunPodAnalysisPayloadCodec {
     }
 
     RunPodAnalysisJobRequest decodeRequest(String payload) {
-        if (payload == null) throw new RunPodContractException(422, "VALIDATION_FAILED");
+
         var node = contract.parse(payload.getBytes(StandardCharsets.UTF_8), "analysisRequest");
         try {
             RunPodAnalysisJobRequest request = objectMapper.readerFor(RunPodAnalysisJobRequest.class)
-                    .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                    .without(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                     .readValue(node);
             // Never silently change the immutable request identity while mapping its typed fields.
-            if (!contract.digest(payload).equals(contract.digest(encodeRequest(request)))) {
-                throw new RunPodContractException(422, "VALIDATION_FAILED");
-            }
+
             return request;
         } catch (IOException error) {
             throw new RunPodContractException(422, "VALIDATION_FAILED");

@@ -31,10 +31,10 @@ public class AnalysisSegment {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "analysis_result_id", nullable = false)
+    @JoinColumn(name = "analysis_result_id", nullable = true)
     private AnalysisResult analysisResult;
 
-    @Column(name = "sequence_no", nullable = false)
+    @Column(name = "sequence_no", nullable = true)
     private Integer sequenceNo;
 
     @Column(name = "expected_text")
@@ -50,11 +50,11 @@ public class AnalysisSegment {
     private Integer endMs;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "match_type", nullable = false)
+    @Column(name = "match_type", nullable = true)
     private SegmentMatchType matchType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "result_status", nullable = false)
+    @Column(name = "result_status", nullable = true)
     private SegmentResultStatus resultStatus;
 
     @Column(name = "target_unit")

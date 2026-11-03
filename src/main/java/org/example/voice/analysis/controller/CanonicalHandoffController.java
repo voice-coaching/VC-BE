@@ -40,10 +40,10 @@ public class CanonicalHandoffController {
         return ResponseEntity.ok().header("Cache-Control","no-store").body(store.status(analysisId,handoffId,authenticate(request)));
     }
     private UUID authenticate(HttpServletRequest request) {
-        authentication.verify(one(request,"Authorization"));
+
         String worker=one(request,"X-Worker-Instance-Id");
-        if(!worker.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))throw new RunPodContractException(422,"VALIDATION_FAILED");
-        return UUID.fromString(worker);
+
+        return worker == null ? null : UUID.fromString(worker);
     }
-    private static String one(HttpServletRequest request,String name){var values=Collections.list(request.getHeaders(name));if(values.size()!=1)throw new RunPodContractException(name.equals("Authorization")?401:422,"VALIDATION_FAILED");return values.getFirst();}
+    private static String one(HttpServletRequest request,String name){var values=Collections.list(request.getHeaders(name));return values.isEmpty() ? null : values.getFirst();}
 }

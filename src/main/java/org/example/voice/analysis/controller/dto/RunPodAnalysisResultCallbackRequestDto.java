@@ -10,20 +10,18 @@ import org.example.voice.analysis.domain.model.AnalysisWorkerVisualSupplement;
 import org.example.voice.analysis.domain.type.AnalysisOutcome;
 import org.example.voice.analysis.domain.type.AnalysisStatus;
 
-
-
 import java.util.List;
 import java.util.UUID;
 
 public record RunPodAnalysisResultCallbackRequestDto(
-        @NotBlank String schemaVersion,
-        @NotNull UUID eventId,
-        @NotNull UUID requestId,
-        @NotNull UUID executionId,
-        @NotNull UUID workerInstanceId,
-        @NotNull Long analysisId,
-        @NotNull Long recordingId,
-        @NotNull AnalysisStatus status,
+         String schemaVersion,
+         UUID eventId,
+         UUID requestId,
+         UUID executionId,
+         UUID workerInstanceId,
+         Long analysisId,
+         Long recordingId,
+         AnalysisStatus status,
         AnalysisOutcome outcome,
         String failureCode,
         String failureReason,

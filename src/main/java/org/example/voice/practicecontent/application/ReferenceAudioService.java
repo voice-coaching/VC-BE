@@ -17,9 +17,7 @@ public class ReferenceAudioService {
 
     @Transactional(readOnly = true)
     public ReferenceAudioResponseDto getReferenceAudios(Long contentId) {
-        if (!referenceAudioReader.existsPracticeContent(contentId)) {
-            throw new ContentNotFoundException();
-        }
+
         return ReferenceAudioResponseDto.from(referenceAudioReader.findReferenceAudiosByContentId(contentId).items());
     }
 

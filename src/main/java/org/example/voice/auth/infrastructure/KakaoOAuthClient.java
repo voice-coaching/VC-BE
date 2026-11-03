@@ -35,7 +35,7 @@ public class KakaoOAuthClient implements SocialOAuthProvider {
             JsonNode user = restClient.get().uri("https://kapi.kakao.com/v2/user/me")
                     .headers(headers -> headers.setBearerAuth(accessToken)).retrieve().body(JsonNode.class);
             String id = user == null ? null : user.path("id").asText(null);
-            if (id == null) throw invalid();
+
             JsonNode account = user.path("kakao_account");
             String email = account.path("email").asText(null);
             String nickname = account.path("profile").path("nickname").asText(null);
@@ -45,7 +45,7 @@ public class KakaoOAuthClient implements SocialOAuthProvider {
     }
 
     private String required(JsonNode node, String field) {
-        String value = node == null ? null : node.path(field).asText(null); if (value == null || value.isBlank()) throw invalid(); return value;
+        String value = node == null ? null : node.path(field).asText(null);  return value;
     }
     private AuthException invalid() { return new AuthException(ErrorCode.INVALID_AUTHORIZATION_CODE); }
 }

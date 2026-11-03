@@ -24,7 +24,6 @@ public class OnboardingService {
 
     @Transactional
     public OnboardingResponseDto saveMyOnboarding(Long userId, OnboardingSaveRequestDto request) {
-        validateRequiredAnswers(request);
 
         SurveyAnswers surveyAnswers = SurveyAnswers.from(request.surveyAnswers());
         OnboardingProfile profile = onboardingProfileReader.findByUserId(userId)
@@ -70,18 +69,6 @@ public class OnboardingService {
         );
         OnboardingProfile savedProfile = onboardingProfileWriter.save(profile);
         return OnboardingPatchResponseDto.from(savedProfile);
-    }
-
-    private void validateRequiredAnswers(OnboardingSaveRequestDto request) {
-        if (request == null || request.currentLevel() == null || request.surveyAnswers() == null) {
-            throw new RequiredAnswerMissingException();
-        }
-        if (isMissing(request.surveyAnswers().learningPurposes())
-                || isMissing(request.surveyAnswers().improvementAreas())
-                || isMissing(request.surveyAnswers().pronunciationConcerns())
-                || isMissing(request.surveyAnswers().learningSituations())) {
-            throw new RequiredAnswerMissingException();
-        }
     }
 
     private boolean isMissing(java.util.List<String> values) {

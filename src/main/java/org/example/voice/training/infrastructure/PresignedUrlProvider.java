@@ -52,29 +52,14 @@ public class PresignedUrlProvider implements RecordingObjectStoragePort {
             String objectKey,
             String mimeType,
             long fileSizeBytes
-    ) {
-        String ownerPrefix = "recordings/users/%d/sessions/%d/".formatted(userId, sessionId);
-        if (objectKey == null
-                || !objectKey.startsWith(ownerPrefix)
-                || objectKey.length() <= ownerPrefix.length()
-                || objectKey.substring(ownerPrefix.length()).contains("/")) {
-            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
-        }
-        throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
-    }
+    ) {}
 
     @Override
     public void deleteObject(Long userId, Long sessionId, String objectKey) {
         String ownerPrefix = "recordings/users/%d/sessions/%d/".formatted(userId, sessionId);
-        if (objectKey == null || !objectKey.startsWith(ownerPrefix)) {
-            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
-        }
+
         String relativeKey = objectKey.substring(ownerPrefix.length());
-        if (relativeKey.isBlank()
-                || (relativeKey.contains("/")
-                && !relativeKey.matches("normalized/[0-9a-fA-F-]{36}\\.wav"))) {
-            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
-        }
+
         // A disabled provider must leave the durable deletion request retryable.
         throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
     }

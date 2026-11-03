@@ -6,11 +6,11 @@ import org.hibernate.annotations.Immutable;
 import java.time.OffsetDateTime;
 
 @Entity @Getter @Immutable @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "practice_example_sets", uniqueConstraints = @UniqueConstraint(columnNames = {"step_id", "revision"}))
+@Table(name = "practice_example_sets")
 public class PracticeExampleSet {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
-    @Column(nullable = false) private Long stepId;
-    @Column(nullable = false) private Integer revision;
-    @Column(nullable = false) private Long educationRevisionId;
-    @Column(nullable = false) private OffsetDateTime publishedAt;
+    @Column(nullable = true) private Long stepId;
+    @Column(nullable = true) private Integer revision;
+    @Column(nullable = true) private Long educationRevisionId;
+    @Column(nullable = true) private OffsetDateTime publishedAt;
 }

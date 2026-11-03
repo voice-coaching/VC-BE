@@ -214,3 +214,8 @@ docs
 ## Canonical v5 handoff (2026-10-04)
 
 [Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.
+
+
+### 관리자 회원 DB 삭제
+
+`admin/application/AdminMemberDeletionService`는 권한·확인 번호·최신 상태·세션 해제·감사 기록을 조정한다. `admin/domain/port/AdminMemberDeletionStore`의 구현인 `admin/infrastructure/AdminMemberDeletionPersistence`가 PostgreSQL 삭제 함수 및 최소 영수증을 사용한다. HTTP DTO는 `admin/controller/dto/AdminMemberDeletion*Dto`다. 일반 회원의 기존 탈퇴 서비스나 외부 파일 생명주기를 호출하지 않는다.

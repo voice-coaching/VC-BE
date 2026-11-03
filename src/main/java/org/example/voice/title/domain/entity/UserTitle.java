@@ -12,15 +12,15 @@ import java.time.temporal.ChronoUnit;
 @Entity @Table(name = "user_titles") @Getter @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserTitle {
     @Id @Column(name = "user_id") private Long userId;
-    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 30) private TitleRank rank;
-    @Column(name = "minimum_training_count", nullable = false) private long minimumTrainingCount;
-    @Column(name = "updated_at", nullable = false) private OffsetDateTime updatedAt;
+    @Enumerated(EnumType.STRING) @Column(nullable = true, length = 30) private TitleRank rank;
+    @Column(name = "minimum_training_count", nullable = true) private long minimumTrainingCount;
+    @Column(name = "updated_at", nullable = true) private OffsetDateTime updatedAt;
     public static UserTitle initial(Long userId, OffsetDateTime now) {
         var title = new UserTitle(); title.userId = userId; title.rank = TitleRank.ABSOLUTE_BEGINNER;
         title.updatedAt = now.truncatedTo(ChronoUnit.MICROS); return title;
     }
     public void promote(TitleRank target, long required, OffsetDateTime now) {
-        if (rank.next() != target) throw new TitleException(409, "CONFLICT");
+
         rank = target; minimumTrainingCount = required; updatedAt = now.truncatedTo(ChronoUnit.MICROS);
     }
 }

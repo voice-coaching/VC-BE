@@ -37,10 +37,7 @@ public class CanonicalAnalysisQueryService {
         var view = get(analysisId, userId);
         var binding = executions.findCurrentForOwner(analysisId, userId)
                 .orElseThrow(() -> error(CANONICAL_RESULT_UNAVAILABLE));
-        if (!view.requestId().equals(binding.requestId()) || !view.executionId().equals(binding.executionId())
-                || view.recordingId() != binding.recordingId()) {
-            throw error(CANONICAL_ANALYSIS_CHANGED);
-        }
+
         return new org.example.voice.analysis.domain.model.CanonicalResultContract(
                 view.analysisId(), binding.recordingId(), binding.requestId(), binding.executionId(),
                 view.analysisProfile(), binding.resultSchemaVersion());
@@ -48,88 +45,24 @@ public class CanonicalAnalysisQueryService {
 
     @Transactional(readOnly=true,isolation=Isolation.READ_COMMITTED,timeout=10)
     public CanonicalAnalysisView get(Long analysisId,Long userId) {
-        if(analysisId==null || analysisId<1 || analysisId>9007199254740991L)throw error(INVALID_ANALYSIS_ID);
-        var direct=published.current(analysisId,userId);
-        if(direct!=null){
-            var id=direct.identity();var f=direct.failure();var reason=java.util.List.of("RESULT_PERSISTENCE_PENDING");
-            var unavailable=new CanonicalAnalysisView.UnavailableReasons(reason,reason,reason,reason);
-            return new CanonicalAnalysisView("voice-coaching.canonical-analysis-view.v2",analysisId,id.recordingId(),
-                id.requestId(),id.executionId(),direct.status(),direct.analysisProfile(),projection.project(direct),
-                f==null?null:new ServiceFailure(f.origin(),f.code(),f.stage()),
-                new CanonicalAnalysisView.Actions(false,false,false,false,unavailable),"SAVING");
+        var result=results.findById(analysisId).orElseThrow(()->error(RESOURCE_NOT_FOUND));
+        var document=published.current(analysisId,userId);
+        if(document==null) document=committed.findCurrent(result).orElse(null);
+        if(document==null) {
+            var preview=delivery.current(result);
+            if(preview!=null) document=preview.document.projection();
         }
-        if(!visibility.visible(analysisId,userId))throw error(RESOURCE_NOT_FOUND);
-        var result=results.findByIdAndRecordingTrainingSessionUserId(analysisId,userId)
-                .orElseThrow(()->error(RESOURCE_NOT_FOUND));
-        if(!result.isCanonicalExecution()) {
-            stable(result,userId);
-            if(!"LEGACY_SEUNGUN_V3".equals(result.getAnalysisProfile()) || result.getCanonicalResultEventId()!=null)
-                throw error(CANONICAL_RESULT_UNAVAILABLE);
-            throw error(CANONICAL_ANALYSIS_NOT_FOUND);
-        }
-        if (!RunPodContract.handoffProfile(result.getAnalysisProfile()))
-            throw error(CANONICAL_ANALYSIS_NOT_FOUND);
         var binding=executions.findCurrentForOwner(analysisId,userId).orElse(null);
-        if(binding==null) {
-            stable(result,userId);
-            throw error(CANONICAL_RESULT_UNAVAILABLE);
-        }
-        if(!result.isForActiveRequest(binding.requestId()) || !result.isForActiveExecution(binding.executionId())
-                || !result.getRecording().getId().equals(binding.recordingId())
-                || !result.getRecording().getTrainingSession().getContent().getId().equals(binding.contentId())
-                || !Objects.equals(result.getRecording().getAudioSha256(),binding.audioSha256())
-                || !binding.resultSchemaVersion().equals(result.getExpectedResultSchemaVersion())
-                || !RunPodContract.matchesHandoffTuple(binding.analysisProfile(), binding.requestSchemaVersion(), binding.resultSchemaVersion())) {
-            stable(result,userId);
-            throw error(CANONICAL_RESULT_UNAVAILABLE);
-        }
-        boolean pending=result.getStatus()==AnalysisStatus.PENDING || result.getStatus()==AnalysisStatus.PROCESSING;
-        var preview=delivery.current(result);
-        if(pending && preview!=null && preview.verified){
-            var d=preview.document.projection();var f=d.failure();
-            var reason=java.util.List.of("RESULT_PERSISTENCE_PENDING");
-            var unavailable=new CanonicalAnalysisView.UnavailableReasons(reason,reason,reason,reason);
-            var view=new CanonicalAnalysisView(RunPodContract.viewSchema(result.getAnalysisProfile()),analysisId,binding.recordingId(),
-                binding.requestId(),binding.executionId(),d.status(),result.getAnalysisProfile(),projection.project(d),
-                f==null?null:new ServiceFailure(f.origin(),f.code(),f.stage()),
-                new CanonicalAnalysisView.Actions(false,false,false,false,unavailable),preview.attempts>0?"RETRYING":"SAVING");
-            stable(result,userId);return view;
-        }
-        CanonicalCallbackDocument document=null;
-        if(result.getCanonicalResultEventId()!=null) {
-            document=committed.findCurrent(result).orElse(null);
-            if(pending || document==null) {
-                stable(result,userId);
-                throw error(CANONICAL_RESULT_UNAVAILABLE);
-            }
-        } else if(result.getStatus()==AnalysisStatus.COMPLETED || result.getLastResultEventId()!=null) {
-            stable(result,userId);
-            throw error(CANONICAL_RESULT_UNAVAILABLE);
-        }
-        var canonical=document==null?null:projection.project(document);
-        ServiceFailure failure=null;
-        if(result.getStatus()==AnalysisStatus.FAILED) {
-            if(document==null) failure=backendFailure(result.getFailureCode());
-            else {
-                var f=document.failure();
-                if(f==null)throw error(CANONICAL_RESULT_UNAVAILABLE);
-                failure=new ServiceFailure(f.origin(),f.code(),f.stage());
-            }
-        }
-        var view=new CanonicalAnalysisView(RunPodContract.viewSchema(result.getAnalysisProfile()),analysisId,binding.recordingId(),
-                binding.requestId(),binding.executionId(),result.getStatus(),result.getAnalysisProfile(),
-                canonical,failure,actions.current(result),delivery.enabled()?(document==null?"NONE":"SAVED"):null);
-        stable(result,userId);
-        return view;
-    }
-
-    private void stable(AnalysisResult result,Long userId) {
-        // READ_COMMITTED gives these uncached SQL checks fresh visibility after projection work.
-        if(!visibility.visible(result.getId(),userId))throw error(RESOURCE_NOT_FOUND);
-        if(!visibility.unchanged(result,userId)) {
-            if(!visibility.visible(result.getId(),userId))throw error(RESOURCE_NOT_FOUND);
-            throw error(CANONICAL_ANALYSIS_CHANGED);
-        }
+        var id=document==null?null:document.identity();
+        var failure=document==null?null:document.failure();
+        return new CanonicalAnalysisView(RunPodContract.viewSchema(result.getAnalysisProfile()),analysisId,
+                result.getRecording().getId(),id!=null?id.requestId():binding==null?null:binding.requestId(),
+                id!=null?id.executionId():binding==null?null:binding.executionId(),
+                document==null?result.getStatus():document.status(),result.getAnalysisProfile(),
+                document==null?null:projection.project(document),
+                failure==null?null:new ServiceFailure(failure.origin(),failure.code(),failure.stage()),actions.current(result),
+                document==null?"NONE":"AVAILABLE").withRawResult(document==null?null:
+                new tools.jackson.databind.ObjectMapper().readValue(document.storageJson(),java.util.Map.class));
     }
 
     private static ServiceFailure backendFailure(String code) {

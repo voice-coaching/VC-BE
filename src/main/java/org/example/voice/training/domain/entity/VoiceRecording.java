@@ -33,13 +33,13 @@ public class VoiceRecording {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "training_session_id", nullable = false)
+    @JoinColumn(name = "training_session_id", nullable = true)
     private TrainingSession trainingSession;
 
-    @Column(name = "attempt_no", nullable = false)
+    @Column(name = "attempt_no", nullable = true)
     private Integer attemptNo;
 
-    @Column(name = "audio_url", nullable = false)
+    @Column(name = "audio_url", nullable = true)
     private String audioUrl;
 
     @Column(name = "mime_type")
@@ -73,7 +73,7 @@ public class VoiceRecording {
     private String visualConsentPolicyRevision;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "quality_status", nullable = false)
+    @Column(name = "quality_status", nullable = true)
     private RecordingQualityStatus qualityStatus;
 
     @Column(name = "volume_score")
@@ -82,10 +82,10 @@ public class VoiceRecording {
     @Column(name = "noise_score")
     private BigDecimal noiseScore;
 
-    @Column(name = "is_selected", nullable = false)
+    @Column(name = "is_selected", nullable = true)
     private Boolean selected;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
 
     @Column(name = "deleted_at")

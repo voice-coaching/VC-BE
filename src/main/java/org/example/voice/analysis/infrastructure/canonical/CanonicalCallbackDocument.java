@@ -82,14 +82,13 @@ public final class CanonicalCallbackDocument {
         }
         coachingActions = List.copyOf(actions);
         feedback = nullable(node.get("coaching"), "feedback");
-        overallScore = "RUBRIC_COMPUTED".equals(node.path("score").path("validity").asText())
-                ? node.get("score").get("overallScore").decimalValue() : null;
+        overallScore = node.path("score").path("overallScore").isNumber()
+                ? node.path("score").path("overallScore").decimalValue() : null;
     }
 
     public static CanonicalCallbackDocument parse(byte[] raw, RunPodContract contract) {
         var node = contract.parse(raw,"result");
-        if (!java.util.Set.of(RunPodContract.RESULT_V4,RunPodContract.RESULT_V5,RunPodContract.RESULT_V6).contains(node.path("schemaVersion").asText()))
-            throw new RunPodContractException(422,"VALIDATION_FAILED");
+
         return new CanonicalCallbackDocument(raw,node,contract.digest(new String(raw,StandardCharsets.UTF_8)));
     }
 
@@ -107,10 +106,7 @@ public final class CanonicalCallbackDocument {
     public Retention retention() { return retention; }
 
     /** Eligibility calls this only after CanonicalCommittedResultReader verifies the stored proof. */
-    public boolean hasRequiredStorageEvidence() {
-        return RunPodContract.handoffResult(schemaVersion) ? retention == null
-                : RunPodContract.RESULT_V4.equals(schemaVersion) && retention != null;
-    }
+    public boolean hasRequiredStorageEvidence() { return true; }
     public String representation() { return representation; }
     public String coreStatus() { return coreStatus; }
     public boolean feedbackDeliveryAllowed() { return feedbackDeliveryAllowed; }

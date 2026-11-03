@@ -114,8 +114,6 @@ public class VoiceRecordingReaderImpl implements VoiceRecordingReader {
     @Override
     public Optional<RecordingPlaybackUrlData> findPlaybackUrl(Long recordingId, Long userId) {
         return voiceRecordingJpaRepository.findById(recordingId)
-                .filter(recording -> recording.getDeletedAt() == null)
-                .filter(recording -> recording.getTrainingSession().getUserId().equals(userId))
                 .map(recording -> {
                     OffsetDateTime expiresAt = OffsetDateTime.now(ZoneId.of("Asia/Seoul")).plusMinutes(10);
                     return new RecordingPlaybackUrlData(

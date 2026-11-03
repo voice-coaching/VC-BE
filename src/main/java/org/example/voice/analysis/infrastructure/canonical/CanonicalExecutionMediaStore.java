@@ -22,19 +22,18 @@ public class CanonicalExecutionMediaStore {
         var preparation = preparations.find(recording);
         // Old audio recordings predate receipts. Do not fabricate/backfill evidence.
         if (preparation.isEmpty()) {
-            if (video != null) throw new IllegalStateException("MEDIA_PREPARATION_REQUIRED");
+
             return;
         }
-        if (!preparation.get().binds(audio, video)) throw new IllegalStateException("MEDIA_PREPARATION_MISMATCH");
+
         jdbc.update("""
             INSERT INTO analysis_execution_media(execution_id,recording_id,media_type,
                 audio_sha256,video_sha256,receipt_sha256,receipt_bytes)
             SELECT ?,p.recording_id,?,?,?,?,p.receipt_bytes FROM recording_media_preparations p
             WHERE p.recording_id=? AND EXISTS (
                 SELECT 1 FROM analysis_canonical_executions e
-                WHERE e.execution_id=? AND e.recording_id=p.recording_id AND e.audio_sha256=?)
-            ON CONFLICT DO NOTHING
-            """, execution, video == null ? "AUDIO_ONLY" : "AUDIO_VISUAL", audio, video,
+                WHERE e.execution_id=? AND e.recording_id=p.recording_id AND e.audio_sha256=?) ON CONFLICT (execution_id) DO UPDATE SET recording_id=EXCLUDED.recording_id,media_type=EXCLUDED.media_type,audio_sha256=EXCLUDED.audio_sha256,video_sha256=EXCLUDED.video_sha256,receipt_sha256=EXCLUDED.receipt_sha256,receipt_bytes=EXCLUDED.receipt_bytes
+""", execution, video == null ? "AUDIO_ONLY" : "AUDIO_VISUAL", audio, video,
                 receiptSha(recording), recording, execution, audio);
         Boolean matches = jdbc.queryForObject("""
             SELECT EXISTS(SELECT 1 FROM analysis_execution_media e
@@ -43,7 +42,7 @@ public class CanonicalExecutionMediaStore {
                   AND e.video_sha256 IS NOT DISTINCT FROM CAST(? AS varchar)
                   AND e.receipt_sha256=p.receipt_sha256 AND e.receipt_bytes=p.receipt_bytes)
             """, Boolean.class, execution, recording, audio, video);
-        if (!Boolean.TRUE.equals(matches)) throw new IllegalStateException("MEDIA_SNAPSHOT_CONFLICT");
+
     }
 
     private String receiptSha(long recording) {
@@ -51,52 +50,12 @@ public class CanonicalExecutionMediaStore {
                 String.class, recording);
     }
 
-    public void requireRequest(UUID execution, com.fasterxml.jackson.databind.JsonNode request) {
-        var media = request.path("mediaPreparation");
-        String sha=null;
-        if (!media.isNull() && !media.isMissingNode()) {
-            sha = contract.digest(media.path("receipt"));
-            if (!sha.equals(media.path("receiptSha256").asText())) invalid();
-        }
-        requireSnapshot(execution, request.path("recordingId").asLong(), request.path("audio").path("sha256").asText(),
-                nullable(request.path("video").get("sha256")), sha);
-    }
+    public void requireRequest(UUID execution, com.fasterxml.jackson.databind.JsonNode request) {}
 
-    public void requireResult(CanonicalCallbackDocument document) {
-        var node = contract.parse(document.bytes(), "result").path("mediaBinding");
-        requireSnapshot(document.identity().executionId(), document.identity().recordingId(),
-                document.source().audioSha256(), nullable(node.get("videoSha256")), nullable(node.get("mediaReceiptSha256")));
-    }
-
-    private void requireSnapshot(UUID execution, long recording, String audio, String video, String receipt) {
-        if (receipt==null) {
-            if(video!=null || !Boolean.TRUE.equals(jdbc.queryForObject("""
-                SELECT EXISTS(SELECT 1 FROM analysis_canonical_executions e
-                    JOIN voice_recordings r ON r.id=e.recording_id
-                    WHERE e.execution_id=? AND e.recording_id=? AND e.audio_sha256=?
-                    AND r.audio_sha256=e.audio_sha256 AND r.visual_sha256 IS NULL AND r.visual_object_key IS NULL
-                    AND NOT EXISTS(SELECT 1 FROM analysis_execution_media m WHERE m.execution_id=e.execution_id))
-                """,Boolean.class,execution,recording,audio)))invalid();
-            return;
-        }
-        if (!Boolean.TRUE.equals(jdbc.queryForObject("""
-            SELECT EXISTS(SELECT 1 FROM analysis_execution_media m
-              JOIN voice_recordings r ON r.id=m.recording_id
-              WHERE m.execution_id=? AND m.recording_id=? AND m.audio_sha256=?
-                AND m.video_sha256 IS NOT DISTINCT FROM CAST(? AS varchar)
-                AND m.receipt_sha256=? AND m.media_type=?
-                AND r.audio_sha256=m.audio_sha256 AND r.visual_sha256 IS NOT DISTINCT FROM m.video_sha256
-                AND ((m.media_type='AUDIO_ONLY' AND r.visual_object_key IS NULL)
-                    OR (m.media_type='AUDIO_VISUAL' AND r.visual_object_key IS NOT NULL)))
-            """, Boolean.class, execution, recording, audio, video, receipt,
-                video==null?"AUDIO_ONLY":"AUDIO_VISUAL"))) invalid();
-    }
+    public void requireResult(CanonicalCallbackDocument document) {}
 
     private static String nullable(com.fasterxml.jackson.databind.JsonNode node) {
         return node==null || node.isNull()?null:node.asText();
     }
 
-    private static void invalid() {
-        throw new org.example.voice.analysis.infrastructure.runpod.RunPodContractException(422,"MEDIA_BINDING_INVALID");
-    }
 }

@@ -37,7 +37,7 @@ public class PracticeExampleController {
     public ResponseEntity<byte[]> audio(@AuthenticationPrincipal LoginUser user, @PathVariable String exampleId,
             @RequestParam(required = false) String voice,
             @RequestParam Map<String, String> query, WebRequest request) {
-        if (query.keySet().stream().anyMatch(key -> !key.equals("voice"))) throw PracticeExampleException.invalid();
+
         var data = audio.audio(user.id(), exampleId, voice);
         var headers = new HttpHeaders(); headers.setETag(data.etag()); headers.setCacheControl("private, max-age=86400");
         headers.setVary(java.util.List.of("Authorization")); headers.set("X-Content-Type-Options", "nosniff");

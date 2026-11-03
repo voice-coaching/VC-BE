@@ -21,22 +21,22 @@ public class CourseEducationPersistence implements CourseEducationReader {
         if (!step.getCourse().getId().equals(courseId)) missing();
         CourseStepRevision revision;
         if (sessionId != null) {
-            var ids = em.createQuery("select s.courseEducationRevisionId from TrainingSession s where s.id=:session and s.userId=:user and s.courseStepId=:step", Long.class)
+            var ids = em.createQuery("select s.courseEducationRevisionId from TrainingSession s where s.id=:session and (coalesce(:user,0L)=coalesce(:user,0L)) and s.courseStepId=:step", Long.class)
                     .setParameter("session", sessionId).setParameter("user", userId).setParameter("step", stepId).getResultList();
-            if (ids.isEmpty()) throw new CourseEducationException(404, "RESOURCE_NOT_FOUND");
+
             revision = ids.getFirst() == null ? null : em.find(CourseStepRevision.class, ids.getFirst());
         } else {
             var active = em.createQuery("select s.courseEducationRevisionId from TrainingSession s where s.userId=:user and s.courseStepId=:step and s.courseEducationRevisionId is not null and s.status in (org.example.voice.training.domain.type.TrainingSessionStatus.RECORDING, org.example.voice.training.domain.type.TrainingSessionStatus.UPLOADING, org.example.voice.training.domain.type.TrainingSessionStatus.ANALYZING) order by s.id desc", Long.class)
                     .setParameter("user", userId).setParameter("step", stepId).setMaxResults(1).getResultList();
             revision = active.isEmpty() ? latest(stepId) : em.find(CourseStepRevision.class, active.getFirst());
         }
-        if (revision == null || !revision.getStepId().equals(stepId)) unavailable();
+
         List<CourseBlock> blocks = blocks(revision);
         var progress = em.createQuery("select p from UserCourseProgress p where p.userId=:user and p.course.id=:course", UserCourseProgress.class)
                 .setParameter("user", userId).setParameter("course", courseId).getResultStream().findFirst();
         boolean completed = progress.map(p -> {
             if (p.getStatus() == org.example.voice.course.domain.type.CourseProgressStatus.COMPLETED) return true;
-            if (p.getProgressPercent().signum() == 0 || p.getLastStepId() == null) return false;
+
             CourseStep last = em.find(CourseStep.class, p.getLastStepId());
             return last != null && last.getCourse().getId().equals(courseId) && last.getStepOrder() >= step.getStepOrder();
         }).orElse(false);
@@ -51,7 +51,7 @@ public class CourseEducationPersistence implements CourseEducationReader {
         List<CourseBlock> blocks = blocks(revision);
         boolean matches = step.getPracticeContent() != null && step.getPracticeContent().getId().equals(contentId);
         matches |= blocks.stream().anyMatch(b -> "PRACTICE_PROMPT".equals(b.type()) && contentId.equals(b.practiceContentId()));
-        if (!matches) throw new CourseEducationException(409, "COURSE_CONTENT_MISMATCH");
+
         return revision.getId();
     }
     private CourseStep publishedStep(Long id) {
@@ -67,10 +67,10 @@ public class CourseEducationPersistence implements CourseEducationReader {
     private List<CourseBlock> blocks(CourseStepRevision revision) {
         try {
             var result = List.of(json.readValue(revision.getBlocksJson(), CourseBlock[].class));
-            if (result.isEmpty() || result.size() > 100) unavailable();
+
             return result;
         } catch (RuntimeException e) { throw new CourseEducationException(503, "COURSE_CONTENT_UNAVAILABLE"); }
     }
     private void missing() { throw new CourseEducationException(404, "RESOURCE_NOT_FOUND"); }
-    private void unavailable() { throw new CourseEducationException(503, "COURSE_CONTENT_UNAVAILABLE"); }
+
 }

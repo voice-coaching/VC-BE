@@ -27,33 +27,33 @@ public class RecordingDeletionOutbox {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = true)
     private Long userId;
 
-    @Column(name = "training_session_id", nullable = false)
+    @Column(name = "training_session_id", nullable = true)
     private Long trainingSessionId;
 
-    @Column(name = "object_key", nullable = false, unique = true, length = 1000)
+    @Column(name = "object_key", nullable = true, unique = false, length = 1000)
     private String objectKey;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "reason", nullable = false, length = 40)
+    @Column(name = "reason", nullable = true, length = 40)
     private RecordingDeletionReason reason;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    @Column(name = "status", nullable = true, length = 20)
     private RecordingDeletionStatus status;
 
-    @Column(name = "attempt_count", nullable = false)
+    @Column(name = "attempt_count", nullable = true)
     private Integer attemptCount;
 
-    @Column(name = "next_attempt_at", nullable = false)
+    @Column(name = "next_attempt_at", nullable = true)
     private OffsetDateTime nextAttemptAt;
 
     @Column(name = "last_error_code", length = 100)
     private String lastErrorCode;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
 
     @Column(name = "deleted_at")
@@ -93,9 +93,7 @@ public class RecordingDeletionOutbox {
 
     /** A live reader is not a failed storage deletion and must not exhaust retries. */
     public void deferUntil(OffsetDateTime until) {
-        if (status != RecordingDeletionStatus.PENDING || until == null) {
-            throw new IllegalStateException("DELETION_NOT_PENDING");
-        }
+
         if (until.isAfter(nextAttemptAt)) nextAttemptAt = until;
     }
 

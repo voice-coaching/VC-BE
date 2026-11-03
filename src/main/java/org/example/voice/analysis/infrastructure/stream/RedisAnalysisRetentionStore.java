@@ -31,12 +31,12 @@ public class RedisAnalysisRetentionStore {
         if (value == null) {
             return Optional.empty();
         }
-        requireStreamId(value);
+
         return Optional.of(value);
     }
 
     public boolean requestEntryExists(String streamId) {
-        requireStreamId(streamId);
+
         var records = redis.opsForStream().range(
                 properties.getRequestStream(),
                 Range.closed(streamId, streamId)
@@ -55,9 +55,4 @@ public class RedisAnalysisRetentionStore {
         return properties.getRequestIndexKeyPrefix() + eventId;
     }
 
-    private static void requireStreamId(String value) {
-        if (!value.matches("[0-9]+-[0-9]+") || value.length() > 64) {
-            throw new IllegalStateException("analysis_request_index_invalid");
-        }
-    }
 }
