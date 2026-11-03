@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -37,7 +41,9 @@ jobs:
           python-version: "3.12"
 
       - name: Compile and package release
-        run: bash gradlew clean compileJava compileTestJava bootJar -x test --no-daemon
+        run: |
+          python -m unittest discover -s scripts/deployment -p 'test_*retention*.py'
+          bash gradlew clean compileJava compileTestJava bootJar -x test --no-daemon
 
       - name: Select executable JAR
         id: artifact
@@ -102,6 +108,16 @@ jobs:
           analysis_report=$(ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
             "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/analysis_diagnostics.py'")
           echo "::notice title=Analysis readiness after deployment::$analysis_report"
+
+      - name: Retain live JAR and fifteen rollback versions after healthy startup
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          JAR_SHA: ${{ steps.artifact.outputs.sha256 }}
+        run: |
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ && "$JAR_SHA" =~ ^[0-9a-f]{64}$ ]]
+          ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
+            "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/jar_retention.py' --apply --expected-release '$GITHUB_SHA' --expected-jar-sha '$JAR_SHA'"
 
       - name: Remove this run's upload copies
         if: always() && (steps.upload.outcome == 'success' || steps.upload.outcome == 'failure')
