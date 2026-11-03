@@ -41,25 +41,29 @@ public final class CanonicalAudiovisualReadiness {
     private boolean enabled(String key){return environment.getProperty("analysis.canonical.audiovisual."+key,Boolean.class,false);}
     public Map<String,String> digests(){var result=new LinkedHashMap<String,String>();for(var f:SCHEMAS)result.put(f,contract.schemaSha256(f));return result;}
     public boolean supported(){return enabled("worker-enabled") && handoff.supported() && System.nanoTime()<installedUntil;}
-    public boolean admission(){ return true; }
+    public boolean admission(){try{return supported() && enabled("admission-enabled") && handoff.admission()
+        && System.nanoTime()<podUntil && delivery.headroom(CanonicalHandoffSettings.AUDIOVISUAL_RESERVATION) && settings.used()+CanonicalHandoffSettings.AUDIOVISUAL_RESERVATION<=settings.budget();}
+        catch(Exception ignored){return false;}}
     @PostConstruct public void start(){lane.scheduleWithFixedDelay(this::probe,2,15,TimeUnit.SECONDS);}
     private void probe(){
         if(!enabled("worker-enabled")){installedUntil=podUntil=0;return;}
         try{
-
+            verifier.assertAudiovisualInstalled();
+            if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM flyway_schema_history WHERE version='43' AND success=TRUE)",Boolean.class)))throw new IllegalStateException();
             digests();installedUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(60);
         }catch(Exception ignored){installedUntil=podUntil=0;return;}
         try{
             var uri=URI.create(pod.normalizedEndpointUrl()+"/health/audiovisual");
-
+            if(!"https".equals(uri.getScheme()) || uri.getUserInfo()!=null)throw new IllegalStateException();
             var exchange=http.sendAsync(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(8))
                 .header("Authorization","Bearer "+pod.getApiToken()).header("Accept-Encoding","identity").GET().build(), info -> new BoundedBody());
             try{
                 var reply=exchange.get(8,TimeUnit.SECONDS);
                 byte[] bytes=reply.body();
-
+                if(reply.statusCode()!=200 || bytes.length>65536 || !reply.headers().firstValue("content-encoding").orElse("identity").equals("identity"))throw new IllegalStateException();
                 var mapper=new ObjectMapper();var node=mapper.readTree(bytes);
-
+                if(!HandoffPeerReadiness.matches(node, digests())
+                    || !H5.equals(node.path("llmManifestSha256").asText()))throw new IllegalStateException();
                 podUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(45);
             }finally{exchange.cancel(true);}
         }catch(Exception ignored){podUntil=0;}
