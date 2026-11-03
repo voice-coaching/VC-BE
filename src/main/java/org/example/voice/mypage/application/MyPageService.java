@@ -49,6 +49,7 @@ public class MyPageService {
 
     @Transactional
     public void deleteHistory(Long userId, Long sessionId) {
+        if (!reader.sessionOwned(userId, sessionId)) throw new BaseException(ErrorCode.RESOURCE_NOT_FOUND);
         Long contentId = customContents.prepareHistoryDeletion(sessionId,userId);
 
         analysisCancellation.cancelForSession(sessionId);

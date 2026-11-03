@@ -22,9 +22,8 @@ public class AdminMemberDeletionService {
     public record Result(long userId,OffsetDateTime deletedAt,boolean alreadyDeleted) {}
 
     @Transactional
-    public Result delete(long actor,long targetId,long confirmationUserId,OffsetDateTime expectedUpdatedAt,String reason) {
+    public Result delete(long actor,long targetId,OffsetDateTime expectedUpdatedAt,String reason) {
         access.require(actor);AdminValidation.text(reason,500,true);
-        if(targetId!=confirmationUserId) AdminValidation.invalid();
         if(actor==targetId) throw new BaseException(ErrorCode.ADMIN_SELF_DELETION_NOT_ALLOWED);
         var prior=deletion.deletedAt(targetId);
         if(prior.isPresent()) return new Result(targetId,prior.get(),true);

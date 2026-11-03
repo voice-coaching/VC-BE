@@ -312,8 +312,8 @@ This document summarizes the API list exported from the local API spec directory
 | GET | `/api/admin/popups/{popupId}` | 팝업 상세 |
 | PATCH | `/api/admin/popups/{popupId}` | `{version,popup,reason}` 수정·중지 |
 | GET | `/api/users/me/popup` | 현재 게시 팝업 한 개 또는 null |
-| GET | `/api/admin/users/resolve` | identifier: 숫자 userId 또는 분석 UUID |
-| GET | `/api/admin/users/{userId}/overview` | 회원 정보·분류별 수·현재 코칭 사용량 |
+| GET | `/api/admin/users/resolve` | identifier: 숫자 userId 또는 분석 UUID, 탈퇴/삭제 회원 제외 |
+| GET | `/api/admin/users/{userId}/overview` | 탈퇴하지 않은 회원 정보·분류별 수·현재 코칭 사용량 |
 | GET | `/api/admin/users/{userId}/records` | resource enum 필수, page/size, 허용된 소유 기록 메타데이터 |
 
 일반/요금제 알림 kind는 GENERAL/PLAN이며 전체 ALL_ACTIVE 또는 개별 SELECTED_USERS 최대500명이다. user_notifications의 ADMIN_GENERAL/ADMIN_PLAN을 기존 GET /api/notifications로 조회한다. 외부 푸시·결제 자동 알림은 포함하지 않는다. 팝업 기간1~365일, 서버 endsAt 계산, 로그인 회원 게시 조건 검사. 회원 ID를 UUID로 바꾸거나 비밀정보를 전체 반환하지 않는다.

@@ -76,6 +76,11 @@ class AdminCommunicationsPostgresTest {
             jdbc.update("insert into user_test_membership_grants(user_id,granted_at) values(?,now())",target);
             UUID direct=UUID.randomUUID();
             jdbc.update("insert into direct_analysis_history_links(user_id,job_id,claim_sha256) values(?,?,?)",target,direct,"a".repeat(64));
+            var paidUntil=OffsetDateTime.now(clock).plusDays(2);
+            jdbc.update("insert into payment_test_orders(id,user_id,idempotency_key,product,amount,currency,status,created_at,paid_at,expires_at) values('bulk-valid',?,'valid','SPEAKAI_MONTHLY_TEST_V1',15000,'KRW','PAID',now(),?,?)",other,OffsetDateTime.now(clock).minusDays(1),paidUntil);
+            jdbc.update("insert into payment_test_orders(id,user_id,idempotency_key,product,amount,currency,status,created_at,paid_at,expires_at) values('bulk-future',?,'future','SPEAKAI_MONTHLY_TEST_V1',15000,'KRW','PAID',now(),?,?)",other,OffsetDateTime.now(clock).plusDays(1),paidUntil.plusDays(20));
+            jdbc.update("insert into payment_test_orders(id,user_id,idempotency_key,product,amount,currency,status,created_at,paid_at,expires_at) values('bulk-expired',?,'expired','SPEAKAI_MONTHLY_TEST_V1',15000,'KRW','PAID',now(),?,?)",other,OffsetDateTime.now(clock).minusDays(5),OffsetDateTime.now(clock).minusDays(1));
+            jdbc.update("insert into payment_test_orders(id,user_id,idempotency_key,product,amount,currency,status,created_at,paid_at,expires_at) values('bulk-cancelled',?,'cancelled','SPEAKAI_MONTHLY_TEST_V1',15000,'KRW','CANCELLED',now(),?,?)",other,OffsetDateTime.now(clock).minusDays(1),paidUntil.plusDays(30));
             tx.executeWithoutResult(s->{
                 assertThat(members.activeMember(target)).isTrue();
                 assertThat(members.records(target,AdminUserResource.ONBOARDING,0,20).items()).singleElement().satisfies(r->assertThat(r.fields().get("goalText")).isEqualTo("target-goal"));
@@ -85,13 +90,30 @@ class AdminCommunicationsPostgresTest {
 
                 assertThat(members.resolve(request)).anySatisfy(m->{assertThat(m.userId()).isEqualTo(target);assertThat(m.source()).isEqualTo("ANALYSIS");});
                 assertThat(members.resolve(execution)).hasSize(1);assertThat(members.resolve(direct)).hasSize(1);
-                assertThat(members.counts(target)).hasSize(AdminUserResource.values().length);
-                for(var resource:AdminUserResource.values())members.records(target,resource,0,20);
+                var statistics=emf.unwrap(org.hibernate.SessionFactory.class).getStatistics();statistics.setStatisticsEnabled(true);
+                long beforeCounts=statistics.getPrepareStatementCount();var counts=members.counts(target);
+                assertThat(counts).hasSize(AdminUserResource.values().length);
+                assertThat(statistics.getPrepareStatementCount()-beforeCounts).isEqualTo(1);
+                for(var resource:AdminUserResource.values()) {
+                    var page=members.records(target,resource,0,20);
+                    assertThat(counts.stream().filter(resourceCount->resourceCount.resource()==resource).findFirst().orElseThrow().count()).isEqualTo(page.totalElements());
+                }
+                var facts=new org.example.voice.payment.infrastructure.JpaMembershipFactsReader(em);
+                long beforeFacts=statistics.getPrepareStatementCount();
+                assertThat(facts.readAll(List.of(target,other),OffsetDateTime.now(clock))).hasSize(2)
+                    .anySatisfy(f->{assertThat(f.userId()).isEqualTo(target);assertThat(f.testGrant()).isTrue();})
+                    .anySatisfy(f->{assertThat(f.userId()).isEqualTo(other);assertThat(f.paidUntil().toInstant()).isEqualTo(paidUntil.toInstant());});
+                assertThat(statistics.getPrepareStatementCount()-beforeFacts).isEqualTo(1);
                 var analyses=members.records(target,AdminUserResource.ANALYSES,0,20);
                 assertThat(analyses.items().getFirst().fields().get("id")).isEqualTo(analysis);
                 assertThat(members.records(other,AdminUserResource.ANALYSES,0,20).items()).isEmpty();
                 assertThat(members.records(target,AdminUserResource.RECORDINGS,0,20).items().getFirst().fields()).doesNotContainKey("audioUrl");
             });
+            jdbc.update("update users set status='WITHDRAWN' where id=?",target);
+            tx.executeWithoutResult(s->{assertThat(members.visibleMember(target)).isFalse();assertThat(members.resolve(request)).isEmpty();assertThat(members.resolve(execution)).isEmpty();assertThat(members.resolve(direct)).isEmpty();});
+            jdbc.update("update users set status='ACTIVE',deleted_at=now() where id=?",target);
+            tx.executeWithoutResult(s->{assertThat(members.visibleMember(target)).isFalse();assertThat(members.resolve(request)).isEmpty();assertThat(members.resolve(direct)).isEmpty();});
+            jdbc.update("update users set deleted_at=null where id=?",target);
             var start=OffsetDateTime.now(clock);
             var popup=tx.execute(s->service.createPopup(actor,new PopupDraft("기간 안내","내용",null,10,start,2,true),"등록"));
             tx.executeWithoutResult(s->{

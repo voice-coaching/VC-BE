@@ -219,3 +219,8 @@ docs
 ### 관리자 회원 DB 삭제
 
 `admin/application/AdminMemberDeletionService`는 권한·확인 번호·최신 상태·세션 해제·감사 기록을 조정한다. `admin/domain/port/AdminMemberDeletionStore`의 구현인 `admin/infrastructure/AdminMemberDeletionPersistence`가 PostgreSQL 삭제 함수 및 최소 영수증을 사용한다. HTTP DTO는 `admin/controller/dto/AdminMemberDeletion*Dto`다. 일반 회원의 기존 탈퇴 서비스나 외부 파일 생명주기를 호출하지 않는다.
+
+
+### 관리자 조회 개선
+
+`payment/domain/model/MembershipFact`, `payment/domain/port/MembershipFactsReader`, `payment/infrastructure/JpaMembershipFactsReader`가 페이지 단위 등급 사실을 조회하고 application 정책이 free/paid/admin을 결정한다. `admin`은 해당 정책을 복제하지 않는다. 조회 캐시 정책은 `docs/architecture/admin-read-performance.md`에서 관리한다.

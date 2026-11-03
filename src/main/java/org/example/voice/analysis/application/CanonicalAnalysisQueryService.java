@@ -37,6 +37,9 @@ public class CanonicalAnalysisQueryService {
         var view = get(analysisId, userId);
         var binding = executions.findCurrentForOwner(analysisId, userId)
                 .orElseThrow(() -> error(CANONICAL_RESULT_UNAVAILABLE));
+        if (!Objects.equals(view.requestId(),binding.requestId())
+                || !Objects.equals(view.executionId(),binding.executionId()))
+            throw error(CANONICAL_ANALYSIS_CHANGED);
 
         return new org.example.voice.analysis.domain.model.CanonicalResultContract(
                 view.analysisId(), binding.recordingId(), binding.requestId(), binding.executionId(),
@@ -46,20 +49,27 @@ public class CanonicalAnalysisQueryService {
     @Transactional(readOnly=true,isolation=Isolation.READ_COMMITTED,timeout=10)
     public CanonicalAnalysisView get(Long analysisId,Long userId) {
         var result=results.findById(analysisId).orElseThrow(()->error(RESOURCE_NOT_FOUND));
-        var document=published.current(analysisId,userId);
+        if (!Objects.equals(result.getRecording().getTrainingSession().getUserId(),userId))
+            throw error(RESOURCE_NOT_FOUND);
+        var document=published.current(result);
         if(document==null) document=committed.findCurrent(result).orElse(null);
         if(document==null) {
             var preview=delivery.current(result);
             if(preview!=null) document=preview.document.projection();
         }
         var binding=executions.findCurrentForOwner(analysisId,userId).orElse(null);
+        // Retry/timeout can change the DB while memory and committed bytes are being read.
+        if (!visibility.unchanged(result,userId)) throw error(CANONICAL_ANALYSIS_CHANGED);
         var id=document==null?null:document.identity();
         var failure=document==null?null:document.failure();
+        var canonical = document == null ? null : projection.project(document);
+        if ((document == null ? result.getStatus() : document.status()) == AnalysisStatus.COMPLETED
+                && canonical == null) throw error(CANONICAL_RESULT_UNAVAILABLE);
         return new CanonicalAnalysisView(RunPodContract.viewSchema(result.getAnalysisProfile()),analysisId,
                 result.getRecording().getId(),id!=null?id.requestId():binding==null?null:binding.requestId(),
                 id!=null?id.executionId():binding==null?null:binding.executionId(),
                 document==null?result.getStatus():document.status(),result.getAnalysisProfile(),
-                document==null?null:projection.project(document),
+                canonical,
                 failure==null?null:new ServiceFailure(failure.origin(),failure.code(),failure.stage()),actions.current(result),
                 document==null?"NONE":"AVAILABLE").withRawResult(document==null?null:
                 new tools.jackson.databind.ObjectMapper().readValue(document.storageJson(),java.util.Map.class));

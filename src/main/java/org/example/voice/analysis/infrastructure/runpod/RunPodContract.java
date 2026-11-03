@@ -47,8 +47,8 @@ public class RunPodContract {
     public static final int RESULT_LIMIT = 1_048_576;
     private static final DateTimeFormatter UTC = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSS'Z'");
     private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules()
-            .disable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
-            .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+            .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     private final Map<String, JsonSchema> schemas = new ConcurrentHashMap<>();
@@ -66,11 +66,38 @@ public class RunPodContract {
     }
 
     public JsonNode parse(byte[] bytes, String kind) {
-        try { return canonicalMapper.readTree(bytes); }
-        catch (IOException error) { throw new RunPodContractException(400,"INVALID_JSON"); }
+        if (bytes.length > (kind.equals("handoff") ? 2*RESULT_LIMIT : kind.equals("result") ? RESULT_LIMIT : CONTROL_LIMIT)) {
+            throw new RunPodContractException(413, "PAYLOAD_TOO_LARGE");
+        }
+        JsonNode node;
+        try {
+            String raw = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
+            node = "handoff".equals(kind) ? canonicalMapper.readTree(raw) : mapper.readTree(raw);
+            // Frozen MFA seconds must not round-trip through binary floating point.
+            // The legacy mapper and legacy wire semantics remain unchanged.
+            if ("result".equals(kind) && node != null
+                    && java.util.Set.of(RESULT_V4,RESULT_V5,RESULT_V6).contains(node.path("schemaVersion").asText())) {
+                node = canonicalMapper.readTree(raw);
+            }
+            // Parse with Jackson's nesting limits before recursive canonicalization.
+            // Canonicalizer also rejects lone surrogates and non-finite numbers.
+            new JsonCanonicalizer(raw);
+        } catch (IOException | IllegalArgumentException error) {
+            throw new RunPodContractException(400, "INVALID_JSON");
+        }
+        validate(node, kind);
+        return node;
     }
 
-    public void validate(JsonNode node, String kind) {}
+    public void validate(JsonNode node, String kind) {
+        kind = schemaKind(node, kind);
+        if (node == null || !schemas.computeIfAbsent(kind, this::schema).validate(node).isEmpty()) {
+            throw new RunPodContractException(422, "VALIDATION_FAILED");
+        }
+        // Python and Java share UTF-16 limits in addition to schema code-point limits.
+        utf16(node, definition(kind), root(kind));
+    }
 
     private String schemaKind(JsonNode node, String kind) {
         if ("handoff".equals(kind) && node != null && "voice-coaching.canonical-handoff.v2".equals(node.path("metadata").path("schemaVersion").asText())) return "handoffV2";
@@ -180,7 +207,9 @@ public class RunPodContract {
         // A frozen embedded $id starts a new local-reference resource (inputValidation).
         JsonNode resource = schema.has("$id") ? schema : root;
         if (schema.has("$ref")) { utf16(value, resource.at(schema.get("$ref").asText().substring(1)), resource); return; }
-
+        if (value.isTextual() && schema.has("maxLength") && value.textValue().length() > schema.get("maxLength").asInt()) {
+            throw new RunPodContractException(422, "VALIDATION_FAILED");
+        }
         if (value.isObject()) schema.path("properties").fields().forEachRemaining(e -> {
             if (value.has(e.getKey())) utf16(value.get(e.getKey()), e.getValue(), resource);
         });

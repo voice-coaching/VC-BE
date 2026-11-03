@@ -70,6 +70,10 @@ public class CanonicalCallbackCommitter {
             return AnalysisResultIngestionDisposition.IGNORED_DUPLICATE;
         }
 
+        if (!org.example.voice.analysis.infrastructure.canonical.CanonicalResultAttempt.matches(result,doc)
+                || (result.getStatus()!=AnalysisStatus.PENDING && result.getStatus()!=AnalysisStatus.PROCESSING))
+            throw new RunPodContractException(409,"EXECUTION_INACTIVE");
+
         // Video uses its existing recording deletion outbox. Canonical commit
         // never deletes MP4s or translates old segments into new visual evidence.
 

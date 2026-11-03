@@ -320,7 +320,7 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.DELETE, "/api/admin/contents/{contentId}", "관리자", "공용 콘텐츠 삭제",
                 "활성 관리자만 version과 작업 사유를 제출해 콘텐츠를 삭제합니다. 기존 학습 기록은 보존하고 신규 조회·연습에서 제외합니다.", false);
         add(map,PathItem.HttpMethod.DELETE,"/api/admin/users/{userId}","관리자","회원 및 업무 기록 삭제",
-                "회원 번호와 최근 변경 시각을 확인하고 회원 및 연결된 DB 업무 기록을 삭제합니다. 다른 회원과 공용 콘텐츠, AI 서버·별도 보관소 파일은 삭제하지 않습니다. 최소 삭제 영수증과 관리자 작업 기록을 남기며 본인 계정은 삭제할 수 없습니다.",false);
+                "대상 회원과 최근 변경 시각을 확인하고 삭제 사유를 받아 회원 및 연결된 DB 업무 기록을 삭제합니다. 다른 회원과 공용 콘텐츠, AI 서버·별도 보관소 파일은 삭제하지 않습니다. 최소 삭제 영수증과 관리자 작업 기록을 남기며 본인 계정은 삭제할 수 없습니다.",false);
         return Map.copyOf(map);
     }
 

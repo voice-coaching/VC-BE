@@ -106,7 +106,11 @@ public class CanonicalExecutionRegistryImpl implements CanonicalExecutionRegistr
     @Override
     @Transactional(readOnly = true)
     public Optional<CanonicalExecutionBinding> findCurrentForOwner(Long analysisId, Long userId) {
-        return jdbc.query("SELECT * FROM analysis_canonical_executions WHERE analysis_id=? ORDER BY registered_at DESC",MAPPER,analysisId)
+        return jdbc.query("""
+                SELECT e.* FROM analysis_results a JOIN analysis_canonical_executions e
+                  ON e.analysis_id=a.id AND e.execution_id::text=a.active_execution_id
+                    AND e.request_id::text=a.active_request_event_id
+                """+VISIBLE_RELATION+" AND u.id=?",MAPPER,analysisId,userId)
                 .stream().findFirst();
     }
 

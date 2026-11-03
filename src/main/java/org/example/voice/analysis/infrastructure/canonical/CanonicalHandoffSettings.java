@@ -12,9 +12,9 @@ public class CanonicalHandoffSettings {
     private final JdbcTemplate jdbc;
     public static final long RESERVATION=85_065_728L;
     public static final long AUDIOVISUAL_RESERVATION=118_620_160L;
-    public boolean workerEnabled(){ return true; }
-    public boolean admissionEnabled(){ return true; }
-    public boolean archiveEnabled(){ return true; }
+    public boolean workerEnabled(){return "true".equals(value("worker-enabled"));}
+    public boolean admissionEnabled(){return "true".equals(value("admission-enabled"));}
+    public boolean archiveEnabled(){return "true".equals(value("archive-enabled"));}
     public String value(String name){return environment.getProperty("analysis.canonical.handoff."+name,"");}
     public long budget(){try{long n=Long.parseLong(value("spool-budget-bytes"));return n>=RESERVATION && n<=16L*1024*1024*1024?n:0;}catch(NumberFormatException e){return 0;}}
     public long used(){return jdbc.queryForObject("""

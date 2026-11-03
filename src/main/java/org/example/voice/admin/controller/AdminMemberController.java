@@ -37,7 +37,7 @@ public class AdminMemberController {
     public ResponseEntity<ApiResponse<AdminMemberDeletionResponseDto>> delete(
             @AuthenticationPrincipal LoginUser actor,@PathVariable long userId,
             @Valid @RequestBody AdminMemberDeletionRequestDto request) {
-        var result=deletion.delete(actor.id(),userId,request.confirmationUserId(),request.expectedUpdatedAt(),request.reason());
+        var result=deletion.delete(actor.id(),userId,request.expectedUpdatedAt(),request.reason());
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.success("회원 및 업무 기록을 삭제했습니다.",AdminMemberDeletionResponseDto.from(result)));
     }
     private static <T> ResponseEntity<ApiResponse<T>> ok(T data) { return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.success("회원 관련 기록을 조회했습니다.",data)); }

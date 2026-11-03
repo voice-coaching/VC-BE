@@ -68,3 +68,26 @@ verifier가 초기화하지 않는다. 취소 HTTP는 공용 scheduler와 분리
 
 운영 근거·파일별 변경·개발자 확인 범위는
 [추가 장애 수정 기록](troubleshooting/canonical-result-head-blocking-20261103.md)을 따른다.
+
+## 2026-11-03 현재 실행 조회와 거절 상태 복원
+
+PUBLISHED·DB·파일 큐 조회는 현재 request/execution/worker와 녹음·콘텐츠 identity를
+비교한다. Backend timeout·취소 이후 미저장 preview와 재시도 이전 결과를 반환하지
+않는다. 신규 commit도 같은 분석 잠금 아래 현재 실행을 확인하며 이미 저장된 동일
+결과의 멱등 ACK는 유지한다.
+
+파일 큐는 rejected marker를 복원하고 원본의 제한 크기·SHA를 확인한 뒤 preview를
+연다. 확정적인 계약/충돌 오류는 REJECTED, 비활성 DB 인계는 REVOKED로 마감한다.
+일시 I/O·DB 장애는 재시도하고 원본은 보존한다. 구현 범위·운영 관측·검증 제한은
+[현재 실행·큐 복원 기록](troubleshooting/canonical-generation-recovery-20261103.md)을 따른다.
+
+## 2026-11-03 시작 시 과거 계약 오류 격리
+
+영속 큐 복원은 각 문서에 현재 계약 검증을 적용한다. 과거 문서 하나의 확정적인
+400/413/422가 전체 Spring 시작을 중단하지 않도록 원본 디렉터리에 `quarantined`
+marker를 영속화하고 해당 항목만 격리한다. 정상 문서 복원은 계속하며 같은 격리 ID의
+수신·자동 재처리·덮어쓰기는 거절한다. 원본·기존 DB 결과는 변경하거나 삭제하지 않는다.
+I/O·인프라 오류와 다른 초기화 오류는 이 경계에서 숨기지 않는다.
+
+실제 운영 원인과 AI peer의 별도 접수 차단 조건은
+[시작 장애 기록](troubleshooting/startup-contract-regression-20261103.md)에 구분했다.

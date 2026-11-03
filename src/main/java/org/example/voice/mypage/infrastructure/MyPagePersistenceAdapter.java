@@ -97,7 +97,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
     }
 
     @Override public boolean sessionOwned(Long userId, Long sessionId) {
-        return entityManager.createQuery("select count(s.id) from TrainingSession s where s.id=:id and (coalesce(:userId,0L)=coalesce(:userId,0L))", Long.class)
+        return entityManager.createQuery("select count(s.id) from TrainingSession s where s.id=:id and s.userId=:userId", Long.class)
                 .setParameter("id", sessionId).setParameter("userId", userId).getSingleResult() > 0;
     }
 
@@ -106,7 +106,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
         List<Object[]> sessions = entityManager.createQuery("""
                 select s.id, s.status, s.startedAt, s.completedAt, s.totalLearningSeconds,
                        c.id, c, s
-                from TrainingSession s join s.content c where s.id=:id and (coalesce(:userId,0L)=coalesce(:userId,0L))
+                from TrainingSession s join s.content c where s.id=:id and s.userId=:userId
                 """, Object[].class).setParameter("id", sessionId).setParameter("userId", userId).getResultList();
         if (sessions.isEmpty()) return Optional.empty();
         Object[] session = sessions.getFirst();
@@ -181,7 +181,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
         List<Object[]> rows = entityManager.createQuery("""
                 select s.targetUnit, avg(s.pronunciationScore), count(s.id)
                 from AnalysisSegment s where s.targetUnit is not null and s.pronunciationScore is not null
-                and s.analysisResult.status=:status and (coalesce(:userId,0L)=coalesce(:userId,0L))
+                and s.analysisResult.status=:status and s.analysisResult.recording.trainingSession.userId=:userId
                 and s.analysisResult.analyzedAt>=:from and s.analysisResult.analyzedAt<:to
                 group by s.targetUnit
                 """, Object[].class).setParameter("status", AnalysisStatus.COMPLETED).setParameter("userId", userId)
@@ -198,7 +198,7 @@ public class MyPagePersistenceAdapter implements MyPageReader, MyPageWriter {
         List<Object[]> rows = entityManager.createQuery("""
                 select s.errorType, count(s.id) from AnalysisSegment s
                 where s.targetUnit=:target and s.errorType is not null and s.analysisResult.status=:status
-                and (coalesce(:userId,0L)=coalesce(:userId,0L))
+                and s.analysisResult.recording.trainingSession.userId=:userId
                 and s.analysisResult.analyzedAt>=:from and s.analysisResult.analyzedAt<:to
                 group by s.errorType order by count(s.id) desc
                 """, Object[].class).setParameter("target", target).setParameter("status", AnalysisStatus.COMPLETED)

@@ -2148,3 +2148,8 @@ PostgreSQL 18의 `pg_restore --schema-only --no-owner --no-privileges --file=<�
 - `admin_purge_member_database(BIGINT)`: 선택 회원의 연관 데이터를 하위 관계부터 지우는 PostgreSQL 함수. 트랜잭션 임시 실행 식별자 테이블은 함수 종료/커밋 때 제거하며, 외부 파일 삭제는 호출하지 않는다. 실패 시 전체 롤백한다.
 - V61이 기존 FK/불변 트리거를 제거한 현행 정책을 전제로 하며, 공유 개인 콘텐츠·다른 회원 데이터는 명시적으로 보호한다. 기존 마이그레이션은 수정하지 않는다.
 - [DB 삭제 범위와 보존 경계](../api/admin-communications-and-members.md)를 함께 확인한다.
+
+
+## 관리자 조회 개선 (#180)
+
+스키마·기존 마이그레이션·삭제 함수는 변경하지 않는다. users.status=WITHDRAWN 또는 deleted_at이 있는 회원은 관리자 읽기에서 제외한다. 20개 관련 기록 개수는 기존 소유 관계와 COUNT 의미를 유지하는 UNION ALL SQL 한 번으로 조회한다. 등급 일괄 사실은 users/user_test_membership_grants/payment_test_orders의 기존 관계와 유효 paid_at/expires_at 조건을 사용한다. 별도 서버 결과 캐시나 권한 캐시는 추가하지 않는다.

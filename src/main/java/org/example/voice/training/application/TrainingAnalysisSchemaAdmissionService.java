@@ -26,6 +26,12 @@ public class TrainingAnalysisSchemaAdmissionService {
 
         return AnalysisExecutionProfile.CANONICAL_AUDIOVISUAL;
     }
-    public void assertAvailable(String requestedResultSchema) {}
-    public void assertAvailable(String requestedResultSchema, boolean video) {}
+    public void assertAvailable(String requestedResultSchema) {
+        assertAvailable(requestedResultSchema, false);
+    }
+    public void assertAvailable(String requestedResultSchema, boolean video) {
+        submissions.assertOpen();
+        if (!handoff.admission() || (video && !audiovisual.admission()))
+            throw new AnalysisSchemaAdmissionException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
+    }
 }

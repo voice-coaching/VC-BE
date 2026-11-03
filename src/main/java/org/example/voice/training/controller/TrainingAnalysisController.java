@@ -78,7 +78,9 @@ public class TrainingAnalysisController {
     private AnalysisExecutionProfile requestedProfile(HttpServletRequest request) {
         var values = Collections.list(request.getHeaders("X-Analysis-Result-Schema"));
 
-        // The active formatter is selected without a schema-admission check.
-        return schemaAdmissionService.selectProfile(values.isEmpty() ? null : values.getFirst());
+        String requested = values.isEmpty() ? null : values.getFirst();
+        var profile = schemaAdmissionService.selectProfile(requested);
+        schemaAdmissionService.assertAvailable(requested);
+        return profile;
     }
 }

@@ -33,7 +33,7 @@ public final class CanonicalDeliveryWorker {
             throw new RunPodContractException(409, "RESULT_EVENT_CONFLICT");
         if("COMMITTED".equals(current.get("state"))) { entry.committed=true;entry.submitted=true;return true; }
         if (Set.of("REJECTED", "REVOKED").contains(current.get("state"))) {
-            entry.rejected=true;entry.verified=false;return true;
+            spool.reject(entry);return true;
         }
         return false;
     }
@@ -45,9 +45,12 @@ public final class CanonicalDeliveryWorker {
     private void verify(){
         verificationTick=System.nanoTime();
         for (var entry : pending()) {
-            if (entry.verified) continue;
-            entry.verified=true;
-            published.signal(entry.document.projection().identity().analysisId());
+            if (entry.verified || entry.retryAt>System.currentTimeMillis()) continue;
+            try {
+                spool.originals(entry); // Check durable bytes before making a preview available.
+                entry.verified=true;
+                published.signal(entry.document.projection().identity().analysisId());
+            } catch (Exception error) { failed(entry,error,System.nanoTime()); }
         }
     }
     private void save(){
@@ -75,6 +78,14 @@ public final class CanonicalDeliveryWorker {
         }
     }
     private void failed(CanonicalDeliverySpool.Entry e,Exception error,long started){
+        if (error instanceof RunPodContractException protocol
+                && (protocol.status()==400 || protocol.status()==422 || (protocol.status()==409 && Set.of(
+                        "RESULT_EVENT_CONFLICT","PAYLOAD_DIGEST_MISMATCH","EXECUTION_INACTIVE",
+                        "WORKER_CONFLICT").contains(protocol.reason())))) {
+            e.verified=false;
+            try { spool.reject(e);log("REJECTED",e,started);return; }
+            catch (RunPodContractException unavailable) { error=unavailable; }
+        }
         e.attempts = Math.min(Integer.MAX_VALUE - 1, e.attempts) + 1;
         e.retryAt=System.currentTimeMillis()+TimeUnit.SECONDS.toMillis(Math.min(60L,1L << Math.min(e.attempts-1,6)));
         org.slf4j.LoggerFactory.getLogger(getClass()).warn("canonical_delivery analysisId={} type={} sqlState={}",

@@ -32,7 +32,7 @@ public class AnalysisCapabilitiesReaderImpl implements AnalysisCapabilitiesReade
     public AnalysisCapabilitiesData read() {
         boolean uploadConfigured=storage.isEnabled() && normalization.isEnabled();
         return new AnalysisCapabilitiesData(status(uploadConfigured),status(uploadConfigured && (stream.isEnabled() || isRunPodHttpConfigured())),
-                List.of(LearningFocus.values()),List.of("audio/*"),List.of("video/*"),Long.MAX_VALUE,Long.MAX_VALUE,0,Integer.MAX_VALUE,
+                List.of(LearningFocus.PRONUNCIATION),List.of("audio/*"),List.of("video/*"),Long.MAX_VALUE,Long.MAX_VALUE,0,Integer.MAX_VALUE,
                 false,false,false,null,null);
     }
 

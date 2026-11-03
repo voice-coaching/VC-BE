@@ -32,7 +32,30 @@
 7. 실행 실패의 상태 reconciliation은 정확한 request/execution/worker의 FAILED 중 INTERNAL_ERROR/DEPENDENCY_UNAVAILABLE만 사용한다. timeout, unknown, stale, 네트워크 장애를 실행 실패로 추정하지 않는다. 취소/다른 실행/영수증/commit/lease 만료가 있으면 확정하지 않는다.
 8. 기존 성공 분석의 세션은 정책 수정 후 정상 조회/complete API로 복구한다. DB 강제 변경, 기존 결과 덮어쓰기, 자동 재채점은 수행하지 않는다.
 
-## 확인 범위와 개발자 인수 항목
+## 응답 계약과 접수 조건
+
+`GET /api/analysis-capabilities`의 지원 유형은 현행 AI request v4와 같은
+`PRONUNCIATION`이다. canonical 최초·재시도 접수는 선택 녹음의 유형을 검사하고,
+다르면 pending 상태를 만들기 전에 `ANALYSIS_FOCUS_NOT_SUPPORTED`로 거부한다.
+접수 Controller와 공개 canonical capabilities는 유지보수 hold와 실제 handoff 준비를 확인한다.
+
+handoff/영상 readiness는 활성화 설정·작업자·저장소·만료되지 않은 AI 응답을 확인한다.
+AI의 계약 버전, executor/admission boolean, 정확한 11개 schema digest와
+`supportedLearningFocuses=["PRONUNCIATION"]`이 일치해야 한다. 먼저 AI의 additive
+readiness 필드를 배포한 뒤 이 Backend를 반영한다. 과거 AI가 해당 필드를 제공하지 않으면
+접수 불가로 표시하며 추론 요청으로 우회하지 않는다. 공유 request/result schema는 변경하지 않는다.
+
+내부 `RunPodContract`는 JSON 중복 key·후행 token·UTF-8·크기·버전별 JSON schema와
+UTF-16 길이를 검증한다. 공개 결과 변환 실패 또는 완료 결과의 누락은 HTTP503
+`CANONICAL_RESULT_UNAVAILABLE`이다. `rawResult` 보관을 공개 projection 성공으로
+해석하지 않고, 실패를 `COMPLETED`의 null projection으로 전달하지 않는다.
+
+학습 이력 상세와 단위별 통계·약점 응답은 실제 세션 소유자의 userId로 조회한다.
+이력 삭제도 취소·동의 철회·파일 정리 전에 같은 소유권을 확인한다.
+단위별 점수 캐시 namespace는 `owner-v2`를 사용해 기존의 소유자 필터 없는 집계값을
+재사용하지 않는다. 저장된 분석 결과나 다른 캐시를 삭제하지 않는다.
+
+## 개발자 확인
 
 로컬 Java compileJava, TypeScript noEmit, 변경 Python의 syntax compile, 문서/차이 정적 확인만 수행한다. 자동 회귀 테스트·브라우저 자동화·실제 녹음/추론·장애 주입은 실행하지 않는다. PR에서 실행되는 기존 저장소 CI 결과도 실제 음성·품질 수용을 대신하지 않는다.
 

@@ -6,7 +6,8 @@ either history. The integration branch starts from develop and merges main.
 ## Reviewed starting points
 
 - develop: `38c65a6a46f1e75285f1cb77c63c50a08b56d6b6` (PR #176).
-- main: `c0f940e` (including PR #177 administrator work, PR #178 timeout recovery and PR #181 handoff recovery).
+- main: `e3247c6` (including PR #177 administrator work and PR #178, #181–185
+  delivery, ownership/contract, administrator read and startup recovery changes).
 - Common ancestor: `7e05c29c6005c05838c2dae658cae7fca136668f`.
 
 The initial main/develop difference is not an instruction to restore older
@@ -55,7 +56,7 @@ repository's existing deployment workflow.
 
 ## Recorded validation outcome
 
-The final `c0f940e` integration passes all eleven related regression tests with
+The reviewed `c0f940e` integration passes all eleven related regression tests with
 real isolated PostgreSQL and passes full production/test compilation and bootJar.
 The cancellation fixture waits for main's asynchronous delivery completion and
 closes the executor; it preserves the original execution and no-HTTP-transaction
@@ -67,5 +68,14 @@ an extended context-resource scan while preparing TitleIntegrationTest. Unmodifi
 latest main `c0f940e`, extracted into a separate source directory, reproduces four
 representative failures in AnalysisServiceTest/FeedbackRegenerationServiceTest
 (six tests, two pass/four fail). All remaining failures have not been individually
-diagnosed. Do not describe the full suite as passing. Publishing while preserving
-main policies requires an explicit exception to the local failed-validation rule.
+diagnosed. Do not describe the full suite as passing. The user explicitly approved
+publishing with these failed/incomplete results disclosed while preserving main
+policies. This does not authorize automatic PR merging or policy changes.
+
+During that approval main advanced again; the integration baseline is pinned to
+`e3247c6`. The newer main changes are incorporated through an additional merge,
+with a fresh related regression/build verification. The broad failed/incomplete
+run above was against `ae254ff`, and the independent four-failure reproduction
+was against `c0f940e`; neither is a completed full regression of `e3247c6`.
+The final `e3247c6` verification passes all eleven related tests without skips,
+including real PostgreSQL, and full production/test compilation plus bootJar.

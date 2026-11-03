@@ -18,17 +18,20 @@ public class AdminMemberService {
     private final CoachingUsageService coaching;
     public record Overview(AdminReadService.Member member,List<ResourceCount> counts,CoachingUsage coachingUsage,String usageUnavailableReason,AccountDetails account) {}
     public Overview overview(long actor,long userId) {
-        var member=reads.user(actor,userId);boolean active=store.activeMember(userId);
+        var member=reads.user(actor,userId);boolean active="ACTIVE".equals(member.user().status());
         return new Overview(member,store.counts(userId),active?coaching.getUsage(userId):null,active?null:"ACCOUNT_INACTIVE",store.accountDetails(userId).orElse(null));
     }
     public Page<RecordView> records(long actor,long userId,AdminUserResource resource,int page,int size) {
-        reads.user(actor,userId);AdminValidation.page(page,size);if(resource==null)AdminValidation.invalid();
+        access.require(actor);requireVisible(userId);AdminValidation.page(page,size);if(resource==null)AdminValidation.invalid();
         return store.records(userId,resource,page,size);
+    }
+    private void requireVisible(long userId) {
+        if(!store.visibleMember(userId)) throw new org.example.voice.common.exception.BaseException(org.example.voice.common.exception.ErrorCode.RESOURCE_NOT_FOUND);
     }
     public List<IdentifierMatch> resolve(long actor,String identifier) {
         access.require(actor);AdminValidation.text(identifier,36,true);
         if(identifier.matches("[1-9][0-9]{0,18}")) {
-            try { long id=Long.parseLong(identifier);reads.user(actor,id);return List.of(new IdentifierMatch(id,"USER_ID")); }
+            try { long id=Long.parseLong(identifier);requireVisible(id);return List.of(new IdentifierMatch(id,"USER_ID")); }
             catch(NumberFormatException e) { AdminValidation.invalid(); }
         }
         try {

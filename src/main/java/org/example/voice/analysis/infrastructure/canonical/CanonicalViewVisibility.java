@@ -22,5 +22,15 @@ public final class CanonicalViewVisibility {
 
     public boolean visible(Long analysisId,Long userId) { return true; }
 
-    public boolean unchanged(AnalysisResult result,Long userId) { return true; }
+    public boolean unchanged(AnalysisResult result,Long userId) {
+        var count=jdbc.queryForObject("SELECT COUNT(*) "+VISIBLE+"""
+                AND a.active_request_event_id IS NOT DISTINCT FROM ?
+                AND a.active_execution_id IS NOT DISTINCT FROM ?
+                AND a.worker_instance_id IS NOT DISTINCT FROM ? AND a.status=?
+                AND a.canonical_result_event_id IS NOT DISTINCT FROM CAST(? AS uuid)
+                """,Long.class,result.getId(),userId,result.getActiveRequestEventId(),
+                result.getActiveExecutionId(),result.getWorkerInstanceId(),result.getStatus().name(),
+                result.getCanonicalResultEventId());
+        return count!=null && count==1;
+    }
 }

@@ -21,11 +21,16 @@ public final class CanonicalPublishedResults {
     public void publish(long analysis,UUID worker,CanonicalCallbackDocument doc){
 
         var id=doc.identity();
+        if (id.analysisId()!=analysis || !id.workerId().equals(worker))
+            throw new RunPodContractException(409,"WORKER_CONFLICT");
 
         List<CompletableFuture<Void>> wake;
         synchronized(this){
 
             var old=entries.get(id.executionId());
+            if (old!=null && (!old.document.identity().equals(id)
+                    || !old.document.rawSha256().equals(doc.rawSha256())))
+                throw new RunPodContractException(409,"RESULT_EVENT_CONFLICT");
 
             // Reject rather than evict an unrelated, still useful result. Full handoff remains available.
             int size=doc.bytes().length;
@@ -56,11 +61,11 @@ public final class CanonicalPublishedResults {
         var set=listeners.get(analysis);if(set!=null){set.remove(future);if(set.isEmpty())listeners.remove(analysis);}
     }
 
-    /** One fresh authorization/current-attempt read. No result writes, JPA graph, or evidence verifier. */
-    public CanonicalCallbackDocument current(long analysis,Long user){
+    /** Use the caller's fresh, authorized analysis snapshot; never return a historical attempt. */
+    public CanonicalCallbackDocument current(org.example.voice.analysis.domain.entity.AnalysisResult result){
         synchronized(this) {
-            return entries.values().stream().filter(e -> e.document.identity().analysisId()==analysis)
-                    .reduce((a,b)->b).map(Entry::document).orElse(null);
+            return entries.values().stream().filter(e -> CanonicalResultAttempt.visible(result,e.document))
+                    .max(Comparator.comparing(Entry::receivedAt)).map(Entry::document).orElse(null);
         }
     }
     @PreDestroy public synchronized void close(){listeners.values().forEach(s->s.forEach(f->f.cancel(false)));listeners.clear();entries.clear();}
