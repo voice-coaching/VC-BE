@@ -66,6 +66,11 @@ public class TrainingAnalysisRequestService {
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.SELECTED_RECORDING_NOT_FOUND));
 
+        if (profile != AnalysisExecutionProfile.LEGACY
+                && source.learningFocus() != LearningFocus.PRONUNCIATION) {
+            throw new BaseException(ErrorCode.ANALYSIS_FOCUS_NOT_SUPPORTED);
+        }
+
         UUID requestEventId = UUID.randomUUID();
 
         trainingSessionWriter.startAnalysis(sessionId);
@@ -104,6 +109,11 @@ public class TrainingAnalysisRequestService {
 
         AnalysisProgressData failed = trainingAnalysisReader.findLatestFailedBySelectedRecording(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FOUND));
+
+        if (profile != AnalysisExecutionProfile.LEGACY
+                && source.learningFocus() != LearningFocus.PRONUNCIATION) {
+            throw new BaseException(ErrorCode.ANALYSIS_FOCUS_NOT_SUPPORTED);
+        }
 
         UUID requestEventId = UUID.randomUUID();
 

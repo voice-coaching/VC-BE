@@ -33,8 +33,7 @@ public final class CanonicalPublicProjection {
                     RunPodContract.RESULT_V6.equals(document.schemaVersion())
                             ? read(root.get("visual"),LipVisual.class) : read(root.get("visual"),AudioVisual.class));
         } catch (Exception ignored) {
-            // Preserve the full document via rawResult when the typed compatibility view cannot represent it.
-            return null; // rawResult remains available when the legacy typed view cannot represent new fields.
+            throw new CanonicalAnalysisViewException(CANONICAL_RESULT_UNAVAILABLE);
         }
     }
 

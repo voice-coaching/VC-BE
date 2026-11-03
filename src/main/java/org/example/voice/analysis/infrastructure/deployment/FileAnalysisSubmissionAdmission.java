@@ -18,5 +18,7 @@ public final class FileAnalysisSubmissionAdmission implements AnalysisSubmission
     }
 
     @Override
-    public void assertOpen() {}
+    public void assertOpen() {
+        if (Files.exists(hold)) throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
+    }
 }

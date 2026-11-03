@@ -62,11 +62,14 @@ public class CanonicalAnalysisQueryService {
         if (!visibility.unchanged(result,userId)) throw error(CANONICAL_ANALYSIS_CHANGED);
         var id=document==null?null:document.identity();
         var failure=document==null?null:document.failure();
+        var canonical = document == null ? null : projection.project(document);
+        if ((document == null ? result.getStatus() : document.status()) == AnalysisStatus.COMPLETED
+                && canonical == null) throw error(CANONICAL_RESULT_UNAVAILABLE);
         return new CanonicalAnalysisView(RunPodContract.viewSchema(result.getAnalysisProfile()),analysisId,
                 result.getRecording().getId(),id!=null?id.requestId():binding==null?null:binding.requestId(),
                 id!=null?id.executionId():binding==null?null:binding.executionId(),
                 document==null?result.getStatus():document.status(),result.getAnalysisProfile(),
-                document==null?null:projection.project(document),
+                canonical,
                 failure==null?null:new ServiceFailure(failure.origin(),failure.code(),failure.stage()),actions.current(result),
                 document==null?"NONE":"AVAILABLE").withRawResult(document==null?null:
                 new tools.jackson.databind.ObjectMapper().readValue(document.storageJson(),java.util.Map.class));
