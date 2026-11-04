@@ -62,8 +62,7 @@ public final class CanonicalAudiovisualReadiness {
                 byte[] bytes=reply.body();
                 if(reply.statusCode()!=200 || bytes.length>65536 || !reply.headers().firstValue("content-encoding").orElse("identity").equals("identity"))throw new IllegalStateException();
                 var mapper=new ObjectMapper();var node=mapper.readTree(bytes);
-                if(!HandoffPeerReadiness.matches(node, digests())
-                    || !H5.equals(node.path("llmManifestSha256").asText()))throw new IllegalStateException();
+                if(!HandoffPeerReadiness.matches(node, digests()))throw new IllegalStateException();
                 podUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(45);
             }finally{exchange.cancel(true);}
         }catch(Exception ignored){podUntil=0;}

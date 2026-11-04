@@ -32,4 +32,9 @@ public class AdminNotificationCampaign {
         if(sentAt!=null)throw new IllegalStateException("Already dispatched");
         sentCount=count;sentAt=now;
     }
+    public void edit(AdminAudience audience,AdminNotificationKind kind,String title,String body,String link,Set<Long> users) {
+        if(sentAt!=null)throw new IllegalStateException("Already dispatched");
+        this.audience=audience;this.kind=kind;this.title=title;this.body=body;this.deepLink=link;
+        userIds.clear();userIds.addAll(users);
+    }
 }

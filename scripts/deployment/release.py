@@ -8,6 +8,7 @@ import shutil
 import subprocess
 from common import ROOT, HOLD, SERVICE, record
 from release_snapshot import RELEASES
+from deployment_lock import exclusive
 
 LIVE = Path('/opt/alpha/app.jar')
 
@@ -19,6 +20,13 @@ def switch_jar(target):
 
 def run(args):
     ROOT.mkdir(parents=True,exist_ok=True)
+    if args.phase == 'check':
+        return run_locked(args)
+    with exclusive(ROOT / 'deployment.lock', create=True):
+        return run_locked(args)
+
+
+def run_locked(args):
     RELEASES.mkdir(parents=True,exist_ok=True)
     directory=ROOT/'releases'/args.release
     directory.mkdir(parents=True,exist_ok=True)

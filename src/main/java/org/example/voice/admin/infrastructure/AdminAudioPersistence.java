@@ -54,6 +54,10 @@ public class AdminAudioPersistence implements AdminAudioStore {
         em.createQuery("update ReferenceAudio r set r.primary=true where r.id=:id").setParameter("id",id).executeUpdate();
     }
     @Override public void save(ReferenceAudio audio) { em.persist(audio); }
+    @Override public void retire(long id,OffsetDateTime now) {
+        em.createQuery("update ReferenceAudio r set r.retiredAt=:now,r.primary=false where r.id=:id and r.retiredAt is null")
+                .setParameter("id",id).setParameter("now",now).executeUpdate();
+    }
     @Override public void advanceVersion(PracticeContent content) {
         // The parent is already write-locked. Increment immediately rather than using a
         // deferred FORCE_INCREMENT: response versions must also be current before commit.

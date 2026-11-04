@@ -2153,3 +2153,7 @@ PostgreSQL 18의 `pg_restore --schema-only --no-owner --no-privileges --file=<�
 ## 관리자 조회 개선 (#180)
 
 스키마·기존 마이그레이션·삭제 함수는 변경하지 않는다. users.status=WITHDRAWN 또는 deleted_at이 있는 회원은 관리자 읽기에서 제외한다. 20개 관련 기록 개수는 기존 소유 관계와 COUNT 의미를 유지하는 UNION ALL SQL 한 번으로 조회한다. 등급 일괄 사실은 users/user_test_membership_grants/payment_test_orders의 기존 관계와 유효 paid_at/expires_at 조건을 사용한다. 별도 서버 결과 캐시나 권한 캐시는 추가하지 않는다.
+
+## 관리자 기존 기능 보완 (#188)
+
+스키마·인덱스·FK·마이그레이션 변경 없음. notices는 관리자 버전 잠금 후 물리 삭제한다(감사 이력 보존). reference_audios는 기존 retired_at 및 is_primary를 갱신하는 논리 삭제로 행·업로드 FK·object_key를 보존한다. admin_notification_campaigns는 미발송 초안만 수정·삭제하며 삭제 시 JPA의 admin_notification_recipients 연결도 제거한다. 발송 완료 행과 user_notifications는 보존한다. [동작 계약](../api/admin-management-completion.md).

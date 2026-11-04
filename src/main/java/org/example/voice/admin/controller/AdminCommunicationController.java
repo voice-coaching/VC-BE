@@ -30,6 +30,14 @@ public class AdminCommunicationController {
     public ResponseEntity<ApiResponse<CampaignDto>> create(@AuthenticationPrincipal LoginUser actor,@Valid @RequestBody CampaignCreateDto request) {
         return response(201,CampaignDto.from(service.create(actor.id(),request.command(),request.reason())));
     }
+    @PatchMapping("/notification-campaigns/{campaignId}") @Operation(summary="발송 전 알림 초안 수정")
+    public ResponseEntity<ApiResponse<CampaignDto>> edit(@AuthenticationPrincipal LoginUser actor,@PathVariable long campaignId,@Valid @RequestBody CampaignEditDto request) {
+        return response(200,CampaignDto.from(service.edit(actor.id(),campaignId,request.version(),request.command(),request.reason())));
+    }
+    @DeleteMapping("/notification-campaigns/{campaignId}") @Operation(summary="발송 전 알림 초안 삭제")
+    public ResponseEntity<ApiResponse<Void>> delete(@AuthenticationPrincipal LoginUser actor,@PathVariable long campaignId,@Valid @RequestBody CampaignDeleteDto request) {
+        service.delete(actor.id(),campaignId,request.version(),request.reason());return response(200,null);
+    }
     @PostMapping("/notification-campaigns/{campaignId}/dispatch") @Operation(summary="앱 내 알림 발송")
     public ResponseEntity<ApiResponse<CampaignDto>> dispatch(@AuthenticationPrincipal LoginUser actor,@PathVariable long campaignId,@Valid @RequestBody CampaignDispatchDto request) {
         return response(200,CampaignDto.from(service.dispatch(actor.id(),campaignId,request.version(),request.reason())));
