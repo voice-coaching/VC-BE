@@ -53,15 +53,36 @@ public final class CanonicalPublicProjection {
                     items.add(new CoachingItem(candidate,read(item.get("expression"),Expression.class)));
                 }
                 yield new ReadyCoaching(version,adapter,generation,List.copyOf(items),attempts,
-                        node.get("fallbackReason").isNull()?null:text(node,"fallbackReason"),
+                        node.hasNonNull("fallbackReason")?text(node,"fallbackReason"):null,
                         node.get("naturalLanguageSemanticsFullyVerified").booleanValue(),node.get("visualCorrectiveClaimsAllowed").booleanValue(),
-                        node.hasNonNull("feedback")?text(node,"feedback"):null);
+                        node.hasNonNull("feedback")?text(node,"feedback"):null,
+                        node.hasNonNull("sixDimension")?sixDimension(node.get("sixDimension")):null);
             }
             case "GLOBAL_REJECT","GLOBAL_INCONCLUSIVE","GLOBAL_SYSTEM_FAILURE","NO_PERMITTED_COACHING_CONTENT" ->
                     new EmptyCoaching(version,adapter,generation,List.of(),attempts);
             case "FAIL_CLOSED" -> new FailedCoaching(version,adapter,generation,List.of(),attempts,text(node,"errorCode"));
             default -> throw new IllegalArgumentException("CANONICAL_PROJECTION_INVALID");
         };
+    }
+
+    private SixDimensionView sixDimension(JsonNode result) throws java.io.IOException {
+        var assessment=result.get("assessment");
+        var criteria=new ArrayList<SixDimensionCriterion>();
+        for(var source:assessment.get("criteria")) {
+            // Private evidence IDs, full CORE association and storage metadata stay retained.
+            var safe=(com.fasterxml.jackson.databind.node.ObjectNode)source.deepCopy();
+            safe.retain("criterionId","label","scope","status","score","components");
+            criteria.add(read(safe,SixDimensionCriterion.class));
+        }
+        var selected=new ArrayList<String>();
+        assessment.get("selectedCriterionIds").forEach(value->selected.add(value.textValue()));
+        var feedback=new ArrayList<SixDimensionFeedback>();
+        for(var source:result.get("feedback")) {
+            feedback.add(new SixDimensionFeedback(text(source,"criterionId"),text(source,"observation"),text(source,"practice")));
+        }
+        return new SixDimensionView("voice-coaching.six-dimension-view.v1",text(assessment,"status"),
+                text(assessment,"validationStatus"),text(assessment,"policyRevision"),text(result,"generationStatus"),
+                List.copyOf(criteria),List.copyOf(selected),List.copyOf(feedback));
     }
 
     private <T> T read(JsonNode node,Class<T> type) throws java.io.IOException { return mapper.treeToValue(node,type); }

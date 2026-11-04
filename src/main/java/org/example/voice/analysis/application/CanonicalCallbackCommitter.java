@@ -74,7 +74,8 @@ public class CanonicalCallbackCommitter {
         if(!result.finishCanonical(completion))throw new RunPodContractException(409,"RESULT_ALREADY_FINALIZED");
         result.recordCanonicalCoachingDelivery(doc.decision() != null
                 && doc.decision().status() == CanonicalCallbackDocument.DecisionStatus.ACCEPT
-                && (("READY".equals(doc.adapterStatus()) && doc.feedbackDeliveryAllowed())
+                && (("READY".equals(doc.adapterStatus()) && doc.feedbackDeliveryAllowed()
+                     && (!doc.hasSixDimensionCoaching() || "STRUCTURALLY_VALID".equals(doc.generationStatus())))
                     || doc.overallScore() != null));
         writer.save(result);
         var session=result.getRecording().getTrainingSession();

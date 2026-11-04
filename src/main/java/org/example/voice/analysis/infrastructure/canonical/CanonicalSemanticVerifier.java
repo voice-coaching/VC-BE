@@ -123,7 +123,11 @@ public final class CanonicalSemanticVerifier {
                     "f6d56e1decc160f0ca38cc8d52303f3de20945f872d714bf6a2e743ed94c0391",
                     "3e430635a4d714ead5d8e08352e41ff9a2b06c893d73af7f018fb43b4c37f61c",
                     "58c26086546abb8b94eb6998671101d67633af426adf373cceb42862ccaf0ec4");
-            if (!nativeV1 && !nativeV2 && !nativeV4 && !seungunGpt && !seungunGop && !dlpcGop && !dlpcAnnouncer && !dlpcConcise) unavailable();
+            boolean sixDimension=matchesNativeIdentity(response,
+                    "f6d56e1decc160f0ca38cc8d52303f3de20945f872d714bf6a2e743ed94c0391",
+                    "7fbfbd4a56bd0d7a7d9c750a62c6b6e78c8654cd0ac5d721df9fe29c331a39e2",
+                    "f4309130f20715b3c2f055121a88197e09c8ae37088e8eb2341b337f36cc65c8");
+            if (!nativeV1 && !nativeV2 && !nativeV4 && !seungunGpt && !seungunGop && !dlpcGop && !dlpcAnnouncer && !dlpcConcise && !sixDimension) unavailable();
         }
         if (!CanonicalHandoffReadiness.VERSION.equals(response.path("handoffContractVersion").asText()))
             unavailable();

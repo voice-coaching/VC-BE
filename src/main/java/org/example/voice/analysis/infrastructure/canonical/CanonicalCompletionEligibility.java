@@ -24,6 +24,7 @@ public final class CanonicalCompletionEligibility {
                 || !document.hasRequiredStorageEvidence() || document.failure()!=null) return false;
         return ("READY".equals(document.adapterStatus())
                 && ("SCHEMA_AND_STRUCTURAL_SEMANTICS_VALID".equals(document.generationStatus())
+                    || "STRUCTURALLY_VALID".equals(document.generationStatus())
                     || "DETERMINISTIC_FALLBACK".equals(document.generationStatus())))
                 || ("NO_PERMITTED_COACHING_CONTENT".equals(document.adapterStatus())
                     && "NOT_DISPATCHED".equals(document.generationStatus()));
