@@ -1,60 +1,16 @@
-name: Deploy production
-
+name: Recover AI reverse tunnel
 on:
-  push:
-    branches: [develop, main]
   workflow_dispatch:
-
 permissions:
   contents: read
-
-concurrency:
-  group: production-deploy
-  cancel-in-progress: false
-
 jobs:
-  deploy:
+  recover:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 5
     environment: production
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: corretto
-          java-version: "21"
-          cache: gradle
-
-      - name: Grant execute permission for scripts
-        run: chmod +x gradlew scripts/deploy.sh
-
-      - name: Set up Python 3.12 for deployment and sandbox verification
-        id: python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Compile and package release
-        run: |
-          python -m unittest discover -s scripts/deployment -p 'test_*retention*.py'
-          bash gradlew clean compileJava compileTestJava bootJar -x test --no-daemon
-
-      - name: Select executable JAR
-        id: artifact
-        shell: bash
-        run: |
-          jar_path="$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' | head -n 1)"
-          test -n "$jar_path"
-          echo "path=$jar_path" >> "$GITHUB_OUTPUT"
-          echo "sha256=$(sha256sum "$jar_path" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
-
-      - name: Configure SSH
+      - uses: actions/checkout@v4
+      - name: Configure existing deployment SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
@@ -63,68 +19,9 @@ jobs:
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/alpha-deploy
           chmod 600 ~/.ssh/alpha-deploy
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-
-      - name: Upload release
-        id: upload
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-          JAR_PATH: ${{ steps.artifact.outputs.path }}
-        run: |
-          scp -i ~/.ssh/alpha-deploy "$JAR_PATH" "$EC2_USER@$EC2_HOST:/var/tmp/alpha-${GITHUB_SHA}.jar"
-          ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" "mkdir -p '/var/tmp/alpha-deploy-${GITHUB_SHA}'"
-          scp -i ~/.ssh/alpha-deploy scripts/deploy.sh "$EC2_USER@$EC2_HOST:/var/tmp/alpha-deploy-${GITHUB_SHA}/deploy.sh"
-          scp -r -i ~/.ssh/alpha-deploy scripts/deployment "$EC2_USER@$EC2_HOST:/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment"
-
-      - name: Read-only analysis readiness diagnostics
-        continue-on-error: true
+      - name: Release only a stale AI reverse-forward session
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
         run: |
-          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
-          analysis_report=$(ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
-            "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/analysis_diagnostics.py'")
-          echo "::notice title=Analysis readiness::$analysis_report"
-
-      - name: Activate release
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-          JAR_SHA: ${{ steps.artifact.outputs.sha256 }}
-        run: |
-          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ && "$JAR_SHA" =~ ^[0-9a-f]{64}$ ]]
-          ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
-            "sudo bash '/var/tmp/alpha-deploy-${GITHUB_SHA}/deploy.sh' '$GITHUB_SHA' '$JAR_SHA'"
-
-      - name: Read analysis readiness after deployment
-        continue-on-error: true
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-        run: |
-          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
-          analysis_report=$(ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
-            "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/analysis_diagnostics.py'")
-          echo "::notice title=Analysis readiness after deployment::$analysis_report"
-
-      - name: Retain live JAR and fifteen rollback versions after healthy startup
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-          JAR_SHA: ${{ steps.artifact.outputs.sha256 }}
-        run: |
-          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ && "$JAR_SHA" =~ ^[0-9a-f]{64}$ ]]
-          ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
-            "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/jar_retention.py' --apply --expected-release '$GITHUB_SHA' --expected-jar-sha '$JAR_SHA'"
-
-      - name: Remove this run's upload copies
-        if: always() && (steps.upload.outcome == 'success' || steps.upload.outcome == 'failure')
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-        run: |
-          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
-          ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
-            "rm -f -- '/var/tmp/alpha-${GITHUB_SHA}.jar'; rm -rf -- '/var/tmp/alpha-deploy-${GITHUB_SHA}'"
+          ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" 'sudo python3 -' < scripts/deployment/recover_ai_tunnel.py
