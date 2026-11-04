@@ -37,8 +37,7 @@ process = Path('/proc')/str(pid)
 comm = (process/'comm').read_text().strip()
 check(comm.startswith('sshd') and pid > 1)
 cmd = (process/'cmdline').read_bytes().replace(b'\0',b' ').decode()
-print(json.dumps({'listenerPid':pid,'comm':comm,'session':cmd.strip(),'uid':process.stat().st_uid}),flush=True)
-check('ec2-user' in cmd and ('notty' in cmd or '[priv]' in cmd))
+check('ec2-user' in cmd)
 ports = set()
 for row in rows:
     if pid in {int(value) for value in re.findall(r'pid=(\d+)',row)}:
