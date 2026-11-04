@@ -101,6 +101,10 @@ public class AdminController {
     public ResponseEntity<ApiResponse<NoticeDto>> editNotice(@AuthenticationPrincipal LoginUser actor,@PathVariable long noticeId,@Valid @RequestBody NoticeEditDto request) {
         return ok(NoticeDto.from(support.editNotice(actor.id(),noticeId,request.version(),request.notice().command(),request.reason())));
     }
+    @DeleteMapping("/notices/{noticeId}") @Operation(summary="공지 삭제")
+    public ResponseEntity<ApiResponse<Void>> deleteNotice(@AuthenticationPrincipal LoginUser actor,@PathVariable long noticeId,@Valid @RequestBody NoticeDeleteDto request) {
+        support.deleteNotice(actor.id(),noticeId,request.version(),request.reason());return ok(null);
+    }
     @GetMapping("/inquiries") @Operation(summary="전체 문의 목록 조회")
     public ResponseEntity<ApiResponse<PageDto<InquirySummaryDto>>> inquiries(@AuthenticationPrincipal LoginUser actor,
             @RequestParam(required=false) String keyword,@RequestParam(required=false) Inquiry.Status status,@RequestParam(required=false) String category,

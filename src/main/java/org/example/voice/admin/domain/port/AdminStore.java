@@ -25,6 +25,7 @@ public interface AdminStore {
     Optional<NoticeView> notice(long id);
     Notice lockNotice(long id);
     void saveNotice(Notice notice);
+    void deleteNotice(Notice notice);
     NoticeView view(Notice notice);
     Page<InquiryView> inquiries(InquiryFilter filter);
     Optional<InquiryView> inquiry(long id);

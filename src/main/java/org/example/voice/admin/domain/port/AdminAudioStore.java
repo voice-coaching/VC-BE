@@ -15,6 +15,7 @@ public interface AdminAudioStore {
     Optional<Audio> audio(long audioId);
     void clearPrimaries(long contentId);
     void makePrimary(long audioId);
+    void retire(long audioId,java.time.OffsetDateTime now);
     void save(ReferenceAudio audio);
     void advanceVersion(org.example.voice.practicecontent.domain.entity.PracticeContent content);
 }

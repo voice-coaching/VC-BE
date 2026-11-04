@@ -13,6 +13,7 @@ import org.example.voice.admin.domain.port.AdminCommunicationStore;
 public class AdminCommunicationPersistence implements AdminCommunicationStore {
     private final EntityManager em;
     public void save(AdminNotificationCampaign c) { em.persist(c); }
+    public void delete(AdminNotificationCampaign c) { em.remove(c); }
     public Optional<AdminNotificationCampaign> campaign(long id,boolean lock) {
         return Optional.ofNullable(em.find(AdminNotificationCampaign.class,id,lock?LockModeType.PESSIMISTIC_WRITE:LockModeType.NONE));
     }

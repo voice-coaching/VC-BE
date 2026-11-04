@@ -14,4 +14,5 @@ public final class AdminAudioRequestDto {
     public record RegisterDto(@NotNull UUID uploadId,@NotNull @PositiveOrZero Long version,
             @NotBlank @Size(max=255) String speakerName,@NotNull Boolean primary,@NotBlank @Size(max=500) String reason) {}
     public record PrimaryDto(@NotNull @PositiveOrZero Long version,@NotBlank @Size(max=500) String reason) {}
+    public record AudioDeleteDto(@NotNull @PositiveOrZero Long version,@NotBlank @Size(max=500) String reason) {}
 }

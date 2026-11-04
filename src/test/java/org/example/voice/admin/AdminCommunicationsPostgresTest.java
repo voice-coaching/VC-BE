@@ -123,10 +123,54 @@ class AdminCommunicationsPostgresTest {
                 assertThat(service.activePopup(target).id()).isEqualTo(popup.id());
             });
             assertThatThrownBy(()->jdbc.update("update admin_popups set ends_at=starts_at where id=?",popup.id())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+            concurrentDraftChanges(jdbc,tx,service,actor,other);
         } finally {
             if(factory.getObject()!=null)factory.destroy();
             root.execute("drop schema if exists "+schema+" cascade");
         }
+    }
+    private void concurrentDraftChanges(JdbcTemplate jdbc,TransactionTemplate tx,AdminCommunicationService service,long actor,long target) throws Exception {
+        for(boolean deleting:List.of(false,true)) {
+            var original=tx.execute(s->service.create(actor,new CampaignDraft(AdminAudience.SELECTED_USERS,AdminNotificationKind.GENERAL,"원문","내용","/home",List.of(target)),"등록"));
+            long before=jdbc.queryForObject("select count(*) from user_notifications where user_id=?",Long.class,target);
+            var ready=new CountDownLatch(2);var go=new CountDownLatch(1);
+            try(var pool=Executors.newFixedThreadPool(2)) {
+                Callable<Boolean> mutate=()->{
+                    ready.countDown();assertThat(go.await(5,TimeUnit.SECONDS)).isTrue();
+                    try {
+                        tx.executeWithoutResult(s->{
+                            if(deleting)service.delete(actor,original.id(),original.version(),"초안 삭제");
+                            else service.edit(actor,original.id(),original.version(),new CampaignDraft(AdminAudience.SELECTED_USERS,AdminNotificationKind.PLAN,"수정","새 내용","/mypage",List.of(target)),"초안 수정");
+                        });return true;
+                    } catch(org.example.voice.common.exception.BaseException e) {
+                        assertThat(e.getErrorCode()).isEqualTo(org.example.voice.common.exception.ErrorCode.ADMIN_EDIT_CONFLICT);return false;
+                    }
+                };
+                Callable<Boolean> send=()->{
+                    ready.countDown();assertThat(go.await(5,TimeUnit.SECONDS)).isTrue();
+                    try { tx.executeWithoutResult(s->service.dispatch(actor,original.id(),original.version(),"발송"));return true; }
+                    catch(org.example.voice.common.exception.BaseException e) {
+                        assertThat(e.getErrorCode()).isIn(org.example.voice.common.exception.ErrorCode.ADMIN_EDIT_CONFLICT,org.example.voice.common.exception.ErrorCode.RESOURCE_NOT_FOUND);return false;
+                    }
+                };
+                var changed=pool.submit(mutate);var sent=pool.submit(send);assertThat(ready.await(5,TimeUnit.SECONDS)).isTrue();go.countDown();
+                boolean changeWon=changed.get(15,TimeUnit.SECONDS),sendWon=sent.get(15,TimeUnit.SECONDS);
+                assertThat(changeWon).isNotEqualTo(sendWon);
+                assertThat(jdbc.queryForObject("select count(*) from user_notifications where user_id=?",Long.class,target)).isEqualTo(before+(sendWon?1:0));
+                if(deleting&&changeWon) {
+                    assertThat(jdbc.queryForObject("select count(*) from admin_notification_campaigns where id=?",Long.class,original.id())).isZero();
+                    assertThat(jdbc.queryForObject("select count(*) from admin_notification_recipients where campaign_id=?",Long.class,original.id())).isZero();
+                } else {
+                    var remaining=tx.execute(s->service.campaign(actor,original.id()));
+                    assertThat(remaining.title()).isEqualTo(sendWon?"원문":"수정");
+                    assertThat(remaining.status()).isEqualTo(sendWon?"SENT":"DRAFT");
+                }
+            }
+        }
+        var rollback=tx.execute(s->service.create(actor,new CampaignDraft(AdminAudience.SELECTED_USERS,AdminNotificationKind.GENERAL,"보존","내용","/home",List.of(target)),"등록"));
+        assertThatThrownBy(()->tx.executeWithoutResult(s->{service.delete(actor,rollback.id(),rollback.version(),"삭제");throw new IllegalStateException("rollback");})).isInstanceOf(IllegalStateException.class);
+        assertThat(tx.execute(s->service.campaign(actor,rollback.id())).userIds()).containsExactly(target);
+        assertThat(jdbc.queryForObject("select count(*) from admin_audit_logs where action='NOTIFICATION_DELETE' and target_id=?",Long.class,Long.toString(rollback.id()))).isZero();
     }
     private long account(JdbcTemplate jdbc,String role) {
         return jdbc.queryForObject("insert into users(nickname,status,role,terms_agreed_at,privacy_agreed_at,created_at,updated_at) values('test','ACTIVE',?,now(),now(),now(),now()) returning id",Long.class,role);

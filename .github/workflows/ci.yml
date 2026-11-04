@@ -18,5 +18,10 @@ jobs:
           distribution: corretto
           java-version: "21"
           cache: gradle
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Verify JAR retention and deployment integration
+        run: python -m unittest discover -s scripts/deployment -p 'test_*retention*.py'
       - name: Compile production and existing test sources; package without QA execution
         run: bash gradlew clean compileJava compileTestJava bootJar -x test --no-daemon
