@@ -16,11 +16,11 @@ import org.springframework.web.bind.annotation.*;
 @RestController @RequiredArgsConstructor @RequestMapping("/api")
 public class NotificationController {
     private final NotificationService service;
-    public record Keys(@NotBlank @Size(max = 100) String p256dh, @NotBlank @Size(max = 100) String auth) {
+    public record Keys(  String p256dh,   String auth) {
         @Override public String toString() { return "Keys[redacted]"; }
     }
-    public record RegisterPush(@NotBlank @Size(max = 2048) String endpoint, @NotNull @Valid Keys keys,
-                               @NotBlank @Size(max = 512) String userAgent, @Size(max = 100) String deviceName) {
+    public record RegisterPush(  String endpoint,   Keys keys,
+                                 String userAgent,  String deviceName) {
         PushDraft draft() { return new PushDraft(endpoint, keys.p256dh(), keys.auth(), userAgent, deviceName); }
         @Override public String toString() { return "RegisterPush[redacted]"; }
     }
@@ -33,7 +33,7 @@ public class NotificationController {
         return ApiResponse.success("OK", service.patch(user.id(), patch));
     }
     @PostMapping("/users/me/push-subscriptions") @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<Subscription> register(@AuthenticationPrincipal LoginUser user, @Valid @RequestBody RegisterPush draft,
+    public ApiResponse<Subscription> register(@AuthenticationPrincipal LoginUser user,  @RequestBody RegisterPush draft,
                                               @RequestHeader(value = "Idempotency-Key", required = false) String key) {
         return ApiResponse.success("OK", service.register(user.id(), draft.draft(), key));
     }

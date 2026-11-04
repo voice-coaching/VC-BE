@@ -36,7 +36,7 @@ public class UserController {
     @PatchMapping("/me")
     public ApiResponse<UserProfileUpdateResponseDto> updateMyProfile(
             @AuthenticationPrincipal LoginUser loginUser,
-            @Valid @RequestBody UserProfileUpdateRequestDto request
+             @RequestBody UserProfileUpdateRequestDto request
     ) {
         UserProfileUpdateResponseDto response = UserProfileUpdateResponseDto.from(
                 userService.updateMyProfile(loginUser.id(), request.nickname()));

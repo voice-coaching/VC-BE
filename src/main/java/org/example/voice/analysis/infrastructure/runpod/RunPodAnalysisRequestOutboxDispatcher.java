@@ -2,6 +2,7 @@ package org.example.voice.analysis.infrastructure.runpod;
 
 import lombok.extern.slf4j.Slf4j;
 import org.example.voice.analysis.domain.entity.AnalysisRequestOutbox;
+import org.example.voice.analysis.domain.entity.AnalysisResult;
 import org.example.voice.analysis.domain.type.AnalysisRequestOutboxStatus;
 import org.example.voice.analysis.infrastructure.AnalysisRequestOutboxJpaRepository;
 import org.example.voice.training.infrastructure.AnalysisResultJpaRepository;
@@ -12,7 +13,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 
 @Slf4j
 @Component
@@ -45,29 +45,29 @@ public class RunPodAnalysisRequestOutboxDispatcher {
         if (!properties.isConfigured()) return;
         var claim = gate.acquire(properties.normalizedEndpointUrl());
         if (claim == null) return;
-        var next = OffsetDateTime.now(ZoneOffset.UTC);
         try {
             Delivery delivery = transactions.execute(status -> outboxRepository
-                    .findFirstByTransportAndStatusOrderByIdAsc("RUNPOD_HTTP", AnalysisRequestOutboxStatus.PENDING)
+                    .findFirstByTransportAndStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(
+                            "RUNPOD_HTTP", AnalysisRequestOutboxStatus.PENDING, OffsetDateTime.now(ZoneOffset.UTC))
                     .map(event -> {
                         var now = OffsetDateTime.now(ZoneOffset.UTC);
                         var analysis = event.getAnalysisResult();
                         if (analysis.getStatus() == org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
                                 || analysis.getStatus() == org.example.voice.analysis.domain.type.AnalysisStatus.FAILED
-                                || !analysis.isForActiveRequest(UUID.fromString(event.getEventId()))
-                                || !analysis.isForActiveExecution(UUID.fromString(event.getExecutionId()))) {
+                                || !matchesCurrentExecution(analysis, event.getEventId(), event.getExecutionId())) {
                             event.cancelPending("stale_or_terminal_execution");
                             return null;
                         }
-                        if (event.getNextAttemptAt().isAfter(now))
-                            return new Delivery(event.getId(), event.getAnalysisResult().getId(), null, event.getNextAttemptAt(),event.getEventId(),event.getExecutionId());
+                        if (analysis.getWorkerInstanceId() != null || analysis.getHandoffReceivedAt() != null) {
+                            event.markDelivered(event.getExecutionId());
+                            return null;
+                        }
                         event.reserveDeliveryUntil(now.plusSeconds(60));
                         org.example.voice.common.logging.AnalysisLogEvents.event(log,"analysis_dispatch_attempt",analysis.getId(),event.getEventId(),event.getExecutionId(),null)
                                 .addKeyValue("queue_age_ms",java.time.Duration.between(event.getCreatedAt(),now).toMillis()).log("Analysis dispatch attempt");
-                        return new Delivery(event.getId(), event.getAnalysisResult().getId(), event.getPayload(), now,event.getEventId(),event.getExecutionId());
+                        return new Delivery(event.getId(), event.getAnalysisResult().getId(), event.getPayload(),event.getEventId(),event.getExecutionId());
                     }).orElse(null));
             if (delivery == null) return;
-            if (delivery.payload() == null) { next = delivery.readyAt(); return; }
             String error = null;
             boolean retryable = true;
             int retryAfter = 1;
@@ -91,11 +91,13 @@ public class RunPodAnalysisRequestOutboxDispatcher {
             final String outcome = error;
             final boolean retry = retryable;
             final int delay = retryAfter;
-            next = transactions.execute(status -> finish(delivery, outcome, retry, delay));
+            transactions.execute(status -> finish(delivery, outcome, retry, delay));
             org.example.voice.common.logging.AnalysisLogEvents.event(log,"analysis_dispatch_finished",delivery.analysisId(),delivery.requestId(),delivery.executionId(),outcome)
                     .addKeyValue("duration_ms",(System.nanoTime()-started)/1_000_000).log("Analysis dispatch finished");
         } finally {
-            gate.release(claim, next == null ? OffsetDateTime.now(ZoneOffset.UTC).plusSeconds(1) : next);
+            // Backoff belongs to the individual outbox row. Holding the endpoint
+            // until that row is due would block unrelated, ready requests.
+            gate.release(claim, OffsetDateTime.now(ZoneOffset.UTC));
         }
     }
 
@@ -104,8 +106,9 @@ public class RunPodAnalysisRequestOutboxDispatcher {
         var result = analysisResultRepository.findForIngestion(delivery.analysisId()).orElse(null);
         var event = outboxRepository.findForDeliveryUpdate(delivery.id()).orElse(null);
         if (result == null || event == null || event.getStatus() != AnalysisRequestOutboxStatus.PENDING) return OffsetDateTime.now(ZoneOffset.UTC);
-        if (!result.isForActiveRequest(UUID.fromString(event.getEventId()))
-                || !result.isForActiveExecution(UUID.fromString(event.getExecutionId()))) {
+        if (!matchesCurrentExecution(result, delivery.requestId(), delivery.executionId())
+                || !delivery.requestId().equals(event.getEventId())
+                || !delivery.executionId().equals(event.getExecutionId())) {
             event.cancelPending("stale_execution");
             return OffsetDateTime.now(ZoneOffset.UTC);
         }
@@ -119,11 +122,11 @@ public class RunPodAnalysisRequestOutboxDispatcher {
             return event.deferCapacity(retryAfter);
         }
         // A claim proves delivery even if its HTTP acknowledgment was lost; never fail live inference.
-        if (error == null || result.getWorkerInstanceId() != null) {
+        if (error == null || result.getWorkerInstanceId() != null || result.getHandoffReceivedAt() != null) {
             event.markDelivered(event.getExecutionId());
         } else {
             org.example.voice.common.logging.AnalysisLogEvents.event(log,"analysis_dispatch_failed",delivery.analysisId(),event.getEventId(),event.getExecutionId(),error).log("Analysis dispatch failed");
-            if (event.recordDispatchFailure(error, retryable ? properties.getDispatchMaxAttempts() : 1)) {
+            if (event.recordDispatchFailure(error, retryable ? properties.getDispatchMaxAttempts() : 1, retryAfter)) {
                 boolean expired = "analysis_execution_timeout".equals(error);
                 result.fail(expired ? error : FAILURE, expired ? "분석 제한 시간이 지났습니다. 다시 시도해 주세요."
                         : "분석 작업을 전달하지 못했습니다. 다시 시도해 주세요.", null, null);
@@ -134,5 +137,12 @@ public class RunPodAnalysisRequestOutboxDispatcher {
                 ? event.getNextAttemptAt() : OffsetDateTime.now(ZoneOffset.UTC);
     }
 
-    private record Delivery(Long id, Long analysisId, String payload, OffsetDateTime readyAt,String requestId,String executionId) {}
+    /** Scope the restored delivery fence without changing unrelated main-branch policies. */
+    private boolean matchesCurrentExecution(AnalysisResult result, String requestId, String executionId) {
+        return requestId != null && executionId != null
+                && requestId.equals(result.getActiveRequestEventId())
+                && executionId.equals(result.getActiveExecutionId());
+    }
+
+    private record Delivery(Long id, Long analysisId, String payload,String requestId,String executionId) {}
 }

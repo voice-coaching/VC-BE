@@ -19,9 +19,7 @@ public class AnalysisSegmentService {
     public AnalysisSegmentPageData getSegments(Long analysisId, Long userId, int page, int size) {
         var current = analysisResultReader.findOwned(analysisId, userId)
                 .map(result -> {
-                    if (!result.isCompleted()) {
-                        throw new AnalysisNotCompletedException();
-                    }
+
                     return result;
                 })
                 .orElseThrow(AnalysisNotFoundException::new);

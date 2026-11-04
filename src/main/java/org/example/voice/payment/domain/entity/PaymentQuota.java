@@ -9,14 +9,14 @@ import java.time.Duration;
 import java.time.Instant;
 
 @Entity
-@Table(name = "payment_request_quotas", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "operation"}))
+@Table(name = "payment_request_quotas")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PaymentQuota {
     @Id @Column(length = 64) private String id;
-    @Column(name = "user_id", nullable = false) private Long userId;
-    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 16) private PaymentOperation operation;
-    @Column(name = "window_started_at", nullable = false) private Instant windowStartedAt;
-    @Column(nullable = false) private int attempts;
+    @Column(name = "user_id", nullable = true) private Long userId;
+    @Enumerated(EnumType.STRING) @Column(nullable = true, length = 16) private PaymentOperation operation;
+    @Column(name = "window_started_at", nullable = true) private Instant windowStartedAt;
+    @Column(nullable = true) private int attempts;
 
     public PaymentQuota(Long userId, PaymentOperation operation, Instant now) {
         this.id = id(userId, operation);

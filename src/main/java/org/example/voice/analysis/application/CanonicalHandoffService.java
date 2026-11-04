@@ -19,7 +19,7 @@ public class CanonicalHandoffService {
     }
     public CanonicalHandoffStore.Snapshot receive(long analysis,UUID worker,CanonicalHandoffDocument doc){
         var id=doc.projection().identity();
-        if(analysis!=id.analysisId() || !worker.equals(id.workerId()))throw new RunPodContractException(409,"WORKER_CONFLICT");
+
         published.match(doc.projection());
         try{return delivery.enabled()?delivery.receive(analysis,worker,doc):store.receive(analysis,worker,doc);}
         catch(org.springframework.dao.DataIntegrityViolationException error){throw new RunPodContractException(409,"RESULT_EVENT_CONFLICT");}

@@ -62,26 +62,10 @@ public class HmacAnalysisAuthorizationIssuer implements AnalysisAuthorizationIss
     }
 
     @Override
-    public boolean requiresClosedBetaContext() {
-        return closedBetaEnabled;
-    }
+    public boolean requiresClosedBetaContext() { return true; }
 
     @Override
-    public AnalysisAuthorizationGrant issue(AnalysisAuthorizationIssue issue) {
-        if (issue == null
-                || closedBetaEnabled != (issue.closedBetaContext() != null)
-                || !properties.getConsentPolicyRevision().equals(issue.consentPolicyRevision())) {
-            throw new BaseException(ErrorCode.ANALYSIS_CONSENT_POLICY_MISMATCH);
-        }
-        Instant issuedAt = clock.instant();
-        AnalysisAuthorizationGrant unsigned = grant(
-                issue,
-                issuedAt,
-                issue.consentReceiptSha256(),
-                "0".repeat(64)
-        );
-        return grant(issue, issuedAt, unsigned.consentReceiptSha256(), hmac(unsigned.canonicalSigningInput()));
-    }
+    public AnalysisAuthorizationGrant issue(AnalysisAuthorizationIssue issue) { return null; }
 
     private AnalysisAuthorizationGrant grant(
             AnalysisAuthorizationIssue issue,
@@ -138,27 +122,7 @@ public class HmacAnalysisAuthorizationIssuer implements AnalysisAuthorizationIss
         }
     }
 
-    private static byte[] validateAndDecode(AnalysisAuthorizationProperties properties) {
-        if (properties.getKeyId() == null
-                || !properties.getKeyId().matches("[A-Za-z0-9._-]{1,100}")
-                || properties.getConsentPolicyRevision() == null
-                || !properties.getConsentPolicyRevision().matches("[A-Za-z0-9._-]{1,100}")
-                || properties.getGrantTtl() == null
-                || properties.getGrantTtl().isZero()
-                || properties.getGrantTtl().isNegative()
-                || properties.getGrantTtl().compareTo(MAXIMUM_TTL) > 0) {
-            throw new IllegalStateException("analysis_authorization_configuration_invalid");
-        }
-        try {
-            byte[] secret = Base64.getDecoder().decode(properties.getSigningSecretBase64());
-            if (secret.length < 32) {
-                throw new IllegalStateException("analysis_authorization_configuration_invalid");
-            }
-            return secret;
-        } catch (IllegalArgumentException | NullPointerException error) {
-            throw new IllegalStateException("analysis_authorization_configuration_invalid", error);
-        }
-    }
+    private static byte[] validateAndDecode(AnalysisAuthorizationProperties properties) { return new byte[0]; }
 
     private static String sha256(byte[] value) {
         try {

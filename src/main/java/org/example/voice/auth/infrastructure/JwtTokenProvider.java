@@ -20,8 +20,10 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.Locale;
 
 @Component
+/** Issues only signed HS256 credentials; unsigned migration-era JWTs are not accepted. */
 public class JwtTokenProvider implements TokenProvider {
     private final JwtEncoder encoder;
     private final JwtDecoder decoder;
@@ -36,12 +38,14 @@ public class JwtTokenProvider implements TokenProvider {
             @Value("${auth.jwt.access-token-seconds}") long accessSeconds,
             @Value("${auth.jwt.refresh-token-seconds}") long refreshSeconds
     ) {
-        if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
             throw new IllegalArgumentException("JWT secret must be at least 32 bytes");
         }
         SecretKey key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
         this.encoder = new NimbusJwtEncoder(new ImmutableSecret<>(key));
-        this.decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
+        NimbusJwtDecoder verifier = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
+        verifier.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
+        this.decoder = verifier;
         this.issuer = issuer;
         this.accessSeconds = accessSeconds;
         this.refreshSeconds = refreshSeconds;
@@ -55,6 +59,9 @@ public class JwtTokenProvider implements TokenProvider {
 
     @Override
     public IssuedTokens reissue(Long userId, UserRole role, String sessionId) {
+        if (userId == null || userId <= 0 || role == null) {
+            throw new IllegalArgumentException("A valid token subject and role are required");
+        }
         if (sessionId == null || sessionId.isBlank()) {
             throw new IllegalArgumentException("Login session ID is required");
         }
@@ -84,14 +91,18 @@ public class JwtTokenProvider implements TokenProvider {
     private TokenClaims parse(String token, String expectedType, ErrorCode errorCode) {
         try {
             Jwt jwt = decoder.decode(token);
-            if (!issuer.equals(jwt.getClaimAsString("iss")) || !expectedType.equals(jwt.getClaimAsString("type"))) {
+            String sessionId = jwt.getClaimAsString("sid");
+            if (!expectedType.equals(jwt.getClaimAsString("type")) || jwt.getExpiresAt() == null
+                    || sessionId == null || sessionId.isBlank()) {
                 throw new InvalidTokenException(errorCode);
             }
-            return new TokenClaims(Long.valueOf(jwt.getSubject()), UserRole.valueOf(jwt.getClaimAsString("role")), jwt.getClaimAsString("sid"),
+            long userId = Long.parseLong(jwt.getSubject());
+            if (userId <= 0) throw new InvalidTokenException(errorCode);
+            return new TokenClaims(userId, UserRole.valueOf(jwt.getClaimAsString("role")), sessionId,
                     OffsetDateTime.ofInstant(jwt.getExpiresAt(), ZoneOffset.UTC));
         } catch (JwtValidationException exception) {
             ErrorCode mapped = "refresh".equals(expectedType) && exception.getErrors().stream()
-                    .anyMatch(error -> error.getDescription().toLowerCase().contains("expired"))
+                    .anyMatch(error -> error.getDescription().toLowerCase(Locale.ROOT).contains("expired"))
                     ? ErrorCode.REFRESH_TOKEN_EXPIRED : errorCode;
             throw new InvalidTokenException(mapped, exception);
         } catch (InvalidTokenException exception) {

@@ -11,6 +11,11 @@ final class HandoffPeerReadiness {
         if (response == null || !response.path("executorConfigured").isBoolean()
                 || !response.path("executorConfigured").booleanValue()) return false;
         if (!CanonicalHandoffReadiness.VERSION.equals(response.path("contractVersion").asText())) return false;
+        if (!response.path("admissionEnabled").isBoolean()
+                || !response.path("admissionEnabled").booleanValue()) return false;
+        JsonNode focuses = response.path("supportedLearningFocuses");
+        if (!focuses.isArray() || focuses.size() != 1
+                || !"PRONUNCIATION".equals(focuses.get(0).asText())) return false;
         JsonNode digests = response.path("schemaDigests");
         if (!digests.isObject() || digests.size() != expected.size()) return false;
         for (var pin : expected.entrySet()) {

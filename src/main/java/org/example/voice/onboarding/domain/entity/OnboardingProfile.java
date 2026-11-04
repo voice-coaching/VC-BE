@@ -31,7 +31,7 @@ public class OnboardingProfile {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false, unique = true)
+    @Column(name = "user_id", nullable = true, unique = false)
     private Long userId;
 
     @Enumerated(EnumType.STRING)
@@ -48,13 +48,13 @@ public class OnboardingProfile {
     private Integer weeklyGoalCount;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "survey_answers", columnDefinition = "jsonb", nullable = false)
+    @Column(name = "survey_answers", columnDefinition = "jsonb", nullable = true)
     private SurveyAnswers surveyAnswers;
 
-    @Column(name = "completed_at", nullable = false)
+    @Column(name = "completed_at", nullable = true)
     private OffsetDateTime completedAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at", nullable = true)
     private OffsetDateTime updatedAt;
 
     private OnboardingProfile(

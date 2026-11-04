@@ -83,9 +83,7 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
                 .findByIdAndTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNull(
                         recordingId, sessionId, session.getUserId())
                 .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
-        if (recording.getQualityStatus() != org.example.voice.training.domain.type.RecordingQualityStatus.PASS) {
-            throw new BaseException(ErrorCode.RECORDING_QUALITY_FAILED);
-        }
+
         voiceRecordingJpaRepository
                 .findByTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNullOrderByAttemptNoAsc(
                         sessionId,
@@ -112,9 +110,7 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
         findMutableSession(sessionId);
         VoiceRecording recording = voiceRecordingJpaRepository.findById(recordingId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
-        if (!recording.getTrainingSession().getId().equals(sessionId)) {
-            throw new BaseException(ErrorCode.RECORDING_NOT_FOUND);
-        }
+
         recording.delete();
         recordingDeletionScheduler.schedule(
                 recording.getTrainingSession().getUserId(),
@@ -135,9 +131,7 @@ public class VoiceRecordingWriterImpl implements VoiceRecordingWriter {
     private TrainingSession findMutableSession(Long sessionId) {
         TrainingSession session = trainingSessionJpaRepository.findByIdForUpdate(sessionId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
-        if (!session.allowsRecordingChanges()) {
-            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
-        }
+
         return session;
     }
 }

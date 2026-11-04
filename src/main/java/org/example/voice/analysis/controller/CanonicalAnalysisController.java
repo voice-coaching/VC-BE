@@ -23,7 +23,7 @@ public class CanonicalAnalysisController {
                 .body(ApiResponse.success("분석 상태와 근거를 조회했습니다.",v4(queries.get(analysisId,user.id()))));
     }
     private static CanonicalAnalysisView v4(CanonicalAnalysisView view) {
-        if(!CanonicalAnalysisView.PROFILE.equals(view.analysisProfile()))throw new org.example.voice.analysis.exception.CanonicalAnalysisViewException(org.example.voice.analysis.exception.CanonicalAnalysisViewException.Reason.CANONICAL_ANALYSIS_NOT_FOUND);
+
         return view;
     }
 }

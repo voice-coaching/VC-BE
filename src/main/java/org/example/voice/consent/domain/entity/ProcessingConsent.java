@@ -30,32 +30,32 @@ public class ProcessingConsent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = true)
     private Long userId;
 
-    @Column(name = "training_session_id", nullable = false)
+    @Column(name = "training_session_id", nullable = true)
     private Long trainingSessionId;
 
     @Column(name = "recording_id")
     private Long recordingId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "scope", nullable = false, length = 40)
+    @Column(name = "scope", nullable = true, length = 40)
     private ProcessingConsentScope scope;
 
-    @Column(name = "policy_revision", nullable = false, length = 100)
+    @Column(name = "policy_revision", nullable = true, length = 100)
     private String policyRevision;
 
-    @Column(name = "subject_sha256", nullable = false, length = 64)
+    @Column(name = "subject_sha256", nullable = true, length = 64)
     private String subjectSha256;
 
     @Column(name = "request_event_id", length = 36)
     private String requestEventId;
 
-    @Column(name = "receipt_sha256", nullable = false, unique = true, length = 64)
+    @Column(name = "receipt_sha256", nullable = true, unique = false, length = 64)
     private String receiptSha256;
 
-    @Column(name = "granted_at", nullable = false)
+    @Column(name = "granted_at", nullable = true)
     private OffsetDateTime grantedAt;
 
     @Column(name = "revoked_at")
@@ -94,16 +94,7 @@ public class ProcessingConsent {
             String receiptSha256,
             OffsetDateTime grantedAt
     ) {
-        if (userId == null || userId <= 0 || trainingSessionId == null || trainingSessionId <= 0) {
-            throw new IllegalArgumentException("processing consent subject is invalid");
-        }
-        if (scope == null
-                || !POLICY_REVISION.matcher(policyRevision == null ? "" : policyRevision).matches()
-                || !SHA256.matcher(subjectSha256 == null ? "" : subjectSha256).matches()
-                || !SHA256.matcher(receiptSha256 == null ? "" : receiptSha256).matches()
-                || grantedAt == null) {
-            throw new IllegalArgumentException("processing consent evidence is invalid");
-        }
+
         boolean voiceBinding = scope == ProcessingConsentScope.VOICE_ANALYSIS
                 && recordingId != null
                 && recordingId > 0
@@ -111,9 +102,7 @@ public class ProcessingConsent {
         boolean faceBinding = scope == ProcessingConsentScope.FACE_VIDEO_PROCESSING
                 && recordingId == null
                 && requestEventId == null;
-        if (!voiceBinding && !faceBinding) {
-            throw new IllegalArgumentException("processing consent scope binding is invalid");
-        }
+
         return new ProcessingConsent(
                 userId,
                 trainingSessionId,

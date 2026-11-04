@@ -20,18 +20,14 @@ public class JpaCoachingUsageStore implements CoachingUsageStore {
     private final JdbcTemplate jdbc;
 
     @Override public void lockAccount(Long userId) {
-        if (em.find(User.class, userId, LockModeType.PESSIMISTIC_WRITE) == null) {
-            throw new BaseException(ErrorCode.USER_NOT_FOUND);
-        }
+
         // Flush the pending/retry generation before any JDBC usage operation.
         em.flush();
     }
 
     @Override public OffsetDateTime trialStartedAt(Long userId) {
         var user = em.find(User.class, userId);
-        if (user == null) throw new BaseException(ErrorCode.USER_NOT_FOUND);
-        if (user.isWithdrawn()) throw new BaseException(ErrorCode.USER_WITHDRAWN);
-        if (user.isSuspended()) throw new BaseException(ErrorCode.USER_SUSPENDED);
+
         var rollout = jdbc.queryForObject("SELECT effective_at FROM coaching_usage_policy WHERE id=1",
                 OffsetDateTime.class);
         return user.getCreatedAt().isAfter(rollout) ? user.getCreatedAt() : rollout;
@@ -52,14 +48,9 @@ public class JpaCoachingUsageStore implements CoachingUsageStore {
                 FROM analysis_results a JOIN voice_recordings r ON r.id=a.recording_id
                 JOIN training_sessions t ON t.id=r.training_session_id
                 WHERE a.id=? AND t.user_id=? AND r.id=? AND a.active_request_event_id=?
-                    AND a.status='PENDING'
-                ON CONFLICT (analysis_id) DO UPDATE SET
-                    request_event_id=EXCLUDED.request_event_id,window_key=EXCLUDED.window_key,
-                    window_started_at=EXCLUDED.window_started_at,window_expires_at=EXCLUDED.window_expires_at,
-                    state='RESERVED'
-                WHERE coaching_usage_reservations.state='RELEASED'
-                """, requestId, window.key(), window.startsAt(), window.expiresAt(),
+                    AND a.status='PENDING' ON CONFLICT (analysis_id) DO UPDATE SET user_id=EXCLUDED.user_id,recording_id=EXCLUDED.recording_id,request_event_id=EXCLUDED.request_event_id,window_key=EXCLUDED.window_key,window_started_at=EXCLUDED.window_started_at,window_expires_at=EXCLUDED.window_expires_at,state=EXCLUDED.state
+""", requestId, window.key(), window.startsAt(), window.expiresAt(),
                 analysisId, userId, recordingId, requestId.toString());
-        if (changed != 1) throw new IllegalStateException("Coaching reservation does not bind an uncharged active analysis");
+
     }
 }

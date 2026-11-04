@@ -2,6 +2,14 @@
 
 # Endpoint List - voice
 
+## 승급시험 새로 시작
+
+| Method | URL | Auth | Description |
+| --- | --- | --- | --- |
+| POST | `/api/users/me/title-exams/{examId}/restart` | 로그인 + 본인 미채점 시험 | 이전 세션 ID를 확인하고 새 녹음 세션을 연결. [요청·재전송·취소 계약](title-exam-restart.md) |
+
+이 항목은 소스 계약이며 운영 배포 완료를 뜻하지 않는다. Backend를 먼저 배포한 뒤 프런트의 재개·새 시작 선택 화면을 배포한다.
+
 ## TEST 결제
 
 결제 호출 제한 계약: [회원별 작업 한도·429/503 응답](payment-rate-limits.md).
@@ -240,6 +248,34 @@ This document summarizes the API list exported from the local API spec directory
 | GET | `/api/analyses/{id}/result-contract` | User login + ownership | Current attempt contract |
 | GET | `/api/v3/analyses/{id}` | User login + ownership | Committed v5 public result |
 
+## 관리자 1차
+
+| Method | Path | Authentication | Purpose |
+|---|---|---|---|
+| GET | `/api/admin/me` | Bearer + active ADMIN | 관리자 접근 정보 |
+| GET | `/api/admin/users` | Bearer + active ADMIN | 회원 목록 |
+| GET | `/api/admin/users/{userId}` | Bearer + active ADMIN | 회원 상세 |
+| GET | `/api/admin/content-categories` | Bearer + active ADMIN | 등록용 카테고리 |
+| GET | `/api/admin/contents` | Bearer + active ADMIN | 공용 콘텐츠 목록 |
+| GET | `/api/admin/contents/{contentId}` | Bearer + active ADMIN | 공용 콘텐츠 상세 |
+| POST | `/api/admin/contents` | Bearer + active ADMIN | 초안 생성 |
+| PATCH | `/api/admin/contents/{contentId}` | Bearer + active ADMIN | 초안 수정 |
+| PATCH | `/api/admin/contents/{contentId}/publication` | Bearer + active ADMIN | 공개·숨김 |
+| GET | `/api/admin/notices` | Bearer + active ADMIN | 공지 목록 |
+| GET | `/api/admin/notices/{noticeId}` | Bearer + active ADMIN | 공지 상세 |
+| POST | `/api/admin/notices` | Bearer + active ADMIN | 공지 생성 |
+| PATCH | `/api/admin/notices/{noticeId}` | Bearer + active ADMIN | 공지 수정 |
+| GET | `/api/admin/inquiries` | Bearer + active ADMIN | 문의 목록 |
+| GET | `/api/admin/inquiries/{inquiryId}` | Bearer + active ADMIN | 문의 상세 |
+| PATCH | `/api/admin/inquiries/{inquiryId}/answer` | Bearer + active ADMIN | 문의 답변 |
+| PATCH | `/api/admin/inquiries/{inquiryId}/status` | Bearer + active ADMIN | 문의 상태 전환 |
+| GET | `/api/admin/audit-logs` | Bearer + active ADMIN | 관리자 작업 이력 |
+| POST | `/api/admin/contents/{contentId}/reference-audios/upload-url` | Bearer + active ADMIN | 아나운서 음성 업로드 발급 |
+| POST | `/api/admin/contents/{contentId}/reference-audios` | Bearer + active ADMIN | 검증한 음성 연결 |
+| GET | `/api/admin/contents/{contentId}/reference-audios` | Bearer + active ADMIN | 초안 포함 기준 음성 목록 |
+| PATCH | `/api/admin/reference-audios/{audioId}/primary` | Bearer + active ADMIN | 대표 음성 지정 |
+| GET | `/api/admin/reference-audios/{audioId}/playback-url` | Bearer + active ADMIN | 관리자 음성 미리듣기 |
+
 ## Direct analysis background history (default OFF)
 
 [Contract](../contracts/direct_analysis_history_v1.md). These endpoints never gate RunPod result display.
@@ -250,3 +286,40 @@ This document summarizes the API list exported from the local API spec directory
 | POST | `/api/direct-analysis-history/{jobId}/link` | Existing user login | Attach received result to the account |
 | GET | `/api/direct-analysis-history/{jobId}` | Existing user login | History storage state |
 | GET | `/api/direct-analysis-history` | Existing user login | Independent voice analysis history |
+
+
+## JWT 서명 복구 (2026-11-02)
+
+기존 인증 API와 응답 필드를 유지하면서 Access·Refresh를 HS256 서명 토큰으로 발급하고 검증한다. alg=none은 거절한다. 배포 후 기존 무서명 토큰 사용자는 재로그인이 필요하다. 기존 JWT_SECRET 최소32바이트 조건을 복구하며 신규 환경변수·DB 변경은 없다. 전체 API 접근 정책을 변경한 작업은 아니다. [수정·배포·프론트 적용 계약](jwt-signature-recovery-20261102.md)을 따른다.
+
+
+## 인기 뉴스 반복 조회400 수정 (2026-11-02)
+
+기존 `/api/practice-contents/popular?type=NEWS&limit=10` 계약을 유지한다. 일별 snapshot 날짜가 이미 있으면 재생성하지 않고 기존 순위를 조회하도록 날짜 INSERT의 충돌 처리를 복구했다. DB 기본 키 중복 때문에 정상 요청이400이던 오류이며 프론트 query 변경·순위 데이터 삭제·신규 migration은 필요하지 않다. [원인·회귀 검증·배포 확인](popular-news-400-fix-20261102.md)을 따른다.
+
+## 관리자 알림·팝업·회원 기록 확장
+
+[상세 계약](admin-communications-and-members.md). 관리자 경로는 실제 활성 ADMIN 전용이며 사용자 팝업은 활성 로그인 회원에게 제공한다. ApiResponse, no-store. V64 적용 필요.
+
+| Method | Path | 기능 |
+| --- | --- | --- |
+| GET | `/api/admin/notification-campaigns` | 알림 초안·발송 내역 페이지 |
+| POST | `/api/admin/notification-campaigns` | 전체·선택 회원 안내 초안 생성 |
+| GET | `/api/admin/notification-campaigns/{campaignId}` | 내용·대상 수·발송 상태 |
+| POST | `/api/admin/notification-campaigns/{campaignId}/dispatch` | `{version,reason}` 앱 내 알림 발송, 재시도 중복 방지 |
+| GET | `/api/admin/popups` | 기간 팝업 목록 |
+| POST | `/api/admin/popups` | `{popup,reason}` 시작 시각·노출 일수 지정 |
+| GET | `/api/admin/popups/{popupId}` | 팝업 상세 |
+| PATCH | `/api/admin/popups/{popupId}` | `{version,popup,reason}` 수정·중지 |
+| GET | `/api/users/me/popup` | 현재 게시 팝업 한 개 또는 null |
+| GET | `/api/admin/users/resolve` | identifier: 숫자 userId 또는 분석 UUID, 탈퇴/삭제 회원 제외 |
+| GET | `/api/admin/users/{userId}/overview` | 탈퇴하지 않은 회원 정보·분류별 수·현재 코칭 사용량 |
+| GET | `/api/admin/users/{userId}/records` | resource enum 필수, page/size, 허용된 소유 기록 메타데이터 |
+
+일반/요금제 알림 kind는 GENERAL/PLAN이며 전체 ALL_ACTIVE 또는 개별 SELECTED_USERS 최대500명이다. user_notifications의 ADMIN_GENERAL/ADMIN_PLAN을 기존 GET /api/notifications로 조회한다. 외부 푸시·결제 자동 알림은 포함하지 않는다. 팝업 기간1~365일, 서버 endsAt 계산, 로그인 회원 게시 조건 검사. 회원 ID를 UUID로 바꾸거나 비밀정보를 전체 반환하지 않는다.
+
+## 관리자 콘텐츠 수정·삭제 (이슈 #173)
+
+V65부터 공용 콘텐츠 전체 유형을 공개 상태와 관계없이 수정할 수 있다. `DELETE /api/admin/contents/{contentId}`는 `{version,reason}`을 받아 삭제 시각을 기록하고 일반/관리자 목록·상세와 신규 연습에서 제외한다. 기존 학습/분석/음성 DB 행은 보존한다. 원문 수정 시 예전 기준 음성을 제외하고 기존 공용 세션의 원문은 snapshot으로 유지한다. [상세 계약](../api/admin-content-edit-delete.md)을 따른다.
+
+| DELETE | `/api/admin/users/{userId}` | 활성 관리자 | 회원 및 연결된 DB 업무 기록 삭제 |

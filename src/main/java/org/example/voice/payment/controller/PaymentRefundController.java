@@ -32,7 +32,7 @@ public class PaymentRefundController {
     @PostMapping("/api/payment-orders/{orderId}/refund-requests")
     public ResponseEntity<ApiResponse<PaymentRefundResponseDto>> request(@AuthenticationPrincipal LoginUser user,
             @PathVariable String orderId, @RequestBody PaymentRefundRequestDto request) {
-        limiter.require(user.id(), PaymentOperation.CANCEL);
+
         var result = PaymentRefundResponseDto.from(refunds.request(user.id(), orderId, request.reason()));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(ApiResponse.success("전액 환불 신청을 확인했습니다.", result));
@@ -47,7 +47,7 @@ public class PaymentRefundController {
     @GetMapping("/api/refund-requests/{requestId}")
     public ResponseEntity<ApiResponse<PaymentRefundResponseDto>> read(@AuthenticationPrincipal LoginUser user,
             @PathVariable String requestId) {
-        limiter.require(user.id(), PaymentOperation.READ);
+
         var result = PaymentRefundResponseDto.from(refunds.read(user.id(), requestId));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(ApiResponse.success("전액 환불 처리 상태를 조회했습니다.", result));

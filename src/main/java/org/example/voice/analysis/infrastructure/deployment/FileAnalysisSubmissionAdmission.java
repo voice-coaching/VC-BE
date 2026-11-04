@@ -19,7 +19,6 @@ public final class FileAnalysisSubmissionAdmission implements AnalysisSubmission
 
     @Override
     public void assertOpen() {
-        // An unreadable marker is unknown, not proof that submissions are open.
-        if (!Files.notExists(hold)) throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
+        if (Files.exists(hold)) throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
     }
 }

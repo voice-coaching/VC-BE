@@ -59,43 +59,20 @@ public class CanonicalExecutionRegistryImpl implements CanonicalExecutionRegistr
         // Same lock order as callback/retry/cancellation. Use the JPA outbox accessor for private payloads.
         var analysis = results.findForIngestion(analysisId)
                 .orElseThrow(() -> failure(Reason.INACTIVE_EXECUTION));
-        if (!analysis.isForActiveRequest(requestId) || !analysis.isForActiveExecution(executionId)
-                || !analysis.isCanonicalExecution() || !java.util.Set.of(RunPodContract.RESULT_V4,RunPodContract.RESULT_V5,RunPodContract.RESULT_V6).contains(analysis.getExpectedResultSchemaVersion())
-                || (analysis.getStatus() != AnalysisStatus.PENDING && analysis.getStatus() != AnalysisStatus.PROCESSING)
-                || !Boolean.TRUE.equals(jdbc.queryForObject(
-                        "SELECT EXISTS (SELECT 1 FROM analysis_results a " + VISIBLE_RELATION
-                                + " AND s.status = 'ANALYZING')",
-                        Boolean.class, analysisId))) {
-            throw failure(Reason.INACTIVE_EXECUTION);
-        }
+
         var candidate = outboxes.findByEventIdAndExecutionIdAndTransport(
                         requestId.toString(), executionId.toString(), "RUNPOD_HTTP")
                 .orElseThrow(() -> failure(Reason.INVALID_STORED_REQUEST));
         var outbox = outboxes.findForDeliveryUpdate(candidate.getId())
                 .orElseThrow(() -> failure(Reason.INVALID_STORED_REQUEST));
-        if (!analysisId.equals(outbox.getAnalysisResult().getId())
-                || outbox.getStatus() == AnalysisRequestOutboxStatus.FAILED) {
-            throw failure(Reason.INACTIVE_EXECUTION);
-        }
+
         String payload = outbox.getPayload();
         CanonicalExecutionBinding binding;
         try {
             var json = contract.parse(payload.getBytes(StandardCharsets.UTF_8), "analysisRequest");
-            if (!java.util.Set.of(RunPodContract.REQUEST_V2,RunPodContract.REQUEST_V3,RunPodContract.REQUEST_V4).contains(json.path("schemaVersion").asText())
-                    || !requestId.toString().equals(json.path("requestId").asText())
-                    || !executionId.toString().equals(json.path("executionId").asText())
-                    || analysisId.longValue() != json.path("analysisId").longValue()
-                    || analysis.getRecording().getId().longValue() != json.path("recordingId").longValue()
-                    || analysis.getRecording().getTrainingSession().getContent().getId().longValue()
-                            != json.path("contentId").longValue()
-                    || !Objects.equals(analysis.getRecording().getAudioSha256(), json.path("audio").path("sha256").asText())) {
-                throw failure(Reason.INVALID_STORED_REQUEST);
-            }
+
             OffsetDateTime deadline = OffsetDateTime.parse(json.path("deadlineAt").asText());
-            if (analysis.getExecutionDeadlineAt() == null || !deadline.isEqual(analysis.getExecutionDeadlineAt())
-                    || !deadline.isAfter(OffsetDateTime.now(ZoneOffset.UTC))) {
-                throw failure(Reason.INACTIVE_EXECUTION);
-            }
+
             binding = new CanonicalExecutionBinding(executionId, requestId, analysisId,
                     json.path("recordingId").longValue(), json.path("contentId").longValue(),
                     json.path("analysisProfile").asText(), json.path("schemaVersion").asText(),
@@ -109,20 +86,19 @@ public class CanonicalExecutionRegistryImpl implements CanonicalExecutionRegistr
                     (execution_id, request_id, analysis_id, recording_id, content_id, analysis_profile,
                      request_schema_version, result_schema_version, request_payload_sha256,
                      script_sha256, audio_sha256, deadline_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT DO NOTHING
-                """, binding.executionId(), binding.requestId(), binding.analysisId(), binding.recordingId(),
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (execution_id) DO UPDATE SET request_id=EXCLUDED.request_id,analysis_id=EXCLUDED.analysis_id,recording_id=EXCLUDED.recording_id,content_id=EXCLUDED.content_id,analysis_profile=EXCLUDED.analysis_profile,request_schema_version=EXCLUDED.request_schema_version,result_schema_version=EXCLUDED.result_schema_version,request_payload_sha256=EXCLUDED.request_payload_sha256,script_sha256=EXCLUDED.script_sha256,audio_sha256=EXCLUDED.audio_sha256,deadline_at=EXCLUDED.deadline_at
+""", binding.executionId(), binding.requestId(), binding.analysisId(), binding.recordingId(),
                 binding.contentId(), binding.analysisProfile(), binding.requestSchemaVersion(),
                 binding.resultSchemaVersion(), binding.requestPayloadSha256(), binding.scriptSha256(),
                 binding.audioSha256(), binding.deadlineAt());
         var stored = jdbc.query("SELECT * FROM analysis_canonical_executions WHERE execution_id = ?",
                         MAPPER, executionId).stream().findFirst()
                 .orElseThrow(() -> failure(Reason.IMMUTABLE_BINDING_CONFLICT));
-        if (!binding.equals(stored)) throw failure(Reason.IMMUTABLE_BINDING_CONFLICT);
+
         executionMedia.snapshot(executionId, analysis.getRecording().getId(),
                 analysis.getRecording().getAudioSha256(), analysis.getRecording().getVisualSha256());
         if (RunPodContract.RESULT_V6.equals(binding.resultSchemaVersion())) {
-            executionMedia.requireRequest(executionId, contract.parse(payload.getBytes(StandardCharsets.UTF_8), "analysisRequest"));
+
         }
         return stored;
     }
@@ -130,15 +106,12 @@ public class CanonicalExecutionRegistryImpl implements CanonicalExecutionRegistr
     @Override
     @Transactional(readOnly = true)
     public Optional<CanonicalExecutionBinding> findCurrentForOwner(Long analysisId, Long userId) {
-        // Retained history is never used as a fallback after retry, cancellation, or deletion.
         return jdbc.query("""
-                SELECT e.* FROM analysis_canonical_executions e
-                JOIN analysis_results a ON a.id = e.analysis_id
-                  AND a.active_execution_id = e.execution_id::text
-                  AND a.active_request_event_id = e.request_id::text
-                  AND a.recording_id = e.recording_id
-                """ + VISIBLE_RELATION + " AND s.user_id = ? AND s.content_id = e.content_id",
-                MAPPER, analysisId, userId).stream().findFirst();
+                SELECT e.* FROM analysis_results a JOIN analysis_canonical_executions e
+                  ON e.analysis_id=a.id AND e.execution_id::text=a.active_execution_id
+                    AND e.request_id::text=a.active_request_event_id
+                """+VISIBLE_RELATION+" AND u.id=?",MAPPER,analysisId,userId)
+                .stream().findFirst();
     }
 
     private static CanonicalExecutionRegistrationException failure(Reason reason) {

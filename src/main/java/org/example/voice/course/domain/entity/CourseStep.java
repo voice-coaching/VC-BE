@@ -28,7 +28,7 @@ public class CourseStep {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id", nullable = false)
+    @JoinColumn(name = "course_id", nullable = true)
     private Course course;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -36,21 +36,21 @@ public class CourseStep {
     private PracticeContent practiceContent;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "step_type", nullable = false)
+    @Column(name = "step_type", nullable = true)
     private CourseStepType stepType;
 
-    @Column(name = "step_order", nullable = false)
+    @Column(name = "step_order", nullable = true)
     private Integer stepOrder;
 
-    @Column(name = "title", nullable = false)
+    @Column(name = "title", nullable = true)
     private String title;
 
     @Column(name = "body")
     private String body;
 
-    @Column(name = "required", nullable = false)
+    @Column(name = "required", nullable = true)
     private Boolean required;
 
-    @Column(name = "retired", nullable = false)
+    @Column(name = "retired", nullable = true)
     private boolean retired;
 }

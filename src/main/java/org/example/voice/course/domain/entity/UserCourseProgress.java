@@ -33,17 +33,17 @@ public class UserCourseProgress {
     private Long lastStepId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id", nullable = false)
+    @JoinColumn(name = "course_id", nullable = true)
     private Course course;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = true)
     private Long userId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = true)
     private CourseProgressStatus status;
 
-    @Column(name = "progress_percent", nullable = false)
+    @Column(name = "progress_percent", nullable = true)
     private BigDecimal progressPercent;
 
     @Column(name = "started_at")
@@ -52,7 +52,7 @@ public class UserCourseProgress {
     @Column(name = "completed_at")
     private OffsetDateTime completedAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at", nullable = true)
     private OffsetDateTime updatedAt;
 
     public static UserCourseProgress start(Course course, Long userId, Long firstStepId, OffsetDateTime now) {

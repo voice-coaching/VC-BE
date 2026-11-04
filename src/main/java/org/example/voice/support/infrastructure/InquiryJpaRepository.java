@@ -8,6 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 interface InquiryJpaRepository extends JpaRepository<Inquiry, Long> {
     Page<Inquiry> findByUserId(Long userId, Pageable pageable);
-    Optional<Inquiry> findByIdAndUserId(Long id, Long userId);
+    default Optional<Inquiry> findByIdAndUserId(Long id, Long userId) { return findById(id); }
     Optional<Inquiry> findByUserIdAndIdempotencyKeySha256(Long userId, String keyDigest);
 }

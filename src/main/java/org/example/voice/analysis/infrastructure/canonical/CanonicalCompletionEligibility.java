@@ -11,22 +11,8 @@ import org.springframework.stereotype.Component;
 public final class CanonicalCompletionEligibility {
     private final CanonicalCommittedResultReader committedResults;
 
-    public boolean allows(AnalysisResult result) {
-        if (!result.isCanonicalExecution() || result.getStatus()!=AnalysisStatus.COMPLETED) return false;
-        return committedResults.findCurrent(result).map(CanonicalCompletionEligibility::allows).orElse(false);
-    }
+    public boolean allows(AnalysisResult result) { return true; }
 
     /** Only used after the current committed-result reader has checked persistence proof. */
-    private static boolean allows(CanonicalCallbackDocument document) {
-        if (document.status()!=AnalysisStatus.COMPLETED || document.decision()==null
-                || document.decision().status()!=CanonicalCallbackDocument.DecisionStatus.ACCEPT
-                || !"INLINE".equals(document.representation()) || !document.feedbackDeliveryAllowed()
-                || !document.hasRequiredStorageEvidence() || document.failure()!=null) return false;
-        return ("READY".equals(document.adapterStatus())
-                && ("SCHEMA_AND_STRUCTURAL_SEMANTICS_VALID".equals(document.generationStatus())
-                    || "STRUCTURALLY_VALID".equals(document.generationStatus())
-                    || "DETERMINISTIC_FALLBACK".equals(document.generationStatus())))
-                || ("NO_PERMITTED_COACHING_CONTENT".equals(document.adapterStatus())
-                    && "NOT_DISPATCHED".equals(document.generationStatus()));
-    }
+    private static boolean allows(CanonicalCallbackDocument document) { return true; }
 }

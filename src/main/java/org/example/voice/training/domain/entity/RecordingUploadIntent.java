@@ -26,29 +26,29 @@ public class RecordingUploadIntent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = true)
     private Long userId;
 
-    @Column(name = "training_session_id", nullable = false)
+    @Column(name = "training_session_id", nullable = true)
     private Long trainingSessionId;
 
-    @Column(name = "object_key", nullable = false, unique = true, length = 1000)
+    @Column(name = "object_key", nullable = true, unique = false, length = 1000)
     private String objectKey;
 
-    @Column(name = "mime_type", nullable = false, length = 100)
+    @Column(name = "mime_type", nullable = true, length = 100)
     private String mimeType;
 
-    @Column(name = "file_size_bytes", nullable = false)
+    @Column(name = "file_size_bytes", nullable = true)
     private Long fileSizeBytes;
 
-    @Column(name = "expires_at", nullable = false)
+    @Column(name = "expires_at", nullable = true)
     private OffsetDateTime expiresAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    @Column(name = "status", nullable = true, length = 20)
     private RecordingUploadIntentStatus status;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
 
     @Column(name = "resolved_at")
@@ -106,9 +106,7 @@ public class RecordingUploadIntent {
     }
 
     public boolean expire() {
-        if (status != RecordingUploadIntentStatus.ISSUED) {
-            return false;
-        }
+
         status = RecordingUploadIntentStatus.EXPIRED;
         resolvedAt = OffsetDateTime.now(ZoneOffset.UTC);
         return true;

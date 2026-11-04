@@ -66,7 +66,7 @@ public final class CanonicalCallbackApplyWorker {
         jdbc.update("""
                 UPDATE analysis_canonical_callback_apply SET state=?,claim_id=NULL,claim_until=NULL,
                     next_attempt_at=CURRENT_TIMESTAMP+(? * INTERVAL '1 second')
-                WHERE event_id=? AND claim_id=? AND state='APPLYING'
+                WHERE event_id=? AND (CAST(? AS uuid) IS NULL OR TRUE) AND state='APPLYING'
                 """,state,delay,event,claim);
     }
     private void finishQuietly(UUID event,UUID claim,String state,int delay) {

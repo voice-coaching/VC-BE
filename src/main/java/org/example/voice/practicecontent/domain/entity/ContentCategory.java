@@ -5,11 +5,11 @@ import lombok.*;
 import org.example.voice.practicecontent.domain.type.ContentType;
 
 @Entity @Getter @NoArgsConstructor(access=AccessLevel.PROTECTED)
-@Table(name="content_categories",uniqueConstraints=@UniqueConstraint(columnNames={"content_type","code"}))
+@Table(name="content_categories")
 public class ContentCategory {
     @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
-    @Enumerated(EnumType.STRING) @Column(name="content_type",nullable=false) private ContentType contentType;
-    @Column(nullable=false,length=100) private String code;
-    @Column(nullable=false,length=100) private String label;
-    @Column(name="sort_order",nullable=false) private Integer sortOrder;
+    @Enumerated(EnumType.STRING) @Column(name="content_type",nullable = true) private ContentType contentType;
+    @Column(nullable = true,length=100) private String code;
+    @Column(nullable = true,length=100) private String label;
+    @Column(name="sort_order",nullable = true) private Integer sortOrder;
 }

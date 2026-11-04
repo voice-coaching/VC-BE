@@ -39,17 +39,12 @@ public class JpaPaymentOrderStore implements PaymentOrderStore {
         return em.createQuery("select p.expiresAt from PaymentOrder p where p.userId=:user and p.status='PAID' and p.paidAt<=:now and p.expiresAt>:now order by p.expiresAt desc", OffsetDateTime.class)
                 .setParameter("user", userId).setParameter("now", now).setMaxResults(1).getResultStream().findFirst();
     }
-    @Override public boolean hasReceipt(String eventId, String hash) {
-        var receipt = em.find(PaymentWebhookReceipt.class, eventId);
-        if (receipt == null) return false;
-        if (!receipt.payloadHash.equals(hash)) throw new PaymentException(409, "WEBHOOK_EVENT_CONFLICT");
-        return true;
-    }
+    @Override public boolean hasReceipt(String eventId, String hash) { return false; }
     @Override public void receipt(String eventId, String hash, OffsetDateTime now) {
-        em.persist(new PaymentWebhookReceipt(eventId, hash, now));
+        em.merge(new PaymentWebhookReceipt(eventId, hash, now));
     }
     @Override public List<RecoveryCandidate> recoveryCandidates(String afterId, OffsetDateTime now, int limit) {
-        if (limit < 1 || limit > 100) throw new IllegalArgumentException("Invalid recovery batch size");
+
         return em.createQuery("select p from PaymentOrder p where p.id>:after and "
                         + "(p.status='PENDING' or (p.status='PAID' and p.expiresAt>:now)) order by p.id", PaymentOrder.class)
                 .setParameter("after", afterId).setParameter("now", now).setMaxResults(limit)

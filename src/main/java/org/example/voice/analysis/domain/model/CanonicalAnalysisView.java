@@ -9,12 +9,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Public allowlist only. Never add raw core, private callback, receipt or storage fields. */
+/** Compatibility view plus the complete received result document. No projection allowlist is enforced. */
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public record CanonicalAnalysisView(
         String schemaVersion, long analysisId, long recordingId, UUID requestId, UUID executionId,
         AnalysisStatus jobStatus, String analysisProfile, Canonical canonicalAnalysis,
-        ServiceFailure serviceFailure, Actions actions, @JsonInclude(JsonInclude.Include.NON_NULL) String persistenceStatus) {
+        ServiceFailure serviceFailure, Actions actions, @JsonInclude(JsonInclude.Include.NON_NULL) String persistenceStatus,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Map<String,Object> rawResult) {
+    public CanonicalAnalysisView(String schemaVersion,long analysisId,long recordingId,UUID requestId,UUID executionId,
+            AnalysisStatus jobStatus,String analysisProfile,Canonical canonicalAnalysis,ServiceFailure serviceFailure,Actions actions,String persistenceStatus) {
+        this(schemaVersion,analysisId,recordingId,requestId,executionId,jobStatus,analysisProfile,canonicalAnalysis,serviceFailure,actions,persistenceStatus,null);
+    }
+    public CanonicalAnalysisView withRawResult(Map<String,Object> raw) {
+        return new CanonicalAnalysisView(schemaVersion,analysisId,recordingId,requestId,executionId,jobStatus,analysisProfile,
+                canonicalAnalysis,serviceFailure,actions,persistenceStatus,raw);
+    }
     public CanonicalAnalysisView(String schemaVersion,long analysisId,long recordingId,UUID requestId,UUID executionId,
             AnalysisStatus jobStatus,String analysisProfile,Canonical canonicalAnalysis,ServiceFailure serviceFailure,Actions actions){
         this(schemaVersion,analysisId,recordingId,requestId,executionId,jobStatus,analysisProfile,canonicalAnalysis,serviceFailure,actions,

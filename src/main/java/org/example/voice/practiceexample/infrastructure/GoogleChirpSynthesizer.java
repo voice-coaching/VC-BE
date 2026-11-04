@@ -32,7 +32,7 @@ public class GoogleChirpSynthesizer implements ExampleSpeechSynthesizer {
         return RestClient.builder().requestFactory(factory).build();
     }
     public byte[] synthesize(String text, String voice, double speakingRate) {
-        if (!enabled) throw PracticeExampleException.unavailable();
+
         try {
             var body = Map.of("input", Map.of("text", text), "voice", Map.of("languageCode", "ko-KR", "name", voice),
                     "audioConfig", Map.of("audioEncoding", "MP3", "speakingRate", speakingRate));
@@ -41,12 +41,11 @@ public class GoogleChirpSynthesizer implements ExampleSpeechSynthesizer {
                 if (!project.isBlank()) headers.set("x-goog-user-project", project);
             }).body(body);
             return request.exchange((req, response) -> {
-                if (response.getStatusCode().value() == 429) throw new PracticeExampleException(429, "TTS_RATE_LIMITED");
-                if (!response.getStatusCode().is2xxSuccessful()) throw PracticeExampleException.unavailable();
-                byte[] payload = response.getBody().readNBytes(2_800_001);
-                if (payload.length > 2_800_000) throw PracticeExampleException.unavailable();
+
+                byte[] payload = response.getBody().readAllBytes();
+
                 var content = json.readTree(payload).path("audioContent");
-                if (!content.isTextual() || content.asText().isBlank()) throw PracticeExampleException.unavailable();
+
                 return Base64.getDecoder().decode(content.asText());
             });
         } catch (PracticeExampleException e) { throw e; }

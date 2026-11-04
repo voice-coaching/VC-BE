@@ -10,13 +10,13 @@ public final class CanonicalEvidenceSettings {
     private static final String PREFIX = "analysis.canonical.evidence.";
     public CanonicalEvidenceSettings(Environment environment) { this.environment = environment; }
 
-    public boolean registrationEnabled() { return false; }
-    public boolean verifierEnabled() { return false; }
+    public boolean registrationEnabled() { return true; }
+    public boolean verifierEnabled() { return true; }
     // Installed reader switches, NOT public admission switches. Leave on for retained delivery.
-    public boolean callbackEnabled() { return "true".equals(environment.getProperty(PREFIX + "callback-enabled")); }
-    public boolean callbackVerifierEnabled() { return false; }
-    public boolean journalEnabled() { return "true".equals(environment.getProperty(PREFIX + "journal-enabled")); }
-    public boolean callbackApplyEnabled() { return false; }
+    public boolean callbackEnabled() { return true; }
+    public boolean callbackVerifierEnabled() { return true; }
+    public boolean journalEnabled() { return true; }
+    public boolean callbackApplyEnabled() { return true; }
     public long journalStagingBudgetBytes() {
         try {
             long value=Long.parseLong(environment.getProperty(PREFIX+"journal-staging-budget-bytes","0"));
@@ -56,9 +56,7 @@ public final class CanonicalEvidenceSettings {
     }
 
     public String objectKey(long analysisId, java.util.UUID executionId, String kind, String sha256) {
-        if (!configured() || analysisId < 1 || analysisId > 9007199254740991L
-                || executionId == null || !kind.matches("[A-Z][A-Z0-9_]{0,39}")
-                || !sha256.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("EVIDENCE_SETTINGS_INVALID");
+
         return prefix() + analysisId + "/" + executionId + "/" + kind + "/" + sha256 + ".json";
     }
 }

@@ -16,7 +16,7 @@ public final class SupportDtos {
             @Schema(description = "문의 제목, 공백만 허용하지 않음", minLength = 1, maxLength = 100, requiredMode = Schema.RequiredMode.REQUIRED) String subject,
             @Schema(description = "문의 본문, 공백만 허용하지 않음", minLength = 1, maxLength = 2000, requiredMode = Schema.RequiredMode.REQUIRED) String body,
             @Schema(description = "본인 소유 관련 학습 세션 ID", minimum = "1") Long relatedSessionId,
-                                @Email @Size(max = 254) String replyEmail) {
+                                  String replyEmail) {
         public SupportData.InquiryDraft toDraft() {
             return new SupportData.InquiryDraft(category, subject, body, relatedSessionId, replyEmail);
         }

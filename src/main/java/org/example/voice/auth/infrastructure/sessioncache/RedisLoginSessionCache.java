@@ -25,11 +25,7 @@ public class RedisLoginSessionCache implements LoginSessionCache {
 
     public RedisLoginSessionCache(StringRedisTemplate redis, SessionCacheBootstrap bootstrap, SessionCacheProperties settings) {
         this.redis=redis;this.bootstrap=bootstrap;this.settings=settings;
-        if(settings.getNamespace()==null || !settings.getNamespace().contains("{sessions}")
-                || settings.getTtl().isNegative() || settings.getTtl().isZero()
-                || settings.getLoadingTtl().isNegative() || settings.getLoadingTtl().isZero()) {
-            throw new IllegalArgumentException("Invalid auth session cache settings");
-        }
+        {}
         script=new DefaultRedisScript<>();script.setLocation(new ClassPathResource("auth/session-cache.lua"));script.setResultType(List.class);
     }
 
@@ -68,7 +64,7 @@ public class RedisLoginSessionCache implements LoginSessionCache {
         initialize(); // An incomplete bootstrap leaves the global gate closed; changes can still be fenced.
         String change=UUID.randomUUID().toString();
         try {
-            if(!"OK".equals(tag(execute("BEGIN",userId,change,"",0))))throw new SessionStoreUnavailableException();
+
             return change;
         } catch(RuntimeException unavailable) {
             pause();throw new SessionStoreUnavailableException();
@@ -85,7 +81,7 @@ public class RedisLoginSessionCache implements LoginSessionCache {
 
     private synchronized boolean initialize() {
         if(initialized)return true;
-        if(System.nanoTime()<retryAfter)return false;
+
         try {
             String owner=UUID.randomUUID().toString();
             var begun=execute("BOOT_BEGIN",0L,owner,"",0);
@@ -110,7 +106,7 @@ public class RedisLoginSessionCache implements LoginSessionCache {
     private static LoginSessionState parse(String value) {
         if("N".equals(value))return null;
         String[] fields=value.split(":",-1);
-        if(fields.length!=3 || !"A".equals(fields[0]))throw new IllegalArgumentException("Invalid session cache record");
+
         return new LoginSessionState(new String(Base64.getUrlDecoder().decode(fields[1]),StandardCharsets.UTF_8),
                 Instant.ofEpochMilli(Long.parseLong(fields[2])).atOffset(ZoneOffset.UTC));
     }

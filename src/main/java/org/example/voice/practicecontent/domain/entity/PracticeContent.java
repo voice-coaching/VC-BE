@@ -27,32 +27,36 @@ import java.util.List;
 @Table(name = "practice_contents")
 public class PracticeContent {
 
+    @jakarta.persistence.Version
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long version;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "content_type", nullable = false)
+    @Column(name = "content_type", nullable = true)
     private ContentType contentType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "learning_focus", nullable = false)
+    @Column(name = "learning_focus", nullable = true)
     private LearningFocus learningFocus;
 
     @Column(name = "category")
     private String category;
 
-    @Column(name = "title", nullable = false)
+    @Column(name = "title", nullable = true)
     private String title;
 
     @Column(name = "description")
     private String description;
 
-    @Column(name = "script_text", nullable = false)
+    @Column(name = "script_text", nullable = true)
     private String scriptText;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "difficulty", nullable = false)
+    @Column(name = "difficulty", nullable = true)
     private Difficulty difficulty;
 
     @JdbcTypeCode(SqlTypes.JSON)
@@ -63,16 +67,16 @@ public class PracticeContent {
     private Integer estimatedSeconds;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", nullable = true)
     private PublishStatus status;
 
     @Column(name = "published_at")
     private OffsetDateTime publishedAt;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at", nullable = true)
     private OffsetDateTime updatedAt;
 
     @Column(name = "publisher")
@@ -109,11 +113,61 @@ public class PracticeContent {
     }
 
     public void eraseCustom(OffsetDateTime now) {
-        if (ownerId == null) throw new IllegalStateException("Not user input");
+
         customTitle=null; customScript=null; customDeletedAt=now; updatedAt=now;
     }
 
-    public boolean isPublished() {
-        return ownerId == null && status == PublishStatus.PUBLISHED;
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
+
+    @Column(name = "tts_revision", nullable = false, columnDefinition = "integer default 1")
+    private int ttsRevision = 1;
+
+    public void delete(OffsetDateTime now) {
+        if (ownerId != null || deletedAt != null) throw new IllegalStateException("CONTENT_NOT_EDITABLE");
+        deletedAt = now; status = PublishStatus.HIDDEN; updatedAt = now;
     }
+
+    /** Published public content remains editable; private ownership is a separate boundary. */
+    public void editPublic(LearningFocus focus, String category, Difficulty difficulty, String title,
+            String description, String script, List<String> targets, Integer seconds, OffsetDateTime now) {
+        if (ownerId != null || deletedAt != null) throw new IllegalStateException("CONTENT_NOT_EDITABLE");
+        if (!java.util.Objects.equals(scriptText, script)) ttsRevision++;
+        this.learningFocus = focus; this.category = category; this.difficulty = difficulty;
+        this.title = title; this.description = description; this.scriptText = script;
+        this.targetPronunciations = List.copyOf(targets); this.estimatedSeconds = seconds; this.updatedAt = now;
+    }
+
+    public boolean isPublished() {
+        return ownerId == null && deletedAt == null && status == PublishStatus.PUBLISHED;
+    }
+
+    public static PracticeContent draft(ContentType type, LearningFocus focus, String category, Difficulty difficulty,
+            String title, String description, String script, List<String> targets, Integer seconds, OffsetDateTime now) {
+        var content = new PracticeContent();
+        content.contentType = type;
+        content.status = PublishStatus.DRAFT;
+        content.createdAt = now;
+        content.editDraft(focus, category, difficulty, title, description, script, targets, seconds, now);
+        return content;
+    }
+
+    public void editDraft(LearningFocus focus, String category, Difficulty difficulty, String title,
+            String description, String script, List<String> targets, Integer seconds, OffsetDateTime now) {
+        if (ownerId != null || status != PublishStatus.DRAFT || publishedAt != null)
+            throw new IllegalStateException("PUBLISHED_CONTENT_IMMUTABLE");
+        this.learningFocus = focus; this.category = category; this.difficulty = difficulty;
+        this.title = title; this.description = description; this.scriptText = script;
+        this.targetPronunciations = List.copyOf(targets); this.estimatedSeconds = seconds; this.updatedAt = now;
+    }
+
+    public void changePublication(PublishStatus target, OffsetDateTime now) {
+        if (ownerId != null || deletedAt != null || target == PublishStatus.DRAFT || target == null
+                || (target == PublishStatus.HIDDEN && status == PublishStatus.DRAFT))
+            throw new IllegalStateException("INVALID_PUBLICATION_STATE");
+        status = target;
+        if (target == PublishStatus.PUBLISHED && publishedAt == null) publishedAt = now;
+        updatedAt = now;
+    }
+
 }

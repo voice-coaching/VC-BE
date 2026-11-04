@@ -24,12 +24,18 @@ import java.time.OffsetDateTime;
 @Table(name = "reference_audios")
 public class ReferenceAudio {
 
+    public static ReferenceAudio announcer(PracticeContent content,String speaker,String key,int duration,boolean primary,OffsetDateTime now) {
+        var audio=new ReferenceAudio();audio.content=content;audio.speakerName=speaker;audio.speakerType=SpeakerType.ANNOUNCER;
+        audio.objectKey=key;audio.durationMs=duration;audio.primary=primary;audio.createdAt=now;
+        return audio;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "content_id", nullable = false)
+    @JoinColumn(name = "content_id", nullable = true)
     private PracticeContent content;
 
     @Column(name = "speaker_name")
@@ -48,9 +54,12 @@ public class ReferenceAudio {
     @Column(name = "duration_ms")
     private Integer durationMs;
 
-    @Column(name = "is_primary", nullable = false)
+    @Column(name = "is_primary", nullable = true)
     private Boolean primary;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "retired_at")
+    private OffsetDateTime retiredAt;
+
+    @Column(name = "created_at", nullable = true)
     private OffsetDateTime createdAt;
 }

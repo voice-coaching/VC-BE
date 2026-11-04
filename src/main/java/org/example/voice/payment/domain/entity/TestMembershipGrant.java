@@ -19,7 +19,7 @@ public class TestMembershipGrant {
     @Column(name = "user_id", updatable = false)
     private Long userId;
 
-    @Column(name = "granted_at", nullable = false, updatable = false)
+    @Column(name = "granted_at", nullable = true, updatable = false)
     private OffsetDateTime grantedAt;
 
     public static TestMembershipGrant create(Long userId, OffsetDateTime grantedAt) {

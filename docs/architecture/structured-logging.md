@@ -38,7 +38,7 @@ those response bodies and uses a log-only fallback.
 
 Analysis events include `analysis_queued`, `analysis_dispatch_attempt`,
 `analysis_dispatch_finished`, `analysis_capacity_wait`,
-`analysis_dispatch_failed`, `analysis_evidence_verified`, `analysis_completed`
+`analysis_dispatch_failed`, `analysis_handoff_processing`, `analysis_completed`
 and `analysis_failed`. Queue and terminal events run after transaction commit,
 so rolled-back operations do not appear completed. Verification/dispatch events
 describe attempts and do not imply a committed result. HTTP and background events
@@ -46,6 +46,32 @@ can be joined using `analysis_id`, `analysis_request_id` and `execution_id`;
 the original HTTP request ID is present on the queued event, not automatically
 copied to every subsequent worker thread. Logs are observational, not a billing
 ledger or an exactly-once delivery guarantee.
+
+### 2026-11-02 main/develop integration
+
+The integration keeps main's existing identity adapter, dispatch/retry behavior,
+disabled timeout sweeper and handoff processing behavior. It adds develop's
+structured logging and bounded-H5 schema revision without restoring removed
+admission or verification checks. Authentication remains main's unverified
+identity selection behavior; the logging integration tests use that existing
+adapter rather than asserting develop's former authentication rejection.
+The CORS configuration retains main's wildcard headers and explicitly exposes
+`X-Request-ID` for credentialed browser requests.
+
+`analysis_handoff_processing` records processing only. Main does not invoke the
+semantic verifier at this point, so emitting `analysis_evidence_verified` would
+incorrectly claim verification. Disabled capacity gates and timeout sweeps do not
+emit capacity-wait or timeout events. Deployment workflows and release snapshot
+handling remain main's versions; snapshot PR #167 is outside this integration.
+
+Integration validation compiles all production/test sources and packages the
+executable JAR. Logging tests, V6 schema pins and audio round-trip tests are run
+separately. Two existing `UnifiedV6AudioContractTest` rejection tests fail both
+on unmodified main `abf9930` and the integration: `missingMediaDiscriminatorsAndWrongTupleAreRejected`
+and `audioDoesNotRequireOptionalVideoReadinessAndExplicitRetiredSchemaIsRejected`.
+They expect checks removed by main. Their assertions are retained; this is not
+a claim that the full test suite passes. Main's existing compile-only CI and
+deployment workflow are unchanged by this merge.
 
 ## Privacy and retention
 
