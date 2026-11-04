@@ -42,6 +42,7 @@ public final class CanonicalCallbackDocument {
     private final Retention retention;
     private final String representation, coreStatus, adapterStatus, generationStatus;
     private final boolean feedbackDeliveryAllowed;
+    private final boolean sixDimensionCoaching;
     private final List<String> coachingActions;
     private final String feedback;
     private final java.math.BigDecimal overallScore;
@@ -74,6 +75,7 @@ public final class CanonicalCallbackDocument {
         retention = (r.isNull() || r.isMissingNode()) ? null : new Retention(uuid(r,"evidenceReceiptId"),r.get("manifestSha256").asText());
         adapterStatus = nullable(node.get("coaching"),"adapterStatus");
         generationStatus = nullable(node.get("coaching"),"generationStatus");
+        sixDimensionCoaching = node.path("coaching").hasNonNull("sixDimension");
         var actions = new ArrayList<String>();
         if ("READY".equals(adapterStatus)) {
             for (var item : node.get("coaching").get("items")) {
@@ -115,6 +117,7 @@ public final class CanonicalCallbackDocument {
     public java.math.BigDecimal overallScore() { return overallScore; }
     public String adapterStatus() { return adapterStatus; }
     public String generationStatus() { return generationStatus; }
+    public boolean hasSixDimensionCoaching() { return sixDimensionCoaching; }
     public String workerRevision() { return workerRevision; }
     public String pipelineRevision() { return pipelineRevision; }
     @Override public String toString() { return "CanonicalCallbackDocument[private]"; }

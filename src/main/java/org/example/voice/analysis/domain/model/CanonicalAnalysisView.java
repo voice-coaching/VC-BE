@@ -62,7 +62,15 @@ public record CanonicalAnalysisView(
                                 List<CoachingItem> items, int dispatchAttempts, String fallbackReason,
                                 boolean naturalLanguageSemanticsFullyVerified,
                                 boolean visualCorrectiveClaimsAllowed,
-                                @JsonInclude(JsonInclude.Include.NON_NULL) String feedback) implements Coaching {
+                                @JsonInclude(JsonInclude.Include.NON_NULL) String feedback,
+                                @JsonInclude(JsonInclude.Include.NON_NULL) SixDimensionView sixDimension) implements Coaching {
+        public ReadyCoaching(String schemaVersion, String adapterStatus, String generationStatus,
+                             List<CoachingItem> items, int dispatchAttempts, String fallbackReason,
+                             boolean naturalLanguageSemanticsFullyVerified, boolean visualCorrectiveClaimsAllowed,
+                             String feedback) {
+            this(schemaVersion, adapterStatus, generationStatus, items, dispatchAttempts, fallbackReason,
+                    naturalLanguageSemanticsFullyVerified, visualCorrectiveClaimsAllowed, feedback, null);
+        }
         public ReadyCoaching(String schemaVersion, String adapterStatus, String generationStatus,
                              List<CoachingItem> items, int dispatchAttempts, String fallbackReason,
                              boolean naturalLanguageSemanticsFullyVerified, boolean visualCorrectiveClaimsAllowed) {
@@ -74,6 +82,18 @@ public record CanonicalAnalysisView(
                                 List<CoachingItem> items, int dispatchAttempts) implements Coaching {}
     public record FailedCoaching(String schemaVersion, String adapterStatus, String generationStatus,
                                  List<CoachingItem> items, int dispatchAttempts, String errorCode) implements Coaching {}
+    public record SixDimensionView(String schemaVersion, String status, String validationStatus,
+                                   String policyRevision, String generationStatus,
+                                   List<SixDimensionCriterion> criteria, List<String> selectedCriterionIds,
+                                   List<SixDimensionFeedback> feedback) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record SixDimensionCriterion(String criterionId, String label, String scope, String status,
+                                        BigDecimal score, List<SixDimensionComponent> components) {}
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record SixDimensionComponent(String metric, BigDecimal value, String unit, BigDecimal score,
+                                        BigDecimal weight, String direction, List<BigDecimal> target,
+                                        Integer validSampleCount, Integer expectedSampleCount) {}
+    public record SixDimensionFeedback(String criterionId, String observation, String practice) {}
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Score(BigDecimal overallScore, String validity, String reason,
                         @JsonInclude(JsonInclude.Include.NON_NULL)
