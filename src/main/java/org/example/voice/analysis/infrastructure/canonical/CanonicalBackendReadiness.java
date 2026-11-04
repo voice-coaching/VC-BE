@@ -113,14 +113,7 @@ public final class CanonicalBackendReadiness {
                 stage="RUNPOD_EXECUTOR";
 
                 stage="RUNPOD_SCHEMA";
-                var digests=doc.path("schemaDigests");
 
-                for(String file:SCHEMAS) {
-                    int matches=0;
-                    for(var row:digests)if(file.equals(row.path("file").asText())
-                        && contract.schemaSha256(file).equals(row.path("sha256").asText()))matches++;
-
-                }
             }
             workerUntil=System.nanoTime()+Duration.ofSeconds(45).toNanos();
             reason="true".equals(environment.getProperty("analysis.canonical.admission-enabled"))?null:"ADMISSION_DISABLED";

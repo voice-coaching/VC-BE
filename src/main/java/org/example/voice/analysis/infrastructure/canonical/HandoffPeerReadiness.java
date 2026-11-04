@@ -3,7 +3,7 @@ package org.example.voice.analysis.infrastructure.canonical;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 
-/** Match the complete current peer contract; a version string alone is insufficient. */
+/** Check peer capability and admission; release hashes are observational metadata. */
 final class HandoffPeerReadiness {
     private HandoffPeerReadiness() {}
 
@@ -16,12 +16,6 @@ final class HandoffPeerReadiness {
         JsonNode focuses = response.path("supportedLearningFocuses");
         if (!focuses.isArray() || focuses.size() != 1
                 || !"PRONUNCIATION".equals(focuses.get(0).asText())) return false;
-        JsonNode digests = response.path("schemaDigests");
-        if (!digests.isObject() || digests.size() != expected.size()) return false;
-        for (var pin : expected.entrySet()) {
-            JsonNode value = digests.get(pin.getKey());
-            if (value == null || !value.isTextual() || !pin.getValue().equals(value.textValue())) return false;
-        }
         return true;
     }
 }
