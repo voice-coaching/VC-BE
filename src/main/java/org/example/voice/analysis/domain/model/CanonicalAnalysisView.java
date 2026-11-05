@@ -77,9 +77,9 @@ public record CanonicalAnalysisView(
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Score(BigDecimal overallScore, String validity, String reason,
                         @JsonInclude(JsonInclude.Include.NON_NULL)
-                        String rubricRevision,
+                        Object rubricRevision,
                         @JsonInclude(JsonInclude.Include.NON_NULL)
-                        List<ScoreCriterion> criteria) {}
+                        Object criteria) {}
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record ScoreCriterion(String criterionId, Integer level) {}
     public sealed interface Visual permits AudioVisual, LipVisual {
