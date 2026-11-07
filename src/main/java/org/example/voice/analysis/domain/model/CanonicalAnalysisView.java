@@ -79,7 +79,23 @@ public record CanonicalAnalysisView(
                         @JsonInclude(JsonInclude.Include.NON_NULL)
                         Object rubricRevision,
                         @JsonInclude(JsonInclude.Include.NON_NULL)
-                        Object criteria) {}
+                        Object criteria,
+                        @JsonInclude(JsonInclude.Include.NON_NULL)
+                        ScoreDetails details) {
+        public Score(BigDecimal overallScore, String validity, String reason,
+                     Object rubricRevision, Object criteria) {
+            this(overallScore, validity, reason, rubricRevision, criteria, null);
+        }
+    }
+    /** AI-owned display values; consumers do not recompute or verify the worksheet. */
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record ScoreDetails(String schemaVersion, String validationStatus, String aggregationMode,
+                               BigDecimal audioScore, BigDecimal visualScore,
+                               Integer audioWeight, Integer visualWeight,
+                               List<ScoreDetailCriterion> criteria) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record ScoreDetailCriterion(String criterionId, String label, BigDecimal score,
+                                       String status, String reasonCode, Integer weight) {}
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record ScoreCriterion(String criterionId, Integer level) {}
     public sealed interface Visual permits AudioVisual, LipVisual {
@@ -90,7 +106,8 @@ public record CanonicalAnalysisView(
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record LipVisual(String status, boolean correctiveClaimsAllowed, BigDecimal score, String scoreKind,
             LipCoverage coverage, List<LipPhone> phoneAssessments, List<String> reasonCodes,
-            String alignmentScope, List<Long> unresolvedExpectedIndices, int omittedPhoneAssessmentCount) implements Visual {}
+            String alignmentScope, List<Long> unresolvedExpectedIndices, int omittedPhoneAssessmentCount,
+            @JsonInclude(JsonInclude.Include.NON_NULL) List<LipSubScore> subScores) implements Visual {}
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record LipCoverage(long targetCount, long visuallyEligibleCount, long observedCount,
                               long scoredCount, BigDecimal coverage) {}
@@ -99,7 +116,14 @@ public record CanonicalAnalysisView(
             BigDecimal score, String scoreKind, BigDecimal referenceDistance, List<String> referenceIds,
             String calibrationRevision, BigDecimal audioStartSeconds, BigDecimal audioEndSeconds,
             BigDecimal videoStartSeconds, BigDecimal videoEndSeconds, int frameCount,
-            List<String> reasonCodes, List<LipObservation> observations, List<String> allowedActionIds) {}
+            List<String> reasonCodes, List<LipObservation> observations, List<String> allowedActionIds,
+            @JsonInclude(JsonInclude.Include.NON_NULL) List<LipSubScore> subScores) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record LipSubScore(String criterionId, String label, BigDecimal score, String status,
+                              String reasonCode,
+                              @JsonInclude(JsonInclude.Include.NON_NULL) List<LipMeasurement> measurements) {}
+    public record LipMeasurement(String metricId, BigDecimal value, BigDecimal referenceMedian,
+                                 BigDecimal referenceScale, Long referenceCount, BigDecimal tolerance, String unit) {}
     public record LipObservation(String observationId, String code, BigDecimal minimum, BigDecimal maximum, String unit) {}
     public record Actions(boolean canRetry, boolean canRerecord, boolean canComplete, boolean canRegenerate,
                           UnavailableReasons unavailableReasonCodes) {}
