@@ -2,6 +2,17 @@
 
 # API Specification - voice
 
+## 2026-11-08 선택형 공개 세부점수
+
+기존 canonical Score DTO의 선택 `details`를 저장·투영하며 Direct 저장 이력의 원본 JSON도 유지한다.
+인증·상태·endpoint 변경 없이 AI가 제공한 점수만 전달한다. [필드·호환성·적용 순서](public-score-details.md).
+
+## 독립 음성 분석 후보 (2026-11-07)
+
+[AI 독립 API v1](independent-analysis-v1.md)과 [Backend 흐름·플래그](../architecture/independent-analysis-pull.md)를 추가했다.
+기존 공개 endpoint, Backend 정수 ID, `data.canonicalAnalysis.score.overallScore`와 `coaching.feedback`를 유지한다.
+AI의 완료와 Backend의 일시 수집 장애를 구분하며 null 점수를 0점으로 변환하지 않는다. 운영 제공 확인은 아직 하지 않았다.
+
 회원 정보의 `membershipType` 허용값은 `free`, `paid`, `admin`이다. `admin`은 기존 활성 회원용 테스트 이용등급이며 관리자 권한과 분리한다. nullable 만료일·환경·적용 대상·계산 우선순위는 [회원 이용등급 계약](membership-api.md)을 따른다.
 
 ## TEST 결제 계약
@@ -1974,6 +1985,11 @@ Content-Type: application/json
 
 ## POST /api/users/me/title-exams/{examId}/submit
 
+2026-11-07: 합격 시에만 칭호를 변경한다. 미달 응답의 `currentTitle`은 기존 칭호다.
+본인 시험의 세션·콘텐츠에 연결된 선택 녹음의 완료 점수(0~100)를 사용한다.
+점수 없음·범위 오류·다른 세션·미완료 분석은 `409 ANALYSIS_SCORE_UNAVAILABLE`로
+거부하며 채점·승급하지 않는다. 동일 분석 재제출은 저장 결과를 재사용한다.
+
 - Description: 분석 결과 제출, 서버 저장 점수 기반 채점, 합격 시 한 단계 승급
 - Auth: Bearer accessToken
 - Path params: `examId`
@@ -2178,3 +2194,11 @@ GET /api/admin/users와 개별 상세·overview·records·resolve는 탈퇴(WITH
 ## 기존 관리자 기능 보완 (#188)
 
 DELETE `/api/admin/notices/{noticeId}`, DELETE `/api/admin/reference-audios/{audioId}`, PATCH·DELETE `/api/admin/notification-campaigns/{campaignId}`를 추가한다. 활성 ADMIN 전용이며 query는 없다. 요청 필드·응답 타입·null·상태 전이·HTTP 오류 전체 계약은 [관리자 기능 보완](admin-management-completion.md)을 따른다. 기존 경로와 사용자 API 계약은 유지한다.
+
+## 관리자 승급 시험 설정
+
+GET `/api/admin/title-exam-policies`, PATCH `/api/admin/title-exam-policies/{targetRank}`의 인증·필드 타입·null·요청/응답·오류·콘텐츠 보호 계약은 [상세 명세](admin-title-exam-policies.md)를 따른다. 설정 버전과 선택 문장 버전을 확인하며 새로 생성하는 시험부터 적용한다.
+
+## Video lip provisional scores (2026-11-07)
+
+The existing v3 analysis view accepts PROVISIONAL and optional subScores. No new endpoint or overall-score calculation is introduced. Capabilities expose actual MIME, size, duration and existing video consent requirements. See [contract](video-lip-provisional-consumer.md) and [frontend handoff](frontend-video-lip-consumer.md).

@@ -98,6 +98,11 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
     ) {
         requireOwnerPrefix(userId, sessionId, sourceObjectKey);
         boolean video = declaredMimeType != null && declaredMimeType.startsWith("video/");
+        if (video && (visualAuthorization == null || visualAuthorization.receiptSha256() == null
+                || !visualAuthorization.receiptSha256().matches("[0-9a-f]{64}")))
+            throw new BaseException(ErrorCode.VIDEO_PROCESSING_CONSENT_REQUIRED);
+        if (declaredFileSizeBytes <= 0 || declaredFileSizeBytes > media.getMaximumInputBytes())
+            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
 
         Path workspace = createWorkspace();
         Path source = workspace.resolve("source.media");
@@ -121,12 +126,15 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             GetObjectRequest.Builder getRequest = GetObjectRequest.builder()
                     .bucket(storage.getBucket())
                     .key(sourceObjectKey);
-
+            getRequest.ifMatch(sourceInspection.eTag());
+            if (sourceInspection.versionId() != null) getRequest.versionId(sourceInspection.versionId());
             GetObjectResponse download = s3Client.getObject(
                     getRequest.build(),
                     source
             );
             sourceDownloaded = true;
+            requireSameSourceObject(download, sourceInspection);
+            if (Files.size(source) != declaredFileSizeBytes) throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
 
             Files.setPosixFilePermissions(source, READ_ONLY_FILE_PERMISSIONS);
 
@@ -171,6 +179,8 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             Files.setPosixFilePermissions(canonical, READ_ONLY_FILE_PERMISSIONS);
 
             PcmQuality quality = inspectCanonicalWav(canonical);
+            validateDuration(quality.durationMs());
+            if (Files.size(canonical) > media.getMaximumNormalizedBytes()) throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
 
             String digest = sha256(canonical);
             s3Client.putObject(
@@ -213,7 +223,10 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
                     DeleteObjectRequest.Builder deleteRequest = DeleteObjectRequest.builder()
                             .bucket(storage.getBucket())
                             .key(sourceObjectKey);
-
+                    if (sourceInspection != null) {
+                        deleteRequest.ifMatch(sourceInspection.eTag());
+                        if (sourceInspection.versionId() != null) deleteRequest.versionId(sourceInspection.versionId());
+                    }
                     s3Client.deleteObject(deleteRequest.build());
                 } catch (RuntimeException cleanupFailure) {
                     mandatoryCleanupFailure = new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
@@ -262,7 +275,43 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             String objectKey,
             String declaredMimeType,
             long declaredFileSizeBytes
-    ) { return null; }
+    ) {
+        HeadObjectResponse response = s3Client.headObject(HeadObjectRequest.builder()
+                .bucket(storage.getBucket())
+                .key(objectKey)
+                .build());
+        String eTag = response.eTag();
+        String versionId = normalizeVersionId(response.versionId());
+        if (response.contentLength() == null
+                || response.contentLength() != declaredFileSizeBytes
+                || response.contentType() == null
+                || !response.contentType().equalsIgnoreCase(declaredMimeType)
+                || !isSafeObjectIdentity(eTag)
+                || (versionId != null && !isSafeObjectIdentity(versionId))) {
+            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
+        }
+        return new SourceObjectInspection(
+                eTag,
+                versionId,
+                response.contentLength(),
+                response.contentType()
+        );
+    }
+
+    private static void requireSameSourceObject(
+            GetObjectResponse response,
+            SourceObjectInspection inspection
+    ) {
+        if (response.contentLength() == null
+                || response.contentLength() != inspection.contentLength()
+                || response.contentType() == null
+                || !response.contentType().equalsIgnoreCase(inspection.contentType())
+                || !inspection.eTag().equals(response.eTag())
+                || (inspection.versionId() != null
+                    && !inspection.versionId().equals(response.versionId()))) {
+            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
+        }
+    }
 
     private static String normalizeVersionId(String versionId) {
         return versionId == null || versionId.isBlank() || versionId.equals("null")
@@ -360,13 +409,22 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
             boolean captureOutput,
             Path workspace
     ) throws IOException, InterruptedException {
-        ProcessBuilder builder=new ProcessBuilder(command).directory(workspace.toFile())
-                .redirectError(ProcessBuilder.Redirect.DISCARD);
-        if (!captureOutput) builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-        Process process=builder.start();
-        byte[] bytes=captureOutput ? process.getInputStream().readAllBytes() : new byte[0];
-        if (process.waitFor()!=0) throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
-        return bytes;
+        Path output=captureOutput?Files.createTempFile(workspace,"probe-",".json"):null;
+        Process process=null;
+        try {
+            ProcessBuilder builder=new ProcessBuilder(command).directory(workspace.toFile())
+                    .redirectError(ProcessBuilder.Redirect.DISCARD);
+            builder.redirectOutput(captureOutput?ProcessBuilder.Redirect.to(output.toFile()):ProcessBuilder.Redirect.DISCARD);
+            process=builder.start();
+            if (!process.waitFor(media.getProcessTimeout().toMillis(),TimeUnit.MILLISECONDS) || process.exitValue()!=0)
+                throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
+            if (captureOutput && Files.size(output)>MAXIMUM_PROBE_OUTPUT_BYTES)
+                throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
+            return captureOutput?Files.readAllBytes(output):new byte[0];
+        } finally {
+            if(process!=null && process.isAlive()) { process.destroyForcibly(); process.waitFor(5,TimeUnit.SECONDS); }
+            if(output!=null) Files.deleteIfExists(output);
+        }
     }
 
     private List<String> sandboxedCommand(List<String> target, Path workspace) throws IOException { return target; }
@@ -409,8 +467,61 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
     }
 
     private Long validateProbe(ProbeDocument probe, String declaredMimeType) {
-        String duration=probe.format().duration();
-        return duration == null || "N/A".equals(duration) ? null : parseDurationMs(duration);
+        if (probe == null || probe.format() == null || probe.streams() == null) {
+            throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
+        }
+        String duration = probe.format().duration();
+        Long durationMs = null;
+        if (duration != null && !"N/A".equals(duration)) {
+            durationMs = parseDurationMs(duration);
+            validateDuration(durationMs);
+        } else if (!"audio/webm".equals(declaredMimeType) && !"video/webm".equals(declaredMimeType)) {
+            throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
+        }
+        // Browser MediaRecorder WebM can omit duration. Codec/container checks
+        // still apply here; decoded PCM length is authoritative before storage.
+        List<ProbeStream> audioStreams = probe.streams().stream()
+                .filter(stream -> "audio".equals(stream.codecType()))
+                .toList();
+        List<ProbeStream> videoStreams = probe.streams().stream()
+                .filter(stream -> "video".equals(stream.codecType()))
+                .toList();
+        if (audioStreams.size() != 1) {
+            throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
+        }
+        String format = lower(probe.format().formatName());
+        String audioCodec = lower(audioStreams.getFirst().codecName());
+        switch (declaredMimeType) {
+            case "audio/wav" -> requireFormat(
+                    format.contains("wav") && audioCodec.startsWith("pcm_") && videoStreams.isEmpty()
+            );
+            case "audio/mpeg" -> requireFormat(
+                    format.contains("mp3") && audioCodec.equals("mp3") && videoStreams.isEmpty()
+            );
+            case "audio/webm" -> requireFormat(
+                    format.contains("webm") && WEBM_AUDIO_CODECS.contains(audioCodec) && videoStreams.isEmpty()
+            );
+            case "video/mp4", "video/quicktime" -> requireFormat(
+                    format.contains("mov")
+                            && videoStreams.size() == 1
+                            && MP4_VIDEO_CODECS.contains(lower(videoStreams.getFirst().codecName()))
+                            && audioCodec.equals("aac")
+            );
+            case "video/webm" -> requireFormat(
+                    format.contains("webm")
+                            && videoStreams.size() == 1
+                            && WEBM_VIDEO_CODECS.contains(lower(videoStreams.getFirst().codecName()))
+                            && WEBM_AUDIO_CODECS.contains(audioCodec)
+            );
+            default -> throw new BaseException(ErrorCode.UNSUPPORTED_AUDIO_FORMAT);
+        }
+        return durationMs;
+    }
+
+    private void validateDuration(long durationMs) {
+        if (durationMs < media.getMinimumDurationMs() || durationMs > media.getMaximumDurationMs()) {
+            throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
+        }
     }
 
     private PcmQuality inspectCanonicalWav(Path path) throws IOException {
@@ -534,11 +645,19 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
     }
 
     private String requireOwnerPrefix(Long userId, Long sessionId, String objectKey) {
-
+        if (userId == null || userId <= 0 || sessionId == null || sessionId <= 0 || objectKey == null) {
+            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
+        }
         String ownerPrefix = "%susers/%d/sessions/%d/".formatted(
                 storage.getRecordingsPrefix(), userId, sessionId
         );
-
+        if (!objectKey.startsWith(ownerPrefix)
+                || objectKey.length() <= ownerPrefix.length()
+                || objectKey.contains("\\")
+                || java.util.Arrays.stream(objectKey.split("/"))
+                        .anyMatch(segment -> segment.isBlank() || segment.equals(".") || segment.equals(".."))) {
+            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
+        }
         return ownerPrefix;
     }
 
@@ -554,9 +673,17 @@ public class FfmpegS3RecordingMediaNormalizer implements RecordingMediaNormaliza
     private static long parseDurationMs(String value) {
         try {
             double seconds = Double.parseDouble(value);
-
+            if (!Double.isFinite(seconds) || seconds <= 0) {
+                throw new NumberFormatException();
+            }
             return Math.round(seconds * 1_000.0);
         } catch (NumberFormatException error) {
+            throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
+        }
+    }
+
+    private static void requireFormat(boolean accepted) {
+        if (!accepted) {
             throw new BaseException(ErrorCode.MEDIA_NORMALIZATION_FAILED);
         }
     }

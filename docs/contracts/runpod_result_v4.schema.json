@@ -2698,6 +2698,9 @@
         },
         "reason": {
           "const": "NO_APPROVED_SCORING_CONTRACT"
+        },
+        "details": {
+          "$ref": "#/$defs/publicScoreDetails"
         }
       },
       "required": [
@@ -2776,6 +2779,9 @@
             },
             "reason": {
               "const": "INPUT_NOT_ACCEPTED"
+            },
+            "details": {
+              "$ref": "#/$defs/publicScoreDetails"
             }
           }
         },
@@ -2796,6 +2802,9 @@
             },
             "reason": {
               "const": "RESULT_NOT_DELIVERED"
+            },
+            "details": {
+              "$ref": "#/$defs/publicScoreDetails"
             }
           }
         }

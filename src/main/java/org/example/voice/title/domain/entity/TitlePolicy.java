@@ -12,4 +12,13 @@ public class TitlePolicy {
     @Column(name = "required_training_count", nullable = true) private long requiredTrainingCount;
     @Column(name = "passing_score", nullable = true) private int passingScore;
     @Column(name = "practice_content_id") private Long practiceContentId;
+    @Column(name = "edit_version", nullable = false) private long editVersion;
+
+    public void configure(Long contentId, int score) {
+        if (contentId == null || contentId <= 0 || score < 1 || score > 100)
+            throw new IllegalArgumentException("Invalid title exam policy");
+        practiceContentId = contentId;
+        passingScore = score;
+        editVersion++;
+    }
 }

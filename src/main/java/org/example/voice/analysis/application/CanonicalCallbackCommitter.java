@@ -78,6 +78,7 @@ public class CanonicalCallbackCommitter {
         // never deletes MP4s or translates old segments into new visual evidence.
 
         var decision=doc.decision();
+        if (RunPodContract.RESULT_V6.equals(doc.schemaVersion())) executionMedia.requireResult(doc);
         int inserted = jdbc.update("""
                 INSERT INTO analysis_canonical_results
                     (event_id,execution_id,request_id,analysis_id,recording_id,content_id,worker_instance_id,

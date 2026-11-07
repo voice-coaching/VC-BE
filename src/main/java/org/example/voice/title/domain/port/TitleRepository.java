@@ -1,6 +1,7 @@
 package org.example.voice.title.domain.port;
 
 import org.example.voice.title.domain.TitleRank;
+import org.example.voice.title.domain.TitleExamScore;
 import org.example.voice.title.domain.entity.*;
 import org.example.voice.training.domain.model.TrainingSessionCreatedData;
 import java.math.BigDecimal;
@@ -19,6 +20,7 @@ public interface TitleRepository {
     boolean availableContent(Long id);
     boolean ownedAnalysis(Long id, Long userId);
     Optional<BigDecimal> score(Long analysisId, Long userId, Long sessionId, Long contentId);
+    TitleExamScore assessScore(Long analysisId, Long userId, Long sessionId, Long contentId);
     boolean coachingScoreUnavailable(Long analysisId, Long userId, Long sessionId, Long contentId);
     Optional<TrainingSessionCreatedData> reusableSession(Long sessionId, Long userId);
 }

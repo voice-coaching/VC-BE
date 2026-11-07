@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.example.voice.admin.domain.entity.AdminAuditLog;
 import org.example.voice.admin.domain.model.AdminData.*;
 import org.example.voice.admin.domain.port.*;
+import org.example.voice.common.exception.BaseException;
+import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.practicecontent.domain.entity.PracticeContent;
 import org.example.voice.practicecontent.domain.type.*;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ public class AdminContentService {
     private final AdminStore store;
     private final AdminContentInvalidation invalidation;
     private final Clock clock;
+    private final AdminTitleExamPolicyStore titlePolicies;
 
     public ContentView create(long actor,ContentDraft draft,String reason) {
         access.require(actor); validate(draft,reason);
@@ -30,6 +33,8 @@ public class AdminContentService {
         var content=store.lockContent(id);AdminValidation.version(content.getVersion(),version);
         if(content.getContentType()!=draft.type())AdminValidation.conflict();
         boolean scriptChanged=!java.util.Objects.equals(content.getScriptText(),draft.scriptText());
+        if (titlePolicies.referencedContent(id) && (scriptChanged || !java.util.Objects.equals(content.getCategory(), draft.category())
+                || content.getLearningFocus() != draft.focus())) throw new BaseException(ErrorCode.ADMIN_TITLE_EXAM_CONTENT_IN_USE);
         if(scriptChanged) store.retireReferenceAudios(id,OffsetDateTime.now(clock));
         try { content.editPublic(draft.focus(),draft.category(),draft.difficulty(),draft.title(),draft.description(),draft.scriptText(),draft.targets(),draft.seconds(),OffsetDateTime.now(clock)); }
         catch(IllegalStateException error) { AdminValidation.conflict(); }
@@ -39,6 +44,7 @@ public class AdminContentService {
     public ContentView publication(long actor,long id,long version,PublishStatus status,String reason) {
         access.require(actor);AdminValidation.text(reason,500,true);
         var content=store.lockContent(id);AdminValidation.version(content.getVersion(),version);
+        if (status != PublishStatus.PUBLISHED && titlePolicies.referencedContent(id)) throw new BaseException(ErrorCode.ADMIN_TITLE_EXAM_CONTENT_IN_USE);
         // Revalidate taxonomy and script even for existing drafts, including SQL-created ones.
         if(status==PublishStatus.PUBLISHED) validate(new ContentDraft(content.getContentType(),content.getLearningFocus(),content.getCategory(),
                 content.getDifficulty(),content.getTitle(),content.getDescription(),content.getScriptText(),
@@ -51,6 +57,7 @@ public class AdminContentService {
     public ContentDeletion delete(long actor,long id,long version,String reason) {
         access.require(actor);AdminValidation.text(reason,500,true);
         var content=store.lockContent(id);AdminValidation.version(content.getVersion(),version);
+        if (titlePolicies.referencedContent(id)) throw new BaseException(ErrorCode.ADMIN_TITLE_EXAM_CONTENT_IN_USE);
         var now=OffsetDateTime.now(clock);
         content.delete(now);store.retireReferenceAudios(id,now);
         audit(actor,"CONTENT_DELETE",content,reason,"deletedAt,status,referenceAudios");

@@ -1,5 +1,18 @@
 # 디렉토리 문서 - voice
 
+- `analysis/domain/model/PublicScoreDetails.java`: AI 표시용 6항목 DTO. 기존 Score의 선택 details이며 계산/저장 entity가 아니다.
+- CanonicalPublicProjection과 IndependentResultDocument는 기존 원본에서 같은 공개 DTO로 전달한다. [계약](../api/public-score-details.md).
+
+## 독립 음성 분석 후보 추가 (2026-11-07)
+
+- `analysis/domain/port/IndependentAnalysis{Submission,Client}.java`, `IndependentAudioSource.java`: 접수·AI 호출·준비 PCM 읽기 경계.
+- `analysis/domain/model/IndependentAnalysisAttempt.java`, `domain/type/IndependentAnalysisStage.java`: Backend worker snapshot과 수집 상태.
+- `analysis/application/IndependentAnalysisWorker.java`: 분리된 제출·수집·ACK lane.
+- `analysis/infrastructure/independent/`: DB queue, HTTP client, S3 source, 설정, 독립 결과 DTO/공개 view adapter.
+- `src/main/resources/db/migration/V68__independent_analysis_pull.sql`: 독립 시도/outbox와 원본 결과 저장.
+
+[동작·설정·검증 제한](independent-analysis-pull.md). 기존 transport를 삭제하거나 운영 모드를 전환한 변경은 아니다.
+
 이 문서는 voice 프로젝트의 현재 디렉토리 구조와 각 경로의 책임을 설명한다.
 
 - `training/domain/model/MediaPreparationData.java`: 서버 미디어 identity 모델.
@@ -224,3 +237,11 @@ docs
 ### 관리자 조회 개선
 
 `payment/domain/model/MembershipFact`, `payment/domain/port/MembershipFactsReader`, `payment/infrastructure/JpaMembershipFactsReader`가 페이지 단위 등급 사실을 조회하고 application 정책이 free/paid/admin을 결정한다. `admin`은 해당 정책을 복제하지 않는다. 조회 캐시 정책은 `docs/architecture/admin-read-performance.md`에서 관리한다.
+
+## 관리자 승급 시험 관리
+
+`admin/controller/AdminTitleExamPolicyController`와 controller/dto는 설정 조회·수정 계약을 담당한다. `admin/application/AdminTitleExamPolicyService`는 권한·상태·설정/문장 버전·감사 트랜잭션을 처리한다. `admin/domain/port/AdminTitleExamPolicyStore`와 `admin/infrastructure/AdminTitleExamPolicyPersistence`는 정책 잠금과 사용 중인 콘텐츠 확인을 담당한다. `title/domain/entity/TitlePolicy`는 설정 값과 editVersion을 보관한다. 상세 계약은 docs/api/admin-title-exam-policies.md, 검증은 docs/qa/admin-title-exam-policies.md다.
+
+## Video lip consumer changes (2026-11-07)
+
+No new module: analysis/domain/model/CanonicalAnalysisView contains the lip models; analysis/infrastructure/canonical maintains media binding. Preparation stays in training/application and training/infrastructure/storage. LipProvisionalContractTest, LipMediaPostgresTest and LipAudiovisualAdmissionTest cover the consumer.

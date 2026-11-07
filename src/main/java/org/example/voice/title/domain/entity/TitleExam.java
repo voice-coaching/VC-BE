@@ -39,14 +39,17 @@ public class TitleExam {
     }
     public boolean graded() { return status.equals("PASSED") || status.equals("FAILED"); }
     public void bind(Long sessionId) {
-
+        if (graded()) throw new TitleException(409, "TITLE_EXAM_ALREADY_GRADED");
         trainingSessionId = sessionId; status = "IN_PROGRESS";
     }
     public void grade(Long analysisId, BigDecimal score, OffsetDateTime now) {
-
+        if (graded()) throw new TitleException(409, "TITLE_EXAM_ALREADY_GRADED");
+        if (analysisId == null || score == null || score.signum() < 0
+                || score.compareTo(BigDecimal.valueOf(100)) > 0 || passingScore < 0 || passingScore > 100)
+            throw new TitleException(409, "ANALYSIS_SCORE_UNAVAILABLE");
         this.analysisId = analysisId; this.score = score;
-        status = score == null ? "UNSCORED" : score.compareTo(BigDecimal.valueOf(passingScore)) >= 0 ? "PASSED" : "FAILED";
+        status = score.compareTo(BigDecimal.valueOf(passingScore)) >= 0 ? "PASSED" : "FAILED";
         evaluatedAt = now.truncatedTo(ChronoUnit.MICROS);
     }
-    public TitleRank resultingRank() { return evaluatedAt != null ? targetRank : previousRank; }
+    public TitleRank resultingRank() { return "PASSED".equals(status) ? targetRank : previousRank; }
 }

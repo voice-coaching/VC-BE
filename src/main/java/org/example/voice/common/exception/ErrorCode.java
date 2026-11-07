@@ -18,6 +18,7 @@ public enum ErrorCode {
     ADMIN_STORE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "관리자 정보를 안전하게 처리할 수 없습니다. 잠시 후 다시 시도해 주세요."),
     ADMIN_SELF_DELETION_NOT_ALLOWED(HttpStatus.CONFLICT, "현재 로그인한 관리자 본인의 계정은 여기서 삭제할 수 없습니다."),
     ADMIN_EDIT_CONFLICT(HttpStatus.CONFLICT, "대상 상태가 변경되었거나 수정할 수 없습니다. 다시 조회해 주세요."),
+    ADMIN_TITLE_EXAM_CONTENT_IN_USE(HttpStatus.CONFLICT, "승급 시험에서 사용 중인 문장입니다. 새 문장을 등록해 교체하고 진행 중인 시험이 끝난 뒤 정리해 주세요."),
     ADMIN_AUDIO_INVALID(HttpStatus.UNPROCESSABLE_ENTITY, "업로드한 음성 파일의 형식·해시·길이를 확인해 주세요."),
     ADMIN_AUDIO_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "기준 음성 저장소 또는 검증 기능을 사용할 수 없습니다."),
     ADMIN_AUDIO_UPLOAD_EXPIRED(HttpStatus.CONFLICT, "기준 음성 업로드 시간이 만료되었습니다. 다시 업로드해 주세요."),

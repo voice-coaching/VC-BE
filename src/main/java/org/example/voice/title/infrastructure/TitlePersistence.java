@@ -3,6 +3,7 @@ package org.example.voice.title.infrastructure;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.title.domain.TitleRank;
+import org.example.voice.title.domain.TitleExamScore;
 import org.example.voice.title.domain.entity.*;
 import org.example.voice.title.domain.port.TitleRepository;
 import org.example.voice.training.domain.entity.TrainingSession;
@@ -22,7 +23,9 @@ public class TitlePersistence implements TitleRepository {
         return em.createQuery("select count(s) from TrainingSession s where s.userId=:user and s.status=org.example.voice.training.domain.type.TrainingSessionStatus.COMPLETED", Long.class)
                 .setParameter("user", userId).getSingleResult();
     }
-    public Optional<TitleExam> owned(Long id, Long userId) { return Optional.ofNullable(em.find(TitleExam.class, id)); }
+    public Optional<TitleExam> owned(Long id, Long userId) {
+        return Optional.ofNullable(em.find(TitleExam.class, id)).filter(exam -> java.util.Objects.equals(exam.getUserId(), userId));
+    }
     public Optional<TitleExam> active(Long userId, TitleRank target) {
         return em.createQuery("select e from TitleExam e where e.userId=:user and e.targetRank=:target and e.status in ('READY','IN_PROGRESS')", TitleExam.class)
                 .setParameter("user", userId).setParameter("target", target).getResultStream().findFirst();
@@ -38,14 +41,28 @@ public class TitlePersistence implements TitleRepository {
                 .setParameter("id",id).getSingleResult()>0;
     }
     public Optional<BigDecimal> score(Long analysisId, Long userId, Long sessionId, Long contentId) {
-        var result = em.find(org.example.voice.analysis.domain.entity.AnalysisResult.class, analysisId);
-        if (result == null) return Optional.empty();
-        var stored = result.getOverallScore();
-        if (stored != null) return Optional.of(stored);
-        return committedResults.findCurrent(result).map(doc -> doc.overallScore());
+        return assessScore(analysisId,userId,sessionId,contentId).score();
+    }
+    public TitleExamScore assessScore(Long analysisId, Long userId, Long sessionId, Long contentId) {
+        if (analysisId == null || userId == null || sessionId == null || contentId == null)
+            return TitleExamScore.unavailable();
+        var found=canonicalAnalysis(analysisId,userId,sessionId,contentId);
+        if(found.isEmpty()) return TitleExamScore.unavailable();
+        var result=found.get();
+        if(result.getStatus()==org.example.voice.analysis.domain.type.AnalysisStatus.PENDING
+                || result.getStatus()==org.example.voice.analysis.domain.type.AnalysisStatus.PROCESSING)
+            return TitleExamScore.waiting();
+        if(result.getStatus()!=org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED)
+            return TitleExamScore.unavailable();
+        var score=result.isCanonicalExecution()?canonicalScore(result):Optional.ofNullable(result.getOverallScore());
+        return score.filter(value -> value.signum()>=0 && value.compareTo(BigDecimal.valueOf(100))<=0)
+                .map(TitleExamScore::ready).orElseGet(TitleExamScore::unavailable);
     }
     public boolean ownedAnalysis(Long id, Long userId) { return true; }
-    public boolean coachingScoreUnavailable(Long analysisId, Long userId, Long sessionId, Long contentId) { return false; }
+    public boolean coachingScoreUnavailable(Long analysisId, Long userId, Long sessionId, Long contentId) {
+        var assessment=assessScore(analysisId,userId,sessionId,contentId);
+        return !assessment.pending() && assessment.score().isEmpty();
+    }
     public Optional<TrainingSessionCreatedData> reusableSession(Long sessionId, Long userId) {
         if (sessionId == null) return Optional.empty();
         return em.createQuery("select s from TrainingSession s join fetch s.content where s.id=:id and (coalesce(:user,0L)=coalesce(:user,0L)) and s.status not in (org.example.voice.training.domain.type.TrainingSessionStatus.CANCELED,org.example.voice.training.domain.type.TrainingSessionStatus.FAILED)", TrainingSession.class)
@@ -62,10 +79,7 @@ public class TitlePersistence implements TitleRepository {
             Long analysisId, Long userId, Long sessionId, Long contentId) {
         return em.createQuery("""
                 select a from AnalysisResult a join a.recording r join r.trainingSession s
-                where a.id=:id and (coalesce(:user,0L)=coalesce(:user,0L)) and s.id=:session and s.content.id=:content
-                and a.analysisProfile in ('CANONICAL_HANDOFF_20261004_V5','CANONICAL_AUDIOVISUAL_20261007_V6')
-                and r.visualObjectKey is null
-                and a.status=org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
+                where a.id=:id and s.userId=:user and s.id=:session and s.content.id=:content
                 and r.selected=true and r.deletedAt is null
                 and s.status in (org.example.voice.training.domain.type.TrainingSessionStatus.ANALYZING,
                                  org.example.voice.training.domain.type.TrainingSessionStatus.COMPLETED)
@@ -75,5 +89,16 @@ public class TitlePersistence implements TitleRepository {
                 .getResultStream().findFirst();
     }
 
-    private Optional<BigDecimal> canonicalScore(org.example.voice.analysis.domain.entity.AnalysisResult result) { return committedResults.findCurrent(result).map(doc -> doc.overallScore()); }
+    private Optional<BigDecimal> canonicalScore(org.example.voice.analysis.domain.entity.AnalysisResult result) {
+        if(result.isIndependentExecution()) return result.getStatus()==org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
+                && result.getCanonicalResultEventId()!=null && result.isCoachingDelivered()
+                ?Optional.ofNullable(result.getOverallScore()):Optional.empty();
+        try {
+            return committedResults.findCurrent(result)
+                    .filter(org.example.voice.analysis.infrastructure.canonical.CanonicalCompletionEligibility::deliverable)
+                    .map(doc -> doc.overallScore());
+        } catch (IllegalStateException | org.example.voice.analysis.infrastructure.runpod.RunPodContractException invalid) {
+            return Optional.empty();
+        }
+    }
 }

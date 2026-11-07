@@ -23,6 +23,8 @@ class CanonicalTitleScoreTest {
     TitlePersistence titles = new TitlePersistence(em, reader);
 
     @BeforeEach void setup() {
+        when(analysis.isCanonicalExecution()).thenReturn(true);
+        when(analysis.getStatus()).thenReturn(org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED);
         @SuppressWarnings("unchecked") TypedQuery<AnalysisResult> query = mock(TypedQuery.class);
         when(em.createQuery(anyString(), eq(AnalysisResult.class))).thenReturn(query);
         when(query.setParameter(anyString(), any())).thenReturn(query);

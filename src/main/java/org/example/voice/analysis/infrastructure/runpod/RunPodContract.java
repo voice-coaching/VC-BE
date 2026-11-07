@@ -19,9 +19,10 @@ import java.util.HexFormat;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** The same checked-in schemas used by the Python worker, isolated from public API JSON settings. */
+/** Backend transport schemas for worker interchange, isolated from public API JSON settings. */
 @Component
 public class RunPodContract {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(RunPodContract.class);
     public static final String VERSION = "voice-coaching.runpod-http.v1.1";
     public static final String CAPABILITY_VERSION = "voice-coaching.runpod-http.v1.2";
     public static final String REQUEST_V1 = "voice-coaching.runpod-analysis-request.v1";
@@ -92,7 +93,16 @@ public class RunPodContract {
 
     public void validate(JsonNode node, String kind) {
         kind = schemaKind(node, kind);
-        if (node == null || !schemas.computeIfAbsent(kind, this::schema).validate(node).isEmpty()) {
+        if (node == null) throw new RunPodContractException(422, "VALIDATION_FAILED");
+        var violations = schemas.computeIfAbsent(kind, this::schema).validate(node);
+        if (!violations.isEmpty()) {
+            // Do not log validator messages/arguments: they may contain script or result values.
+            var paths = violations.stream().map(v -> v.getInstanceLocation().toString())
+                    .filter(path -> path.matches("[A-Za-z0-9_.$/\\[\\]~#-]{1,180}"))
+                    .distinct().sorted().limit(8).toList();
+            LOG.atWarn().addKeyValue("event", "analysis_contract_rejected")
+                    .addKeyValue("contract_kind", kind).addKeyValue("violation_count", violations.size())
+                    .addKeyValue("field_paths", String.join(",", paths)).log("Analysis contract validation rejected");
             throw new RunPodContractException(422, "VALIDATION_FAILED");
         }
         // Python and Java share UTF-16 limits in addition to schema code-point limits.

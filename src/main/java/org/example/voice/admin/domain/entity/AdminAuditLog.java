@@ -22,8 +22,12 @@ public class AdminAuditLog {
 
     public static AdminAuditLog success(long actor, String action, String type, long target, String reason,
                                         String fields, OffsetDateTime now) {
+        return success(actor, action, type, Long.toString(target), reason, fields, now);
+    }
+    public static AdminAuditLog success(long actor, String action, String type, String target, String reason,
+                                        String fields, OffsetDateTime now) {
         var log = new AdminAuditLog();
-        log.actorId=actor; log.action=action; log.targetType=type; log.targetId=Long.toString(target);
+        log.actorId=actor; log.action=action; log.targetType=type; log.targetId=target;
         log.reason=reason; log.changedFields=fields; log.outcome="SUCCESS";
         log.correlationId=java.util.UUID.randomUUID().toString(); log.createdAt=now;
         return log;

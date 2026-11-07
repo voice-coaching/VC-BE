@@ -47,7 +47,22 @@ public class VoiceRecordingService {
         // objectKey는 스토리지에 올라간 파일의 식별자 역할을 한다.
         // 같은 objectKey가 이미 등록되어 있으면 같은 파일을 중복 등록한 것으로 본다.
 
+        trainingSessionService.assertSessionExists(sessionId,userId);
+        if (request == null || request.objectKey() == null || request.objectKey().isBlank()
+                || request.mimeType() == null || request.fileSizeBytes() == null || request.fileSizeBytes() <= 0)
+            throw new BaseException(ErrorCode.VALIDATION_ERROR);
+        boolean video=request.mimeType().startsWith("video/");
+        if (video && (!Boolean.TRUE.equals(request.videoProcessingConsentAccepted())
+                || !RecordingMediaPolicy.VIDEO_CONSENT_POLICY_REVISION.equals(request.videoProcessingConsentPolicyRevision())))
+            throw new BaseException(ErrorCode.VIDEO_PROCESSING_CONSENT_REQUIRED);
+        uploadIntentRegistry.reserveForRegistration(userId,sessionId,request.objectKey(),request.mimeType(),request.fileSizeBytes());
+        objectStorage.assertUploadedObject(userId,sessionId,request.objectKey(),request.mimeType(),request.fileSizeBytes());
         VisualProcessingAuthorizationData visualAuthorization = null;
+        if (video) {
+            var consent=processingConsentLedger.grantFaceVideoProcessing(userId,sessionId,
+                    request.videoProcessingConsentPolicyRevision(),request.objectKey());
+            visualAuthorization=new VisualProcessingAuthorizationData(consent.receiptSha256(),request.videoProcessingConsentPolicyRevision());
+        }
         NormalizedRecordingData normalized = mediaNormalization.normalize(
                 userId,
                 sessionId,
@@ -62,7 +77,7 @@ public class VoiceRecordingService {
         registerRollbackCleanup(rollbackCleanup);
 
         try {
-
+            uploadIntentRegistry.markConsumed(userId,sessionId,request.objectKey());
             return voiceRecordingWriter.register(sessionId, normalized);
         } catch (RuntimeException error) {
             try {

@@ -17,8 +17,8 @@ import java.util.Optional;
 public class RecordingMediaPreparationStoreImpl implements RecordingMediaPreparationStore {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper = new ObjectMapper()
-            .disable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
-            .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+            .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+            .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     public RecordingMediaPreparationStoreImpl(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     @Override @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
@@ -27,8 +27,8 @@ public class RecordingMediaPreparationStoreImpl implements RecordingMediaPrepara
             byte[] raw = new JsonCanonicalizer(mapper.writeValueAsString(preparation)).getEncodedUTF8();
             jdbc.update("""
                 INSERT INTO recording_media_preparations(recording_id,schema_version,receipt_bytes,receipt_sha256)
-                VALUES (?,?,?,?) ON CONFLICT (recording_id) DO UPDATE SET schema_version=EXCLUDED.schema_version,receipt_bytes=EXCLUDED.receipt_bytes,receipt_sha256=EXCLUDED.receipt_sha256
-""", recordingId, preparation.schemaVersion(), raw, digest(raw));
+                VALUES (?,?,?,?)
+                """, recordingId, preparation.schemaVersion(), raw, digest(raw));
         } catch (java.io.IOException error) { throw new IllegalStateException("MEDIA_PREPARATION_INVALID"); }
     }
 
@@ -37,7 +37,7 @@ public class RecordingMediaPreparationStoreImpl implements RecordingMediaPrepara
         return jdbc.query("SELECT receipt_bytes,receipt_sha256 FROM recording_media_preparations WHERE recording_id=?",
                 (row,index) -> {
                     byte[] raw = row.getBytes("receipt_bytes");
-
+                    if (!digest(raw).equals(row.getString("receipt_sha256"))) throw new IllegalStateException("MEDIA_PREPARATION_INVALID");
                     try { return mapper.readValue(raw, MediaPreparationData.class); }
                     catch (java.io.IOException error) { throw new IllegalStateException("MEDIA_PREPARATION_INVALID"); }
                 }, recordingId).stream().findFirst();

@@ -61,7 +61,7 @@ class UnifiedV6AudioContractTest {
                 .isInstanceOf(AnalysisSchemaAdmissionException.class);
     }
 
-    @Test void packagedPinsMatchThePinnedAiSourceBytes() {
+    @Test void packagedPinsMatchBackendTransportContracts() {
         java.util.Map<String,String> pins=java.util.Map.ofEntries(
                 java.util.Map.entry("runpod_http_control_v1.schema.json","58b497491b949b4b672caec4febbc4b4f0950b41a460eebb4f3f31f5092fb0b9"),
                 java.util.Map.entry("runpod_http_control_v1_2.schema.json","7acd63e1a0ff9aa68bd2d86c2c5ec37827df10b85b186efac08c1d338287e7a4"),
@@ -70,11 +70,11 @@ class UnifiedV6AudioContractTest {
                 java.util.Map.entry("runpod_canonical_output.schema.json","5ca5421f8053b51cc9da9dafe06c0dffcd98e85ca24ce24d373e2d2b0351def8"),
                 java.util.Map.entry("runpod_canonical_journal_v1.schema.json","798aa2eee85f9196d0519763119f266b14f065899c03faa75599fab5fed2e5f5"),
                 java.util.Map.entry("runpod_analysis_request_v4.schema.json","8fde9cf8ee44b5b151bf31205a355c80789fedc6c8d74ba994274bc898c9eec0"),
-                // Includes the coordinated bounded-H5 classification update from 2026-11-02.
-                java.util.Map.entry("runpod_result_v6.schema.json","f17fd6ff70cd4fa3fcb1ee91d878cdf7fef0b2880159e4da17b5d19a46b9e40f"),
+                // Backend accepts AI-owned CORE identities; this digest identifies our transport schema.
+                java.util.Map.entry("runpod_result_v6.schema.json","4bbc76bf4aeb015d7c1d9bebb7fdeb353b8889b64ee11071c16319f8e3fef362"),
                 java.util.Map.entry("runpod_canonical_handoff_v2.schema.json","8677401f5edf88258ca72344cde932b0ddbefdd8e35ccc1885970e6ac2632c07"),
                 java.util.Map.entry("runpod_media_preparation_v1.schema.json","0a9c91e88d37f2108a77772512db1d23fcdce48b3a3741407a7f27b31c06946f"),
-                java.util.Map.entry("runpod_visual_coaching_input_v1.schema.json","b9bb57c31bd1ab1dcb80957343449ab0a6b231bdea61a4adf876fc70af3a868c"));
+                java.util.Map.entry("runpod_visual_coaching_input_v1.schema.json","63c560fdd1e775cdce21831ad840e63419f12e53ca5e70023d302bd95cdcdbde"));
         assertThat(CanonicalHandoffReadiness.SCHEMAS).containsExactlyInAnyOrderElementsOf(pins.keySet());
         pins.forEach((file,sha)->assertThat(contract.schemaSha256(file)).as(file).isEqualTo(sha));
     }
