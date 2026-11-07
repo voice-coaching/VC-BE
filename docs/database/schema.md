@@ -2157,3 +2157,7 @@ PostgreSQL 18의 `pg_restore --schema-only --no-owner --no-privileges --file=<�
 ## 관리자 기존 기능 보완 (#188)
 
 스키마·인덱스·FK·마이그레이션 변경 없음. notices는 관리자 버전 잠금 후 물리 삭제한다(감사 이력 보존). reference_audios는 기존 retired_at 및 is_primary를 갱신하는 논리 삭제로 행·업로드 FK·object_key를 보존한다. admin_notification_campaigns는 미발송 초안만 수정·삭제하며 삭제 시 JPA의 admin_notification_recipients 연결도 제거한다. 발송 완료 행과 user_notifications는 보존한다. [동작 계약](../api/admin-management-completion.md).
+
+## V67: 관리자 승급 시험 설정 버전
+
+`title_policies.edit_version`: BIGINT, NOT NULL, 기본값 0. owner module은 title이며 관리자 설정의 동시 수정 확인에 사용한다. 관리자 수정은 정책 행 잠금과 기대 버전 일치 후 1 증가한다. 별도 인덱스·unique·FK·soft delete 변경은 없다. target_rank PK와 practice_content_id 관계는 유지한다. 기존 점수·문제·필요 횟수·개별 title_exams snapshot은 변경하지 않는다. [계약](../api/admin-title-exam-policies.md).

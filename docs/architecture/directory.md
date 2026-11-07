@@ -224,3 +224,7 @@ docs
 ### 관리자 조회 개선
 
 `payment/domain/model/MembershipFact`, `payment/domain/port/MembershipFactsReader`, `payment/infrastructure/JpaMembershipFactsReader`가 페이지 단위 등급 사실을 조회하고 application 정책이 free/paid/admin을 결정한다. `admin`은 해당 정책을 복제하지 않는다. 조회 캐시 정책은 `docs/architecture/admin-read-performance.md`에서 관리한다.
+
+## 관리자 승급 시험 관리
+
+`admin/controller/AdminTitleExamPolicyController`와 controller/dto는 설정 조회·수정 계약을 담당한다. `admin/application/AdminTitleExamPolicyService`는 권한·상태·설정/문장 버전·감사 트랜잭션을 처리한다. `admin/domain/port/AdminTitleExamPolicyStore`와 `admin/infrastructure/AdminTitleExamPolicyPersistence`는 정책 잠금과 사용 중인 콘텐츠 확인을 담당한다. `title/domain/entity/TitlePolicy`는 설정 값과 editVersion을 보관한다. 상세 계약은 docs/api/admin-title-exam-policies.md, 검증은 docs/qa/admin-title-exam-policies.md다.

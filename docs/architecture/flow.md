@@ -597,3 +597,7 @@ API 상세 필드와 응답 형식은 `docs/api/specification.md`, 모듈 책임
 ## Canonical v5 handoff (2026-10-04)
 
 [Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.
+
+## 관리자 승급 시험 설정 흐름
+
+관리자 인증 → 설정 목록 → 공용·공개 시험 문장 조회/미리보기 → 문장 잠금 및 버전 확인 → 정책 잠금 및 버전 확인 → 문제/점수 변경 → 감사 저장 → 커밋 순서다. 실패 시 함께 롤백한다. 새 시험은 변경 후 정책을 복사하고 기존 시험의 문제/점수는 유지한다. 현재 정책 또는 진행 시험의 문제는 원문 변경·숨김·삭제를 거부한다. API 계약은 docs/api/admin-title-exam-policies.md를 따른다.
