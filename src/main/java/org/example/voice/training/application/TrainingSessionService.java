@@ -74,7 +74,11 @@ public class TrainingSessionService {
         return canceled;
     }
 
-    public void assertSessionExists(Long sessionId, Long userId) {}
+    public void assertSessionExists(Long sessionId, Long userId) {
+        if (userId == null) throw new BaseException(ErrorCode.UNAUTHORIZED);
+        if (!trainingSessionReader.existsSession(sessionId,userId))
+            throw new BaseException(ErrorCode.TRAINING_SESSION_NOT_FOUND);
+    }
 
     private TrainingSessionCreatedData createTrainingSession(TrainingSessionCreateRequestDto request, Long userId, Long stepId) {
         if (request.sentenceIndex() == null)

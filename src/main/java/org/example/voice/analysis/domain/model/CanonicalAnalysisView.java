@@ -90,7 +90,15 @@ public record CanonicalAnalysisView(
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record LipVisual(String status, boolean correctiveClaimsAllowed, BigDecimal score, String scoreKind,
             LipCoverage coverage, List<LipPhone> phoneAssessments, List<String> reasonCodes,
-            String alignmentScope, List<Long> unresolvedExpectedIndices, int omittedPhoneAssessmentCount) implements Visual {}
+            String alignmentScope, List<Long> unresolvedExpectedIndices, int omittedPhoneAssessmentCount,
+            @JsonInclude(JsonInclude.Include.NON_NULL) List<LipSubScore> subScores) implements Visual {
+        public LipVisual(String status, boolean correctiveClaimsAllowed, BigDecimal score, String scoreKind,
+                LipCoverage coverage, List<LipPhone> phoneAssessments, List<String> reasonCodes,
+                String alignmentScope, List<Long> unresolvedExpectedIndices, int omittedPhoneAssessmentCount) {
+            this(status,correctiveClaimsAllowed,score,scoreKind,coverage,phoneAssessments,reasonCodes,
+                    alignmentScope,unresolvedExpectedIndices,omittedPhoneAssessmentCount,null);
+        }
+    }
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record LipCoverage(long targetCount, long visuallyEligibleCount, long observedCount,
                               long scoredCount, BigDecimal coverage) {}
@@ -99,7 +107,23 @@ public record CanonicalAnalysisView(
             BigDecimal score, String scoreKind, BigDecimal referenceDistance, List<String> referenceIds,
             String calibrationRevision, BigDecimal audioStartSeconds, BigDecimal audioEndSeconds,
             BigDecimal videoStartSeconds, BigDecimal videoEndSeconds, int frameCount,
-            List<String> reasonCodes, List<LipObservation> observations, List<String> allowedActionIds) {}
+            List<String> reasonCodes, List<LipObservation> observations, List<String> allowedActionIds,
+            @JsonInclude(JsonInclude.Include.NON_NULL) List<LipSubScore> subScores) {
+        public LipPhone(long expectedIndex, String expectedPhone, String role, String status,
+                BigDecimal score, String scoreKind, BigDecimal referenceDistance, List<String> referenceIds,
+                String calibrationRevision, BigDecimal audioStartSeconds, BigDecimal audioEndSeconds,
+                BigDecimal videoStartSeconds, BigDecimal videoEndSeconds, int frameCount,
+                List<String> reasonCodes, List<LipObservation> observations, List<String> allowedActionIds) {
+            this(expectedIndex,expectedPhone,role,status,score,scoreKind,referenceDistance,referenceIds,
+                    calibrationRevision,audioStartSeconds,audioEndSeconds,videoStartSeconds,videoEndSeconds,
+                    frameCount,reasonCodes,observations,allowedActionIds,null);
+        }
+    }
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record LipSubScore(String criterionId, String label, BigDecimal score, String status, String reasonCode,
+            @JsonInclude(JsonInclude.Include.NON_NULL) List<LipMeasurement> measurements) {}
+    public record LipMeasurement(String metricId, BigDecimal value, BigDecimal referenceMedian,
+            BigDecimal referenceScale, int referenceCount, BigDecimal tolerance, String unit) {}
     public record LipObservation(String observationId, String code, BigDecimal minimum, BigDecimal maximum, String unit) {}
     public record Actions(boolean canRetry, boolean canRerecord, boolean canComplete, boolean canRegenerate,
                           UnavailableReasons unavailableReasonCodes) {}

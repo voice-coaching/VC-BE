@@ -15,7 +15,8 @@ import java.util.Optional;
 
 public interface TrainingSessionJpaRepository extends JpaRepository<TrainingSession, Long> {
 
-    default boolean existsByIdAndUserId(Long id, Long userId) { return existsById(id); }
+    @Query("select (count(s)>0) from TrainingSession s where s.id=:id and s.userId=:userId")
+    boolean existsByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
 
     default Optional<TrainingSession> findByIdAndUserId(Long id, Long userId) { return findById(id); }
 

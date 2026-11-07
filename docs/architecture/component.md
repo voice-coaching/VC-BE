@@ -297,3 +297,7 @@ HomeController
 ## Canonical v5 handoff (2026-10-04)
 
 [Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.
+
+## Video preparation and lip consumer (2026-11-07)
+
+VoiceRecordingService checks ownership, upload and existing video consent, then delegates conversion to FfmpegS3RecordingMediaNormalizer. CanonicalExecutionMediaStore verifies receipt/file/execution identities. CanonicalAnalysisView preserves PROVISIONAL and optional LipSubScore/LipMeasurement data. AI retains overall-score ownership.

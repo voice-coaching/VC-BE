@@ -61,6 +61,30 @@ class UnifiedV6PublisherTest {
                 properties,registry,settings,scope,preparations,new RunPodContract(),video);
     }
 
+    @Test void videoWithRealPreparationKeepsHashesAndDoesNotAddInternalConsentFields() {
+        when(video.admission()).thenReturn(true);
+        when(request.visualInput()).thenReturn(new org.example.voice.analysis.domain.model.AnalysisWorkerVisualInput(
+                "recordings/analysis-video/fixture.mp4","c".repeat(64),"video/mp4",100L,null,null));
+        var receipt=new org.example.voice.training.domain.model.MediaPreparationData(
+                org.example.voice.training.domain.model.MediaPreparationData.SCHEMA,"d".repeat(64),"b".repeat(64),"c".repeat(64),
+                org.example.voice.training.domain.model.MediaPreparationData.REVISION,java.math.BigDecimal.ZERO,java.math.BigDecimal.ZERO,
+                "1/16000","1/12800","UNVERIFIED");
+        when(preparations.find(2L)).thenReturn(Optional.of(receipt));
+        publisher.publish(request);
+        var captured=ArgumentCaptor.forClass(AnalysisRequestOutbox.class);verify(outboxes).save(captured.capture());
+        var raw=new RunPodContract().parse(captured.getValue().getPayload().getBytes(java.nio.charset.StandardCharsets.UTF_8),"analysisRequest");
+        assertThat(raw.path("video").path("sha256").asText()).isEqualTo("c".repeat(64));
+        assertThat(raw.path("mediaPreparation").path("receipt").path("sourceSha256").asText()).isEqualTo("d".repeat(64));
+        assertThat(raw.path("mediaPreparation").path("receiptSha256").asText()).isEqualTo(new RunPodContract().digest(raw.path("mediaPreparation").path("receipt")));
+        assertThat(raw.path("video").has("consentReceiptSha256")).isFalse();
+        assertThat(raw.has("authorization")).isFalse();
+    }
+    @Test void videoWithoutRealPreparationIsRejectedBeforeOutbox() {
+        when(video.admission()).thenReturn(true);
+        when(request.visualInput()).thenReturn(mock(org.example.voice.analysis.domain.model.AnalysisWorkerVisualInput.class));
+        assertThatThrownBy(()->publisher.publish(request)).isInstanceOf(BaseException.class);
+        verifyNoInteractions(outboxes,registry);
+    }
     @Test void publishesAudioAsV6WithoutInventingVideoOrPreparation() {
         publisher.publish(request);
         var captured=ArgumentCaptor.forClass(AnalysisRequestOutbox.class);
