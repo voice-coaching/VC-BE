@@ -1,5 +1,15 @@
 # 상태 문서 - voice
 
+## 독립 분석 후보 상태 (2026-11-07)
+
+`IndependentAnalysisStage`와 `independent_analysis_attempts.stage`는
+SUBMIT_PENDING → LOOKUP_PENDING → COLLECTING → ACK_PENDING → ACKED를 기본 흐름으로 사용한다.
+수집 장애는 COLLECTING_FAILED에서 같은 job을 다시 조회한다. 입력 거절은 SUBMISSION_REJECTED,
+미접수 비활성 시도는 CANCELLED, 결과 없는 AI 종료의 후처리는 FINISHED다.
+AI status와 수집 stage는 별개이며 HTTP 오류가 AI FAILED를 만들지 않는다.
+Backend AnalysisStatus는 PENDING/PROCESSING에서 검증·commit된 COMPLETED/FAILED로 전환한다.
+[전이·재개·정산 상세](independent-analysis-pull.md). 기본 비활성, 운영 미전환이다.
+
 이 문서는 voice 백엔드의 주요 상태 모델, enum 값, 상태 전이 규칙을 기록한다.
 상태를 추가하거나 변경할 때는 관련 entity, API 문서, DB schema, 테스트를 함께 검토한다.
 

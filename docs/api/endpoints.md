@@ -2,6 +2,11 @@
 
 # Endpoint List - voice
 
+## 독립 분석 후보 내부 송신 (2026-11-07)
+
+Backend가 호출하는 AI의 `/v2/analysis-jobs` 제출·조회·결과·ACK·취소는 [독립 API 계약](independent-analysis-v1.md#인증과-경계)에 별도 색인한다.
+이는 새 Backend 공개 endpoint가 아니다. 기존 사용자 `/api` 경로는 유지하고 기본 플래그는 false다.
+
 ## 승급시험 새로 시작
 
 | Method | URL | Auth | Description |

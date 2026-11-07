@@ -2,6 +2,12 @@
 
 # API Specification - voice
 
+## 독립 음성 분석 후보 (2026-11-07)
+
+[AI 독립 API v1](independent-analysis-v1.md)과 [Backend 흐름·플래그](../architecture/independent-analysis-pull.md)를 추가했다.
+기존 공개 endpoint, Backend 정수 ID, `data.canonicalAnalysis.score.overallScore`와 `coaching.feedback`를 유지한다.
+AI의 완료와 Backend의 일시 수집 장애를 구분하며 null 점수를 0점으로 변환하지 않는다. 운영 제공 확인은 아직 하지 않았다.
+
 회원 정보의 `membershipType` 허용값은 `free`, `paid`, `admin`이다. `admin`은 기존 활성 회원용 테스트 이용등급이며 관리자 권한과 분리한다. nullable 만료일·환경·적용 대상·계산 우선순위는 [회원 이용등급 계약](membership-api.md)을 따른다.
 
 ## TEST 결제 계약

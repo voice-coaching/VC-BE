@@ -19,7 +19,7 @@ import java.util.Objects;
 import static org.example.voice.analysis.exception.CanonicalAnalysisViewException.Reason.*;
 
 @Service
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_=@org.springframework.beans.factory.annotation.Autowired)
 public class CanonicalAnalysisQueryService {
     private final AnalysisResultJpaRepository results;
     private final CanonicalExecutionRegistry executions;
@@ -30,6 +30,11 @@ public class CanonicalAnalysisQueryService {
     private final CanonicalDeliverySpool delivery;
     private final CanonicalPublishedResults published;
     private final org.example.voice.analysis.infrastructure.independent.IndependentAnalysisViewReader independent;
+    public CanonicalAnalysisQueryService(AnalysisResultJpaRepository results,CanonicalExecutionRegistry executions,
+            CanonicalCommittedResultReader committed,CanonicalViewVisibility visibility,CanonicalPublicProjection projection,
+            CanonicalActionPolicy actions,CanonicalDeliverySpool delivery,CanonicalPublishedResults published) {
+        this(results,executions,committed,visibility,projection,actions,delivery,published,null);
+    }
 
     @Transactional(readOnly=true,isolation=Isolation.READ_COMMITTED,timeout=10)
     public org.example.voice.analysis.domain.model.CanonicalResultContract contract(Long analysisId, Long userId) {

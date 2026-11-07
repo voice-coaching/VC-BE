@@ -1,5 +1,8 @@
 # 아키텍처 문서 - voice
 
+2026-11-07: 플래그 기본 false인 [독립 음성 분석 제출·수집 경로](independent-analysis-pull.md)를 추가했다.
+기존 공개 `/api`와 Backend ID를 유지하고 AI transport만 전용 adapter로 분리한다. 운영 전환은 별도다.
+
 ## 요약
 
 voice는 발음 및 억양 학습을 위한 Spring Boot 기반 백엔드 프로젝트이다.

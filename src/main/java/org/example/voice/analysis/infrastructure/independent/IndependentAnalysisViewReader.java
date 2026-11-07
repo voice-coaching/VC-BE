@@ -10,6 +10,7 @@ import org.example.voice.analysis.infrastructure.runpod.RunPodContract;
 import java.util.List;
 import java.util.Set;
 import static org.example.voice.analysis.exception.CanonicalAnalysisViewException.Reason.*;
+import static org.example.voice.analysis.domain.type.IndependentAnalysisStage.*;
 
 /** Project only the current stored independent result; no remote I/O or legacy envelope parsing. */
 @Component @RequiredArgsConstructor
@@ -19,10 +20,12 @@ public class IndependentAnalysisViewReader {
         var attempt=queue.current(result.getId(),ownerId,result.getActiveRequestEventId(),result.getActiveExecutionId())
                 .orElseThrow(()->new CanonicalAnalysisViewException(CANONICAL_RESULT_UNAVAILABLE));
         boolean terminal=result.getStatus()==AnalysisStatus.COMPLETED || result.getStatus()==AnalysisStatus.FAILED;
-        boolean committed=Set.of("ACK_PENDING","ACKED","FINISHED").contains(attempt.stage());
+        boolean committed=Set.of(ACK_PENDING,ACKED,FINISHED).contains(attempt.stage());
         CanonicalAnalysisView.Canonical canonical=null;
         if(terminal && committed && attempt.resultBytes()!=null) {
             try {
+                if(!IndependentResultDocument.sha256(attempt.resultBytes()).equals(attempt.resultSha256()))
+                    throw new CanonicalAnalysisViewException(CANONICAL_RESULT_UNAVAILABLE);
                 canonical=IndependentResultDocument.parse(attempt.resultBytes(),attempt).project();
                 if(result.getStatus()==AnalysisStatus.FAILED && (canonical.decision()==null || canonical.score()==null
                         || canonical.score().validity()==null || canonical.score().reason()==null)) canonical=null;

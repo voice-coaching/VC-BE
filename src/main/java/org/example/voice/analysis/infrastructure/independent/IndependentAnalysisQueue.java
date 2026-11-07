@@ -42,6 +42,12 @@ public class IndependentAnalysisQueue implements IndependentAnalysisSubmission {
             throw new BaseException(ErrorCode.RESOURCE_NOT_FOUND);
     }
     @Transactional(propagation=Propagation.MANDATORY)
+    public void assertSession(Long sessionId,Long ownerId) {
+        // Validate before startAnalysis can overwrite a cancelled session's state.
+        if(jdbc.queryForList("SELECT id FROM training_sessions WHERE id=? AND user_id=? AND status<>'CANCELED' FOR UPDATE",sessionId,ownerId).isEmpty())
+            throw new BaseException(ErrorCode.RESOURCE_NOT_FOUND);
+    }
+    @Transactional(propagation=Propagation.MANDATORY)
     public void enqueue(AnalysisWorkerRequest request,Long ownerId) {
         if(!properties.acceptsSubmissions()) throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
         var analysis=analyses.findForIngestion(request.analysisId()).orElseThrow(()->new BaseException(ErrorCode.ANALYSIS_NOT_FOUND));
@@ -96,7 +102,7 @@ public class IndependentAnalysisQueue implements IndependentAnalysisSubmission {
         return new IndependentAnalysisAttempt((UUID)r.get("client_request_id"),(UUID)r.get("backend_execution_id"),
                 number(r,"analysis_id"),number(r,"recording_id"),number(r,"owner_id"),number(r,"session_id"),number(r,"content_id"),
                 (String)r.get("audio_object_key"),(String)r.get("audio_sha256"),number(r,"audio_size"),(String)r.get("script_ciphertext"),
-                (String)r.get("script_sha256"),(String)r.get("stage"),(UUID)r.get("ai_job_id"),(UUID)r.get("ai_execution_id"),
+                (String)r.get("script_sha256"),org.example.voice.analysis.domain.type.IndependentAnalysisStage.valueOf((String)r.get("stage")),(UUID)r.get("ai_job_id"),(UUID)r.get("ai_execution_id"),
                 (String)r.get("ai_status"),(UUID)r.get("claim_id"),((Number)r.get("attempt_count")).intValue(),
                 (String)r.get("result_sha256"),(byte[])r.get("result_bytes"),Boolean.TRUE.equals(r.get("current_attempt")),r.get("cancel_requested_at")!=null);
     }
@@ -124,7 +130,7 @@ public class IndependentAnalysisQueue implements IndependentAnalysisSubmission {
     }
     @Transactional(timeout=5)
     public boolean beforeSubmit(IndependentAnalysisAttempt a) {
-        return jdbc.update("UPDATE independent_analysis_attempts SET stage='LOOKUP_PENDING' WHERE client_request_id=? AND claim_id=? AND claim_until>CURRENT_TIMESTAMP",a.clientRequestId(),a.claimId())==1;
+        return jdbc.update("UPDATE independent_analysis_attempts q SET stage='LOOKUP_PENDING' WHERE client_request_id=? AND claim_id=? AND claim_until>CURRENT_TIMESTAMP AND "+CURRENT,a.clientRequestId(),a.claimId())==1;
     }
     public static void correlate(IndependentAnalysisAttempt a,Job job) {
         if(!a.clientRequestId().equals(job.clientRequestId()) || (a.jobId()!=null && !a.jobId().equals(job.jobId()))
@@ -173,7 +179,7 @@ public class IndependentAnalysisQueue implements IndependentAnalysisSubmission {
             analysis.finishIndependent(a.clientRequestId(),status,document.score(),document.feedback(),safeCode(document.failure()),delivered);
             analyses.saveAndFlush(analysis);
             settle(a,delivered);
-        }
+        } else settle(a,false);
         jdbc.update("""
             UPDATE independent_analysis_attempts SET stage='ACK_PENDING',committed_at=CURRENT_TIMESTAMP,
                 next_attempt_at=CURRENT_TIMESTAMP,attempt_count=0,claim_id=NULL,claim_until=NULL,last_error_code=NULL
@@ -186,7 +192,7 @@ public class IndependentAnalysisQueue implements IndependentAnalysisSubmission {
         if(current(analysis,a)) {
             analysis.finishIndependent(a.clientRequestId(),AnalysisStatus.FAILED,null,null,safeCode(job.failureCode()),false);
             analyses.saveAndFlush(analysis);settle(a,false);
-        }
+        } else settle(a,false);
         jdbc.update("UPDATE independent_analysis_attempts SET stage='ACK_PENDING',ai_status=?,ai_sequence=?,committed_at=CURRENT_TIMESTAMP,next_attempt_at=CURRENT_TIMESTAMP,claim_id=NULL,claim_until=NULL WHERE client_request_id=?",
                 job.status(),job.sequence(),a.clientRequestId());
     }
@@ -196,7 +202,10 @@ public class IndependentAnalysisQueue implements IndependentAnalysisSubmission {
     }
     @Transactional(timeout=5)
     public void canceledBeforeSubmit(IndependentAnalysisAttempt a) {
-        if(owned(a).isPresent())jdbc.update("UPDATE independent_analysis_attempts SET stage='CANCELLED',claim_id=NULL,claim_until=NULL WHERE client_request_id=?",a.clientRequestId());
+        if(owned(a).isPresent()) {
+            jdbc.update("UPDATE independent_analysis_attempts SET stage='CANCELLED',claim_id=NULL,claim_until=NULL WHERE client_request_id=?",a.clientRequestId());
+            settle(a,false);
+        }
     }
     @Transactional(timeout=5)
     public void cancelRequested(IndependentAnalysisAttempt a) {
@@ -230,7 +239,7 @@ public class IndependentAnalysisQueue implements IndependentAnalysisSubmission {
         if(rejected && current(analysis,a)) {
             analysis.finishIndependent(a.clientRequestId(),AnalysisStatus.FAILED,null,null,"INDEPENDENT_SUBMISSION_REJECTED",false);
             analyses.saveAndFlush(analysis);settle(a,false);
-        }
+        } else if(rejected) settle(a,false);
     }
     private void settle(IndependentAnalysisAttempt a,boolean delivered) {
         // V61 removed the legacy settlement trigger; independent attempts settle explicitly once.

@@ -72,6 +72,7 @@ public class TrainingAnalysisRequestService {
         // 선택된 세션의 녹음으로 요청을 구성한다. 별도의 접수·동의·품질 제한은 적용하지 않는다.
 
         trainingSessionWriter.lockAnalysisSelection(sessionId, userId);
+        if(profile==AnalysisExecutionProfile.INDEPENDENT_PULL) independent.assertSession(sessionId,userId);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.SELECTED_RECORDING_NOT_FOUND));
         if(profile==AnalysisExecutionProfile.INDEPENDENT_PULL && trainingAnalysisReader.existsRunningAnalysis(source.recordingId()))
@@ -116,6 +117,7 @@ public class TrainingAnalysisRequestService {
         // 실패 row를 새 request event id의 PENDING 상태로 전환하고 outbox에 다시 기록한다.
 
         trainingSessionWriter.lockAnalysisSelection(sessionId, userId);
+        if(profile==AnalysisExecutionProfile.INDEPENDENT_PULL) independent.assertSession(sessionId,userId);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
         if(profile==AnalysisExecutionProfile.INDEPENDENT_PULL && trainingAnalysisReader.existsRunningAnalysis(source.recordingId()))

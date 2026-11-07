@@ -6,7 +6,7 @@ CREATE TABLE independent_analysis_attempts (
     recording_id BIGINT NOT NULL REFERENCES voice_recordings(id) ON DELETE CASCADE,
     owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     session_id BIGINT NOT NULL REFERENCES training_sessions(id) ON DELETE CASCADE,
-    content_id BIGINT NOT NULL,
+    content_id BIGINT NOT NULL CHECK (content_id>0),
     audio_object_key TEXT NOT NULL,
     audio_sha256 VARCHAR(64) NOT NULL CHECK (audio_sha256 ~ '^[a-f0-9]{64}$'),
     audio_size BIGINT NOT NULL CHECK (audio_size BETWEEN 1 AND 20971520),

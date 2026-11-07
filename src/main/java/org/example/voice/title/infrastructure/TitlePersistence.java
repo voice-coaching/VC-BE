@@ -75,5 +75,10 @@ public class TitlePersistence implements TitleRepository {
                 .getResultStream().findFirst();
     }
 
-    private Optional<BigDecimal> canonicalScore(org.example.voice.analysis.domain.entity.AnalysisResult result) { return committedResults.findCurrent(result).map(doc -> doc.overallScore()); }
+    private Optional<BigDecimal> canonicalScore(org.example.voice.analysis.domain.entity.AnalysisResult result) {
+        if(result.isIndependentExecution()) return result.getStatus()==org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
+                && result.getCanonicalResultEventId()!=null && result.isCoachingDelivered()
+                ?Optional.ofNullable(result.getOverallScore()):Optional.empty();
+        return committedResults.findCurrent(result).map(doc -> doc.overallScore());
+    }
 }
