@@ -10,7 +10,7 @@ public final class SafeLoggingJsonCustomizer implements StructuredLoggingJsonMem
     private static final Set<String> FIELDS=Set.of("@timestamp","@version","message","logger_name","thread_name",
             "level","level_value","service_name","event","http_method","route","http_status","duration_ms",
             "request_id","error_code","exception_type","stack_trace","analysis_id","analysis_request_id",
-            "execution_id","queue_age_ms");
+            "execution_id","queue_age_ms","contract_kind","violation_count","field_paths");
     @Override public void customize(JsonWriter.Members<ILoggingEvent> members) {
         // JsonWriter's predicate identifies excluded paths (true means omit), not allowed paths.
         members.applyingPathFilter(path -> !path.name().isEmpty() && !FIELDS.contains(path.name()));

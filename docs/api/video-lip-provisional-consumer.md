@@ -1,5 +1,8 @@
 # 영상 입술 임시 점수 백엔드 연동
 
+2026-11-07 후속 [CORE 수신 호환성 수정](ai-owned-core-compatibility.md)은 CORE release enum을 제거하고
+visual coaching 입력도 운영 AI의 PROVISIONAL·selection policy·action 계약에 맞춘다. 아래 초기 도입 범위와 구분한다.
+
 ## 근거와 범위
 
 사용자 전달 `backend-handoff.md`(2026-11-06)를 최신 main `f48a6c8`과 대조했다.

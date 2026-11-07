@@ -1,5 +1,11 @@
 # Deployment Notes - voice
 
+## AI 결과 수신 호환성 수정 후보 (2026-11-07)
+
+[CORE 수신 계약](../api/ai-owned-core-compatibility.md)의 결과 스키마 2개와 visual coaching 입력을 JAR에 함께 포함한다.
+이 변경에는 DB migration·독립 분석 플래그 전환이 없다. 기존 실패 180·181이나 원본을 자동 재실행/변환하지 않는다.
+`analysis_contract_rejected` 로그의 field_paths는 새 인계의 거절 지점 확인용이며 결과 값이나 토큰을 기록하지 않는다.
+
 ## 독립 음성 분석 후보 설정 (2026-11-07)
 
 V68과 소스는 준비했으나 운영 migration·배포·AI 프로필 전환은 미수행이다.

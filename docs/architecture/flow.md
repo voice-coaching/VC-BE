@@ -1,5 +1,11 @@
 # 흐름 문서 - voice
 
+### 2026-11-07 운영 AI 결과 수신 호환성 수정 후보
+
+legacy v6/handoff v2의 결과 수신에서 CORE release 고정 enum을 제거한다. AI 자산 선택을 재판정하지 않고
+기존 transport/identity/digest 경계를 유지한다. 검증 거절 로그는 원문 값 없이 제한된 필드 경로를 남긴다.
+[확인 근거·계약·미검증 범위](../api/ai-owned-core-compatibility.md). 독립 경로 플래그 전환과 기존 분석 재실행은 포함하지 않는다.
+
 ### 2026-11-07 독립 음성 제출·결과 수집 후보
 
 새 접수 플래그를 켠 음성은 사용자·세션·이용량 검증 → 분석/outbox 원자 저장 → PCM 제출 → AI 상태/원본 결과 수집 → DB commit → ACK 순서다.
