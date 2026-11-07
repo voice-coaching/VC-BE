@@ -14,6 +14,7 @@ public class TitleExceptionHandler {
     @ExceptionHandler(TitleException.class)
     public ResponseEntity<ApiResponse<Void>> title(TitleException error) {
         String message = switch (error.getMessage()) {
+            case "ANALYSIS_NOT_COMPLETED" -> "아직 채점 가능한 분석이 완료되지 않았습니다. 분석 완료 후 같은 시험의 채점을 다시 확인해 주세요.";
             case "ANALYSIS_SCORE_UNAVAILABLE" -> "발음 코칭은 완료됐지만 점수를 확정할 수 없어 승급 채점을 보류했습니다.";
             case "TITLE_EXAM_ANALYSIS_IN_PROGRESS" -> "기존 시험 분석이 진행 중입니다. 새 녹음을 시작하지 않고 기존 작업을 유지했습니다.";
             default -> "승급 시험 요청을 처리할 수 없습니다.";

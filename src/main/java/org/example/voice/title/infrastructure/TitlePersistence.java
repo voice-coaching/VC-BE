@@ -3,6 +3,7 @@ package org.example.voice.title.infrastructure;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.example.voice.title.domain.TitleRank;
+import org.example.voice.title.domain.TitleExamScore;
 import org.example.voice.title.domain.entity.*;
 import org.example.voice.title.domain.port.TitleRepository;
 import org.example.voice.training.domain.entity.TrainingSession;
@@ -40,14 +41,28 @@ public class TitlePersistence implements TitleRepository {
                 .setParameter("id",id).getSingleResult()>0;
     }
     public Optional<BigDecimal> score(Long analysisId, Long userId, Long sessionId, Long contentId) {
-        if (analysisId == null || userId == null || sessionId == null || contentId == null) return Optional.empty();
-        return canonicalAnalysis(analysisId, userId, sessionId, contentId).flatMap(result -> {
-            var stored = result.getOverallScore();
-            return stored != null ? Optional.of(stored) : canonicalScore(result);
-        }).filter(score -> score.signum() >= 0 && score.compareTo(BigDecimal.valueOf(100)) <= 0);
+        return assessScore(analysisId,userId,sessionId,contentId).score();
+    }
+    public TitleExamScore assessScore(Long analysisId, Long userId, Long sessionId, Long contentId) {
+        if (analysisId == null || userId == null || sessionId == null || contentId == null)
+            return TitleExamScore.unavailable();
+        var found=canonicalAnalysis(analysisId,userId,sessionId,contentId);
+        if(found.isEmpty()) return TitleExamScore.unavailable();
+        var result=found.get();
+        if(result.getStatus()==org.example.voice.analysis.domain.type.AnalysisStatus.PENDING
+                || result.getStatus()==org.example.voice.analysis.domain.type.AnalysisStatus.PROCESSING)
+            return TitleExamScore.waiting();
+        if(result.getStatus()!=org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED)
+            return TitleExamScore.unavailable();
+        var score=result.isCanonicalExecution()?canonicalScore(result):Optional.ofNullable(result.getOverallScore());
+        return score.filter(value -> value.signum()>=0 && value.compareTo(BigDecimal.valueOf(100))<=0)
+                .map(TitleExamScore::ready).orElseGet(TitleExamScore::unavailable);
     }
     public boolean ownedAnalysis(Long id, Long userId) { return true; }
-    public boolean coachingScoreUnavailable(Long analysisId, Long userId, Long sessionId, Long contentId) { return false; }
+    public boolean coachingScoreUnavailable(Long analysisId, Long userId, Long sessionId, Long contentId) {
+        var assessment=assessScore(analysisId,userId,sessionId,contentId);
+        return !assessment.pending() && assessment.score().isEmpty();
+    }
     public Optional<TrainingSessionCreatedData> reusableSession(Long sessionId, Long userId) {
         if (sessionId == null) return Optional.empty();
         return em.createQuery("select s from TrainingSession s join fetch s.content where s.id=:id and (coalesce(:user,0L)=coalesce(:user,0L)) and s.status not in (org.example.voice.training.domain.type.TrainingSessionStatus.CANCELED,org.example.voice.training.domain.type.TrainingSessionStatus.FAILED)", TrainingSession.class)
@@ -65,7 +80,6 @@ public class TitlePersistence implements TitleRepository {
         return em.createQuery("""
                 select a from AnalysisResult a join a.recording r join r.trainingSession s
                 where a.id=:id and s.userId=:user and s.id=:session and s.content.id=:content
-                and a.status=org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
                 and r.selected=true and r.deletedAt is null
                 and s.status in (org.example.voice.training.domain.type.TrainingSessionStatus.ANALYZING,
                                  org.example.voice.training.domain.type.TrainingSessionStatus.COMPLETED)
@@ -79,6 +93,12 @@ public class TitlePersistence implements TitleRepository {
         if(result.isIndependentExecution()) return result.getStatus()==org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
                 && result.getCanonicalResultEventId()!=null && result.isCoachingDelivered()
                 ?Optional.ofNullable(result.getOverallScore()):Optional.empty();
-        return committedResults.findCurrent(result).map(doc -> doc.overallScore());
+        try {
+            return committedResults.findCurrent(result)
+                    .filter(org.example.voice.analysis.infrastructure.canonical.CanonicalCompletionEligibility::deliverable)
+                    .map(doc -> doc.overallScore());
+        } catch (IllegalStateException | org.example.voice.analysis.infrastructure.runpod.RunPodContractException invalid) {
+            return Optional.empty();
+        }
     }
 }

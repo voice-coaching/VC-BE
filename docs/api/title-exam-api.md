@@ -160,6 +160,17 @@ Content-Type: application/json
 
 채점은 클라이언트가 보낸 점수가 아니라 서버에 저장된 `analysis_results.overall_score`를 사용한다.
 
+Canonical V4/V5/V6 분석은 현재 실행과 일치하는 커밋된 결과 문서의 점수를 사용한다. 미확정 프리뷰와 수정 가능한 점수 컬럼만으로 승급하지 않는다. Independent 분석은 저장 완료된 결과의 점수와 전달 상태를 확인한다.
+
+### 분석 저장 확정과 자동 제출
+
+- `GET /api/v2/analyses/{analysisId}`, `GET /api/v3/analyses/{analysisId}`는 피드백을 먼저 표시할 수 있다. `jobStatus=COMPLETED`만으로 승급 제출을 시작하지 않는다.
+- 결과 공개 후 DB 저장 중에는 `persistenceStatus=SAVING`, `actions.canComplete=false`다. 현재 실행의 결과와 분석 완료가 커밋되면 `persistenceStatus=SAVED`가 된다. B2 비동기 보관 완료까지 기다리는 것은 아니다.
+- 프론트는 같은 분석을 조회하며 저장 확정을 기다리고, `SAVED` 및 `canComplete=true`를 확인한 뒤 학습 완료와 승급 제출을 진행한다. 기존 서버의 `AVAILABLE`은 저장 확정 증거로 사용하지 않는다.
+- 일찍 도착한 승급 제출은 409 `ANALYSIS_NOT_COMPLETED`로 응답하며 시험·칭호를 변경하지 않는다. 자동 대기·재확인 시 동일 `examId`와 `analysisId`를 유지한다. 새 분석이나 재녹음은 필요하지 않다.
+- 저장 완료 후 실제 점수가 없거나 유효하지 않으면 409 `ANALYSIS_SCORE_UNAVAILABLE`이며, 이를 자동 불합격이나 0점으로 처리하지 않는다.
+- 기존에 거절된 제출을 서버가 자동 재실행하지는 않는다. 이미 채점된 동일 분석의 재제출은 최초 결과를 반환한다.
+
 ## 승급 정책
 
 | 목표 칭호 | 누적 완료 연습 | 합격 점수 |
@@ -195,7 +206,7 @@ Content-Type: application/json
 | 409 | `TITLE_EXAM_NOT_ELIGIBLE` | 누적 완료 연습 횟수 부족 |
 | 409 | `MAX_TITLE_REACHED` | 이미 최고 칭호 |
 | 409 | `TITLE_EXAM_CONTENT_MISMATCH` | 시험 콘텐츠와 세션 콘텐츠 불일치 |
-| 409 | `ANALYSIS_NOT_COMPLETED` | 채점 가능한 완료 분석 없음 |
+| 409 | `ANALYSIS_NOT_COMPLETED` | 시험 연결이 없거나 해당 시험 분석이 아직 진행·저장 중. 같은 분석의 저장 확정 후 제출 |
 | 409 | `ANALYSIS_SCORE_UNAVAILABLE` | 분석은 완료됐지만 승급 채점용 점수 없음 |
 | 409 | `TITLE_EXAM_ALREADY_GRADED` | 이미 채점된 시험 |
 | 503 | `TITLE_EXAM_CONTENT_UNAVAILABLE` | 운영 DB에 시험용 게시 콘텐츠가 준비되지 않음 |
