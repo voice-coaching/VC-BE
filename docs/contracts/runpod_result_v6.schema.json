@@ -2833,6 +2833,9 @@
         },
         "reason": {
           "const": "EVIDENCE_BOUND_PRACTICE_SCORE"
+        },
+        "details": {
+          "$ref": "#/$defs/scoreDetails"
         }
       },
       "$comment": "AI-owned calculated overallScore. Legacy rubric metadata is optional and opaque to consumers; no peer worksheet/version/phone-level gate."
@@ -2856,6 +2859,9 @@
             },
             "reason": {
               "const": "SCORING_FAILED"
+            },
+            "details": {
+              "$ref": "#/$defs/scoreDetails"
             }
           }
         },
@@ -2950,7 +2956,8 @@
         "scoreKind": {
           "enum": [
             "NONE",
-            "CALIBRATED"
+            "CALIBRATED",
+            "PROVISIONAL"
           ]
         },
         "coverage": {
@@ -3045,7 +3052,8 @@
                 "enum": [
                   "NONE",
                   "REFERENCE_SIMILARITY",
-                  "CALIBRATED"
+                  "CALIBRATED",
+                  "PROVISIONAL"
                 ]
               },
               "audioStartSeconds": {
@@ -3118,9 +3126,11 @@
               "allowedActionIds": {
                 "type": "array",
                 "items": {
-                  "type": "string"
+                  "enum": [
+                    "COMPARE_REFERENCE"
+                  ]
                 },
-                "maxItems": 0
+                "maxItems": 1
               },
               "reasonCodes": {
                 "type": "array",
@@ -3190,6 +3200,13 @@
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 3600
+              },
+              "subScores": {
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "$ref": "#/$defs/lipSubScore"
+                }
               }
             },
             "required": [
@@ -3239,7 +3256,10 @@
                 "then": {
                   "properties": {
                     "scoreKind": {
-                      "const": "CALIBRATED"
+                      "enum": [
+                        "CALIBRATED",
+                        "PROVISIONAL"
+                      ]
                     },
                     "score": {
                       "type": "number",
@@ -3277,6 +3297,13 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 2048
+        },
+        "subScores": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/lipSubScore"
+          }
         }
       },
       "required": [
@@ -3319,7 +3346,10 @@
           "then": {
             "properties": {
               "scoreKind": {
-                "const": "CALIBRATED"
+                "enum": [
+                  "CALIBRATED",
+                  "PROVISIONAL"
+                ]
               },
               "score": {
                 "type": "number",
@@ -4068,6 +4098,344 @@
                     }
                   }
                 }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "scoreDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "validationStatus",
+        "aggregationMode",
+        "audioScore",
+        "visualScore",
+        "audioWeight",
+        "visualWeight",
+        "criteria"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "voice-coaching.score-details.v1"
+        },
+        "validationStatus": {
+          "const": "EXPERT_REVIEW_PENDING"
+        },
+        "aggregationMode": {
+          "enum": [
+            "AUDIO_ONLY",
+            "AUDIO_VISUAL"
+          ]
+        },
+        "audioScore": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "visualScore": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "audioWeight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "visualWeight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/scoreDetailCriterion"
+                },
+                {
+                  "properties": {
+                    "criterionId": {
+                      "const": "pronunciation_accuracy"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/scoreDetailCriterion"
+                },
+                {
+                  "properties": {
+                    "criterionId": {
+                      "const": "speaking_rate"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/scoreDetailCriterion"
+                },
+                {
+                  "properties": {
+                    "criterionId": {
+                      "const": "articulation_rate"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/scoreDetailCriterion"
+                },
+                {
+                  "properties": {
+                    "criterionId": {
+                      "const": "pauses"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/scoreDetailCriterion"
+                },
+                {
+                  "properties": {
+                    "criterionId": {
+                      "const": "pitch"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/scoreDetailCriterion"
+                },
+                {
+                  "properties": {
+                    "criterionId": {
+                      "const": "intensity"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "items": false
+        }
+      }
+    },
+    "scoreDetailCriterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "criterionId",
+        "label",
+        "score",
+        "status",
+        "reasonCode",
+        "weight"
+      ],
+      "properties": {
+        "criterionId": {
+          "enum": [
+            "pronunciation_accuracy",
+            "speaking_rate",
+            "articulation_rate",
+            "pauses",
+            "pitch",
+            "intensity"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "status": {
+          "enum": [
+            "SCORED",
+            "UNSCORABLE"
+          ]
+        },
+        "reasonCode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "SCORED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "number"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "score": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "lipSubScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "criterionId",
+        "label",
+        "score",
+        "status",
+        "reasonCode"
+      ],
+      "properties": {
+        "criterionId": {
+          "enum": [
+            "lip_aperture",
+            "lip_rounding",
+            "lip_closure",
+            "lip_timing"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "status": {
+          "enum": [
+            "SCORED",
+            "UNSCORABLE",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "reasonCode": {
+          "type": "string"
+        },
+        "measurements": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "metricId",
+              "value",
+              "referenceMedian",
+              "referenceScale",
+              "referenceCount",
+              "tolerance",
+              "unit"
+            ],
+            "properties": {
+              "metricId": {
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              },
+              "referenceMedian": {
+                "type": "number"
+              },
+              "referenceScale": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "referenceCount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 32
+              },
+              "tolerance": {
+                "type": "number",
+                "minimum": 0
+              },
+              "unit": {
+                "enum": [
+                  "PHONE_PHASE",
+                  "FACE_SCALE_NORMALIZED"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "SCORED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "number"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "score": {
+                "type": "null"
               }
             }
           }
