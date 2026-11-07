@@ -71,7 +71,7 @@ class UnifiedV6AudioContractTest {
                 java.util.Map.entry("runpod_canonical_journal_v1.schema.json","798aa2eee85f9196d0519763119f266b14f065899c03faa75599fab5fed2e5f5"),
                 java.util.Map.entry("runpod_analysis_request_v4.schema.json","8fde9cf8ee44b5b151bf31205a355c80789fedc6c8d74ba994274bc898c9eec0"),
                 // Backend accepts AI-owned CORE identities; this digest identifies our transport schema.
-                java.util.Map.entry("runpod_result_v6.schema.json","09334a54c3b81c402a7b26136db5826e71fff0a0605338351e92327383033c6a"),
+                java.util.Map.entry("runpod_result_v6.schema.json","4bbc76bf4aeb015d7c1d9bebb7fdeb353b8889b64ee11071c16319f8e3fef362"),
                 java.util.Map.entry("runpod_canonical_handoff_v2.schema.json","8677401f5edf88258ca72344cde932b0ddbefdd8e35ccc1885970e6ac2632c07"),
                 java.util.Map.entry("runpod_media_preparation_v1.schema.json","0a9c91e88d37f2108a77772512db1d23fcdce48b3a3741407a7f27b31c06946f"),
                 java.util.Map.entry("runpod_visual_coaching_input_v1.schema.json","63c560fdd1e775cdce21831ad840e63419f12e53ca5e70023d302bd95cdcdbde"));

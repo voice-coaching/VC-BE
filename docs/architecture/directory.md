@@ -1,5 +1,8 @@
 # 디렉토리 문서 - voice
 
+- `analysis/domain/model/PublicScoreDetails.java`: AI 표시용 6항목 DTO. 기존 Score의 선택 details이며 계산/저장 entity가 아니다.
+- CanonicalPublicProjection과 IndependentResultDocument는 기존 원본에서 같은 공개 DTO로 전달한다. [계약](../api/public-score-details.md).
+
 ## 독립 음성 분석 후보 추가 (2026-11-07)
 
 - `analysis/domain/port/IndependentAnalysis{Submission,Client}.java`, `IndependentAudioSource.java`: 접수·AI 호출·준비 PCM 읽기 경계.
