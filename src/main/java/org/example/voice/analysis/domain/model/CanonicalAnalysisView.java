@@ -79,7 +79,13 @@ public record CanonicalAnalysisView(
                         @JsonInclude(JsonInclude.Include.NON_NULL)
                         Object rubricRevision,
                         @JsonInclude(JsonInclude.Include.NON_NULL)
-                        Object criteria) {}
+                        Object criteria,
+                        @JsonInclude(JsonInclude.Include.NON_NULL)
+                        PublicScoreDetails details) {
+        public Score(BigDecimal overallScore, String validity, String reason, Object rubricRevision, Object criteria) {
+            this(overallScore, validity, reason, rubricRevision, criteria, null);
+        }
+    }
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record ScoreCriterion(String criterionId, Integer level) {}
     public sealed interface Visual permits AudioVisual, LipVisual {

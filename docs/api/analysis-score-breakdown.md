@@ -1,5 +1,7 @@
 # 항목별 발음 점수 응답
 
+2026-11-08: 아래는 기존 9개 음소 항목이다. 선택형 음성 6항목은 [score.details](public-score-details.md)에 별도로 보존하며 기존 배열이나 계산식을 재사용하지 않는다.
+
 GET /api/analyses/{analysisId} 및 GET /api/training-sessions/{sessionId}/analysis의 공통 응답 data에 scoreBreakdown을 추가한다. 기존 인증·소유권·완료 조건과 overallScore는 바꾸지 않는다.
 
 - scoreBreakdown: object 또는 null. 상세 v2 근거가 없는 구버전 분석, 아직 점수가 없는 분석, 지원하지 않거나 검증되지 않는 저장 근거는 null이다. 0점이나 평가 대상 없음과 구별한다.
