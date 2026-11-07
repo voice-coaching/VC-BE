@@ -38,12 +38,11 @@ public class TrainingSessionService {
         // 콘텐츠가 없으면 404, 존재하지만 게시 상태가 아니면 409로 분리한다.
         // 프론트가 "없는 콘텐츠"와 "현재 학습 불가 콘텐츠"를 다르게 처리할 수 있게 하기 위함이다.
 
-        if (customContents.validateSession(request.contentId(),userId,request.courseStepId(),request.titleExamId())) {
-            return createTrainingSession(request,userId,null);
-        }
-
         if (request.titleExamId() != null) {
             return titleExams.createSession(userId,request.titleExamId(),request.contentId(),request.courseStepId(),request.learningFocus());
+        }
+        if (customContents.validateSession(request.contentId(),userId,request.courseStepId(),request.titleExamId())) {
+            return createTrainingSession(request,userId,null);
         }
         return createTrainingSession(request,userId,request.courseStepId());
     }

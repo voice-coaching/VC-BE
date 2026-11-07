@@ -22,7 +22,9 @@ public class TitlePersistence implements TitleRepository {
         return em.createQuery("select count(s) from TrainingSession s where s.userId=:user and s.status=org.example.voice.training.domain.type.TrainingSessionStatus.COMPLETED", Long.class)
                 .setParameter("user", userId).getSingleResult();
     }
-    public Optional<TitleExam> owned(Long id, Long userId) { return Optional.ofNullable(em.find(TitleExam.class, id)); }
+    public Optional<TitleExam> owned(Long id, Long userId) {
+        return Optional.ofNullable(em.find(TitleExam.class, id)).filter(exam -> java.util.Objects.equals(exam.getUserId(), userId));
+    }
     public Optional<TitleExam> active(Long userId, TitleRank target) {
         return em.createQuery("select e from TitleExam e where e.userId=:user and e.targetRank=:target and e.status in ('READY','IN_PROGRESS')", TitleExam.class)
                 .setParameter("user", userId).setParameter("target", target).getResultStream().findFirst();
@@ -38,11 +40,11 @@ public class TitlePersistence implements TitleRepository {
                 .setParameter("id",id).getSingleResult()>0;
     }
     public Optional<BigDecimal> score(Long analysisId, Long userId, Long sessionId, Long contentId) {
-        var result = em.find(org.example.voice.analysis.domain.entity.AnalysisResult.class, analysisId);
-        if (result == null) return Optional.empty();
-        var stored = result.getOverallScore();
-        if (stored != null) return Optional.of(stored);
-        return committedResults.findCurrent(result).map(doc -> doc.overallScore());
+        if (analysisId == null || userId == null || sessionId == null || contentId == null) return Optional.empty();
+        return canonicalAnalysis(analysisId, userId, sessionId, contentId).flatMap(result -> {
+            var stored = result.getOverallScore();
+            return stored != null ? Optional.of(stored) : canonicalScore(result);
+        }).filter(score -> score.signum() >= 0 && score.compareTo(BigDecimal.valueOf(100)) <= 0);
     }
     public boolean ownedAnalysis(Long id, Long userId) { return true; }
     public boolean coachingScoreUnavailable(Long analysisId, Long userId, Long sessionId, Long contentId) { return false; }
@@ -62,9 +64,7 @@ public class TitlePersistence implements TitleRepository {
             Long analysisId, Long userId, Long sessionId, Long contentId) {
         return em.createQuery("""
                 select a from AnalysisResult a join a.recording r join r.trainingSession s
-                where a.id=:id and (coalesce(:user,0L)=coalesce(:user,0L)) and s.id=:session and s.content.id=:content
-                and a.analysisProfile in ('CANONICAL_HANDOFF_20261004_V5','CANONICAL_AUDIOVISUAL_20261007_V6')
-                and r.visualObjectKey is null
+                where a.id=:id and s.userId=:user and s.id=:session and s.content.id=:content
                 and a.status=org.example.voice.analysis.domain.type.AnalysisStatus.COMPLETED
                 and r.selected=true and r.deletedAt is null
                 and s.status in (org.example.voice.training.domain.type.TrainingSessionStatus.ANALYZING,

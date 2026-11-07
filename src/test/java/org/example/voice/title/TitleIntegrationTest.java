@@ -47,6 +47,8 @@ class TitleIntegrationTest {
     org.springframework.cache.CacheManager cacheManager;
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     org.example.voice.analysis.infrastructure.canonical.CanonicalReadFence canonicalReadFence;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    org.example.voice.analysis.infrastructure.canonical.CanonicalCommittedResultReader committedResults;
     Long user, other, content;
     TransactionTemplate tx;
     @BeforeEach void setup() {
@@ -226,6 +228,87 @@ class TitleIntegrationTest {
         tx.executeWithoutResult(s->ReflectionTestUtils.setField(em.find(TitlePolicy.class,TitleRank.BEGINNER),"practiceContentId",null));
         assertCode(()->titles.create(user,null),"TITLE_EXAM_CONTENT_UNAVAILABLE");
     }
+    @Test void passingCriteriaRejectsLowScoreAndKeepsPersistedRank() {
+        var exam = titles.create(user, null);
+        var result = analysis(user, bind(exam.id()), new BigDecimal("69.99"));
+        var grade = titles.submit(user, exam.id(), result);
+        assertThat(grade.status()).isEqualTo("FAILED");
+        assertThat(grade.passed()).isFalse();
+        assertThat(grade.currentTitle()).isEqualTo(grade.previousTitle());
+        assertThat(titles.progress(user).code()).isEqualTo("ABSOLUTE_BEGINNER");
+        assertThat(titles.submit(user, exam.id(), result)).isEqualTo(grade);
+    }
+
+    @Test void passingCriteriaAcceptsExactSnapshotThresholdAndReplaysOnlySameAnalysis() {
+        var exam = titles.create(user, null);
+        var result = analysis(user, bind(exam.id()), new BigDecimal("70.00"));
+        tx.executeWithoutResult(s -> ReflectionTestUtils.setField(em.find(TitlePolicy.class, TitleRank.BEGINNER), "passingScore", 99));
+        var grade = titles.submit(user, exam.id(), result);
+        assertThat(grade.passed()).isTrue();
+        assertThat(grade.passingScore()).isEqualTo(70);
+        assertThat(titles.progress(user).code()).isEqualTo("BEGINNER");
+        assertThat(titles.submit(user, exam.id(), result)).isEqualTo(grade);
+        assertCode(() -> titles.submit(user, exam.id(), result + 999), "TITLE_EXAM_ALREADY_GRADED");
+        assertCode(() -> titles.createSession(user, exam.id(), content, null, LearningFocus.BOTH), "TITLE_EXAM_ALREADY_GRADED");
+    }
+
+    @Test void passingCriteriaMissingOrOutOfRangeScoreDoesNotGrade() {
+        var exam = titles.create(user, null);
+        Long session = bind(exam.id());
+        Long result = analysis(user, session, null);
+        assertCode(() -> titles.submit(user, exam.id(), result), "ANALYSIS_SCORE_UNAVAILABLE");
+        for (var value : List.of(new BigDecimal("-1"), new BigDecimal("101"))) {
+            tx.executeWithoutResult(s -> ReflectionTestUtils.setField(em.find(AnalysisResult.class, result), "overallScore", value));
+            assertCode(() -> titles.submit(user, exam.id(), result), "ANALYSIS_SCORE_UNAVAILABLE");
+        }
+        assertThat(titles.get(user, exam.id()).status()).isEqualTo("IN_PROGRESS");
+        assertThat(titles.progress(user).code()).isEqualTo("ABSOLUTE_BEGINNER");
+    }
+
+    @Test void passingCriteriaDoesNotUseOtherMembersSessionsOrUnfinishedAnalysis() {
+        var exam = titles.create(user, null);
+        Long session = bind(exam.id());
+        var otherSession = sessions.create(new TrainingSessionCreateRequestDto(content, null, LearningFocus.BOTH), other);
+        Long alien = analysis(other, otherSession.sessionId(), BigDecimal.valueOf(100));
+        assertCode(() -> titles.submit(user, exam.id(), alien), "ANALYSIS_SCORE_UNAVAILABLE");
+        assertCode(() -> titles.submit(other, exam.id(), alien), "RESOURCE_NOT_FOUND");
+        var unrelated = sessions.create(new TrainingSessionCreateRequestDto(content, null, LearningFocus.BOTH), user);
+        Long unrelatedResult = analysis(user, unrelated.sessionId(), BigDecimal.valueOf(100));
+        assertCode(() -> titles.submit(user, exam.id(), unrelatedResult), "ANALYSIS_SCORE_UNAVAILABLE");
+        Long running = analysis(user, session, BigDecimal.valueOf(100));
+        tx.executeWithoutResult(s -> ReflectionTestUtils.setField(em.find(AnalysisResult.class, running), "status", AnalysisStatus.PROCESSING));
+        assertCode(() -> titles.submit(user, exam.id(), running), "ANALYSIS_SCORE_UNAVAILABLE");
+        tx.executeWithoutResult(s -> {
+            var a = em.find(AnalysisResult.class, running);
+            ReflectionTestUtils.setField(a, "status", AnalysisStatus.COMPLETED);
+            a.getRecording().unselect();
+        });
+        assertCode(() -> titles.submit(user, exam.id(), running), "ANALYSIS_SCORE_UNAVAILABLE");
+        assertThat(titles.progress(user).code()).isEqualTo("ABSOLUTE_BEGINNER");
+    }
+
+    @Test void passingCriteriaZeroScoreIsFailureAndUnboundExamCannotGrade() {
+        var exam = titles.create(user, null);
+        assertCode(() -> titles.submit(user, exam.id(), 999L), "ANALYSIS_NOT_COMPLETED");
+        Long result = analysis(user, bind(exam.id()), BigDecimal.ZERO);
+        var grade = titles.submit(user, exam.id(), result);
+        assertThat(grade.status()).isEqualTo("FAILED");
+        assertThat(grade.score()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(grade.currentTitle()).isEqualTo(grade.previousTitle());
+        assertThat(titles.progress(user).code()).isEqualTo("ABSOLUTE_BEGINNER");
+    }
+
+    @Test void passingCriteriaConcurrentSubmitPromotesOnlyOnce() throws Exception {
+        var exam = titles.create(user, null);
+        Long result = analysis(user, bind(exam.id()), BigDecimal.valueOf(80));
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var first = pool.submit(() -> titles.submit(user, exam.id(), result));
+            var second = pool.submit(() -> titles.submit(user, exam.id(), result));
+            assertThat(first.get(10, TimeUnit.SECONDS)).isEqualTo(second.get(10, TimeUnit.SECONDS));
+        }
+        assertThat(titles.progress(user).code()).isEqualTo("BEGINNER");
+    }
+
     private Long bind(Long exam) { return sessions.create(new TrainingSessionCreateRequestDto(content,null,LearningFocus.BOTH,exam),user).sessionId(); }
     private void completed(int count) { tx.executeWithoutResult(s->{ for(int i=0;i<count;i++){var t=TrainingSession.create(user,em.find(PracticeContent.class,content),null,LearningFocus.BOTH); t.startAnalysis(); t.complete(20); em.persist(t);}}); }
     private Long analysis(Long owner,Long session,BigDecimal score) {
