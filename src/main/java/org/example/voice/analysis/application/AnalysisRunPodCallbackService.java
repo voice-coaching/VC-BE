@@ -90,7 +90,9 @@ public class AnalysisRunPodCallbackService {
     }
 
     private AnalysisResult find(Long id) {
-        return analysisResultReader.findForIngestion(id).orElseThrow(() -> new RunPodContractException(404, "TARGET_NOT_FOUND"));
+        var result=analysisResultReader.findForIngestion(id).orElseThrow(() -> new RunPodContractException(404, "TARGET_NOT_FOUND"));
+        if(result.isIndependentExecution()) throw new RunPodContractException(409,"EXECUTION_INACTIVE");
+        return result;
     }
 
     private String executionPayload(AnalysisResult result, UUID request, UUID execution) {

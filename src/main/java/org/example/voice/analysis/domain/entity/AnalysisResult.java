@@ -303,11 +303,32 @@ public class AnalysisResult {
         analysisProfile="CANONICAL_AUDIOVISUAL_20261007_V6";
         expectedResultSchemaVersion="voice-coaching.runpod-analysis-result.v6";
     }
-    public boolean isCanonicalExecution() { return java.util.Set.of("CANONICAL_FROZEN_20260928_V4","CANONICAL_HANDOFF_20261004_V5","CANONICAL_AUDIOVISUAL_20261007_V6").contains(analysisProfile); }
+    public boolean isCanonicalExecution() { return isIndependentExecution() || java.util.Set.of("CANONICAL_FROZEN_20260928_V4","CANONICAL_HANDOFF_20261004_V5","CANONICAL_AUDIOVISUAL_20261007_V6").contains(analysisProfile); }
+
+    public boolean isIndependentExecution() { return "INDEPENDENT_PULL_V1".equals(analysisProfile); }
+
+    public void assignIndependentExecution(UUID executionId) {
+        assignExecution(executionId);
+        analysisProfile="INDEPENDENT_PULL_V1";
+        expectedResultSchemaVersion="voice-coaching.independent-analysis.v1";
+    }
+
+    /** Called under the analysis lock after exact request/execution ownership has been checked. */
+    public void finishIndependent(UUID requestId,AnalysisStatus finalStatus,BigDecimal score,String feedback,String code,boolean delivered) {
+        if(!isIndependentExecution() || !requestId.toString().equals(activeRequestEventId)
+                || (status!=AnalysisStatus.PENDING && status!=AnalysisStatus.PROCESSING)
+                || (finalStatus!=AnalysisStatus.COMPLETED && finalStatus!=AnalysisStatus.FAILED))
+            throw new IllegalStateException("Independent attempt changed");
+        clearWorkerResult();status=finalStatus;overallScore=score;summaryFeedback=feedback;
+        failureCode=finalStatus==AnalysisStatus.FAILED?code:null;
+        failureReason=finalStatus==AnalysisStatus.FAILED?"음성 분석 결과를 제공하지 못했습니다.":null;
+        canonicalResultEventId=requestId;committedResultSchemaVersion=expectedResultSchemaVersion;
+        coachingDelivered=delivered;analyzedAt=OffsetDateTime.now(SEOUL_ZONE_ID);
+    }
 
     /** Clears legacy score/selected-phone/coaching fields, without fabricating a legacy result. */
     public boolean finishCanonical(org.example.voice.analysis.domain.model.CanonicalResultCompletion result) {
-
+        if(isIndependentExecution()) throw new IllegalStateException("Independent result requires pull collection");
         clearWorkerResult();
         status=result.status();
         summaryFeedback=result.summary();
@@ -359,7 +380,7 @@ public class AnalysisResult {
     public boolean markProcessing() { status=AnalysisStatus.PROCESSING; analyzedAt=OffsetDateTime.now(SEOUL_ZONE_ID); return true; }
 
     public boolean complete(AnalysisWorkerResult result) {
-
+        if(isIndependentExecution()) throw new IllegalStateException("Independent result requires pull collection");
         this.status = AnalysisStatus.COMPLETED;
         this.analysisOutcome = result.outcome();
         this.coachingDelivered = result.outcome() == AnalysisOutcome.COACHING_READY

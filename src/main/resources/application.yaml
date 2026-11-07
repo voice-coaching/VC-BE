@@ -115,6 +115,13 @@ storage:
     maximum-duration-ms: ${MEDIA_NORMALIZATION_MAXIMUM_DURATION_MS:180000}
 
 analysis:
+  independent:
+    submission-enabled: ${ANALYSIS_INDEPENDENT_SUBMISSION_ENABLED:false}
+    workers-enabled: ${ANALYSIS_INDEPENDENT_WORKERS_ENABLED:false}
+    endpoint: ${AI_INDEPENDENT_ENDPOINT_URL:}
+    allowed-origins: ${AI_INDEPENDENT_ALLOWED_ORIGINS:}
+    api-token: ${AI_ANALYSIS_API_TOKEN:}
+    http-timeout: ${AI_INDEPENDENT_HTTP_TIMEOUT:PT25S}
   transport: ${AI_ANALYSIS_TRANSPORT:disabled}
   runpod:
     endpoint-url: ${RUNPOD_ENDPOINT_URL:}

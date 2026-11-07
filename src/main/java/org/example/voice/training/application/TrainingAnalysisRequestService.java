@@ -36,7 +36,7 @@ import java.util.HexFormat;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_=@org.springframework.beans.factory.annotation.Autowired)
 public class TrainingAnalysisRequestService {
 
     // 분석 요청의 도메인 검증과 transaction 경계를 소유한다. Redis Stream I/O는 publisher adapter에 숨긴다.
@@ -50,6 +50,14 @@ public class TrainingAnalysisRequestService {
     private final ProcessingConsentLedger processingConsentLedger;
     private final AnalysisAdmissionGuard analysisAdmissionGuard;
     private final CoachingUsageReservation coachingUsageService;
+    private final org.example.voice.analysis.domain.port.IndependentAnalysisSubmission independent;
+
+    public TrainingAnalysisRequestService(TrainingSessionService sessions,VoiceRecordingReader recordings,
+            TrainingAnalysisReader reader,TrainingAnalysisWriter writer,TrainingSessionWriter sessionWriter,
+            AnalysisJobPublisher publisher,AnalysisAuthorizationIssuer issuer,ProcessingConsentLedger consents,
+            AnalysisAdmissionGuard guard,CoachingUsageReservation usage) {
+        this(sessions,recordings,reader,writer,sessionWriter,publisher,issuer,consents,guard,usage,null);
+    }
 
     @Transactional
     public AnalysisRequestData requestAnalysis(Long sessionId, Long userId, AnalysisConsentData consent) {
@@ -60,11 +68,14 @@ public class TrainingAnalysisRequestService {
     public AnalysisRequestData requestAnalysis(Long sessionId, Long userId, AnalysisConsentData consent,
                                               AnalysisExecutionProfile profile) {
         java.util.Objects.requireNonNull(profile, "profile");
+        if(profile==AnalysisExecutionProfile.INDEPENDENT_PULL) independent.lockOwner(userId);
         // 선택된 세션의 녹음으로 요청을 구성한다. 별도의 접수·동의·품질 제한은 적용하지 않는다.
 
         trainingSessionWriter.lockAnalysisSelection(sessionId, userId);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.SELECTED_RECORDING_NOT_FOUND));
+        if(profile==AnalysisExecutionProfile.INDEPENDENT_PULL && trainingAnalysisReader.existsRunningAnalysis(source.recordingId()))
+            throw new BaseException(ErrorCode.ANALYSIS_ALREADY_RUNNING);
 
         if (profile != AnalysisExecutionProfile.LEGACY
                 && source.learningFocus() != LearningFocus.PRONUNCIATION) {
@@ -79,7 +90,7 @@ public class TrainingAnalysisRequestService {
         publish(toWorkerRequest(
                 result.analysisId(), requestEventId, userId, sessionId, source,
                 null, null
-        ), profile);
+        ), profile, userId);
         return result;
     }
 
@@ -100,12 +111,15 @@ public class TrainingAnalysisRequestService {
     public AnalysisRetryData retry(Long sessionId, Long userId, AnalysisConsentData consent,
                                    AnalysisExecutionProfile profile) {
         java.util.Objects.requireNonNull(profile, "profile");
+        if(profile==AnalysisExecutionProfile.INDEPENDENT_PULL) independent.lockOwner(userId);
         // 재시도 상태·횟수 제한 없이 현재 분석을 다시 요청한다.
         // 실패 row를 새 request event id의 PENDING 상태로 전환하고 outbox에 다시 기록한다.
 
         trainingSessionWriter.lockAnalysisSelection(sessionId, userId);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.RESOURCE_NOT_FOUND));
+        if(profile==AnalysisExecutionProfile.INDEPENDENT_PULL && trainingAnalysisReader.existsRunningAnalysis(source.recordingId()))
+            throw new BaseException(ErrorCode.ANALYSIS_ALREADY_RUNNING);
 
         AnalysisProgressData failed = trainingAnalysisReader.findLatestFailedBySelectedRecording(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FOUND));
@@ -121,15 +135,20 @@ public class TrainingAnalysisRequestService {
                 failed.analysisId(),
                 requestEventId
         );
+        if(profile==AnalysisExecutionProfile.INDEPENDENT_PULL) trainingSessionWriter.startAnalysis(sessionId);
 
         publish(toWorkerRequest(
                 result.analysisId(), requestEventId, userId, sessionId, source,
                 null, null
-        ), profile);
+        ), profile, userId);
         return result;
     }
 
-    private void publish(AnalysisWorkerRequest request, AnalysisExecutionProfile profile) {
+    private void publish(AnalysisWorkerRequest request, AnalysisExecutionProfile profile, Long ownerId) {
+        if(profile==AnalysisExecutionProfile.INDEPENDENT_PULL) {
+            independent.enqueue(request,ownerId);
+            return;
+        }
         if (profile == AnalysisExecutionProfile.LEGACY) {
             analysisJobPublisher.publish(request);
             return;
