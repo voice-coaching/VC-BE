@@ -19,7 +19,7 @@ import java.util.Objects;
 import static org.example.voice.analysis.exception.CanonicalAnalysisViewException.Reason.*;
 
 @Service
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_=@org.springframework.beans.factory.annotation.Autowired)
 public class CanonicalAnalysisQueryService {
     private final AnalysisResultJpaRepository results;
     private final CanonicalExecutionRegistry executions;
@@ -29,12 +29,21 @@ public class CanonicalAnalysisQueryService {
     private final CanonicalActionPolicy actions;
     private final CanonicalDeliverySpool delivery;
     private final CanonicalPublishedResults published;
+    private final org.example.voice.analysis.infrastructure.independent.IndependentAnalysisViewReader independent;
+    public CanonicalAnalysisQueryService(AnalysisResultJpaRepository results,CanonicalExecutionRegistry executions,
+            CanonicalCommittedResultReader committed,CanonicalViewVisibility visibility,CanonicalPublicProjection projection,
+            CanonicalActionPolicy actions,CanonicalDeliverySpool delivery,CanonicalPublishedResults published) {
+        this(results,executions,committed,visibility,projection,actions,delivery,published,null);
+    }
 
     @Transactional(readOnly=true,isolation=Isolation.READ_COMMITTED,timeout=10)
     public org.example.voice.analysis.domain.model.CanonicalResultContract contract(Long analysisId, Long userId) {
         // Apply the same ownership, visibility and current-generation fences as
         // detail reads, including verified previews. Then read the stored tuple.
         var view = get(analysisId, userId);
+        if (results.findById(analysisId).orElseThrow(()->error(RESOURCE_NOT_FOUND)).isIndependentExecution())
+            return new org.example.voice.analysis.domain.model.CanonicalResultContract(view.analysisId(),view.recordingId(),
+                    view.requestId(),view.executionId(),view.analysisProfile(),RunPodContract.RESULT_V6);
         var binding = executions.findCurrentForOwner(analysisId, userId)
                 .orElseThrow(() -> error(CANONICAL_RESULT_UNAVAILABLE));
         if (!Objects.equals(view.requestId(),binding.requestId())
@@ -51,6 +60,11 @@ public class CanonicalAnalysisQueryService {
         var result=results.findById(analysisId).orElseThrow(()->error(RESOURCE_NOT_FOUND));
         if (!Objects.equals(result.getRecording().getTrainingSession().getUserId(),userId))
             throw error(RESOURCE_NOT_FOUND);
+        if(result.isIndependentExecution()) {
+            var view=independent.read(result,userId);
+            if(!visibility.unchanged(result,userId)) throw error(CANONICAL_ANALYSIS_CHANGED);
+            return view;
+        }
         var document=published.current(result);
         if(document==null) document=committed.findCurrent(result).orElse(null);
         if(document==null) {

@@ -5,5 +5,6 @@ public enum AnalysisExecutionProfile {
     LEGACY,
     CANONICAL,
     CANONICAL_HANDOFF,
-    CANONICAL_AUDIOVISUAL
+    CANONICAL_AUDIOVISUAL,
+    INDEPENDENT_PULL
 }

@@ -1,5 +1,11 @@
 # 흐름 문서 - voice
 
+### 2026-11-07 독립 음성 제출·결과 수집 후보
+
+새 접수 플래그를 켠 음성은 사용자·세션·이용량 검증 → 분석/outbox 원자 저장 → PCM 제출 → AI 상태/원본 결과 수집 → DB commit → ACK 순서다.
+AI readiness 사전 호출, legacy claim/heartbeat/handoff를 사용하지 않는다. 기본 플래그는 false이며 운영 전환은 미수행이다.
+[상태·장애 복구와 설정](independent-analysis-pull.md), [외부 계약](../api/independent-analysis-v1.md)을 참조한다.
+
 ### 2026-10-29 클래스 문장 순차 연습
 
 클래스 진입 → `GET /api/courses/{courseId}/practice-examples` → 반환된 stepId와 문장별 practiceContentId로 세션 생성 → 녹음·분석·완료 → 다음 문장을 반복한다. V53으로 은퇴한 이론·듣기·결과 단계는 새 목록/시작 단계에서 제외하며 과거 세션과 개정은 보존한다. 인증·게시·소유권·개정 고정 검증은 기존 예문 조회를 재사용한다. 문장별 진행률 계산은 이번 범위에서 제외한다. [API 계약](../api/course-sequential-practice-api.md).

@@ -17,13 +17,20 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_=@org.springframework.beans.factory.annotation.Autowired)
 public class AnalysisCapabilitiesReaderImpl implements AnalysisCapabilitiesReader {
     private final ObjectStorageProperties storage;
     private final MediaNormalizationProperties normalization;
     private final AnalysisStreamProperties stream;
     private final RunPodAnalysisProperties runPod;
     private final AnalysisAuthorizationProperties authorization;
+    private final org.example.voice.analysis.infrastructure.independent.IndependentAnalysisProperties independent;
+
+    public AnalysisCapabilitiesReaderImpl(ObjectStorageProperties storage,MediaNormalizationProperties normalization,
+            AnalysisStreamProperties stream,RunPodAnalysisProperties runPod,AnalysisAuthorizationProperties authorization) {
+        this(storage,normalization,stream,runPod,authorization,
+                new org.example.voice.analysis.infrastructure.independent.IndependentAnalysisProperties());
+    }
 
     @Value("${analysis.transport:disabled}")
     private String analysisTransport;
@@ -31,7 +38,8 @@ public class AnalysisCapabilitiesReaderImpl implements AnalysisCapabilitiesReade
     @Override
     public AnalysisCapabilitiesData read() {
         boolean uploadConfigured=storage.isEnabled() && normalization.isEnabled();
-        return new AnalysisCapabilitiesData(status(uploadConfigured),status(uploadConfigured && (stream.isEnabled() || isRunPodHttpConfigured())),
+        boolean analysisConfigured=independent.isSubmissionEnabled()?independent.acceptsSubmissions():(stream.isEnabled() || isRunPodHttpConfigured());
+        return new AnalysisCapabilitiesData(status(uploadConfigured),status(uploadConfigured && analysisConfigured),
                 List.of(LearningFocus.PRONUNCIATION),RecordingMediaPolicy.AUDIO_MIME_TYPES,RecordingMediaPolicy.VIDEO_MIME_TYPES,
                 normalization.getMaximumInputBytes(),normalization.getMaximumInputBytes(),normalization.getMinimumDurationMs(),normalization.getMaximumDurationMs(),
                 true,false,true,null,RecordingMediaPolicy.VIDEO_CONSENT_POLICY_REVISION);

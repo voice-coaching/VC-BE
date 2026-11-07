@@ -1,5 +1,39 @@
 # DB Schema - voice
 
+## 독립 분석 시도·outbox (V68, 2026-11-07 후보)
+
+`V68__independent_analysis_pull.sql`은 `independent_analysis_attempts`를 추가한다. 소유 모듈은 analysis다.
+기존 V67 다음에 적용하는 additive migration이며 운영 DB 적용은 수행하지 않았다. soft delete 열은 없다.
+
+| 열 | PostgreSQL 타입·null/default·제약 |
+| --- | --- |
+| client_request_id | UUID PK, NOT NULL; Backend request event와 동일한 멱등 키 |
+| backend_execution_id | UUID NOT NULL UNIQUE; AI UUID와 분리 |
+| analysis_id / recording_id / owner_id / session_id | BIGINT NOT NULL; 각각 analysis_results/voice_recordings/users/training_sessions(id) FK, ON DELETE CASCADE |
+| content_id | BIGINT NOT NULL CHECK >0; 제출 당시 콘텐츠 ID snapshot |
+| audio_object_key | TEXT NOT NULL; 허용 bucket의 정규화 WAV key |
+| audio_sha256 / script_sha256 | VARCHAR(64) NOT NULL, 소문자 64 hex CHECK |
+| audio_size | BIGINT NOT NULL, 1~20971520 CHECK |
+| script_ciphertext | TEXT NOT NULL; 기존 PrivateTextCipher를 거친 원고 snapshot |
+| stage | VARCHAR(32) NOT NULL DEFAULT SUBMIT_PENDING; CHECK는 아래 상태 목록 |
+| ai_job_id / ai_execution_id | UUID NULL, 각각 UNIQUE; 둘 모두 null 또는 모두 non-null CHECK |
+| ai_status | VARCHAR(16) NULL; QUEUED/RUNNING/COMPLETED/FAILED/CANCELLED CHECK |
+| ai_sequence | BIGINT NOT NULL DEFAULT 0 |
+| result_sha256 / result_bytes | VARCHAR(64) / BYTEA NULL; digest 형식·최대 2 MiB CHECK, 둘의 null 여부 일치 CHECK |
+| collected_at / committed_at / acknowledged_at / cancel_requested_at | TIMESTAMPTZ NULL; ACK 시각은 commit 시각 존재 CHECK |
+| attempt_count | INTEGER NOT NULL DEFAULT 0 |
+| next_attempt_at | TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP |
+| last_http_status / last_error_code | INTEGER / VARCHAR(100) NULL; 원본 오류 본문은 보관하지 않음 |
+| claim_id / claim_until | UUID / TIMESTAMPTZ NULL; Backend worker 120초 claim |
+| created_at / updated_at | TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP |
+
+stage CHECK: SUBMIT_PENDING/LOOKUP_PENDING/COLLECTING/COLLECTING_FAILED/ACK_PENDING/ACKED/SUBMISSION_REJECTED/CANCELLED/FINISHED.
+`independent_analysis_due_idx(stage,next_attempt_at)`는 ACKED/SUBMISSION_REJECTED/CANCELLED/FINISHED 제외 partial index다.
+`independent_analysis_owner_idx(analysis_id,owner_id)`는 소유자별 현재 시도 조회용이다.
+한 analysis에 여러 시도가 가능하지만 clientRequestId·AI job/execution은 중복 연결되지 않는다.
+ACK 뒤 원본 자동 삭제는 없으며 상위 row의 실제 삭제 시에는 FK cascade를 따른다.
+[전이·commit·복구 명세](../architecture/independent-analysis-pull.md).
+
 ## 기준과 적용 범위
 
 - 기준 백업: 사용자 제공 `voicebackup 10.27.sql` (2026-10-27 스냅샷, DB 이름 `voice`).

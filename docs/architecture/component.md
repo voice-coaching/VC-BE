@@ -1,5 +1,12 @@
 # 컴포넌트 및 모듈 문서 - voice
 
+### 독립 음성 분석 후보 (2026-11-07)
+
+TrainingAnalysisRequestService는 independent profile의 인증된 소유자·세션·중복 요청을 확인하고 domain submission port에 위임한다.
+IndependentAnalysisWorker는 HTTP port와 PCM source port를 호출하며, IndependentAnalysisQueue는 짧은 DB transaction의 claim·correlation·commit·정산을 담당한다.
+IndependentResultDocument와 IndependentAnalysisViewReader는 외부 결과와 기존 공개 view를 분리한다.
+Controller에 업무 로직을 추가하지 않는다. [상세 책임과 흐름](independent-analysis-pull.md).
+
 이 문서는 voice 백엔드의 기능 모듈과 주요 컴포넌트 책임을 기록한다.
 상세 패키지 구조는 `docs/architecture/architecture.md`와 `docs/architecture/directory.md`를 함께 참고한다.
 

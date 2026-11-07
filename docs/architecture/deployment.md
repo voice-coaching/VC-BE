@@ -1,5 +1,12 @@
 # Deployment Notes - voice
 
+## 독립 음성 분석 후보 설정 (2026-11-07)
+
+V68과 소스는 준비했으나 운영 migration·배포·AI 프로필 전환은 미수행이다.
+`ANALYSIS_INDEPENDENT_SUBMISSION_ENABLED`와 `ANALYSIS_INDEPENDENT_WORKERS_ENABLED`는 모두 false가 기본값이다.
+원격 상태 확인 없이 플래그를 켜거나 기존 pending을 새 작업으로 변환하지 않는다.
+서버 토큰·HTTPS origin 허용 목록·timeout과 단계별 절차는 [독립 분석 설계](independent-analysis-pull.md#설정)를 따른다.
+
 이 문서는 EC2 배포 환경에서 운영 보조 서비스에 접근하는 방식을 기록한다.
 
 2026-10-03 canonical HTTP 배포 변경은 [분석 파이프라인 배포와 접수 보호](analysis-pipeline-release-20261003.md)를 따른다. 아래 Redis 설명은 해당 전송 경로의 기록이며 현재 canonical 배포 절차를 대체하지 않는다.

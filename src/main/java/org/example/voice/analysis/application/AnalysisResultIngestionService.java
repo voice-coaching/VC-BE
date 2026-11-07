@@ -54,7 +54,7 @@ public class AnalysisResultIngestionService {
     ) {
         AnalysisResult analysisResult = analysisResultReader.findForIngestion(message.analysisId())
                 .orElseThrow(() -> new IllegalArgumentException("analysis result does not exist"));
-        if (!analysisResult.isForActiveRequest(message.requestEventId())) {
+        if (analysisResult.isIndependentExecution() || !analysisResult.isForActiveRequest(message.requestEventId())) {
             return AnalysisResultIngestionDisposition.IGNORED_STALE;
         }
         if (executionId != null && !analysisResult.isForActiveExecution(executionId)) {
@@ -134,7 +134,7 @@ public class AnalysisResultIngestionService {
     public AnalysisResultIngestionDisposition failAfterDeliveryExhausted(AnalysisWorkerResult message) {
         AnalysisResult analysisResult = analysisResultReader.findForIngestion(message.analysisId())
                 .orElseThrow(() -> new IllegalArgumentException("analysis result does not exist"));
-        if (!analysisResult.isForActiveRequest(message.requestEventId())) {
+        if (analysisResult.isIndependentExecution() || !analysisResult.isForActiveRequest(message.requestEventId())) {
             return AnalysisResultIngestionDisposition.IGNORED_STALE;
         }
         boolean failed = analysisResult.fail(

@@ -1,5 +1,15 @@
 # 디렉토리 문서 - voice
 
+## 독립 음성 분석 후보 추가 (2026-11-07)
+
+- `analysis/domain/port/IndependentAnalysis{Submission,Client}.java`, `IndependentAudioSource.java`: 접수·AI 호출·준비 PCM 읽기 경계.
+- `analysis/domain/model/IndependentAnalysisAttempt.java`, `domain/type/IndependentAnalysisStage.java`: Backend worker snapshot과 수집 상태.
+- `analysis/application/IndependentAnalysisWorker.java`: 분리된 제출·수집·ACK lane.
+- `analysis/infrastructure/independent/`: DB queue, HTTP client, S3 source, 설정, 독립 결과 DTO/공개 view adapter.
+- `src/main/resources/db/migration/V68__independent_analysis_pull.sql`: 독립 시도/outbox와 원본 결과 저장.
+
+[동작·설정·검증 제한](independent-analysis-pull.md). 기존 transport를 삭제하거나 운영 모드를 전환한 변경은 아니다.
+
 이 문서는 voice 프로젝트의 현재 디렉토리 구조와 각 경로의 책임을 설명한다.
 
 - `training/domain/model/MediaPreparationData.java`: 서버 미디어 identity 모델.
