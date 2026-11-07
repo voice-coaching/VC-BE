@@ -1107,25 +1107,8 @@
       "additionalProperties": false,
       "properties": {
         "parent_manifest_sha256": {
-          "enum": [
-            "95f2347ad53ab53030f68a65795cfc5a84ca1c8c41bd03119c9a9fb15d0367c2",
-            "6ca67fcdaed390cc3da634fbafaef153890e52b8775c431f3fefae7dc122c776",
-            "08fd8a19b6897d0c3890b0944986685830f24e6e676ea19422038b03a940ba80",
-            "ce16f635da012237b5316b36161d5eeff9432279cd08dbbe7967f5ab7ace7f7e",
-            "9e2a2107db7d30fe8910c8984687974d85b95120760e2bcce53d57640a5d5a32",
-            "68cda53df72be9dace15f3829a840c27f40efbbfee1a561f8e58d314b4991aad",
-            "f1009fcdbf75515ddc13e915dcbbf19dfac751ce39779e404749c4f51dd74841",
-            "20acb7275aa06d0be4aca1a567420ea603c0eec084e50c651c96501903034f1b",
-            "818a3c16cba39dfcfa9f1083865db7f122a3eba40bc332d85256da94d1d6fb1e",
-            "f6d56e1decc160f0ca38cc8d52303f3de20945f872d714bf6a2e743ed94c0391",
-            "4cc0cbacd41b5c6f2ac20e6e4840bc5406f4c7ab79ecf53702586eeb5874ecbc",
-            "c9c7d893ebbf6e5a2fa7762c3fa2e72b33b4ada391c945ce564c59d4d4a5bf82",
-            "755667629b5d603910ff2646daa807bf7757e2d3f3ca29845e265e2e4dc79984",
-            "55cdf30b40dd463080c2aeab8832821a2f6874a9994cc30657d8c5ef3eb6b714",
-            "fb597319347d106e4a8e59d7bb6a254f031a7e85a21b87d8c349763829b0152d",
-            "9e29fbc9a7fcc039a6d4fa36b323cdcca61431100f3786cc9a55e41b53c4a4ba",
-            "f562484d436e42626114e16afa2bcaa782c1abbfc3cc3cdbd5c3b3cf030b920a"
-          ]
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         },
         "core_sha256": {
           "$ref": "#/$defs/sha256"
@@ -1195,25 +1178,8 @@
           "$ref": "#/$defs/sha256"
         },
         "parentManifestSha256": {
-          "enum": [
-            "95f2347ad53ab53030f68a65795cfc5a84ca1c8c41bd03119c9a9fb15d0367c2",
-            "6ca67fcdaed390cc3da634fbafaef153890e52b8775c431f3fefae7dc122c776",
-            "08fd8a19b6897d0c3890b0944986685830f24e6e676ea19422038b03a940ba80",
-            "ce16f635da012237b5316b36161d5eeff9432279cd08dbbe7967f5ab7ace7f7e",
-            "9e2a2107db7d30fe8910c8984687974d85b95120760e2bcce53d57640a5d5a32",
-            "68cda53df72be9dace15f3829a840c27f40efbbfee1a561f8e58d314b4991aad",
-            "f1009fcdbf75515ddc13e915dcbbf19dfac751ce39779e404749c4f51dd74841",
-            "20acb7275aa06d0be4aca1a567420ea603c0eec084e50c651c96501903034f1b",
-            "818a3c16cba39dfcfa9f1083865db7f122a3eba40bc332d85256da94d1d6fb1e",
-            "f6d56e1decc160f0ca38cc8d52303f3de20945f872d714bf6a2e743ed94c0391",
-            "4cc0cbacd41b5c6f2ac20e6e4840bc5406f4c7ab79ecf53702586eeb5874ecbc",
-            "c9c7d893ebbf6e5a2fa7762c3fa2e72b33b4ada391c945ce564c59d4d4a5bf82",
-            "755667629b5d603910ff2646daa807bf7757e2d3f3ca29845e265e2e4dc79984",
-            "55cdf30b40dd463080c2aeab8832821a2f6874a9994cc30657d8c5ef3eb6b714",
-            "fb597319347d106e4a8e59d7bb6a254f031a7e85a21b87d8c349763829b0152d",
-            "9e29fbc9a7fcc039a6d4fa36b323cdcca61431100f3786cc9a55e41b53c4a4ba",
-            "f562484d436e42626114e16afa2bcaa782c1abbfc3cc3cdbd5c3b3cf030b920a"
-          ]
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         },
         "llmManifestSha256": {
           "$ref": "#/$defs/sha256"
@@ -2028,25 +1994,8 @@
           ]
         },
         "parentManifestSha256": {
-          "enum": [
-            "95f2347ad53ab53030f68a65795cfc5a84ca1c8c41bd03119c9a9fb15d0367c2",
-            "6ca67fcdaed390cc3da634fbafaef153890e52b8775c431f3fefae7dc122c776",
-            "08fd8a19b6897d0c3890b0944986685830f24e6e676ea19422038b03a940ba80",
-            "ce16f635da012237b5316b36161d5eeff9432279cd08dbbe7967f5ab7ace7f7e",
-            "9e2a2107db7d30fe8910c8984687974d85b95120760e2bcce53d57640a5d5a32",
-            "68cda53df72be9dace15f3829a840c27f40efbbfee1a561f8e58d314b4991aad",
-            "f1009fcdbf75515ddc13e915dcbbf19dfac751ce39779e404749c4f51dd74841",
-            "20acb7275aa06d0be4aca1a567420ea603c0eec084e50c651c96501903034f1b",
-            "818a3c16cba39dfcfa9f1083865db7f122a3eba40bc332d85256da94d1d6fb1e",
-            "f6d56e1decc160f0ca38cc8d52303f3de20945f872d714bf6a2e743ed94c0391",
-            "4cc0cbacd41b5c6f2ac20e6e4840bc5406f4c7ab79ecf53702586eeb5874ecbc",
-            "c9c7d893ebbf6e5a2fa7762c3fa2e72b33b4ada391c945ce564c59d4d4a5bf82",
-            "755667629b5d603910ff2646daa807bf7757e2d3f3ca29845e265e2e4dc79984",
-            "55cdf30b40dd463080c2aeab8832821a2f6874a9994cc30657d8c5ef3eb6b714",
-            "fb597319347d106e4a8e59d7bb6a254f031a7e85a21b87d8c349763829b0152d",
-            "9e29fbc9a7fcc039a6d4fa36b323cdcca61431100f3786cc9a55e41b53c4a4ba",
-            "f562484d436e42626114e16afa2bcaa782c1abbfc3cc3cdbd5c3b3cf030b920a"
-          ]
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         },
         "llmManifestSha256": {
           "$ref": "#/$defs/sha256"
@@ -3433,25 +3382,8 @@
           "$ref": "#/$defs/sha256"
         },
         "parentManifestSha256": {
-          "enum": [
-            "95f2347ad53ab53030f68a65795cfc5a84ca1c8c41bd03119c9a9fb15d0367c2",
-            "6ca67fcdaed390cc3da634fbafaef153890e52b8775c431f3fefae7dc122c776",
-            "08fd8a19b6897d0c3890b0944986685830f24e6e676ea19422038b03a940ba80",
-            "ce16f635da012237b5316b36161d5eeff9432279cd08dbbe7967f5ab7ace7f7e",
-            "9e2a2107db7d30fe8910c8984687974d85b95120760e2bcce53d57640a5d5a32",
-            "68cda53df72be9dace15f3829a840c27f40efbbfee1a561f8e58d314b4991aad",
-            "f1009fcdbf75515ddc13e915dcbbf19dfac751ce39779e404749c4f51dd74841",
-            "20acb7275aa06d0be4aca1a567420ea603c0eec084e50c651c96501903034f1b",
-            "818a3c16cba39dfcfa9f1083865db7f122a3eba40bc332d85256da94d1d6fb1e",
-            "f6d56e1decc160f0ca38cc8d52303f3de20945f872d714bf6a2e743ed94c0391",
-            "4cc0cbacd41b5c6f2ac20e6e4840bc5406f4c7ab79ecf53702586eeb5874ecbc",
-            "c9c7d893ebbf6e5a2fa7762c3fa2e72b33b4ada391c945ce564c59d4d4a5bf82",
-            "755667629b5d603910ff2646daa807bf7757e2d3f3ca29845e265e2e4dc79984",
-            "55cdf30b40dd463080c2aeab8832821a2f6874a9994cc30657d8c5ef3eb6b714",
-            "fb597319347d106e4a8e59d7bb6a254f031a7e85a21b87d8c349763829b0152d",
-            "9e29fbc9a7fcc039a6d4fa36b323cdcca61431100f3786cc9a55e41b53c4a4ba",
-            "f562484d436e42626114e16afa2bcaa782c1abbfc3cc3cdbd5c3b3cf030b920a"
-          ]
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         },
         "llmManifestSha256": {
           "$ref": "#/$defs/sha256"

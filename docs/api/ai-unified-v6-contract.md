@@ -1,5 +1,9 @@
 # AI V2 handoff / 통합 음성 V6 계약
 
+2026-11-07 수신 호환성 수정: [AI 소유 CORE 수신 계약](ai-owned-core-compatibility.md)을 우선 적용한다.
+Backend는 CORE release enum을 수신 gate로 사용하지 않으며 visual coaching 입력은 운영 AI e0b2c5d에 맞춘다.
+아래 과거 verifier 설치·검증 기록은 현재 운영 복구나 새 검증 수행의 증거가 아니다.
+
 2026-11-01 기준, 2026-11-02 bounded H5 pin 갱신. 신규 요청 계약을 AI 저장소 `4fc844a35c4a748b1688006b6bf170d0d01f22da`의
 `docs/canonical-integration/v6-unification.md` 및 원본 JSON Schema와 맞춘다.
 이 문서는 코드 계약이며 운영 전환 완료를 의미하지 않는다.
@@ -86,10 +90,10 @@ schema pin은 저장소 원본 바이트 SHA-256이고, 실행 payload digest는
 | runpod_canonical_output.schema.json | `5ca5421f8053b51cc9da9dafe06c0dffcd98e85ca24ce24d373e2d2b0351def8` |
 | runpod_canonical_journal_v1.schema.json | `798aa2eee85f9196d0519763119f266b14f065899c03faa75599fab5fed2e5f5` |
 | runpod_analysis_request_v4.schema.json | `8fde9cf8ee44b5b151bf31205a355c80789fedc6c8d74ba994274bc898c9eec0` |
-| runpod_result_v6.schema.json | `f17fd6ff70cd4fa3fcb1ee91d878cdf7fef0b2880159e4da17b5d19a46b9e40f` |
+| runpod_result_v6.schema.json | `09334a54c3b81c402a7b26136db5826e71fff0a0605338351e92327383033c6a` |
 | runpod_canonical_handoff_v2.schema.json | `8677401f5edf88258ca72344cde932b0ddbefdd8e35ccc1885970e6ac2632c07` |
 | runpod_media_preparation_v1.schema.json | `0a9c91e88d37f2108a77772512db1d23fcdce48b3a3741407a7f27b31c06946f` |
-| runpod_visual_coaching_input_v1.schema.json | `b9bb57c31bd1ab1dcb80957343449ab0a6b231bdea61a4adf876fc70af3a868c` |
+| runpod_visual_coaching_input_v1.schema.json | `63c560fdd1e775cdce21831ad840e63419f12e53ca5e70023d302bd95cdcdbde` |
 
 원본 schema의 상대 `$id`는 Java validator 로딩용 복사본에서만 URN으로 정규화한다.
 패키지 원본 bytes·digest 및 검증 제약은 변경하지 않는다.
