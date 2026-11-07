@@ -115,7 +115,13 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
         TrainingSession session = findForUpdate(sessionId);
         // Recheck current-generation eligibility under the existing session mutation lock.
         // The service's earlier read alone must not authorize a later stale completion.
-
+        if (session.getStatus()!=TrainingSessionStatus.ANALYZING && session.getStatus()!=TrainingSessionStatus.COMPLETED)
+            throw new BaseException(ErrorCode.INVALID_SESSION_STATE);
+        if (session.getStatus()!=TrainingSessionStatus.COMPLETED
+                && !trainingAnalysisReader.existsCompletedAnalysisForSelectedRecording(sessionId,session.getUserId()))
+            throw new BaseException(ErrorCode.ANALYSIS_NOT_COMPLETED);
+        if (session.getStatus()==TrainingSessionStatus.COMPLETED)
+            return new TrainingSessionCompletionData(session.getId(),session.getStatus(),session.getCompletedAt());
         session.complete(totalLearningSeconds);
         return new TrainingSessionCompletionData(session.getId(), session.getStatus(), session.getCompletedAt());
     }

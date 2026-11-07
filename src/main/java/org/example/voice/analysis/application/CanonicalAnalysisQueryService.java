@@ -65,8 +65,10 @@ public class CanonicalAnalysisQueryService {
             if(!visibility.unchanged(result,userId)) throw error(CANONICAL_ANALYSIS_CHANGED);
             return view;
         }
-        var document=published.current(result);
-        if(document==null) document=committed.findCurrent(result).orElse(null);
+        var stored=committed.findCurrent(result).orElse(null);
+        boolean saved=CanonicalCompletionEligibility.stored(result,stored);
+        var document=stored;
+        if(document==null) document=published.current(result);
         if(document==null) {
             var preview=delivery.current(result);
             if(preview!=null) document=preview.document.projection();
@@ -84,8 +86,8 @@ public class CanonicalAnalysisQueryService {
                 id!=null?id.executionId():binding==null?null:binding.executionId(),
                 document==null?result.getStatus():document.status(),result.getAnalysisProfile(),
                 canonical,
-                failure==null?null:new ServiceFailure(failure.origin(),failure.code(),failure.stage()),actions.current(result),
-                document==null?"NONE":"AVAILABLE").withRawResult(document==null?null:
+                failure==null?null:new ServiceFailure(failure.origin(),failure.code(),failure.stage()),actions.current(result,stored),
+                document==null?"NONE":saved?"SAVED":"SAVING").withRawResult(document==null?null:
                 new tools.jackson.databind.ObjectMapper().readValue(document.storageJson(),java.util.Map.class));
     }
 

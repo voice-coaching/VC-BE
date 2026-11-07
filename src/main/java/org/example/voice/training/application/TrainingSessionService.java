@@ -56,7 +56,7 @@ public class TrainingSessionService {
     public TrainingSessionCompletionData complete(Long sessionId, Integer totalLearningSeconds, Long userId) {
         // Legacy keeps its completion rule; canonical additionally requires a verified,
         // visible current ACCEPT result. The writer rechecks under the session lock.
-
+        assertSessionExists(sessionId,userId);
         return trainingSessionWriter.complete(sessionId, totalLearningSeconds);
     }
 
