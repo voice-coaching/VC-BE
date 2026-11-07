@@ -332,3 +332,10 @@ V65부터 공용 콘텐츠 전체 유형을 공개 상태와 관계없이 수정
 | DELETE | `/api/admin/reference-audios/{audioId}` | 활성 ADMIN | 기준 음성 개별 삭제 및 대표 승계 |
 | PATCH | `/api/admin/notification-campaigns/{campaignId}` | 활성 ADMIN | 발송 전 알림 초안 수정 |
 | DELETE | `/api/admin/notification-campaigns/{campaignId}` | 활성 ADMIN | 발송 전 알림 초안 삭제 |
+
+## 관리자 승급 시험 설정
+
+| Method | Path | Auth | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/admin/title-exam-policies` | 활성 ADMIN | 칭호별 승급 시험 문제와 합격 기준 조회 |
+| PATCH | `/api/admin/title-exam-policies/{targetRank}` | 활성 ADMIN | 출제 문장과 합격 점수 변경 |

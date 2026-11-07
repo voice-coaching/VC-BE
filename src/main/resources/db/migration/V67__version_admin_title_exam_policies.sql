@@ -1,0 +1,1 @@
+ALTER TABLE title_policies ADD COLUMN edit_version BIGINT NOT NULL DEFAULT 0;

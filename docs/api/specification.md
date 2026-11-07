@@ -2183,3 +2183,7 @@ GET /api/admin/users와 개별 상세·overview·records·resolve는 탈퇴(WITH
 ## 기존 관리자 기능 보완 (#188)
 
 DELETE `/api/admin/notices/{noticeId}`, DELETE `/api/admin/reference-audios/{audioId}`, PATCH·DELETE `/api/admin/notification-campaigns/{campaignId}`를 추가한다. 활성 ADMIN 전용이며 query는 없다. 요청 필드·응답 타입·null·상태 전이·HTTP 오류 전체 계약은 [관리자 기능 보완](admin-management-completion.md)을 따른다. 기존 경로와 사용자 API 계약은 유지한다.
+
+## 관리자 승급 시험 설정
+
+GET `/api/admin/title-exam-policies`, PATCH `/api/admin/title-exam-policies/{targetRank}`의 인증·필드 타입·null·요청/응답·오류·콘텐츠 보호 계약은 [상세 명세](admin-title-exam-policies.md)를 따른다. 설정 버전과 선택 문장 버전을 확인하며 새로 생성하는 시험부터 적용한다.
