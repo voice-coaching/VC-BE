@@ -228,3 +228,7 @@ docs
 ## 관리자 승급 시험 관리
 
 `admin/controller/AdminTitleExamPolicyController`와 controller/dto는 설정 조회·수정 계약을 담당한다. `admin/application/AdminTitleExamPolicyService`는 권한·상태·설정/문장 버전·감사 트랜잭션을 처리한다. `admin/domain/port/AdminTitleExamPolicyStore`와 `admin/infrastructure/AdminTitleExamPolicyPersistence`는 정책 잠금과 사용 중인 콘텐츠 확인을 담당한다. `title/domain/entity/TitlePolicy`는 설정 값과 editVersion을 보관한다. 상세 계약은 docs/api/admin-title-exam-policies.md, 검증은 docs/qa/admin-title-exam-policies.md다.
+
+## Video lip consumer changes (2026-11-07)
+
+No new module: analysis/domain/model/CanonicalAnalysisView contains the lip models; analysis/infrastructure/canonical maintains media binding. Preparation stays in training/application and training/infrastructure/storage. LipProvisionalContractTest, LipMediaPostgresTest and LipAudiovisualAdmissionTest cover the consumer.

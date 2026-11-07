@@ -55,6 +55,7 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
                 .orElseThrow(() -> new IllegalStateException("analysis result disappeared before outbox write"));
 
         boolean audiovisual = request.visualInput()!=null;
+        if (audiovisual && !videoReadiness.admission()) throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
 
         UUID executionId = UUID.randomUUID();
         OffsetDateTime deadline = OffsetDateTime.now(ZoneOffset.UTC).plus(properties.getExecutionTimeout())
@@ -70,10 +71,11 @@ public class RunPodOutboxAnalysisJobPublisher implements AnalysisJobPublisher {
         var receipt = preparations.find(analysisResult.getRecording().getId()).orElse(null);
         RunPodAnalysisJobRequest.MediaPreparationInput prepared=null;
         if (receipt != null) {
-
+            if (!receipt.binds(request.audioSha256(),audiovisual?request.visualInput().sha256():null))
+                throw new BaseException(ErrorCode.ANALYSIS_MEDIA_BINDING_INVALID);
             var node = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules().valueToTree(receipt);
             prepared=new RunPodAnalysisJobRequest.MediaPreparationInput(receipt,contract.digest(node));
-        } else {}
+        } else if (audiovisual) { throw new BaseException(ErrorCode.ANALYSIS_MEDIA_BINDING_INVALID); }
         runPodRequest=runPodRequest.asV6(prepared);
         String payload = codec.encodeRequest(runPodRequest);
 

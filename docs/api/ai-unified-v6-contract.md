@@ -129,3 +129,7 @@ schema pin은 저장소 원본 바이트 SHA-256이고, 실행 payload digest는
   `--check-installation` READY/V2/11개 pin 일치, 합성 pre-core 실패 결과 VALID 및 오디오 해시
   위조 시 INVALID/EVIDENCE_INVALID를 확인했다. 임시 디렉터리는 삭제했다.
 - 합성 입력 검증은 실제 모델 추론·사용자 음성 성공 분석·운영 승급시험 종단 확인을 대체하지 않는다.
+
+## Lip provisional consumer (2026-11-07)
+
+Only visual/lipSubScore definitions from AI c312ca7 are adopted. Result v6, overall score and existing binding definitions remain unchanged. See [integration contract](video-lip-provisional-consumer.md).

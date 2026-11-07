@@ -3001,7 +3001,8 @@
         "scoreKind": {
           "enum": [
             "NONE",
-            "CALIBRATED"
+            "CALIBRATED",
+            "PROVISIONAL"
           ]
         },
         "coverage": {
@@ -3096,7 +3097,8 @@
                 "enum": [
                   "NONE",
                   "REFERENCE_SIMILARITY",
-                  "CALIBRATED"
+                  "CALIBRATED",
+                  "PROVISIONAL"
                 ]
               },
               "audioStartSeconds": {
@@ -3169,9 +3171,11 @@
               "allowedActionIds": {
                 "type": "array",
                 "items": {
-                  "type": "string"
+                  "enum": [
+                    "COMPARE_REFERENCE"
+                  ]
                 },
-                "maxItems": 0
+                "maxItems": 1
               },
               "reasonCodes": {
                 "type": "array",
@@ -3241,6 +3245,13 @@
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 3600
+              },
+              "subScores": {
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "$ref": "#/$defs/lipSubScore"
+                }
               }
             },
             "required": [
@@ -3290,7 +3301,10 @@
                 "then": {
                   "properties": {
                     "scoreKind": {
-                      "const": "CALIBRATED"
+                      "enum": [
+                        "CALIBRATED",
+                        "PROVISIONAL"
+                      ]
                     },
                     "score": {
                       "type": "number",
@@ -3328,6 +3342,13 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 2048
+        },
+        "subScores": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/lipSubScore"
+          }
         }
       },
       "required": [
@@ -3370,7 +3391,10 @@
           "then": {
             "properties": {
               "scoreKind": {
-                "const": "CALIBRATED"
+                "enum": [
+                  "CALIBRATED",
+                  "PROVISIONAL"
+                ]
               },
               "score": {
                 "type": "number",
@@ -4136,6 +4160,120 @@
                     }
                   }
                 }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "lipSubScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "criterionId",
+        "label",
+        "score",
+        "status",
+        "reasonCode"
+      ],
+      "properties": {
+        "criterionId": {
+          "enum": [
+            "lip_aperture",
+            "lip_rounding",
+            "lip_closure",
+            "lip_timing"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "score": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "status": {
+          "enum": [
+            "SCORED",
+            "UNSCORABLE",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "reasonCode": {
+          "type": "string"
+        },
+        "measurements": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "metricId",
+              "value",
+              "referenceMedian",
+              "referenceScale",
+              "referenceCount",
+              "tolerance",
+              "unit"
+            ],
+            "properties": {
+              "metricId": {
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              },
+              "referenceMedian": {
+                "type": "number"
+              },
+              "referenceScale": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "referenceCount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 32
+              },
+              "tolerance": {
+                "type": "number",
+                "minimum": 0
+              },
+              "unit": {
+                "enum": [
+                  "PHONE_PHASE",
+                  "FACE_SCALE_NORMALIZED"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "SCORED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "number"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "score": {
+                "type": "null"
               }
             }
           }

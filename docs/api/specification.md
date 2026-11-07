@@ -2187,3 +2187,7 @@ DELETE `/api/admin/notices/{noticeId}`, DELETE `/api/admin/reference-audios/{aud
 ## 관리자 승급 시험 설정
 
 GET `/api/admin/title-exam-policies`, PATCH `/api/admin/title-exam-policies/{targetRank}`의 인증·필드 타입·null·요청/응답·오류·콘텐츠 보호 계약은 [상세 명세](admin-title-exam-policies.md)를 따른다. 설정 버전과 선택 문장 버전을 확인하며 새로 생성하는 시험부터 적용한다.
+
+## Video lip provisional scores (2026-11-07)
+
+The existing v3 analysis view accepts PROVISIONAL and optional subScores. No new endpoint or overall-score calculation is introduced. Capabilities expose actual MIME, size, duration and existing video consent requirements. See [contract](video-lip-provisional-consumer.md) and [frontend handoff](frontend-video-lip-consumer.md).

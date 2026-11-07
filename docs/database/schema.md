@@ -2161,3 +2161,7 @@ PostgreSQL 18의 `pg_restore --schema-only --no-owner --no-privileges --file=<�
 ## V67: 관리자 승급 시험 설정 버전
 
 `title_policies.edit_version`: BIGINT, NOT NULL, 기본값 0. owner module은 title이며 관리자 설정의 동시 수정 확인에 사용한다. 관리자 수정은 정책 행 잠금과 기대 버전 일치 후 1 증가한다. 별도 인덱스·unique·FK·soft delete 변경은 없다. target_rank PK와 practice_content_id 관계는 유지한다. 기존 점수·문제·필요 횟수·개별 title_exams snapshot은 변경하지 않는다. [계약](../api/admin-title-exam-policies.md).
+
+## Video lip consumer integrity (2026-11-07)
+
+No migration, table or column is added. Existing V41/V42 media preparation and execution snapshots, and V43 result storage are reused. Preparation receipts cannot be overwritten; file hashes and execution identities are checked on request and result. Optional lip subscores remain inside result JSON. See [contract](../api/video-lip-provisional-consumer.md).

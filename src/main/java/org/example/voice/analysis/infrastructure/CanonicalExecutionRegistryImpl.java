@@ -98,7 +98,7 @@ public class CanonicalExecutionRegistryImpl implements CanonicalExecutionRegistr
         executionMedia.snapshot(executionId, analysis.getRecording().getId(),
                 analysis.getRecording().getAudioSha256(), analysis.getRecording().getVisualSha256());
         if (RunPodContract.RESULT_V6.equals(binding.resultSchemaVersion())) {
-
+            executionMedia.requireRequest(executionId, contract.parse(payload.getBytes(StandardCharsets.UTF_8), "analysisRequest"));
         }
         return stored;
     }
