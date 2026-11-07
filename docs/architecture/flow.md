@@ -1,5 +1,9 @@
 # 흐름 문서 - voice
 
+2026-11-08: AI 결과의 선택 `score.details`를 기존 원본 저장과 canonical 공개 투영에 보존한다.
+독립 경로와 Direct 저장 이력에서도 기존 경로를 사용하며 재채점·추가 GPT·과거 결과 backfill은 없다.
+[선택 DTO·배포 호환성](../api/public-score-details.md).
+
 ### 2026-11-07 운영 AI 결과 수신 호환성 수정 후보
 
 legacy v6/handoff v2의 결과 수신에서 CORE release 고정 enum을 제거한다. AI 자산 선택을 재판정하지 않고

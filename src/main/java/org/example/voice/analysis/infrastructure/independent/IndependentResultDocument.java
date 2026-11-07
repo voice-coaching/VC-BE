@@ -53,7 +53,8 @@ public final class IndependentResultDocument {
             var decision=d.isObject()?new CanonicalAnalysisView.Decision(text(d,"status"),text(d,"reason_code"),text(d,"stage")):null;
             var s=node.path("score");
             var score=s.isObject()?new CanonicalAnalysisView.Score(score(),text(s,"validity"),text(s,"reason"),
-                    object(s.get("rubricRevision")),object(s.get("criteria"))):null;
+                    object(s.get("rubricRevision")),object(s.get("criteria")),s.hasNonNull("details")
+                            ?JSON.treeToValue(s.get("details"),org.example.voice.analysis.domain.model.PublicScoreDetails.class):null):null;
             var c=node.path("coaching");CanonicalAnalysisView.Coaching coaching=null;
             if(c.isObject()) {
                 String adapter=text(c,"adapterStatus");String generation=text(c,"generationStatus");

@@ -2,6 +2,11 @@
 
 # API Specification - voice
 
+## 2026-11-08 선택형 공개 세부점수
+
+기존 canonical Score DTO의 선택 `details`를 저장·투영하며 Direct 저장 이력의 원본 JSON도 유지한다.
+인증·상태·endpoint 변경 없이 AI가 제공한 점수만 전달한다. [필드·호환성·적용 순서](public-score-details.md).
+
 ## 독립 음성 분석 후보 (2026-11-07)
 
 [AI 독립 API v1](independent-analysis-v1.md)과 [Backend 흐름·플래그](../architecture/independent-analysis-pull.md)를 추가했다.
