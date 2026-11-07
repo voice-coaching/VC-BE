@@ -1974,6 +1974,11 @@ Content-Type: application/json
 
 ## POST /api/users/me/title-exams/{examId}/submit
 
+2026-11-07: 합격 시에만 칭호를 변경한다. 미달 응답의 `currentTitle`은 기존 칭호다.
+본인 시험의 세션·콘텐츠에 연결된 선택 녹음의 완료 점수(0~100)를 사용한다.
+점수 없음·범위 오류·다른 세션·미완료 분석은 `409 ANALYSIS_SCORE_UNAVAILABLE`로
+거부하며 채점·승급하지 않는다. 동일 분석 재제출은 저장 결과를 재사용한다.
+
 - Description: 분석 결과 제출, 서버 저장 점수 기반 채점, 합격 시 한 단계 승급
 - Auth: Bearer accessToken
 - Path params: `examId`

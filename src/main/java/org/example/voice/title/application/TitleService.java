@@ -65,7 +65,9 @@ public class TitleService implements TitleExamSessionLink {
     public TrainingSessionCreatedData createSession(Long userId, Long examId, Long contentId, Long courseStepId, LearningFocus focus) {
         lock(userId);
         var exam = owned(examId,userId);
-
+        if (exam.graded()) throw new TitleException(409, "TITLE_EXAM_ALREADY_GRADED");
+        if (!java.util.Objects.equals(exam.getPracticeContentId(), contentId) || courseStepId != null)
+            throw new TitleException(409, "TITLE_EXAM_CONTENT_MISMATCH");
         var created = sessions.create(userId,contentId,null,focus);
         exam.bind(created.sessionId()); titles.save(exam); return created;
     }
@@ -74,13 +76,23 @@ public class TitleService implements TitleExamSessionLink {
     public Grade submit(Long userId, Long examId, Long analysisId) {
         lock(userId);
         var exam = owned(examId,userId);
-
-        var score = analysisId == null ? null : titles.score(analysisId, userId, exam.getTrainingSessionId(), exam.getPracticeContentId())
-                .orElse(null);
+        if (exam.graded()) {
+            if (!java.util.Objects.equals(exam.getAnalysisId(), analysisId))
+                throw new TitleException(409, "TITLE_EXAM_ALREADY_GRADED");
+            return grade(exam);
+        }
+        if (analysisId == null || exam.getTrainingSessionId() == null)
+            throw new TitleException(409, "ANALYSIS_NOT_COMPLETED");
+        var score = titles.score(analysisId, userId, exam.getTrainingSessionId(), exam.getPracticeContentId())
+                .orElseThrow(() -> new TitleException(409, "ANALYSIS_SCORE_UNAVAILABLE"));
         var title = titles.title(userId).orElseThrow(() -> new TitleException(409, "CONFLICT"));
-
+        if (title.getRank() != exam.getPreviousRank() || title.getRank().next() != exam.getTargetRank())
+            throw new TitleException(409, "CONFLICT");
         exam.grade(analysisId,score,now());
-        title.promote(exam.getTargetRank(),0,now()); titles.save(title);
+        // Persist a promotion only after the exam's snapshotted threshold is met.
+        if (exam.getStatus().equals("PASSED")) {
+            title.promote(exam.getTargetRank(),exam.getRequiredTrainingCount(),now()); titles.save(title);
+        }
         titles.save(exam); return grade(exam);
     }
     private Grade grade(TitleExam exam) { return new Grade(exam.getId(), exam.getStatus(), exam.getScore(),exam.getPassingScore(),exam.getStatus().equals("PASSED"),exam.getPreviousRank().label(),exam.resultingRank().label(),exam.getEvaluatedAt()); }
