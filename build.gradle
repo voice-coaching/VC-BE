@@ -19,6 +19,7 @@ repositories {
 }
 
 dependencies {
+    implementation 'com.google.firebase:firebase-admin:9.11.0'
     implementation 'io.portone:server-sdk:0.24.0'
     implementation 'com.google.auth:google-auth-library-oauth2-http:1.50.0'
     implementation 'com.twelvemonkeys.imageio:imageio-webp:3.13.1'

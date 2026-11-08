@@ -38,7 +38,7 @@ public class NotificationService {
     @Transactional(readOnly = true)
     public Page list(Long userId, boolean unreadOnly, int page, int size) {
         active(userId, false);
-
+        if (page < 0 || size < 1 || size > 100 || (long) page * size > Integer.MAX_VALUE) throw NotificationException.invalid();
         return store.list(userId, unreadOnly, page, size);
     }
     @Transactional
@@ -76,11 +76,11 @@ public class NotificationService {
     @Transactional
     public boolean generateReminder(Long userId) {
         var user = users.findByIdForUpdate(userId);
-
+        if (user.isEmpty() || user.get().getStatus() != org.example.voice.user.domain.type.UserStatus.ACTIVE) return false;
         var preferences = store.preferences(userId);
-
-        var now = now(); var date = now.toLocalDate();
-
+        if (preferences.isEmpty()) return false;
+        var now = now(); var date = preferences.get().dueDate(now);
+        if (date == null || store.hasEvent(userId, "practice:" + date)) return false;
         store.save(UserNotification.reminder(userId, date, now)); return true;
     }
     private User active(Long userId, boolean lock) {

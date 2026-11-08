@@ -25,7 +25,7 @@ public class UserNotification {
     }
     public static UserNotification create(Long userId, String type, String title, String body, String deepLink,
                                           String deduplicationKey, OffsetDateTime now) {
-
+        if (!java.util.Set.of("/home", "/notifications", "/mypage").contains(deepLink)) throw NotificationException.invalid();
         var n = new UserNotification(); n.userId = userId; n.type = type; n.title = title; n.body = body;
         n.deepLink = deepLink; n.deduplicationKey = deduplicationKey; n.createdAt = now; return n;
     }
