@@ -344,3 +344,14 @@ V65부터 공용 콘텐츠 전체 유형을 공개 상태와 관계없이 수정
 | --- | --- | --- | --- |
 | GET | `/api/admin/title-exam-policies` | 활성 ADMIN | 칭호별 승급 시험 문제와 합격 기준 조회 |
 | PATCH | `/api/admin/title-exam-policies/{targetRank}` | 활성 ADMIN | 출제 문장과 합격 점수 변경 |
+
+## 관리자 클래스와 연결 문장
+
+| Method | Path | Auth | 설명 |
+| --- | --- | --- | --- |
+| GET | `/api/admin/courses` | 활성 ADMIN | 클래스별 목록·검색·페이징 |
+| GET | `/api/admin/courses/{id}` | 활성 ADMIN | 클래스 정보와 현재 연결 문장 |
+| POST | `/api/admin/courses` | 활성 ADMIN | 클래스와 첫 문장 개정 생성 |
+| PATCH | `/api/admin/courses/{id}` | 활성 ADMIN | 정보·문장 추가/수정/제외를 새 개정으로 저장 |
+
+`GET /api/admin/contents`의 선택 `excludeClassPractice` 필터를 포함한 [필드·오류·동시성·기존 학습 보존 계약](admin-course-sentences.md).

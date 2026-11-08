@@ -53,4 +53,8 @@ public class CourseStep {
 
     @Column(name = "retired", nullable = true)
     private boolean retired;
+
+    public static CourseStep practice(Course course,String title) {
+        var step=new CourseStep();step.course=course;step.title=title;step.stepType=CourseStepType.PRACTICE;step.stepOrder=1;step.required=true;return step;
+    }
 }

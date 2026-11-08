@@ -1,5 +1,9 @@
 # DB Schema - voice
 
+## 관리자 클래스 문장 편집
+
+기존 `courses`, `course_steps`, `course_step_revisions`, `practice_example_sets`, `practice_examples`, `practice_contents`를 사용한다. 새 예문 개정과 전용 콘텐츠 행을 추가하며 과거 행은 수정/삭제하지 않는다. 테이블/열/제약 변경과 신규 Flyway는 없다. 현재 V61 이후 스키마를 전제로 한다. [저장·개정 계약](../api/admin-course-sentences.md).
+
 ## 독립 분석 시도·outbox (V68, 2026-11-07 후보)
 
 `V68__independent_analysis_pull.sql`은 `independent_analysis_attempts`를 추가한다. 소유 모듈은 analysis다.

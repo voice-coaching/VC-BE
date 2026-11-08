@@ -53,4 +53,14 @@ public class Course {
 
     @Column(name = "updated_at", nullable = true)
     private OffsetDateTime updatedAt;
+
+    public static Course authored(org.example.voice.course.domain.type.CourseType type, String title, String description,
+            org.example.voice.practicecontent.domain.type.Difficulty difficulty, org.example.voice.practicecontent.domain.type.PublishStatus status,
+            Integer minutes, java.time.OffsetDateTime now) {
+        var course=new Course(); course.createdAt=now; course.revise(type,title,description,difficulty,status,minutes,now); return course;
+    }
+    public void revise(org.example.voice.course.domain.type.CourseType type,String title,String description,
+            org.example.voice.practicecontent.domain.type.Difficulty difficulty,org.example.voice.practicecontent.domain.type.PublishStatus status,Integer minutes,java.time.OffsetDateTime now) {
+        this.courseType=type;this.title=title;this.description=description;this.difficulty=difficulty;this.status=status;this.estimatedMinutes=minutes;this.updatedAt=now;
+    }
 }

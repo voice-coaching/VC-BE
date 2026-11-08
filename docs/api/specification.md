@@ -2,6 +2,10 @@
 
 # API Specification - voice
 
+## 관리자 클래스·연결 문장
+
+클래스별 목록과 원자적인 문장 구성 편집 API를 추가한다. 기존 예문/콘텐츠를 보존하고 새 개정으로 반영한다. [요청·응답·오류·적용 순서](admin-course-sentences.md).
+
 ## 2026-11-08 선택형 공개 세부점수
 
 기존 canonical Score DTO의 선택 `details`를 저장·투영하며 Direct 저장 이력의 원본 JSON도 유지한다.

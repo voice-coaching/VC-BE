@@ -58,8 +58,8 @@ public class AdminController {
     public ResponseEntity<ApiResponse<PageDto<ContentDto>>> contents(@AuthenticationPrincipal LoginUser actor,
             @RequestParam(required=false) String keyword,@RequestParam(required=false) ContentType type,
             @RequestParam(required=false) String category,@RequestParam(required=false) PublishStatus status,
-            @RequestParam(required=false) Difficulty difficulty,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {
-        return ok(PageDto.from(reads.contents(actor.id(),new ContentFilter(new Query(keyword,page,size),type,category,status,difficulty)),ContentDto::from));
+            @RequestParam(required=false) Difficulty difficulty,@RequestParam(defaultValue="false") boolean excludeClassPractice,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {
+        return ok(PageDto.from(reads.contents(actor.id(),new ContentFilter(new Query(keyword,page,size),type,category,status,difficulty,excludeClassPractice)),ContentDto::from));
     }
     @GetMapping("/contents/{contentId}") @Operation(summary="공용 콘텐츠 상세 조회")
     public ResponseEntity<ApiResponse<ContentDto>> content(@AuthenticationPrincipal LoginUser actor,@PathVariable long contentId) {
