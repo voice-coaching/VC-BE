@@ -54,6 +54,8 @@ public enum ErrorCode {
     NEXT_CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "조건에 맞는 다음 콘텐츠가 없습니다."),
 
     // Training
+    INVALID_IDEMPOTENCY_KEY(HttpStatus.BAD_REQUEST, "Idempotency-Key must contain 1-128 letters, digits, dots, underscores, colons or hyphens."),
+    IDEMPOTENCY_KEY_CONFLICT(HttpStatus.CONFLICT, "The request differs from the original request for this key."),
     COACHING_QUOTA_EXCEEDED(HttpStatus.FORBIDDEN, "이용기간의 코칭 횟수를 모두 사용했습니다."),
     COACHING_PERIOD_EXPIRED(HttpStatus.FORBIDDEN, "무료 코칭 체험 기간이 종료되었습니다."),
     COACHING_SCRIPT_LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "코칭 원고는 300자 이내여야 합니다."),

@@ -18,14 +18,13 @@ public interface VoiceRecordingJpaRepository extends JpaRepository<VoiceRecordin
     int findMaxAttemptNoByTrainingSessionId(@Param("sessionId") Long sessionId);
 
     List<VoiceRecording> findByTrainingSessionIdOrderByAttemptNoAsc(Long sessionId);
-    default List<VoiceRecording> findByTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNullOrderByAttemptNoAsc(Long sessionId, Long userId) {
-        return findByTrainingSessionIdOrderByAttemptNoAsc(sessionId);
-    }
+    List<VoiceRecording> findByTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNullOrderByAttemptNoAsc(Long sessionId, Long userId);
 
-    default Optional<VoiceRecording> findByIdAndTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNull(Long id, Long sessionId, Long userId) { return findById(id); }
+    Optional<VoiceRecording> findByIdAndTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNull(Long id, Long sessionId, Long userId);
 
     Optional<VoiceRecording> findFirstByTrainingSessionIdOrderByCreatedAtDesc(Long sessionId);
-    default Optional<VoiceRecording> findFirstByTrainingSessionIdAndTrainingSessionUserIdAndSelectedTrueAndDeletedAtIsNullOrderByCreatedAtDesc(Long sessionId, Long userId) {
-        return findFirstByTrainingSessionIdOrderByCreatedAtDesc(sessionId);
-    }
+    Optional<VoiceRecording> findFirstByTrainingSessionIdAndTrainingSessionUserIdAndSelectedTrueAndDeletedAtIsNullOrderByCreatedAtDesc(Long sessionId, Long userId);
+
+    @Query("select r.id from VoiceRecording r where r.trainingSession.id=:sessionId and r.trainingSession.userId=:userId and r.deletedAt is null and r.id in :ids")
+    java.util.Set<Long> findAvailableIds(@Param("sessionId") Long sessionId, @Param("userId") Long userId, @Param("ids") java.util.Collection<Long> ids);
 }

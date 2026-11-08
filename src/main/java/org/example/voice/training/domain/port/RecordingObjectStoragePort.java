@@ -25,5 +25,8 @@ public interface RecordingObjectStoragePort {
             long fileSizeBytes
     );
 
+    /** False means a confirmed missing object; transport/auth/metadata failures must throw. */
+    boolean isUploadedObject(Long userId, Long sessionId, String objectKey, String mimeType, long fileSizeBytes);
+
     void deleteObject(Long userId, Long sessionId, String objectKey);
 }

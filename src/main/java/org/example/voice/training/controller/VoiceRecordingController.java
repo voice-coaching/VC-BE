@@ -1,9 +1,10 @@
 package org.example.voice.training.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.example.voice.training.application.TrainingCommandService;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.example.voice.common.response.ApiResponse;
 import org.example.voice.common.security.LoginUser;
-import org.example.voice.training.application.RecordingUploadService;
 import org.example.voice.training.application.VoiceRecordingService;
 import org.example.voice.training.controller.dto.RecordingRegisterRequestDto;
 import org.example.voice.training.controller.dto.RecordingSelectionResponseDto;
@@ -27,17 +28,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class VoiceRecordingController {
 
     private final VoiceRecordingService voiceRecordingService;
-    private final RecordingUploadService recordingUploadService;
+    private final TrainingCommandService trainingCommands;
 
     @PostMapping("/{sessionId}/recordings/upload-url")
     public ApiResponse<RecordingUploadUrlResponseDto> createUploadUrl(
             @AuthenticationPrincipal LoginUser user,
             @PathVariable Long sessionId,
-            @RequestBody RecordingUploadUrlRequestDto request
+            @RequestBody RecordingUploadUrlRequestDto request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String key
     ) {
         return ApiResponse.success(
                 "미디어 업로드 URL을 발급했습니다.",
-                RecordingUploadUrlResponseDto.from(recordingUploadService.createUploadUrl(sessionId, request, user.id()))
+                RecordingUploadUrlResponseDto.from(trainingCommands.issueUpload(user.id(), sessionId, request, key))
         );
     }
 
@@ -45,11 +47,12 @@ public class VoiceRecordingController {
     public ApiResponse<VoiceRecordingResponseDto> registerRecording(
             @AuthenticationPrincipal LoginUser user,
             @PathVariable Long sessionId,
-            @RequestBody RecordingRegisterRequestDto request
+            @RequestBody RecordingRegisterRequestDto request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String key
     ) {
         return ApiResponse.success(
                 "미디어 파일이 등록되었습니다.",
-                VoiceRecordingResponseDto.from(voiceRecordingService.register(sessionId, request, user.id()))
+                VoiceRecordingResponseDto.from(trainingCommands.register(user.id(), sessionId, request, key))
         );
     }
 

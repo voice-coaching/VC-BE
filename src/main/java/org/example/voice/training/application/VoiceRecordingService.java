@@ -55,7 +55,13 @@ public class VoiceRecordingService {
         if (video && (!Boolean.TRUE.equals(request.videoProcessingConsentAccepted())
                 || !RecordingMediaPolicy.VIDEO_CONSENT_POLICY_REVISION.equals(request.videoProcessingConsentPolicyRevision())))
             throw new BaseException(ErrorCode.VIDEO_PROCESSING_CONSENT_REQUIRED);
-        uploadIntentRegistry.reserveForRegistration(userId,sessionId,request.objectKey(),request.mimeType(),request.fileSizeBytes());
+        String registrationHash = registrationHash(request);
+        var registered = uploadIntentRegistry.reserveForRegistration(userId, sessionId, request.objectKey(),
+                request.mimeType(), request.fileSizeBytes(), registrationHash);
+        if (registered.isPresent()) {
+            return voiceRecordingReader.findRegistered(sessionId, registered.get(), userId)
+                    .orElseThrow(() -> new BaseException(ErrorCode.RECORDING_NOT_FOUND));
+        }
         objectStorage.assertUploadedObject(userId,sessionId,request.objectKey(),request.mimeType(),request.fileSizeBytes());
         VisualProcessingAuthorizationData visualAuthorization = null;
         if (video) {
@@ -77,8 +83,9 @@ public class VoiceRecordingService {
         registerRollbackCleanup(rollbackCleanup);
 
         try {
-            uploadIntentRegistry.markConsumed(userId,sessionId,request.objectKey());
-            return voiceRecordingWriter.register(sessionId, normalized);
+            var result = voiceRecordingWriter.register(sessionId, normalized);
+            uploadIntentRegistry.markConsumed(userId,sessionId,request.objectKey(), result.recordingId(), registrationHash);
+            return result;
         } catch (RuntimeException error) {
             try {
                 rollbackCleanup.cleanup();
@@ -88,6 +95,16 @@ public class VoiceRecordingService {
             }
             throw error;
         }
+    }
+
+    private static String registrationHash(RecordingRegisterRequestDto request) {
+        StringBuilder value = new StringBuilder();
+        for (Object field : new Object[] {request.objectKey(), request.mimeType(), request.fileSizeBytes(),
+                request.durationMs(), request.videoProcessingConsentAccepted(), request.videoProcessingConsentPolicyRevision()}) {
+            String text = field == null ? null : field.toString();
+            value.append(text == null ? "-1:" : text.length() + ":" + text);
+        }
+        return TrainingRequestReplayService.sha256(value.toString());
     }
 
     private static void registerRollbackCleanup(CanonicalMediaRollbackCleanup cleanup) {

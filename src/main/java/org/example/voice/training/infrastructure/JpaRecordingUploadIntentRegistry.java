@@ -15,6 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.PageRequest;
+import org.example.voice.training.domain.model.RecordingUploadIntentData;
 
 @Repository
 @RequiredArgsConstructor
@@ -47,17 +51,59 @@ public class JpaRecordingUploadIntentRegistry implements RecordingUploadIntentRe
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public void reserveForRegistration(
+    public Optional<Long> reserveForRegistration(
             Long userId,
             Long sessionId,
             String objectKey,
             String mimeType,
-            Long fileSizeBytes
-    ) {}
+            Long fileSizeBytes,
+            String registrationSha256
+    ) {
+        var session = trainingSessionRepository.findByIdForUpdate(sessionId)
+                .filter(s -> userId.equals(s.getUserId()))
+                .orElseThrow(() -> new BaseException(ErrorCode.TRAINING_SESSION_NOT_FOUND));
+        var intent = repository.findByObjectKeyAndUserIdAndTrainingSessionId(objectKey, userId, sessionId)
+                .orElseThrow(() -> new BaseException(ErrorCode.UPLOAD_INTENT_NOT_FOUND));
+        if (!intent.matchesDeclaredMedia(mimeType, fileSizeBytes))
+            throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
+        if (intent.getStatus() == RecordingUploadIntentStatus.CONSUMED) {
+            if (intent.getRecordingId() == null || !registrationSha256.equals(intent.getRegistrationSha256()))
+                throw new BaseException(ErrorCode.IDEMPOTENCY_KEY_CONFLICT);
+            return Optional.of(intent.getRecordingId());
+        }
+        if (!intent.canRegisterAt(OffsetDateTime.now(ZoneOffset.UTC)))
+            throw new BaseException(ErrorCode.UPLOAD_INTENT_NOT_ACTIVE);
+        if (session.getStatus() == org.example.voice.training.domain.type.TrainingSessionStatus.COMPLETED
+                || session.getStatus() == org.example.voice.training.domain.type.TrainingSessionStatus.CANCELED)
+            throw new BaseException(ErrorCode.SESSION_ALREADY_FINISHED);
+        return Optional.empty();
+    }
 
     @Override
     @Transactional
-    public void markConsumed(Long userId, Long sessionId, String objectKey) {}
+    public void markConsumed(Long userId, Long sessionId, String objectKey, Long recordingId, String registrationSha256) {
+        repository.findByObjectKeyAndUserIdAndTrainingSessionId(objectKey, userId, sessionId)
+                .orElseThrow(() -> new BaseException(ErrorCode.UPLOAD_INTENT_NOT_FOUND))
+                .consume(recordingId, registrationSha256);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<RecordingUploadIntentData> find(Long userId, Long sessionId, String objectKey) {
+        return repository.findOwned(userId, sessionId, objectKey).map(this::data);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RecordingUploadIntentData> recent(Long userId, Long sessionId, int limit) {
+        return repository.findByUserIdAndTrainingSessionIdOrderByIdDesc(userId, sessionId, PageRequest.of(0, limit))
+                .stream().map(this::data).toList();
+    }
+
+    private RecordingUploadIntentData data(RecordingUploadIntent i) {
+        return new RecordingUploadIntentData(i.getId(), i.getObjectKey(), i.getMimeType(), i.getFileSizeBytes(),
+                i.getExpiresAt(), i.getStatus(), i.getRecordingId());
+    }
 
     @Override
     @Transactional

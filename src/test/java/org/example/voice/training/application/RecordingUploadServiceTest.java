@@ -77,6 +77,6 @@ class RecordingUploadServiceTest {
     }
 
     private RecordingUploadService service() {
-        return new RecordingUploadService(objectStorage, sessions, sessionWriter, uploadIntentRegistry);
+        return new RecordingUploadService(objectStorage, sessions, sessionWriter, uploadIntentRegistry, java.time.Clock.systemUTC());
     }
 }

@@ -110,8 +110,6 @@ public interface AnalysisResultJpaRepository extends JpaRepository<AnalysisResul
     Optional<AnalysisResult> findFirstByRecordingTrainingSessionIdOrderByCreatedAtDescIdDesc(Long sessionId);
     Optional<AnalysisResult> findFirstByRecordingTrainingSessionIdAndRecordingTrainingSessionUserIdAndRecordingSelectedTrueAndRecordingDeletedAtIsNullOrderByCreatedAtDescIdDesc(Long sessionId, Long userId);
 
-    default Optional<AnalysisResult> findFirstByRecordingTrainingSessionIdAndRecordingTrainingSessionUserIdAndRecordingSelectedTrueAndRecordingDeletedAtIsNullAndStatusOrderByCreatedAtDescIdDesc(Long sessionId, Long userId, AnalysisStatus status) {
-        return findFirstByRecordingTrainingSessionIdOrderByCreatedAtDescIdDesc(sessionId);
-    }
+    Optional<AnalysisResult> findFirstByRecordingTrainingSessionIdAndRecordingTrainingSessionUserIdAndRecordingSelectedTrueAndRecordingDeletedAtIsNullAndStatusOrderByCreatedAtDescIdDesc(Long sessionId, Long userId, AnalysisStatus status);
 
 }

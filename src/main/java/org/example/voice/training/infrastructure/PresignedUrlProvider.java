@@ -15,6 +15,11 @@ import java.util.UUID;
 public class PresignedUrlProvider implements RecordingObjectStoragePort {
 
     @Override
+    public boolean isUploadedObject(Long userId, Long sessionId, String objectKey, String mimeType, long fileSizeBytes) {
+        throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
+    }
+
+    @Override
     public String createObjectKey(Long userId, Long sessionId, String fileName) {
         String extension = "";
         if (fileName != null && fileName.contains(".")) {
@@ -52,7 +57,7 @@ public class PresignedUrlProvider implements RecordingObjectStoragePort {
             String objectKey,
             String mimeType,
             long fileSizeBytes
-    ) {}
+    ) { throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE); }
 
     @Override
     public void deleteObject(Long userId, Long sessionId, String objectKey) {

@@ -1,6 +1,8 @@
 package org.example.voice.training.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.example.voice.training.application.TrainingCommandService;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.example.voice.common.response.ApiResponse;
 import org.example.voice.common.security.LoginUser;
 import org.example.voice.training.controller.dto.TrainingSessionCancelResponseDto;
@@ -24,15 +26,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class TrainingSessionController {
 
     private final TrainingSessionService trainingSessionService;
+    private final TrainingCommandService trainingCommands;
 
     @PostMapping
     public ApiResponse<TrainingSessionResponseDto> createTrainingSession(
             @AuthenticationPrincipal LoginUser user,
-            @RequestBody TrainingSessionCreateRequestDto request
+            @RequestBody TrainingSessionCreateRequestDto request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String key
     ) {
         return ApiResponse.success(
                 "학습 세션이 생성되었습니다.",
-                TrainingSessionResponseDto.from(trainingSessionService.create(request, user.id()))
+                TrainingSessionResponseDto.from(trainingCommands.create(user.id(), request, key))
         );
     }
 

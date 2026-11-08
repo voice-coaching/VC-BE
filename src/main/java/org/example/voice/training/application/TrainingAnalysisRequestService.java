@@ -75,8 +75,11 @@ public class TrainingAnalysisRequestService {
         if(profile==AnalysisExecutionProfile.INDEPENDENT_PULL) independent.assertSession(sessionId,userId);
         SelectedRecordingAnalysisData source = voiceRecordingReader.findSelectedForAnalysis(sessionId, userId)
                 .orElseThrow(() -> new BaseException(ErrorCode.SELECTED_RECORDING_NOT_FOUND));
-        if(profile==AnalysisExecutionProfile.INDEPENDENT_PULL && trainingAnalysisReader.existsRunningAnalysis(source.recordingId()))
+        if(trainingAnalysisReader.existsRunningAnalysis(source.recordingId()))
             throw new BaseException(ErrorCode.ANALYSIS_ALREADY_RUNNING);
+
+        if (trainingAnalysisReader.existsAnalysis(source.recordingId()))
+            throw new BaseException(ErrorCode.ANALYSIS_ALREADY_REQUESTED);
 
         if (profile != AnalysisExecutionProfile.LEGACY
                 && source.learningFocus() != LearningFocus.PRONUNCIATION) {
@@ -124,6 +127,7 @@ public class TrainingAnalysisRequestService {
             throw new BaseException(ErrorCode.ANALYSIS_ALREADY_RUNNING);
 
         AnalysisProgressData failed = trainingAnalysisReader.findLatestFailedBySelectedRecording(sessionId, userId)
+                .filter(progress -> progress.status() == org.example.voice.analysis.domain.type.AnalysisStatus.FAILED)
                 .orElseThrow(() -> new BaseException(ErrorCode.ANALYSIS_NOT_FOUND));
 
         if (profile != AnalysisExecutionProfile.LEGACY
