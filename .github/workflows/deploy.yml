@@ -43,7 +43,9 @@ jobs:
       - name: Compile and package release
         run: |
           python -m unittest discover -s scripts/deployment -p 'test_*retention*.py'
-          bash gradlew clean compileJava compileTestJava bootJar -x test --no-daemon
+          python -m unittest discover -s scripts/deployment -p 'test_browser_video_keys.py'
+          python -m unittest discover -s scripts/deployment -p 'test_browser_video_proxy.py'
+          bash gradlew clean test --tests '*BrowserVideo*' bootJar --no-daemon
 
       - name: Select executable JAR
         id: artifact
@@ -87,6 +89,24 @@ jobs:
           analysis_report=$(ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
             "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/analysis_diagnostics.py'")
           echo "::notice title=Analysis readiness::$analysis_report"
+
+      - name: Prepare Backend browser video signing key
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
+            "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/browser_video_keys.py' --apply"
+
+      - name: Prepare browser video upload proxy
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
+            "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/browser_video_proxy.py' --apply"
 
       - name: Activate release
         env:
