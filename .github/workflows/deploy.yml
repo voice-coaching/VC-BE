@@ -43,6 +43,7 @@ jobs:
       - name: Compile and package release
         run: |
           python -m unittest discover -s scripts/deployment -p 'test_*retention*.py'
+          sudo "$(command -v python)" -m unittest discover -s scripts/deployment -p 'test_runtime_env*.py'
           python -m unittest discover -s scripts/deployment -p 'test_browser_video_keys.py'
           python -m unittest discover -s scripts/deployment -p 'test_browser_video_proxy.py'
           bash gradlew clean test --tests '*BrowserVideo*' bootJar --no-daemon
