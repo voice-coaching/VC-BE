@@ -142,4 +142,60 @@ class AdminTitleExamPolicyIntegrationTest {
         var policy = service.list(actor).getFirst();
         assertThat(policy.version()).isZero(); assertThat(policy.practiceContentId()).isEqualTo(first); assertThat(policy.passingScore()).isEqualTo(70);
     }
+
+    @Test void scriptEditPublishesANewQuestionAndPreservesAlreadyCreatedExam() throws Exception {
+        var existing = titleService.create(member, null);
+        mvc.perform(patch(PATH+"/BEGINNER").header("Authorization", "Bearer "+adminToken)
+                .contentType("application/json").content(body(0, first, 80).replace("}", ",\"scriptText\":\"새 시험 문장을 또박또박 읽습니다.\"}")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content.scriptText").value("새 시험 문장을 또박또박 읽습니다."))
+                .andExpect(jsonPath("$.data.version").value(1)).andExpect(jsonPath("$.data.available").value(true));
+        var changed = service.list(actor).getFirst();
+        assertThat(changed.practiceContentId()).isNotEqualTo(first);
+        assertThat(changed.content().title()).isEqualTo("기존 시험");
+        assertThat(changed.content().status()).isEqualTo(PublishStatus.PUBLISHED);
+        assertThat(changed.content().category()).isEqualTo("TITLE_EXAM");
+        assertThat(titleService.get(member, existing.id()).practiceContentId()).isEqualTo(first);
+        assertThat(titleService.get(member, existing.id()).passingScore()).isEqualTo(70);
+        var next = titleService.create(member, null);
+        assertThat(next.practiceContentId()).isEqualTo(changed.practiceContentId());
+        assertThat(next.passingScore()).isEqualTo(80);
+        tx.executeWithoutResult(s -> {
+            var original = em.find(PracticeContent.class, first);
+            assertThat(original.getScriptText()).isEqualTo("정확한 발음으로 문장을 읽습니다.");
+            assertThat(original.getTtsRevision()).isEqualTo(1);
+            assertThat(original.getStatus()).isEqualTo(PublishStatus.PUBLISHED);
+            assertThat(em.createQuery("select count(a) from ReferenceAudio a where a.content.id=:id", Long.class)
+                    .setParameter("id", changed.practiceContentId()).getSingleResult()).isZero();
+        });
+    }
+
+    @Test void unchangedScriptDoesNotCloneTheQuestion() {
+        var changed = service.edit(actor,TitleRank.BEGINNER,0,first,0,80,"점수 수정","정확한 발음으로 문장을 읽습니다.");
+        assertThat(changed.practiceContentId()).isEqualTo(first);
+        assertThat(changed.version()).isEqualTo(1);
+    }
+
+    @Test void scriptEditValidatesTextAndBothVersionsBeforeCreatingAnything() throws Exception {
+        for (String text : List.of("", "   ", "x".repeat(10001))) {
+            mvc.perform(patch(PATH+"/BEGINNER").header("Authorization", "Bearer "+adminToken)
+                    .contentType("application/json").content(body(0,first,80).replace("}",",\"scriptText\":\""+text+"\"}")))
+                    .andExpect(status().isBadRequest());
+        }
+        assertThatThrownBy(() -> service.edit(actor,TitleRank.BEGINNER,1,first,0,80,"수정","새 원문"))
+                .isInstanceOf(org.example.voice.common.exception.BaseException.class);
+        assertThatThrownBy(() -> service.edit(actor,TitleRank.BEGINNER,0,first,1,80,"수정","새 원문"))
+                .isInstanceOf(org.example.voice.common.exception.BaseException.class);
+        assertThat(service.list(actor).getFirst().practiceContentId()).isEqualTo(first);
+    }
+
+    @Test void failedScriptAuditRollsBackNewContentAndPolicyTogether() {
+        long before = tx.execute(s -> em.createQuery("select count(c) from PracticeContent c",Long.class).getSingleResult());
+        doThrow(new org.springframework.dao.DataAccessResourceFailureException("audit unavailable"))
+                .when(store).audit(argThat(log -> "TITLE_EXAM_POLICY_EDIT".equals(log.getAction())));
+        assertThatThrownBy(() -> service.edit(actor,TitleRank.BEGINNER,0,first,0,80,"수정","새 원문"))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(service.list(actor).getFirst().practiceContentId()).isEqualTo(first);
+        long after = tx.execute(s -> em.createQuery("select count(c) from PracticeContent c",Long.class).getSingleResult());
+        assertThat(after).isEqualTo(before);
+    }
 }
