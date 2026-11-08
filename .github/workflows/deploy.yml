@@ -44,6 +44,7 @@ jobs:
         run: |
           python -m unittest discover -s scripts/deployment -p 'test_*retention*.py'
           python -m unittest discover -s scripts/deployment -p 'test_browser_video_keys.py'
+          python -m unittest discover -s scripts/deployment -p 'test_browser_video_proxy.py'
           bash gradlew clean test --tests '*BrowserVideo*' bootJar --no-daemon
 
       - name: Select executable JAR
@@ -97,6 +98,15 @@ jobs:
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
           ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
             "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/browser_video_keys.py' --apply"
+
+      - name: Prepare browser video upload proxy
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          ssh -i ~/.ssh/alpha-deploy "$EC2_USER@$EC2_HOST" \
+            "sudo python3 -B '/var/tmp/alpha-deploy-${GITHUB_SHA}/deployment/browser_video_proxy.py' --apply"
 
       - name: Activate release
         env:

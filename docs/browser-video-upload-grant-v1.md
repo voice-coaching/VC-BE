@@ -98,3 +98,10 @@ Backend의 기존 recording/analysis 이력 및 독립 결과 수집 worker를 �
 관련 BrowserVideo* 단위 테스트와 Java 컴파일을 수행한다. 운영 키/DB·사용자 작업·GPT는
 해당 테스트에서 사용하지 않는다. 최신 develop 반영 및 실제 브라우저·전체 분석 검증과
 배포는 담당자 인계 범위다.
+
+
+원본 업로드의 AWS 프록시는 기존 기본 location의 64KiB 제한을 상속하면 413으로
+거부된다. `scripts/deployment/browser_video_proxy.py --apply`는 ai.voice-coaching.site의
+J406 upstream 28080을 확인한 뒤 브라우저 경로에만 256MiB·스트리밍 전달·125초
+업로드 설정을 추가한다. 기존 위치·TLS·인증 설정은 보존하며, root 전용 백업 후
+nginx -t와 graceful reload를 수행한다. 검증 실패 시 원래 설정으로 복구한다.
