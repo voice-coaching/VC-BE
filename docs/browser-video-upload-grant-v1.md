@@ -60,12 +60,32 @@ ai.browser-video.ai-base-url=https://ai.example
 ai.browser-video.allowed-origins=https://frontend.example
 ai.browser-video.key-id=<키 식별자>
 ai.browser-video.private-key-file=<Backend 전용 절대경로>
+ai.browser-video.public-key-file=<대응하는 공개키 PEM 절대경로>
 ```
 
 활성화 시 개인키는 PKCS#8 Ed25519 PEM이어야 한다. 개인키는 Backend에만 보관하고
 AI에는 같은 kid의 공개키 PEM만 설치한다. 구성 오류 시 활성 Backend가 시작되지 않는다.
 AI는 alg/typ/kid/issuer/audience/scope/시간/소유자/세션/시도/원고/원본/origin을 로컬에서
 검증하며 Backend readiness·callback에 의존하지 않는다.
+
+## 운영 설치 연결
+
+후속 운영 요청에 따라 기존 CI의 활성화 직전에
+`scripts/deployment/browser_video_keys.py --apply`를 실행하도록 연결했다.
+이 스크립트는 AWS 안에서 Ed25519 개인키를 한 번 생성하며 외부로 내보내지 않는다.
+`/etc/alpha-browser-video/private.pem`은 서비스 UID 소유 0600이고 공개키는 public.pem이다.
+기존 키는 재사용하며, 예상과 다른 기존 설정·symlink·권한은 덮어쓰지 않는다.
+
+`/etc/alpha-browser-video/runtime.env`와 전용 systemd drop-in으로 기능·issuer·audience·
+AI base URL·허용 Origin·키 경로를 설치한다. 기존 환경 파일은 수정하지 않는다.
+그 뒤 기존 JAR 배포가 서비스를 재시작한다. CI는 실제 설치 전에 키 설치 스크립트의
+임시 파일 검사와 BrowserVideo* Java 테스트를 수행한다.
+
+`GET /api/browser-video/.well-known/upload-grant-keys`는 인증 없이 **공개키만** 제공한다.
+응답은 `{schemaVersion:"voice-coaching.browser-video-keyset.v1",keys:{kid:publicPem}}`다.
+개인키·로그인 토큰·AI 서버 Bearer는 포함하지 않는다. 비활성이면 503이다.
+AI 운영 도구는 Backend HTTPS 주소에서 이 공개키를 배포 시에만 조회·고정한다.
+분석 요청 중에는 이 endpoint를 조회하지 않는다.
 
 ## 범위와 검증
 
