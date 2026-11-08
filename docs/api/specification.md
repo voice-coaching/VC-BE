@@ -2199,6 +2199,10 @@ DELETE `/api/admin/notices/{noticeId}`, DELETE `/api/admin/reference-audios/{aud
 
 GET `/api/admin/title-exam-policies`, PATCH `/api/admin/title-exam-policies/{targetRank}`의 인증·필드 타입·null·요청/응답·오류·콘텐츠 보호 계약은 [상세 명세](admin-title-exam-policies.md)를 따른다. 설정 버전과 선택 문장 버전을 확인하며 새로 생성하는 시험부터 적용한다.
 
+PATCH의 선택 `scriptText`(null/생략 허용, 제공 시 공백 불가·최대 10,000자)로 원문을 바꾸면 새 공개 콘텐츠를
+생성해 현재 정책에 연결한다. 응답은 새 practiceContentId/content.id와 수정 원문을 반환한다. 기존 시험·원문·음성은
+유지하고 기존 TTS 조정기가 새 콘텐츠의 생성 작업을 준비한다. 동일 원문은 새 콘텐츠를 만들지 않는다.
+
 ## Video lip provisional scores (2026-11-07)
 
 The existing v3 analysis view accepts PROVISIONAL and optional subScores. No new endpoint or overall-score calculation is introduced. Capabilities expose actual MIME, size, duration and existing video consent requirements. See [contract](video-lip-provisional-consumer.md) and [frontend handoff](frontend-video-lip-consumer.md).
