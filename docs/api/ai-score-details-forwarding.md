@@ -23,3 +23,7 @@ Backend reader 반영 후 AI 응답 writer를 반영한다. Frontend는 HTTP 원
 
 영상의 기존 visual.subScores와 phoneAssessments[].subScores도 optional DTO로 보존한다.
 PROVISIONAL 표시를 수용하되 원본 입술 점수·측정 근거를 재계산하지 않는다.
+
+독립 결과 adapter도 공개 `CanonicalAnalysisView.ScoreDetails` 타입으로 변환한다.
+기존 음성 전용 `LipVisual` 생성자는 optional subScores를 null(응답 생략)로 전달하는 호환 생성자를 유지한다.
+점수나 입술 하위 항목을 새로 생성하지 않으며, 이 호환성은 기존 호출부의 컴파일과 공개 필드의 선택성을 유지하기 위한 것이다.

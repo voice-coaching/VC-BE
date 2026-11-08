@@ -107,7 +107,15 @@ public record CanonicalAnalysisView(
     public record LipVisual(String status, boolean correctiveClaimsAllowed, BigDecimal score, String scoreKind,
             LipCoverage coverage, List<LipPhone> phoneAssessments, List<String> reasonCodes,
             String alignmentScope, List<Long> unresolvedExpectedIndices, int omittedPhoneAssessmentCount,
-            @JsonInclude(JsonInclude.Include.NON_NULL) List<LipSubScore> subScores) implements Visual {}
+            @JsonInclude(JsonInclude.Include.NON_NULL) List<LipSubScore> subScores) implements Visual {
+        /** Existing audio-only callers omit optional visual sub-scores. */
+        public LipVisual(String status, boolean correctiveClaimsAllowed, BigDecimal score, String scoreKind,
+                LipCoverage coverage, List<LipPhone> phoneAssessments, List<String> reasonCodes,
+                String alignmentScope, List<Long> unresolvedExpectedIndices, int omittedPhoneAssessmentCount) {
+            this(status, correctiveClaimsAllowed, score, scoreKind, coverage, phoneAssessments, reasonCodes,
+                    alignmentScope, unresolvedExpectedIndices, omittedPhoneAssessmentCount, null);
+        }
+    }
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record LipCoverage(long targetCount, long visuallyEligibleCount, long observedCount,
                               long scoredCount, BigDecimal coverage) {}
