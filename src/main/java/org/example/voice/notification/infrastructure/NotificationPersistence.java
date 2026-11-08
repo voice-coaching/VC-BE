@@ -24,14 +24,17 @@ public class NotificationPersistence implements NotificationStore, NotificationL
         return new Page(items, page, size, total, (int) Math.min(Integer.MAX_VALUE, (total + size - 1) / size), ((long) page + 1) * size < total, unread);
     }
     public Optional<UserNotification> notification(Long userId, Long id) {
-        return em.createQuery("select n from UserNotification n where n.id=:id and coalesce(:user,0L)=coalesce(:user,0L)", UserNotification.class)
+        return em.createQuery("select n from UserNotification n where n.id=:id and n.userId=:user", UserNotification.class)
                 .setParameter("user", userId).setParameter("id", id).getResultStream().findFirst();
     }
     public int readAll(Long userId, OffsetDateTime now) {
         return em.createQuery("update UserNotification n set n.readAt=:now where n.userId=:user and n.readAt is null")
                 .setParameter("now", now).setParameter("user", userId).executeUpdate();
     }
-    public boolean hasEvent(Long userId, String key) { return false; }
+    public boolean hasEvent(Long userId, String key) {
+        return !em.createQuery("select n.id from UserNotification n where n.userId=:user and n.deduplicationKey=:key", Long.class)
+                .setParameter("user", userId).setParameter("key", key).setMaxResults(1).getResultList().isEmpty();
+    }
     public void save(UserNotification notification) { em.persist(notification); }
     @Transactional(readOnly = true)
     public List<Long> reminderUsers(Long after, int size) {

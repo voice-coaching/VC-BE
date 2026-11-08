@@ -10,7 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-@Order(-40) @RestControllerAdvice(assignableTypes = NotificationController.class)
+@Order(-40) @RestControllerAdvice(assignableTypes = {NotificationController.class, NativeFcmController.class})
 public class NotificationExceptionHandler {
     @ExceptionHandler(NotificationException.class)
     public ResponseEntity<ApiResponse<Void>> business(NotificationException error) {

@@ -195,6 +195,11 @@ management:
       show-details: never
 
 notification:
+  native-fcm:
+    enabled: ${NATIVE_FCM_ENABLED:false}
+    project-id: ${NATIVE_FCM_PROJECT_ID:}
+    encryption-key: ${NATIVE_FCM_ENCRYPTION_KEY:}
+    poll-interval: ${NATIVE_FCM_POLL_INTERVAL:PT15S}
   push:
     encryption-key: ${PUSH_SUBSCRIPTION_ENCRYPTION_KEY:}
   reminders:
