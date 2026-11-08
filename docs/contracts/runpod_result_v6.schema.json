@@ -4450,6 +4450,135 @@
           }
         }
       ]
+    },
+    "publicScoreDetails": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "schemaVersion",
+        "validationStatus",
+        "aggregationMode",
+        "audioScore",
+        "visualScore",
+        "audioWeight",
+        "visualWeight",
+        "criteria"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "voice-coaching.score-details.v1"
+        },
+        "validationStatus": {
+          "type": "string"
+        },
+        "aggregationMode": {
+          "enum": [
+            "AUDIO_ONLY",
+            "AUDIO_VISUAL"
+          ]
+        },
+        "audioScore": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "visualScore": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "audioWeight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "visualWeight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "criterionId",
+              "label",
+              "score",
+              "status",
+              "reasonCode",
+              "weight"
+            ],
+            "properties": {
+              "criterionId": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "score": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 100
+              },
+              "status": {
+                "enum": [
+                  "SCORED",
+                  "UNSCORABLE"
+                ]
+              },
+              "reasonCode": {
+                "type": "string"
+              },
+              "weight": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "SCORED"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "score": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "score": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "minItems": 6,
+          "maxItems": 6
+        }
+      },
+      "$comment": "Optional AI-owned display metadata. No fixed weights, sums, rubric revisions, hashes or model approval gates. Historical phone criteria remain separate."
     }
   }
 }

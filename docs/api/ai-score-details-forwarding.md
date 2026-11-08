@@ -27,3 +27,7 @@ PROVISIONAL 표시를 수용하되 원본 입술 점수·측정 근거를 재계
 독립 결과 adapter도 공개 `CanonicalAnalysisView.ScoreDetails` 타입으로 변환한다.
 기존 음성 전용 `LipVisual` 생성자는 optional subScores를 null(응답 생략)로 전달하는 호환 생성자를 유지한다.
 점수나 입술 하위 항목을 새로 생성하지 않으며, 이 호환성은 기존 호출부의 컴파일과 공개 필드의 선택성을 유지하기 위한 것이다.
+
+v4·v6 스키마의 기존 `legacyScore`와 입력 미접수·결과 미전달 분기가 참조하는
+`publicScoreDetails` 정의도 유지한다. 새 `scoreDetails` 정의로 이를 삭제하면
+기존 handoff spool 복원 중 참조 해석 오류로 서버 기동이 중단될 수 있다.
