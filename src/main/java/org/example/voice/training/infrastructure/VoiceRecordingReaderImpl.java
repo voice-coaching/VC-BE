@@ -22,6 +22,19 @@ import java.util.Optional;
 @Transactional(readOnly = true)
 public class VoiceRecordingReaderImpl implements VoiceRecordingReader {
 
+    @Override
+    public java.util.Set<Long> findAvailableIds(Long sessionId, Long userId, java.util.Collection<Long> ids) {
+        return ids.isEmpty() ? java.util.Set.of() : voiceRecordingJpaRepository.findAvailableIds(sessionId, userId, ids);
+    }
+
+    @Override
+    public Optional<org.example.voice.training.domain.model.VoiceRecordingRegisteredData> findRegistered(
+            Long sessionId, Long recordingId, Long userId) {
+        return voiceRecordingJpaRepository.findByIdAndTrainingSessionIdAndTrainingSessionUserIdAndDeletedAtIsNull(recordingId, sessionId, userId)
+                .map(r -> new org.example.voice.training.domain.model.VoiceRecordingRegisteredData(r.getId(), r.getAttemptNo(),
+                        r.getVisualObjectKey() == null ? "AUDIO_ONLY" : "AUDIO_VISUAL", r.getQualityStatus(), r.getSelected(), r.getCreatedAt()));
+    }
+
     private final VoiceRecordingJpaRepository voiceRecordingJpaRepository;
     private final AnalysisResultJpaRepository analysisResultJpaRepository;
     private final RecordingObjectStoragePort objectStorage;

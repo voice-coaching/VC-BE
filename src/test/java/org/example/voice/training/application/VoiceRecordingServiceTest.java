@@ -68,7 +68,8 @@ class VoiceRecordingServiceTest {
         verify(objectStorage).assertUploadedObject(
                 9L, 7L, request.objectKey(), request.mimeType(), request.fileSizeBytes()
         );
-        verify(uploadIntentRegistry).markConsumed(9L, 7L, request.objectKey());
+        verify(uploadIntentRegistry).markConsumed(org.mockito.ArgumentMatchers.eq(9L), org.mockito.ArgumentMatchers.eq(7L),
+                org.mockito.ArgumentMatchers.eq(request.objectKey()), org.mockito.ArgumentMatchers.eq(50L), any());
         verify(writer).register(7L, normalized);
     }
 

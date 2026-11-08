@@ -54,6 +54,12 @@ public class RecordingUploadIntent {
     @Column(name = "resolved_at")
     private OffsetDateTime resolvedAt;
 
+    @Column(name = "recording_id")
+    private Long recordingId;
+
+    @Column(name = "registration_sha256", length = 64)
+    private String registrationSha256;
+
     private RecordingUploadIntent(
             Long userId,
             Long trainingSessionId,
@@ -97,6 +103,12 @@ public class RecordingUploadIntent {
         }
     }
 
+    public void consume(Long recordingId, String registrationSha256) {
+        consume();
+        this.recordingId = recordingId;
+        this.registrationSha256 = registrationSha256;
+    }
+
     public boolean canRegisterAt(OffsetDateTime now) {
         return status == RecordingUploadIntentStatus.ISSUED && expiresAt.isAfter(now);
     }
@@ -106,7 +118,7 @@ public class RecordingUploadIntent {
     }
 
     public boolean expire() {
-
+        if (status != RecordingUploadIntentStatus.ISSUED) return false;
         status = RecordingUploadIntentStatus.EXPIRED;
         resolvedAt = OffsetDateTime.now(ZoneOffset.UTC);
         return true;

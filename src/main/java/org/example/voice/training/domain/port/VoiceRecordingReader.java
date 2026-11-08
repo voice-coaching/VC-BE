@@ -3,12 +3,17 @@ package org.example.voice.training.domain.port;
 import org.example.voice.training.domain.model.RecordingPlaybackUrlData;
 import org.example.voice.training.domain.model.SelectedRecordingAnalysisData;
 import org.example.voice.training.domain.model.VoiceRecordingData;
+import org.example.voice.training.domain.model.VoiceRecordingRegisteredData;
 import org.example.voice.training.domain.type.RecordingQualityStatus;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface VoiceRecordingReader {
+
+    Optional<VoiceRecordingRegisteredData> findRegistered(Long sessionId, Long recordingId, Long userId);
+
+    java.util.Set<Long> findAvailableIds(Long sessionId, Long userId, java.util.Collection<Long> ids);
 
     boolean existsByObjectKey(String objectKey);
 

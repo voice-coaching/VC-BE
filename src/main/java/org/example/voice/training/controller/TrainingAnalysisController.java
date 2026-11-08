@@ -1,6 +1,8 @@
 package org.example.voice.training.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.example.voice.training.application.TrainingCommandService;
+import org.springframework.web.bind.annotation.RequestHeader;
 import jakarta.servlet.http.HttpServletRequest;
 import org.example.voice.common.exception.ErrorCode;
 import org.example.voice.common.response.ApiResponse;
@@ -31,19 +33,21 @@ public class TrainingAnalysisController {
 
     private final TrainingAnalysisRequestService trainingAnalysisRequestService;
     private final TrainingAnalysisSchemaAdmissionService schemaAdmissionService;
+    private final TrainingCommandService trainingCommands;
 
     @PostMapping("/{sessionId}/analyze")
     public ApiResponse<AnalysisRequestResponseDto> requestAnalysis(
             @AuthenticationPrincipal LoginUser user,
             @PathVariable Long sessionId,
              @RequestBody(required = false) AnalysisConsentRequestDto request,
-            HttpServletRequest httpRequest
+            HttpServletRequest httpRequest,
+            @RequestHeader(value = "Idempotency-Key", required = false) String key
     ) {
         var profile = requestedProfile(httpRequest);
         return ApiResponse.success(
                 "음성 분석을 요청했습니다.",
                 AnalysisRequestResponseDto.from(
-                        trainingAnalysisRequestService.requestAnalysis(sessionId, user.id(), request == null ? null : request.toData(), profile)
+                        trainingCommands.analyze(user.id(), sessionId, request == null ? null : request.toData(), profile, key)
                 )
         );
     }
@@ -64,13 +68,14 @@ public class TrainingAnalysisController {
             @AuthenticationPrincipal LoginUser user,
             @PathVariable Long sessionId,
              @RequestBody(required = false) AnalysisConsentRequestDto request,
-            HttpServletRequest httpRequest
+            HttpServletRequest httpRequest,
+            @RequestHeader(value = "Idempotency-Key", required = false) String key
     ) {
         var profile = requestedProfile(httpRequest);
         return ApiResponse.success(
                 "음성 분석을 다시 요청했습니다.",
                 AnalysisRetryResponseDto.from(
-                        trainingAnalysisRequestService.retry(sessionId, user.id(), request == null ? null : request.toData(), profile)
+                        trainingCommands.retry(user.id(), sessionId, request == null ? null : request.toData(), profile, key)
                 )
         );
     }
@@ -80,7 +85,6 @@ public class TrainingAnalysisController {
 
         String requested = values.isEmpty() ? null : values.getFirst();
         var profile = schemaAdmissionService.selectProfile(requested);
-        schemaAdmissionService.assertAvailable(requested);
         return profile;
     }
 }

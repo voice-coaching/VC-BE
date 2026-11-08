@@ -71,13 +71,18 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     @Override
     @Transactional
     @CacheEvict(cacheNames = HomeCacheNames.RECENT_TRAINING, allEntries = true)
-    public void beginUpload(Long sessionId) { findForUpdate(sessionId).beginUpload(); }
+    public void beginUpload(Long sessionId) {
+        var session = findForUpdate(sessionId);
+        assertNotFinished(session);
+        session.beginUpload();
+    }
 
     @Override
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     public void lockAnalysisSelection(Long sessionId, Long userId) {
         TrainingSession session = findForUpdate(sessionId);
-
+        if (!java.util.Objects.equals(session.getUserId(), userId))
+            throw new BaseException(ErrorCode.TRAINING_SESSION_NOT_FOUND);
     }
 
     @Override
@@ -85,7 +90,13 @@ public class TrainingSessionWriterImpl implements TrainingSessionWriter {
     @CacheEvict(cacheNames = HomeCacheNames.RECENT_TRAINING, allEntries = true)
     public void startAnalysis(Long sessionId) {
         TrainingSession session = findForUpdate(sessionId);
+        assertNotFinished(session);
         session.startAnalysis();
+    }
+
+    private static void assertNotFinished(TrainingSession session) {
+        if (session.getStatus() == TrainingSessionStatus.COMPLETED || session.getStatus() == TrainingSessionStatus.CANCELED)
+            throw new BaseException(ErrorCode.SESSION_ALREADY_FINISHED);
     }
 
     @Override

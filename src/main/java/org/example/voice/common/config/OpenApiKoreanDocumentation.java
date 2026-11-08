@@ -189,6 +189,7 @@ public class OpenApiKoreanDocumentation {
         add(map, PathItem.HttpMethod.GET, "/api/analyses/{analysisId}/result-contract", "분석 결과", "현재 분석 결과 계약 조회", "본인 소유 분석의 현재 요청·실행 식별자와 분석 프로필·결과 스키마 버전을 조회합니다. 저장소 주소나 보존 작업 상태는 반환하지 않습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/training-sessions", "학습 세션", "학습 세션 생성", "학습할 콘텐츠와 학습 초점을 선택해 새로운 녹음·분석 세션을 시작합니다.", false);
         add(map, PathItem.HttpMethod.GET, "/api/training-sessions/{sessionId}", "학습 세션", "학습 세션 상세 조회", "학습 세션의 콘텐츠, 진행 상태, 시간과 선택된 녹음 정보를 조회합니다.", false);
+        add(map, PathItem.HttpMethod.GET, "/api/training-sessions/{sessionId}/recovery", "학습 세션", "연결 단절 후 학습 상태 복구 조회", "본인 세션의 현재 선택 녹음·분석과 최근 20개 업로드의 대기·저장·등록·만료 상태를 조회합니다. 저장소 확인 실패는 503이며 새 업로드나 분석을 시작하지 않습니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/complete", "학습 세션", "학습 세션 완료", "분석이 끝난 학습 세션을 완료 처리하고 실제 학습 시간을 저장합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/cancel", "학습 세션", "학습 세션 취소", "진행 중인 학습 세션을 취소 상태로 변경합니다.", false);
         add(map, PathItem.HttpMethod.POST, "/api/training-sessions/{sessionId}/recordings/upload-url", "학습 세션", "단일 media 업로드 URL 발급", "음성 또는 영상 원본을 스토리지에 직접 업로드할 수 있도록 업로드 URL과 저장 키를 발급합니다.", false);

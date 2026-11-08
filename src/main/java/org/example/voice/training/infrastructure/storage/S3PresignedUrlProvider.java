@@ -58,6 +58,7 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
         PutObjectRequest objectRequest = PutObjectRequest.builder()
                 .bucket(properties.getBucket())
                 .key(objectKey)
+                .contentType(mimeType)
                 .build();
         return presigner.presignPutObject(PutObjectPresignRequest.builder()
                         .signatureDuration(signatureDuration(expiresAt))
@@ -81,7 +82,7 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
     }
 
     @Override
-    public Map<String, String> requiredHeaders(String mimeType, long fileSizeBytes) { return Map.of(); }
+    public Map<String, String> requiredHeaders(String mimeType, long fileSizeBytes) { return Map.of("Content-Type", mimeType); }
 
     @Override
     public void assertUploadedObject(
@@ -90,11 +91,44 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
             String objectKey,
             String mimeType,
             long fileSizeBytes
-    ) {}
+    ) {
+        if (!isUploadedObject(userId, sessionId, objectKey, mimeType, fileSizeBytes))
+            throw new BaseException(ErrorCode.UPLOADED_OBJECT_NOT_FOUND);
+    }
+
+    @Override
+    public boolean isUploadedObject(Long userId, Long sessionId, String objectKey, String mimeType, long fileSizeBytes) {
+        String prefix = "%susers/%d/sessions/%d/".formatted(properties.getRecordingsPrefix(), userId, sessionId);
+        if (objectKey == null || !objectKey.startsWith(prefix) || objectKey.contains("..") || objectKey.contains("\\"))
+            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
+        String relative = objectKey.substring(prefix.length());
+        if (relative.isBlank() || relative.contains("/"))
+            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
+        try {
+            var head = s3Client.headObject(HeadObjectRequest.builder().bucket(properties.getBucket()).key(objectKey)
+                    .overrideConfiguration(c -> c.apiCallTimeout(Duration.ofSeconds(5)).apiCallAttemptTimeout(Duration.ofSeconds(2)))
+                    .build());
+            String type = head.contentType() == null ? "" : head.contentType().split(";", 2)[0].trim();
+            if (head.contentLength() == null || head.contentLength() != fileSizeBytes || !mimeType.equalsIgnoreCase(type))
+                throw new BaseException(ErrorCode.ANALYSIS_SOURCE_NOT_READY);
+            return true;
+        } catch (S3Exception failure) {
+            if (failure.statusCode() == 404) return false;
+            throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
+        } catch (SdkException failure) {
+            throw new BaseException(ErrorCode.ANALYSIS_INTEGRATION_UNAVAILABLE);
+        }
+    }
 
     @Override
     public void deleteObject(Long userId, Long sessionId, String objectKey) {
-
+        String prefix = "%susers/%d/sessions/%d/".formatted(properties.getRecordingsPrefix(), userId, sessionId);
+        // Canonical keys deliberately omit owner IDs. They come from the persisted deletion outbox,
+        // whose recording/session association is the authority; retain the normalizer's key format.
+        boolean canonical = objectKey != null && objectKey.matches(java.util.regex.Pattern.quote(properties.getRecordingsPrefix())
+                + "analysis-(?:audio/[0-9a-f-]{36}\\.wav|video/[0-9a-f-]{36}\\.mp4)");
+        if (objectKey == null || (!objectKey.startsWith(prefix) && !canonical) || objectKey.contains("..") || objectKey.contains("\\"))
+            throw new BaseException(ErrorCode.RECORDING_ACCESS_DENIED);
         try {
             s3Client.deleteObject(DeleteObjectRequest.builder()
                     .bucket(properties.getBucket())
@@ -106,7 +140,9 @@ public class S3PresignedUrlProvider implements RecordingObjectStoragePort {
     }
 
     private static String safeExtension(String fileName) {
-        return fileName == null || !fileName.contains(".") ? "" : fileName.substring(fileName.lastIndexOf('.'));
+        if (fileName == null || !fileName.contains(".")) return "";
+        String extension = fileName.substring(fileName.lastIndexOf('.'));
+        return extension.matches("\\.[A-Za-z0-9]{1,10}") ? extension : "";
     }
 
     private static Duration signatureDuration(OffsetDateTime expiresAt) {
