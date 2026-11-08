@@ -77,10 +77,18 @@ ContentDto의 필드는 `id`, `version`, `type`, `focus`, `category`, `difficult
 | passingScore | integer, 필수, non-null | 1~100 |
 | version | integer(int64), 필수, non-null | 0 이상. 조회한 설정 버전과 현재 버전 일치 |
 | reason | string, 필수, non-null | 공백 제외 필수, 최대 500자. 개인정보·원문을 쓰지 않음 |
+| scriptText | string, 선택, nullable | 생략/null이면 기존 문장을 연결. 제공 시 공백만 있는 문자열 금지, 1~10,000자. 선택 문장의 원문과 다르면 새 콘텐츠로 저장 |
 
 200의 `data`는 수정 후 정책 객체 한 개다. 버전은 1 증가하고 `requiredTrainingCount`는 유지한다.
 설정 행 및 콘텐츠 잠금 아래에서 상태·두 버전을 확인하고 `TITLE_EXAM_POLICY_EDIT` 감사 이력을 같은 트랜잭션에 저장한다.
 감사 기록의 대상 유형은 TITLE_EXAM_POLICY, 대상 ID는 칭호 코드다. 실패하면 정책·버전도 롤백한다.
+
+`scriptText`로 원문을 수정하면 선택 콘텐츠의 유형·분류·학습 초점·제목·설명·난이도·목표 발음·예상 시간을
+복사한 새 공개 콘텐츠를 생성하고 현재 칭호의 정책에 연결한다. 응답의 `practiceContentId`와 `content.id`는
+이 새 ID이며 `content.scriptText`는 입력한 원문이다. 기존 콘텐츠 ID/원문/기준 음성은 변경하거나 삭제하지 않는다.
+동일한 원문이면 복사하지 않는다. 새 콘텐츠·정책 변경·감사는 한 트랜잭션이고 실패 시 함께 롤백한다.
+기존 TTS 작업 조정기(`ExampleTtsPersistence.reconcile`)가 새 콘텐츠/텍스트 revision을 발견해 별도 생성 작업을 만든다.
+음성 생성 완료 전에도 정책 저장은 성공하며, 생성/저장 및 TTS 연동 설정이 준비될 때까지 기준 음성은 대기할 수 있다.
 
 | HTTP | 코드 | 조건 |
 | --- | --- | --- |
@@ -93,12 +101,22 @@ ContentDto의 필드는 `id`, `version`, `type`, `focus`, `category`, `difficult
 
 ## 기존 문제와 시험 보존
 
-설정 변경은 이후 생성하는 시험부터 적용한다. 기존 `title_exams.practice_content_id`와 `passing_score`는 수정하지 않는다.
+설정 변경과 전용 편집의 원문 수정은 이후 생성하는 시험부터 적용한다. 기존 `title_exams.practice_content_id`와 `passing_score`는 수정하지 않는다.
 현재 정책에 연결되어 있거나 READY/IN_PROGRESS 시험이 사용하는 문제는 원문·분류·학습 초점 변경, 숨김, 삭제를 거부한다.
 기존 관리자 콘텐츠 변경 API는 이 경우 `409 ADMIN_TITLE_EXAM_CONTENT_IN_USE`를 반환한다.
 제목·설명 등 원문과 무관한 메타데이터 수정은 기존 검증을 따른다.
 
-새 문제는 별도 콘텐츠로 등록·공개한 뒤 연결한다. 기존 문제를 정리하려면 해당 문제를 참조하는 정책을 모두 교체하고
+새 문제를 별도 콘텐츠로 등록·공개해 연결하거나, 이 PATCH의 `scriptText`로 새 원문을 저장할 수 있다.
+기존 문제를 정리하려면 해당 문제를 참조하는 정책을 모두 교체하고
 진행 중인 시험이 없어야 한다. 기존 완료 시험·녹음·분석은 삭제하지 않는다.
 
 V67을 적용한 백엔드를 먼저 배포하고 프론트 메뉴를 배포한다. 운영 DB에 수동 SQL 실행이나 기준 점수 일괄 변경을 하지 않는다.
+문장 수정 지원에는 추가 Flyway migration이 없다. 선택 `scriptText`와 새 ID 응답을 지원하는 백엔드를 먼저 배포한다.
+
+## 검증
+
+`AdminTitleExamPolicyIntegrationTest`는 수정 후 새 콘텐츠/새 시험 연결, 기존 시험 원문·점수 보존,
+동일 원문 무복사, 잘못된 원문/버전 거절 및 감사 실패 시 생성 콘텐츠까지 롤백하는지 검증한다.
+`AdminTitleExamPolicyPostgresTest`는 로컬 전용 임시 스키마에서 최신 migration과 실제 TTS reconcile을
+실행해 새 콘텐츠의 독립된 PENDING 작업 생성과 기존 시험 원문·기준 음성 보존을 검증한다.
+외부 TTS 합성·운영 API 호출 및 운영 migration은 수행하지 않는다.

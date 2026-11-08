@@ -6,6 +6,8 @@ import org.example.voice.admin.domain.model.AdminData.ContentView;
 import org.example.voice.admin.domain.model.AdminTitleExamPolicyView;
 import org.example.voice.admin.domain.port.AdminStore;
 import org.example.voice.admin.domain.port.AdminTitleExamPolicyStore;
+import org.example.voice.admin.domain.port.AdminContentInvalidation;
+import org.example.voice.practicecontent.domain.entity.PracticeContent;
 import org.example.voice.practicecontent.domain.type.*;
 import org.example.voice.title.domain.TitleRank;
 import org.example.voice.title.domain.entity.TitlePolicy;
@@ -22,6 +24,7 @@ public class AdminTitleExamPolicyService {
     private final AdminStore contents;
     private final AdminTitleExamPolicyStore policies;
     private final Clock clock;
+    private final AdminContentInvalidation invalidation;
 
     public List<AdminTitleExamPolicyView> list(long actor) {
         access.require(actor);
@@ -31,7 +34,15 @@ public class AdminTitleExamPolicyService {
 
     @Transactional
     public AdminTitleExamPolicyView edit(long actor, TitleRank rank, long version, long contentId, long contentVersion, int score, String reason) {
+        return edit(actor, rank, version, contentId, contentVersion, score, reason, null);
+    }
+
+    /** Replace the question on text edits so every already-created exam keeps its original content and audio. */
+    @Transactional
+    public AdminTitleExamPolicyView edit(long actor, TitleRank rank, long version, long contentId, long contentVersion,
+            int score, String reason, String scriptText) {
         access.require(actor); AdminValidation.text(reason, 500, true);
+        if (scriptText != null) AdminValidation.text(scriptText, 10000, true);
         if (rank == null || rank == TitleRank.ABSOLUTE_BEGINNER || contentId <= 0 || score < 1 || score > 100)
             AdminValidation.invalid();
         // Use the same content lock as publication/deletion so only usable questions can be linked.
@@ -40,11 +51,25 @@ public class AdminTitleExamPolicyService {
         if (!eligible(contents.view(content))) AdminValidation.invalid();
         var policy = policies.lockPolicy(rank);
         AdminValidation.version(policy.getEditVersion(), version);
-        policy.configure(contentId, score);
+        boolean textChanged = scriptText != null && !scriptText.equals(content.getScriptText());
+        Long selectedContentId = textChanged ? revisedQuestion(content, scriptText).getId() : contentId;
+        policy.configure(selectedContentId, score);
         contents.audit(AdminAuditLog.success(actor, "TITLE_EXAM_POLICY_EDIT", "TITLE_EXAM_POLICY", rank.name(),
-                reason, "practiceContentId,passingScore,version", OffsetDateTime.now(clock)));
+                reason, "practiceContentId,passingScore,version" + (textChanged ? ",scriptText" : ""), OffsetDateTime.now(clock)));
         contents.flush();
+        if (textChanged) invalidation.afterContentChange();
         return view(policy);
+    }
+
+    private PracticeContent revisedQuestion(PracticeContent original, String scriptText) {
+        var now = OffsetDateTime.now(clock);
+        var revised = PracticeContent.draft(original.getContentType(), original.getLearningFocus(), original.getCategory(),
+                original.getDifficulty(), original.getTitle(), original.getDescription(), scriptText,
+                original.getTargetPronunciations(), original.getEstimatedSeconds(), now);
+        revised.changePublication(PublishStatus.PUBLISHED, now);
+        // The existing TTS reconciler discovers this new content ID; old audio remains valid.
+        contents.saveContent(revised);
+        return revised;
     }
 
     private AdminTitleExamPolicyView view(TitlePolicy policy) {

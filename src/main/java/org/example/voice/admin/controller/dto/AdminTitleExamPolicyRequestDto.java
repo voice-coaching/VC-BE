@@ -5,4 +5,5 @@ import jakarta.validation.constraints.*;
 public record AdminTitleExamPolicyRequestDto(@NotNull @Positive Long practiceContentId,
         @NotNull @PositiveOrZero Long contentVersion,
         @NotNull @Min(1) @Max(100) Integer passingScore, @NotNull @PositiveOrZero Long version,
-        @NotBlank @Size(max = 500) String reason) {}
+        @NotBlank @Size(max = 500) String reason,
+        @Size(min = 1, max = 10000) String scriptText) {}

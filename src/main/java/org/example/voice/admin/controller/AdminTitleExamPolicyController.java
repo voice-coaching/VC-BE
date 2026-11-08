@@ -27,6 +27,6 @@ public class AdminTitleExamPolicyController {
     public ResponseEntity<ApiResponse<AdminTitleExamPolicyResponseDto>> edit(@AuthenticationPrincipal LoginUser actor,
             @PathVariable TitleRank targetRank, @Valid @RequestBody AdminTitleExamPolicyRequestDto body) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.success("승급 시험 설정을 저장했습니다.",
-                AdminTitleExamPolicyResponseDto.from(service.edit(actor.id(), targetRank, body.version(), body.practiceContentId(), body.contentVersion(), body.passingScore(), body.reason()))));
+                AdminTitleExamPolicyResponseDto.from(service.edit(actor.id(), targetRank, body.version(), body.practiceContentId(), body.contentVersion(), body.passingScore(), body.reason(), body.scriptText()))));
     }
 }

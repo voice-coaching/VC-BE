@@ -2194,6 +2194,10 @@ PostgreSQL 18의 `pg_restore --schema-only --no-owner --no-privileges --file=<�
 
 ## V67: 관리자 승급 시험 설정 버전
 
+관리자 원문 편집(2026-11-08)은 추가 스키마 변경 없이 새 `practice_contents` 행을 생성하고,
+해당 `title_policies.practice_content_id`를 교체한다. 기존 `title_exams`·`training_sessions`의 콘텐츠 연결과
+`reference_audios`는 유지한다. 새 콘텐츠의 TTS 작업은 기존 `example_tts_jobs` 생성 경로를 사용한다.
+
 `title_policies.edit_version`: BIGINT, NOT NULL, 기본값 0. owner module은 title이며 관리자 설정의 동시 수정 확인에 사용한다. 관리자 수정은 정책 행 잠금과 기대 버전 일치 후 1 증가한다. 별도 인덱스·unique·FK·soft delete 변경은 없다. target_rank PK와 practice_content_id 관계는 유지한다. 기존 점수·문제·필요 횟수·개별 title_exams snapshot은 변경하지 않는다. [계약](../api/admin-title-exam-policies.md).
 
 ## Video lip consumer integrity (2026-11-07)
