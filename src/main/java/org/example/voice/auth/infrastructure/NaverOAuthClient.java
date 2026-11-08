@@ -44,7 +44,7 @@ public class NaverOAuthClient implements SocialOAuthProvider {
 
     @Override
     public SocialUserInfo authenticate(String authorizationCode, String redirectUri, String state) {
-
+        validateConfigurationAndState(state);
         try {
             var form = new LinkedMultiValueMap<String, String>();
             form.add("grant_type", "authorization_code");
@@ -68,6 +68,9 @@ public class NaverOAuthClient implements SocialOAuthProvider {
                     .retrieve()
                     .body(JsonNode.class);
 
+            if (profile == null || !SUCCESS_RESULT_CODE.equals(profile.path("resultcode").asText())) {
+                throw invalid();
+            }
             JsonNode response = profile.path("response");
             return new SocialUserInfo(
                     required(response, "id"),
@@ -81,9 +84,17 @@ public class NaverOAuthClient implements SocialOAuthProvider {
         }
     }
 
+    private void validateConfigurationAndState(String state) {
+        if (isBlank(clientId) || isBlank(clientSecret) || isBlank(state)) {
+            throw invalid();
+        }
+    }
+
     private String required(JsonNode node, String field) {
         String value = text(node, field);
-
+        if (isBlank(value)) {
+            throw invalid();
+        }
         return value;
     }
 

@@ -34,7 +34,7 @@ class TokenServiceTest {
     void setUp() {
         provider = mock(TokenProvider.class); reader = mock(RefreshTokenReader.class);
         writer = mock(RefreshTokenWriter.class); users = mock(UserReader.class);
-        service = new TokenService(provider, reader, writer, users);
+        service = new TokenService(provider, reader, writer, users, java.time.Clock.systemUTC());
     }
 
     @Test

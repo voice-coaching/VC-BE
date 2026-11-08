@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.Clock;
 import java.util.Locale;
 
 @Service
@@ -26,16 +26,17 @@ public class AuthService {
     private final PasswordHasher passwordHasher;
     private final TokenService tokenService;
     private final OnboardingProfileReader onboardingProfileReader;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
     public boolean isEmailAvailable(String email) { return !userReader.existsByEmail(normalize(email)); }
 
     @Transactional
     public AuthSession signup(String email, String password, String nickname, boolean termsAgreed, boolean privacyAgreed) {
-
+        if (!termsAgreed || !privacyAgreed) throw new AuthException(ErrorCode.VALIDATION_ERROR);
         String normalized = normalize(email);
-
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (userReader.existsByEmail(normalized)) throw new AuthException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        OffsetDateTime now = OffsetDateTime.now(clock);
         User user;
         try {
             user = userWriter.save(User.createLocal(normalized, password == null ? null : passwordHasher.hash(password), nickname == null ? null : nickname.trim(), now));
@@ -50,8 +51,10 @@ public class AuthService {
     public AuthSession login(String email, String password) {
         User user = userReader.findByEmail(normalize(email))
                 .orElseThrow(() -> new AuthException(ErrorCode.INVALID_CREDENTIALS));
-
-        user.recordLogin(OffsetDateTime.now(ZoneOffset.UTC));
+        if (!passwordHasher.matches(password, user.getPassword())) throw new AuthException(ErrorCode.INVALID_CREDENTIALS);
+        if (user.isSuspended()) throw new AuthException(ErrorCode.USER_SUSPENDED);
+        if (user.isWithdrawn()) throw new AuthException(ErrorCode.USER_WITHDRAWN);
+        user.recordLogin(OffsetDateTime.now(clock));
         userWriter.save(user);
         IssuedTokens tokens = tokenService.issueSession(user);
         return session(user, tokens, false, onboardingProfileReader.findByUserId(user.getId()).isPresent());

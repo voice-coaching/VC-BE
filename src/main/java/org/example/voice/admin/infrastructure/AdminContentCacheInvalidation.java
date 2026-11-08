@@ -11,10 +11,12 @@ import org.springframework.transaction.support.*;
 @Component @RequiredArgsConstructor
 public class AdminContentCacheInvalidation implements AdminContentInvalidation {
     private final CacheManager caches;
+    private final org.example.voice.practicecontent.infrastructure.cache.ContentCatalogCacheCoordinator catalog;
     @Override public void afterContentChange() {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() {
-                for(String name: java.util.List.of(PracticeContentCacheNames.LIST,PracticeContentCacheNames.REFERENCE_AUDIO_LIST,PracticeContentCacheNames.DETAIL,PracticeContentCacheNames.NEXT,
+                catalog.invalidate();
+                for(String name: java.util.List.of(PracticeContentCacheNames.LIST,PracticeContentCacheNames.FACETS,PracticeContentCacheNames.REFERENCE_AUDIO_LIST,PracticeContentCacheNames.DETAIL,PracticeContentCacheNames.NEXT,
                         PracticeContentCacheNames.RECOMMENDATIONS,PracticeContentCacheNames.EXISTS,org.example.voice.mypage.infrastructure.cache.MyPageCacheNames.RECOMMENDATIONS,HomeCacheNames.RECOMMENDATIONS)) {
                     try { var cache=caches.getCache(name); if(cache!=null)cache.clear(); }
                     catch(RuntimeException error) {

@@ -33,14 +33,14 @@ public class GoogleOAuthClient implements SocialOAuthProvider {
             String accessToken = required(token, "access_token");
             JsonNode user = restClient.get().uri("https://openidconnect.googleapis.com/v1/userinfo")
                     .headers(headers -> headers.setBearerAuth(accessToken)).retrieve().body(JsonNode.class);
-
+            if (user == null || !user.path("email_verified").asBoolean(false)) throw invalid();
             return new SocialUserInfo(required(user, "sub"), text(user, "email"), text(user, "name"));
         } catch (AuthException exception) { throw exception; }
         catch (Exception exception) { throw new AuthException(ErrorCode.INVALID_AUTHORIZATION_CODE, exception); }
     }
 
     private String required(JsonNode node, String field) {
-        String value = text(node, field);  return value;
+        String value = text(node, field); if (value == null || value.isBlank()) throw invalid(); return value;
     }
     private String text(JsonNode node, String field) { return node == null || node.path(field).isMissingNode() ? null : node.path(field).asText(null); }
     private AuthException invalid() { return new AuthException(ErrorCode.INVALID_AUTHORIZATION_CODE); }

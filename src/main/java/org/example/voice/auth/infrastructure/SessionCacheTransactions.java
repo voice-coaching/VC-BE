@@ -13,7 +13,10 @@ public class SessionCacheTransactions {
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public void changing(Long userId) {
-
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+                || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException("Session mutation requires an application transaction");
+        }
         if (!cache.enabled()) return;
         // Materialize the PostgreSQL transaction before publishing its marker. Otherwise
         // bootstrap could mistake a not-yet-started DB transaction for a completed writer.

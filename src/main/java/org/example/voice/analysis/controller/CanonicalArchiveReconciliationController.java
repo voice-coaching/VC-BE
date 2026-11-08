@@ -21,7 +21,8 @@ public class CanonicalArchiveReconciliationController {
     @PostMapping("/api/internal/ai/archives/{handoffId}/artifacts/{kind}/reconciliation")
     public ResponseEntity<Void> reconcile(@PathVariable UUID handoffId,@PathVariable String kind,HttpServletRequest request)throws java.io.IOException {
         var values=Collections.list(request.getHeaders("Authorization"));String token=settings.value("reconciliation-token");
-
+        if(token==null || token.length()<32 || values.size()!=1 || !MessageDigest.isEqual(("Bearer "+token).getBytes(StandardCharsets.UTF_8),values.getFirst().getBytes(StandardCharsets.UTF_8)))
+            throw new RunPodContractException(401,"UNAUTHENTICATED");
         var doc=contract.parse(RunPodRequestBody.readJson(request,8192),"archiveReconciliation");
         archive.reconcile(handoffId,kind,doc.path("versionId").asText());
         return ResponseEntity.noContent().header("Cache-Control","no-store").build();

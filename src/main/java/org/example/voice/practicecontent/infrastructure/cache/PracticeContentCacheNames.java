@@ -5,6 +5,8 @@ public final class PracticeContentCacheNames {
     private static final String GROUP = "practice-content";
 
     public static final String LIST = GROUP + ":list";
+    public static final String FACETS = GROUP + ":facets";
+    public static final String CATALOG_GENERATION = GROUP + ":catalog-generation";
     public static final String DETAIL = GROUP + ":detail";
     public static final String NEXT = GROUP + ":next";
     public static final String RECOMMENDATIONS = GROUP + ":recommendations";

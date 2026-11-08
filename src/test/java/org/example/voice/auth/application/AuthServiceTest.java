@@ -33,7 +33,7 @@ class AuthServiceTest {
         userReader = mock(UserReader.class); userWriter = mock(UserWriter.class);
         passwordHasher = mock(PasswordHasher.class); tokenService = mock(TokenService.class);
         onboardingReader = mock(OnboardingProfileReader.class);
-        service = new AuthService(userReader, userWriter, passwordHasher, tokenService, onboardingReader);
+        service = new AuthService(userReader, userWriter, passwordHasher, tokenService, onboardingReader, java.time.Clock.systemUTC());
     }
 
     @Test

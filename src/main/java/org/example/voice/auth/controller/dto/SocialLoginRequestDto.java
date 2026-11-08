@@ -1,8 +1,8 @@
 package org.example.voice.auth.controller.dto;
 import jakarta.validation.constraints.NotBlank;
 public record SocialLoginRequestDto(
-         String provider,
-         String authorizationCode,
-         String redirectUri,
+        @NotBlank String provider,
+        @NotBlank String authorizationCode,
+        @NotBlank String redirectUri,
         String state
 ) {}

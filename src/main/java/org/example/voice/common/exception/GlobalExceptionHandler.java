@@ -17,6 +17,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidParameterType(Exception ignored) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(ErrorCode.VALIDATION_ERROR.getMessage(), ErrorCode.VALIDATION_ERROR.name()));
+    }
+
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleMultipartSize(Exception ignored) {
         return ResponseEntity.status(413).body(ApiResponse.error("업로드 용량 제한을 초과했습니다.", "PAYLOAD_TOO_LARGE"));

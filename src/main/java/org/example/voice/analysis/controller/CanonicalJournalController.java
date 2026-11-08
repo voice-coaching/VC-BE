@@ -73,7 +73,9 @@ public class CanonicalJournalController {
         journal.manifest(analysisId,executionId,worker,RunPodRequestBody.readJson(request,RunPodContract.CONTROL_LIMIT));return done();
     }
     private UUID authenticate(HttpServletRequest request) {
-
+        var tokens=Collections.list(request.getHeaders("Authorization"));
+        if(tokens.size()!=1) throw new RunPodContractException(401,"UNAUTHENTICATED");
+        authentication.verify(tokens.getFirst());
         String worker=one(request,"X-Worker-Instance-Id");
 
         return worker == null ? null : UUID.fromString(worker);

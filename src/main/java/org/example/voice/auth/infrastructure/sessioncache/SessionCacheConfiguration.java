@@ -38,7 +38,8 @@ public class SessionCacheConfiguration {
     SessionRedisClient sessionRedisClient(DataRedisProperties redis, SessionCacheProperties settings) {
         // This factory is owned by this client, not exposed as a RedisConnectionFactory bean.
         // Spring Cache and AI Stream client selection/configuration therefore remain independent.
-
+        if (redis.getCluster()!=null || redis.getSentinel()!=null || redis.getMasterreplica()!=null
+                || redis.getSsl().getBundle()!=null) throw new IllegalArgumentException("Auth session cache requires standalone primary Redis");
         var server = new RedisStandaloneConfiguration(redis.getHost(),redis.getPort());
         server.setDatabase(redis.getDatabase());
         boolean tls=redis.getSsl().isEnabled();
@@ -47,7 +48,7 @@ public class SessionCacheConfiguration {
             URI url;
             try {url=URI.create(redis.getUrl());}
             catch(IllegalArgumentException invalid) {throw new IllegalArgumentException("Invalid auth session Redis URL");}
-
+            if (!"redis".equals(url.getScheme()) && !"rediss".equals(url.getScheme())) throw new IllegalArgumentException("Invalid Redis scheme");
             server.setHostName(url.getHost());server.setPort(url.getPort()<0?6379:url.getPort());tls=tls || "rediss".equals(url.getScheme());
             if(url.getPath()!=null && !url.getPath().isBlank() && !"/".equals(url.getPath())) server.setDatabase(Integer.parseInt(url.getPath().substring(1)));
             if (url.getRawUserInfo()!=null) {
