@@ -81,7 +81,8 @@ AI base URL·허용 Origin·키 경로를 설치한다. 기존 환경 파일은 
 그 뒤 기존 JAR 배포가 서비스를 재시작한다. CI는 실제 설치 전에 키 설치 스크립트의
 임시 파일 검사와 BrowserVideo* Java 테스트를 수행한다.
 
-`GET /api/browser-video/.well-known/upload-grant-keys`는 인증 없이 **공개키만** 제공한다.
+`GET /api/browser-video/.well-known/upload-grant-keys`는 **공개 검증키만** 제공한다.
+운영 게이트웨이에서는 기존 서버 Bearer로 조회하며, 사용자 로그인이나 권한 발급을 대신하지 않는다.
 응답은 `{schemaVersion:"voice-coaching.browser-video-keyset.v1",keys:{kid:publicPem}}`다.
 개인키·로그인 토큰·AI 서버 Bearer는 포함하지 않는다. 비활성이면 503이다.
 AI 운영 도구는 Backend HTTPS 주소에서 이 공개키를 배포 시에만 조회·고정한다.
