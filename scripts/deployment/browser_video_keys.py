@@ -7,6 +7,7 @@ from pathlib import Path
 import pwd
 import stat
 import subprocess
+from runtime_environment import ENV_FILE, DROPIN as ENV_DROPIN, validate_managed
 
 KEY_ROOT=Path('/etc/alpha-browser-video')
 DROPIN=Path('/etc/systemd/system/alpha-backend.service.d/40-browser-video.conf')
@@ -44,20 +45,34 @@ def fixed_file(path,raw,mode,uid,gid):
     else:new_file(path,raw,mode,uid,gid)
 
 
-def prepare(root,dropin,uid,gid,*,owner_uid=0,owner_gid=0):
+def prepare(root,dropin,uid,gid,*,owner_uid=0,owner_gid=0,runtime_env=None,runtime_dropin=None):
     require(root.is_absolute() and dropin.is_absolute())
+    managed = runtime_env is not None and runtime_dropin is not None and (
+        runtime_env.exists() or runtime_env.is_symlink() or runtime_dropin.exists() or runtime_dropin.is_symlink())
+    values = validate_managed(runtime_env,runtime_dropin,owner_uid) if managed else None
+    if managed:
+        require(values.get('AI_BROWSER_VIDEO_ENABLED') in ('true','false')
+                and values.get('AI_BROWSER_VIDEO_PRIVATE_KEY_FILE') == str(root/'private.pem')
+                and values.get('AI_BROWSER_VIDEO_PUBLIC_KEY_FILE') == str(root/'public.pem')
+                and all(values.get(k) for k in ('AI_BROWSER_VIDEO_KEY_ID','AI_BROWSER_VIDEO_ISSUER',
+                    'AI_BROWSER_VIDEO_AUDIENCE','AI_BROWSER_VIDEO_AI_BASE_URL','AI_BROWSER_VIDEO_ALLOWED_ORIGINS')))
     root.mkdir(mode=0o750,parents=False,exist_ok=True)
     require(not root.is_symlink() and root.stat().st_uid==owner_uid
             and not root.stat().st_mode&0o022)
     os.chown(root,owner_uid,gid)
     private=root/'private.pem'
     if not private.exists() and not private.is_symlink():
+        require(not managed)
         raw=command(['/usr/bin/openssl','genpkey','-algorithm','ED25519'])
         new_file(private,raw,0o600,uid,gid)
     s=private.lstat()
     require(stat.S_ISREG(s.st_mode) and s.st_uid==uid and s.st_gid==gid and stat.S_IMODE(s.st_mode)==0o600)
     public=command(['/usr/bin/openssl','pkey','-in',str(private),'-pubout'])
     fixed_file(root/'public.pem',public,0o644,owner_uid,gid)
+    if managed:
+        # Runtime .env is operator-owned. Deploys verify keys and keep all chosen settings unchanged.
+        return dict(keyId=values['AI_BROWSER_VIDEO_KEY_ID'],publicKeySha256=hashlib.sha256(public).hexdigest(),
+                    privateKeyExported=False,configurationPrepared=True,environmentMode='consolidated')
     values={
         'AI_BROWSER_VIDEO_ENABLED':'true',
         'AI_BROWSER_VIDEO_ISSUER':'voice-coaching-backend',
@@ -83,8 +98,10 @@ def main():
     require(a.apply and os.geteuid()==0)
     user=command(['systemctl','show','alpha-backend.service','-p','User','--value']).decode().strip() or 'root'
     account=pwd.getpwnam(user)
-    result=prepare(KEY_ROOT,DROPIN,account.pw_uid,account.pw_gid)
-    command(['systemctl','daemon-reload'])
+    from deployment_lock import exclusive
+    with exclusive():
+        result=prepare(KEY_ROOT,DROPIN,account.pw_uid,account.pw_gid,runtime_env=ENV_FILE,runtime_dropin=ENV_DROPIN)
+        command(['systemctl','daemon-reload'])
     print(json.dumps(result))
 
 
