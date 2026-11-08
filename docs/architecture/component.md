@@ -1,5 +1,9 @@
 # 컴포넌트 및 모듈 문서 - voice
 
+## 관리자 클래스 편집
+
+AdminCourseController → AdminCourseService → AdminCourseStore/AdminCoursePersistence 순으로 호출한다. 서비스는 ADMIN 권한, 예상 revision, 기존 문장의 클래스 소속·콘텐츠 버전을 검사한다. 저장소는 클래스 행을 잠근 뒤 새 세트/예문/콘텐츠를 같은 트랜잭션에 저장한다. 삭제는 새 개정에서 제외하는 동작이며 과거 학습 참조를 지우지 않는다. 감사 기록과 변경을 함께 커밋하고 콘텐츠/클래스 캐시를 이후 무효화한다. [계약](../api/admin-course-sentences.md).
+
 ### 독립 음성 분석 후보 (2026-11-07)
 
 TrainingAnalysisRequestService는 independent profile의 인증된 소유자·세션·중복 요청을 확인하고 domain submission port에 위임한다.

@@ -18,4 +18,9 @@ public class CourseStepRevision {
     @Column(name = "step_order", nullable = true) private Integer stepOrder;
     @Enumerated(EnumType.STRING) @Column(name = "step_type", nullable = true) private CourseStepType stepType;
     @Column(name = "blocks_json", nullable = true, columnDefinition = "text") private String blocksJson;
+
+    public static CourseStepRevision practice(long stepId,String title) {
+        var revision=new CourseStepRevision();revision.stepId=stepId;revision.revision=1;revision.title=title;
+        revision.stepOrder=1;revision.stepType=CourseStepType.PRACTICE;revision.blocksJson="[]";return revision;
+    }
 }

@@ -16,7 +16,9 @@ public final class AdminData {
     }
     public record Query(String keyword, int page, int size) {}
     public record UserFilter(Query query, UserStatus status, UserRole role) {}
-    public record ContentFilter(Query query, ContentType type, String category, PublishStatus status, Difficulty difficulty) {}
+    public record ContentFilter(Query query, ContentType type, String category, PublishStatus status, Difficulty difficulty, boolean excludeClassPractice) {
+        public ContentFilter(Query query,ContentType type,String category,PublishStatus status,Difficulty difficulty){this(query,type,category,status,difficulty,false);}
+    }
     public record NoticeFilter(Query query, Boolean published) {}
     public record InquiryFilter(Query query, Inquiry.Status status, String category) {}
     public record AuditFilter(int page, int size, Long actorId, String action, String targetType,
