@@ -40,7 +40,9 @@ public class CanonicalHandoffController {
         return ResponseEntity.ok().header("Cache-Control","no-store").body(store.status(analysisId,handoffId,authenticate(request)));
     }
     private UUID authenticate(HttpServletRequest request) {
-
+        var tokens=Collections.list(request.getHeaders("Authorization"));
+        if(tokens.size()!=1) throw new RunPodContractException(401,"UNAUTHENTICATED");
+        authentication.verify(tokens.getFirst());
         String worker=one(request,"X-Worker-Instance-Id");
 
         return worker == null ? null : UUID.fromString(worker);

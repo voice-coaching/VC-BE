@@ -18,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.Clock;
 import java.util.HexFormat;
 
 @Service
@@ -28,12 +28,13 @@ public class TokenService {
     private final RefreshTokenReader refreshTokenReader;
     private final RefreshTokenWriter refreshTokenWriter;
     private final UserReader userReader;
+    private final Clock clock;
 
     @Transactional
     public IssuedTokens issueSession(User user) {
         User lockedUser = userReader.findByIdForUpdate(user.getId()).orElse(user);
         IssuedTokens issued = tokenProvider.issue(lockedUser.getId(), lockedUser.getRole());
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now = OffsetDateTime.now(clock);
         RefreshToken stored = refreshTokenReader.findByUserIdForUpdate(user.getId())
                 .orElseGet(() -> RefreshToken.issue(user.getId(), hash(issued.refreshToken()), issued.sessionId(), issued.refreshExpiresAt(), now));
         stored.rotate(hash(issued.refreshToken()), issued.sessionId(), issued.refreshExpiresAt(), now);
@@ -44,9 +45,23 @@ public class TokenService {
     @Transactional
     public IssuedTokens rotate(String rawRefreshToken) {
         TokenClaims claims = tokenProvider.parseRefreshToken(rawRefreshToken);
-        User user = userReader.findById(claims.userId())
-                .orElseThrow(() -> new InvalidTokenException(ErrorCode.RESOURCE_NOT_FOUND));
-        return issueSession(user);
+        User user = userReader.findByIdForUpdate(claims.userId())
+                .orElseThrow(() -> new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN));
+        if (user.isWithdrawn() || user.isSuspended()) throw new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN);
+        RefreshToken stored = refreshTokenReader.findByTokenHashForUpdate(hash(rawRefreshToken))
+                .orElseThrow(() -> new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN));
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        if (stored.isExpired(now)) {
+            refreshTokenWriter.delete(stored);
+            throw new InvalidTokenException(ErrorCode.REFRESH_TOKEN_EXPIRED);
+        }
+        if (!java.util.Objects.equals(stored.getUserId(), claims.userId())
+                || !java.util.Objects.equals(stored.getSessionId(), claims.sessionId()))
+            throw new InvalidTokenException(ErrorCode.INVALID_REFRESH_TOKEN);
+        IssuedTokens issued = tokenProvider.reissue(user.getId(), user.getRole(), stored.getSessionId());
+        stored.rotate(hash(issued.refreshToken()), issued.sessionId(), issued.refreshExpiresAt(), now);
+        refreshTokenWriter.save(stored);
+        return issued;
     }
 
     @Transactional

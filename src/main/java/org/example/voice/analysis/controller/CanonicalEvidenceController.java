@@ -39,7 +39,8 @@ public class CanonicalEvidenceController {
 
     private UUID authenticate(HttpServletRequest request) {
         var tokens=Collections.list(request.getHeaders("Authorization"));
-
+        if(tokens.size()!=1) throw new RunPodContractException(401,"UNAUTHENTICATED");
+        authentication.verify(tokens.getFirst());
         var workers=Collections.list(request.getHeaders("X-Worker-Instance-Id"));
 
         return workers.isEmpty() ? null : UUID.fromString(workers.getFirst());

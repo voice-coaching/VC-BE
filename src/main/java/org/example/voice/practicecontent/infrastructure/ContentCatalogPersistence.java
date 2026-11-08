@@ -23,33 +23,61 @@ public class ContentCatalogPersistence implements ContentCatalogReader {
     private final Clock clock;
 
     @Override public PracticeContentPageData<PracticeContentSummaryData> list(Filter filter,int page,int size) {
-
+        return listSnapshot(filter,page,size).value();
+    }
+    public ContentCatalogSnapshot<PracticeContentPageData<PracticeContentSummaryData>> listSnapshot(Filter filter,int page,int size) {
         OffsetDateTime now=OffsetDateTime.now(clock);
         var contents=bind(em.createQuery("select c from PracticeContent c"+where(filter)+ORDER,PracticeContent.class),filter,now)
                 .setFirstResult(page*size).setMaxResults(size).getResultList();
-        long count=bind(em.createQuery("select count(c) from PracticeContent c"+where(filter),Long.class),filter,now).getSingleResult();
+        var visibility=bind(em.createQuery("""
+                select sum(case when c.publishedAt is null or c.publishedAt<=:now then 1 else 0 end),
+                       min(case when c.publishedAt>:now then c.publishedAt else null end)
+                from PracticeContent c
+                """+scope(filter),Object[].class),filter,now).getSingleResult();
+        long count=visibility[0]==null?0:((Number)visibility[0]).longValue();
         Map<Long,String> speakers=speakers(contents);
         var items=contents.stream().map(c->summary(c,speakers.get(c.getId()))).toList();
-        return PracticeContentPageData.of(items,page,size,count);
+        return new ContentCatalogSnapshot<>(PracticeContentPageData.of(items,page,size,count),(OffsetDateTime)visibility[1]);
     }
 
     @Override public Facets facets(ContentType type) {
+        return facetsSnapshot(type).value();
+    }
+    public ContentCatalogSnapshot<Facets> facetsSnapshot(ContentType type) {
         Filter filter=new Filter(type,null,null,null);OffsetDateTime now=OffsetDateTime.now(clock);
-        var counts=bind(em.createQuery("select c.category,count(c) from PracticeContent c"+where(filter)+" and c.category is not null and trim(c.category)<>'' group by c.category",Object[].class),filter,now).getResultList();
+        var groups=bind(em.createQuery("""
+                select c.category,c.difficulty,
+                       sum(case when c.publishedAt is null or c.publishedAt<=:now then 1 else 0 end),
+                       min(case when c.publishedAt>:now then c.publishedAt else null end)
+                from PracticeContent c
+                """+scope(filter)+" group by c.category,c.difficulty",Object[].class),filter,now).getResultList();
+        Map<String,Long> counts=new HashMap<>();
+        Map<Difficulty,Long> levels=new EnumMap<>(Difficulty.class);
+        OffsetDateTime nextPublication=null;
+        for(var row:groups) {
+            long count=((Number)row[2]).longValue();
+            if(count>0) {
+                String category=(String)row[0];
+                // Preserve the original SQL trim(category) <> '' rule (space trimming).
+                if(category!=null && !category.chars().allMatch(ch->ch==' '))counts.merge(category,count,Long::sum);
+                levels.merge((Difficulty)row[1],count,Long::sum);
+            }
+            var next=(OffsetDateTime)row[3];
+            if(next!=null && (nextPublication==null || next.isBefore(nextPublication)))nextPublication=next;
+        }
         Map<String,ContentCategory> taxonomy=new HashMap<>();
         em.createQuery("select t from ContentCategory t where t.contentType=:type",ContentCategory.class)
                 .setParameter("type",type).getResultList().forEach(t->taxonomy.put(t.getCode(),t));
-        var categories=counts.stream().map(row->{
-            String code=(String)row[0];var term=taxonomy.get(code);
-            return new Facet(code,term==null?code:term.getLabel(),(Long)row[1],term==null?Integer.MAX_VALUE:term.getSortOrder());
+        var categories=counts.entrySet().stream().map(row->{
+            String code=row.getKey();var term=taxonomy.get(code);
+            return new Facet(code,term==null?code:term.getLabel(),row.getValue(),term==null?Integer.MAX_VALUE:term.getSortOrder());
         }).sorted(Comparator.comparingInt(Facet::order).thenComparing(Facet::value)).toList();
-        var difficulties=bind(em.createQuery("select c.difficulty,count(c) from PracticeContent c"+where(filter)+" group by c.difficulty",Object[].class),filter,now)
-                .getResultList().stream().map(row->{
-                    Difficulty difficulty=(Difficulty)row[0];
+        var difficulties=levels.entrySet().stream().map(row->{
+                    Difficulty difficulty=row.getKey();
                     String label=switch(difficulty){case BEGINNER->"초급";case INTERMEDIATE->"중급";case ADVANCED->"고급";};
-                    return new Facet(difficulty.name(),label,(Long)row[1],difficulty.ordinal()+1);
+                    return new Facet(difficulty.name(),label,row.getValue(),difficulty.ordinal()+1);
                 }).sorted(Comparator.comparingInt(Facet::order)).toList();
-        return new Facets(type,categories,difficulties,revision(type,categories,difficulties));
+        return new ContentCatalogSnapshot<>(new Facets(type,categories,difficulties,revision(type,categories,difficulties)),nextPublication);
     }
 
     @Override public Adjacent adjacent(Long id,Filter filter) {
@@ -74,7 +102,10 @@ public class ContentCatalogPersistence implements ContentCatalogReader {
     }
 
     private String where(Filter filter) {
-        return " where c.status=org.example.voice.practicecontent.domain.type.PublishStatus.PUBLISHED and c.ownerId is null and c.deletedAt is null and (c.publishedAt is null or c.publishedAt<=:now)"
+        return scope(filter)+" and (c.publishedAt is null or c.publishedAt<=:now)";
+    }
+    private String scope(Filter filter) {
+        return " where c.status=org.example.voice.practicecontent.domain.type.PublishStatus.PUBLISHED and c.ownerId is null and c.deletedAt is null"
                 +(filter.type()==null?"":" and c.contentType=:type")
                 +(category(filter)?" and c.category=:category":"")
                 +(filter.difficulty()==null?"":" and c.difficulty=:difficulty")
@@ -93,7 +124,7 @@ public class ContentCatalogPersistence implements ContentCatalogReader {
         var ids=contents.stream().filter(c->c.getContentType()==ContentType.ANNOUNCER && (c.getSpeakerName()==null || c.getSpeakerName().isBlank())).map(PracticeContent::getId).toList();
         if(ids.isEmpty())return Map.of();
         Map<Long,String> result=new HashMap<>();
-        em.createQuery("select a.content.id,a.speakerName from ReferenceAudio a where a.content.id in :ids and a.speakerName is not null and trim(a.speakerName)<>'' order by a.primary desc,a.id asc",Object[].class)
+        em.createQuery("select a.content.id,a.speakerName from ReferenceAudio a where a.content.id in :ids and a.retiredAt is null and a.speakerName is not null and trim(a.speakerName)<>'' order by a.primary desc,a.id asc",Object[].class)
                 .setParameter("ids",ids).getResultList().forEach(row->result.putIfAbsent((Long)row[0],(String)row[1]));
         return result;
     }

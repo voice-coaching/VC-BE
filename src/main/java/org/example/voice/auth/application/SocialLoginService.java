@@ -26,7 +26,7 @@ public class SocialLoginService {
     public AuthSession login(String providerName, String authorizationCode, String redirectUri, String state) {
         OAuthProvider provider = parseProvider(providerName);
         SocialOAuthProvider client = providers.get(provider);
-
+        if (client == null) throw new UnsupportedSocialProviderException();
         SocialUserInfo profile = client.authenticate(authorizationCode, redirectUri, state);
         return socialAccountService.completeLogin(provider, profile);
     }

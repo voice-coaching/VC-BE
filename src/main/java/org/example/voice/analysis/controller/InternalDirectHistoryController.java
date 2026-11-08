@@ -33,7 +33,8 @@ public class InternalDirectHistoryController {
     @PostMapping("/api/internal/ai/direct-analysis-history")
     public ResponseEntity<Map<String, String>> receive(HttpServletRequest request) throws IOException {
         var headers = Collections.list(request.getHeaders("Authorization"));
-
+        if(headers.size()!=1) throw new RunPodContractException(401,"UNAUTHENTICATED");
+        authentication.verify(headers.getFirst());
         byte[] raw = RunPodRequestBody.readJson(request, 1024 * 1024);
         tools.jackson.databind.JsonNode document;
         try {
