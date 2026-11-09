@@ -1,5 +1,13 @@
 # 디렉토리 문서 - voice
 
+## 관리자 클래스 문장 편집
+
+- `admin/controller/AdminCourseController.java`, `controller/dto/AdminCourse{Request,Response}Dto.java`: 관리자 HTTP 경계와 DTO 변환.
+- `admin/application/AdminCourseService.java`: 권한·개정·연결 문장 검증, 전체 문장 구성 저장·감사 기록.
+- `admin/domain/model/AdminCourseData.java`, `domain/port/AdminCourseStore.java`: 내부 편집 모델과 저장 경계.
+- `admin/infrastructure/AdminCoursePersistence.java`: 실제 course/step/example 연결 조회, 행 잠금, 새 예문·콘텐츠 개정 저장.
+- `admin/AdminCourseIntegrationTest.java`(test): HTTP 권한/충돌/동시 수정·기존 학습 원문 보존 검증.
+
 - `analysis/domain/model/PublicScoreDetails.java`: AI 표시용 6항목 DTO. 기존 Score의 선택 details이며 계산/저장 entity가 아니다.
 - CanonicalPublicProjection과 IndependentResultDocument는 기존 원본에서 같은 공개 DTO로 전달한다. [계약](../api/public-score-details.md).
 

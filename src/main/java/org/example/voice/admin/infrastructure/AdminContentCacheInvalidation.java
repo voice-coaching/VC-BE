@@ -17,7 +17,7 @@ public class AdminContentCacheInvalidation implements AdminContentInvalidation {
             @Override public void afterCommit() {
                 catalog.invalidate();
                 for(String name: java.util.List.of(PracticeContentCacheNames.LIST,PracticeContentCacheNames.FACETS,PracticeContentCacheNames.REFERENCE_AUDIO_LIST,PracticeContentCacheNames.DETAIL,PracticeContentCacheNames.NEXT,
-                        PracticeContentCacheNames.RECOMMENDATIONS,PracticeContentCacheNames.EXISTS,org.example.voice.mypage.infrastructure.cache.MyPageCacheNames.RECOMMENDATIONS,HomeCacheNames.RECOMMENDATIONS)) {
+                        PracticeContentCacheNames.RECOMMENDATIONS,PracticeContentCacheNames.EXISTS,org.example.voice.mypage.infrastructure.cache.MyPageCacheNames.RECOMMENDATIONS,HomeCacheNames.RECOMMENDATIONS,org.example.voice.course.infrastructure.cache.CourseCacheNames.LIST,org.example.voice.course.infrastructure.cache.CourseCacheNames.DETAIL,org.example.voice.course.infrastructure.cache.CourseCacheNames.STEPS)) {
                     try { var cache=caches.getCache(name); if(cache!=null)cache.clear(); }
                     catch(RuntimeException error) {
                         // The DB/audit transaction is already committed. Never imply a safe write retry.

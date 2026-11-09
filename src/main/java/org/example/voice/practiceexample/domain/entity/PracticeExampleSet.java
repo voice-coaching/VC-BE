@@ -13,4 +13,8 @@ public class PracticeExampleSet {
     @Column(nullable = true) private Integer revision;
     @Column(nullable = true) private Long educationRevisionId;
     @Column(nullable = true) private OffsetDateTime publishedAt;
+
+    public static PracticeExampleSet published(long stepId,int revision,long educationRevisionId,OffsetDateTime now) {
+        var set=new PracticeExampleSet();set.stepId=stepId;set.revision=revision;set.educationRevisionId=educationRevisionId;set.publishedAt=now;return set;
+    }
 }
