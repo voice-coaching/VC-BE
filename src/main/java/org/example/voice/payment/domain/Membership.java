@@ -10,6 +10,9 @@ public record Membership(String type, OffsetDateTime expiresAt, String environme
 
     public static Membership free() { return new Membership(FREE, null, null); }
     public static Membership testAdmin() { return new Membership(TEST_ADMIN, null, TEST_ENVIRONMENT); }
+    public static Membership premiumTrial(OffsetDateTime expiresAt) {
+        return new Membership(PAID, expiresAt, "TRIAL");
+    }
     public static Membership testPaid(OffsetDateTime expiresAt) {
         return new Membership(PAID, expiresAt, TEST_ENVIRONMENT);
     }

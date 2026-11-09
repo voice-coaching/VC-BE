@@ -18,16 +18,22 @@ public class JpaCoachingEntitlementReader implements CoachingEntitlementReader {
     private final EntityManager em;
     private final PaymentPolicy policy;
     private final TestMembershipGrantReader testGrants;
+    private final org.example.voice.payment.domain.port.PremiumTrialStore trials;
 
     @Override public Optional<CoachingWindow> find(Long userId, OffsetDateTime now) {
         if (testGrants.exists(userId)) return Optional.of(CoachingWindow.admin());
-        if (!policy.eligible(userId)) return Optional.empty();
-        return em.createQuery("""
+        if (policy.eligible(userId)) {
+            var paid = em.createQuery("""
                 select p from PaymentOrder p where p.userId=:user and p.status='PAID'
                 and p.paidAt<=:now and p.expiresAt>:now order by p.expiresAt desc, p.id desc
                 """, PaymentOrder.class).setParameter("user", userId).setParameter("now", now)
                 .setMaxResults(1).getResultStream().findFirst()
                 .map(p -> new CoachingWindow("paid:" + p.getId(), "paid", "TEST",
                         p.getPaidAt(), p.getExpiresAt(), 30));
+            if (paid.isPresent()) return paid;
+        }
+        return trials.find(userId).filter(trial -> trial.active(now))
+                .map(trial -> new CoachingWindow("premium-trial", "paid", "TRIAL",
+                        trial.startsAt(), trial.expiresAt(), null));
     }
 }

@@ -38,6 +38,8 @@ public enum ErrorCode {
 
     // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    PREMIUM_TRIAL_ALREADY_USED(HttpStatus.CONFLICT, "이미 프리미엄 체험 혜택을 사용한 계정입니다."),
+    PREMIUM_TRIAL_NOT_ELIGIBLE(HttpStatus.CONFLICT, "무료 요금제에서만 프리미엄 체험을 시작할 수 있습니다."),
 
     WITHDRAWAL_ALREADY_PROCESSED(HttpStatus.CONFLICT, "이미 탈퇴 처리된 사용자입니다."),
 
