@@ -14,6 +14,7 @@ public record CoachingWindow(String key, String membershipType, String environme
         return new CoachingWindow("admin", "admin", "TEST", null, null, null);
     }
     public boolean active(OffsetDateTime now) {
-        return limit == null || (!now.isBefore(startsAt) && now.isBefore(expiresAt));
+        return startsAt == null && expiresAt == null ||
+                (startsAt != null && expiresAt != null && !now.isBefore(startsAt) && now.isBefore(expiresAt));
     }
 }

@@ -23,7 +23,8 @@ class TestMembershipServiceTest {
     private final TestMembershipGrantReader grants = mock(TestMembershipGrantReader.class);
     private final Clock clock = Clock.fixed(OffsetDateTime.parse("2026-10-28T00:00:00Z").toInstant(), ZoneOffset.UTC);
     private final org.example.voice.payment.domain.port.MembershipFactsReader facts=mock(org.example.voice.payment.domain.port.MembershipFactsReader.class);
-    private final TestMembershipService service = new TestMembershipService(policy, orders, users, clock, grants, facts);
+    private final org.example.voice.payment.domain.port.PremiumTrialStore trials = mock(org.example.voice.payment.domain.port.PremiumTrialStore.class);
+    private final TestMembershipService service = new TestMembershipService(policy, orders, users, clock, grants, facts, trials);
 
     @Test void batchPreservesGrantPriorityEligibilityInactiveAndMissingRulesWithoutPerUserReads() {
         var until=OffsetDateTime.now(clock).plusDays(10);
