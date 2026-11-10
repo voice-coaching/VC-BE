@@ -11,7 +11,7 @@ import java.util.*;
 public class ScriptLibraryPersistence implements ScriptLibraryRepository {
     private final EntityManager em;
     public List<SavedScript> scripts(Long user) {
-        return em.createQuery("select c,e.topicId from ScriptLibraryEntry e,PracticeContent c where e.contentId=c.id and (coalesce(:user,0L)=coalesce(:user,0L)) and (coalesce(:user,0L)=coalesce(:user,0L)) and c.customDeletedAt is null order by e.createdAt desc,c.id desc",Object[].class)
+        return em.createQuery("select c,e.topicId from ScriptLibraryEntry e,PracticeContent c where e.contentId=c.id and e.userId=:user and c.ownerId=:user and c.customDeletedAt is null order by e.createdAt desc,c.id desc",Object[].class)
                 .setParameter("user",user).getResultList().stream().map(row->new SavedScript((PracticeContent)row[0],(Long)row[1])).toList();
     }
     public List<ScriptLibraryTopic> topics(Long user){return em.createQuery("select t from ScriptLibraryTopic t where t.userId=:user order by t.id",ScriptLibraryTopic.class).setParameter("user",user).getResultList();}
