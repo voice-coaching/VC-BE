@@ -182,3 +182,8 @@ Backend AnalysisStatus는 PENDING/PROCESSING에서 검증·commit된 COMPLETED/F
 ## Canonical v5 handoff (2026-10-04)
 
 [Contract, ownership, worker states and rollout](../canonical-handoff-v5-20261004.md). RunPod transfers immutable originals to Backend PostgreSQL; result verification/commit precedes the independent B2 archive outbox. v4 receipt semantics remain unchanged. Implementation is not deployment or inference QA.
+
+
+## Popup image state
+
+PENDING is persisted before upload; successful version-checked attachment becomes ATTACHED. Replacement or detach makes the old image RETIRED. Cleanup changes RETIRED, expired ATTACHED, or PENDING older than 24 hours to DELETED only after S3 deletion succeeds. A failed deletion keeps its state for retry. Popup endsAt, not a fixed object age, governs attached image expiry. [Details](../api/popup-images.md).

@@ -2215,3 +2215,8 @@ The existing v3 analysis view accepts PROVISIONAL and optional subScores. No new
 ## Administrator member roles
 
 `PATCH /api/admin/users/{userId}/role`: [full contract](admin-user-roles.md).
+
+
+## Popup image attachments
+
+POST and DELETE `/api/admin/popups/{popupId}/image`, and optional image metadata in popup reads: [full request, response, lifecycle and error contract](popup-images.md).

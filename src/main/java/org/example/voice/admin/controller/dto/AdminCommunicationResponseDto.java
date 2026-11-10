@@ -10,10 +10,13 @@ public final class AdminCommunicationResponseDto {
         public static CampaignDto from(CampaignView c) { return new CampaignDto(c.id(),c.version(),c.audience(),c.kind(),c.title(),c.body(),c.deepLink(),c.userIds(),c.status(),c.audienceCount(),c.sentCount(),c.createdAt(),c.sentAt()); }
     }
     public record PopupDto(long id,long version,String title,String body,String deepLink,int priority,
-            OffsetDateTime startsAt,OffsetDateTime endsAt,boolean enabled,OffsetDateTime createdAt) {
-        public static PopupDto from(PopupView p) { return new PopupDto(p.id(),p.version(),p.title(),p.body(),p.deepLink(),p.priority(),p.startsAt(),p.endsAt(),p.enabled(),p.createdAt()); }
+            OffsetDateTime startsAt,OffsetDateTime endsAt,boolean enabled,OffsetDateTime createdAt,PopupImageDto image) {
+        public static PopupDto from(PopupView p) { return new PopupDto(p.id(),p.version(),p.title(),p.body(),p.deepLink(),p.priority(),p.startsAt(),p.endsAt(),p.enabled(),p.createdAt(),PopupImageDto.from(p.image())); }
     }
-    public record ActivePopupDto(Long id,String title,String body,String deepLink,OffsetDateTime startsAt,OffsetDateTime endsAt) {
-        public static ActivePopupDto from(PopupView p) { return p==null?null:new ActivePopupDto(p.id(),p.title(),p.body(),p.deepLink(),p.startsAt(),p.endsAt()); }
+    public record PopupImageDto(java.util.UUID id,String url,OffsetDateTime expiresAt) {
+        public static PopupImageDto from(PopupImageView i){return i==null?null:new PopupImageDto(i.id(),i.url(),i.expiresAt());}
+    }
+    public record ActivePopupDto(Long id,String title,String body,String deepLink,OffsetDateTime startsAt,OffsetDateTime endsAt,PopupImageDto image) {
+        public static ActivePopupDto from(PopupView p) { return p==null?null:new ActivePopupDto(p.id(),p.title(),p.body(),p.deepLink(),p.startsAt(),p.endsAt(),PopupImageDto.from(p.image())); }
     }
 }

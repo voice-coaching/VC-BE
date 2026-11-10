@@ -33,6 +33,7 @@ class AdminCommunicationIntegrationTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean org.example.voice.coaching.application.CoachingUsageService coaching;
     long actor,member,inactive;
     @BeforeEach void fixture() {
+        em.createNativeQuery("CREATE TABLE IF NOT EXISTS user_premium_trials(user_id bigint primary key references users(id) on delete cascade, starts_at timestamp with time zone not null, expires_at timestamp with time zone not null)").executeUpdate();
         actor=user(UserStatus.ACTIVE,UserRole.ADMIN);member=user(UserStatus.ACTIVE,UserRole.USER);inactive=user(UserStatus.SUSPENDED,UserRole.USER);em.flush();
     }
     @Test void permissionsUseCurrentDatabaseRoleForNewRoutes() throws Exception {

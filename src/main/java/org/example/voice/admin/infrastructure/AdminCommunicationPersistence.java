@@ -41,7 +41,9 @@ public class AdminCommunicationPersistence implements AdminCommunicationStore {
     }
     public void save(AdminPopup p) { em.persist(p); }
     public Optional<AdminPopup> popup(long id,boolean lock) {
-        return Optional.ofNullable(em.find(AdminPopup.class,id,lock?LockModeType.PESSIMISTIC_WRITE:LockModeType.NONE));
+        var popup=em.find(AdminPopup.class,id,lock?LockModeType.PESSIMISTIC_WRITE:LockModeType.NONE);
+        if(popup!=null&&lock)em.refresh(popup,LockModeType.PESSIMISTIC_WRITE);
+        return Optional.ofNullable(popup);
     }
     public Page<AdminPopup> popups(int page,int size) {
         return new Page<>(em.createQuery("select p from AdminPopup p order by p.id desc",AdminPopup.class)
