@@ -2210,3 +2210,8 @@ PATCH의 선택 `scriptText`(null/생략 허용, 제공 시 공백 불가·최�
 ## Video lip provisional scores (2026-11-07)
 
 The existing v3 analysis view accepts PROVISIONAL and optional subScores. No new endpoint or overall-score calculation is introduced. Capabilities expose actual MIME, size, duration and existing video consent requirements. See [contract](video-lip-provisional-consumer.md) and [frontend handoff](frontend-video-lip-consumer.md).
+
+
+## Administrator member roles
+
+`PATCH /api/admin/users/{userId}/role`: [full contract](admin-user-roles.md).

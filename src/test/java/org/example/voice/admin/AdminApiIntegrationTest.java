@@ -55,6 +55,8 @@ class AdminApiIntegrationTest {
     static final OffsetDateTime NOW=OffsetDateTime.now(ZoneOffset.UTC);
 
     @BeforeEach void fixture() {
+        // Hibernate's test schema omits JDBC-only tables; match the premium trial fixture.
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> em.createNativeQuery("CREATE TABLE IF NOT EXISTS user_premium_trials(user_id bigint primary key references users(id) on delete cascade, starts_at timestamp with time zone not null, expires_at timestamp with time zone not null)").executeUpdate());
         var localCaches=new java.util.concurrent.ConcurrentHashMap<String,org.springframework.cache.Cache>();
         when(caches.getCache(anyString())).thenAnswer(call -> localCaches.computeIfAbsent(call.getArgument(0),org.springframework.cache.concurrent.ConcurrentMapCache::new));
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {

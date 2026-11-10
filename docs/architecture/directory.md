@@ -253,3 +253,6 @@ docs
 ## Video lip consumer changes (2026-11-07)
 
 No new module: analysis/domain/model/CanonicalAnalysisView contains the lip models; analysis/infrastructure/canonical maintains media binding. Preparation stays in training/application and training/infrastructure/storage. LipProvisionalContractTest, LipMediaPostgresTest and LipAudiovisualAdmissionTest cover the consumer.
+
+
+`admin/controller/AdminUserRoleController` and `controller/dto/AdminUserRoleDto` map HTTP. `application/AdminUserRoleService` checks roles and writes audits atomically through `domain/port/AdminUserRoleStore` and `infrastructure/AdminUserRolePersistence`. The adapter locks actor and target in ID order and refreshes managed state. No AI or database schema changes.

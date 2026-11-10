@@ -51,7 +51,9 @@ public class AdminPersistence implements AdminStore {
     @Override public Page<ContentView> contents(ContentFilter f) {
         var p=new LinkedHashMap<String,Object>();
         String where=" where c.ownerId is null and c.deletedAt is null" + keyword(f.query(),p,"c.title")
-                + (f.excludeClassPractice()?" and c.contentType<>org.example.voice.practicecontent.domain.type.ContentType.CLASS_PRACTICE":"")
+                + (f.excludeClassPractice()?" and c.contentType<>org.example.voice.practicecontent.domain.type.ContentType.CLASS_PRACTICE"
+                    + " and not exists (select e.id from PracticeExample e where e.content.id=c.id"
+                    + " and e.set.stepId in (select s.id from CourseStep s))":"")
                 + eq(p,"type",f.type(),"c.contentType") + eq(p,"category",f.category(),"c.category")
                 + eq(p,"status",f.status(),"c.status") + eq(p,"difficulty",f.difficulty(),"c.difficulty");
         return page("PracticeContent","c",where,"c.createdAt desc,c.id desc",p,f.query(),PracticeContent.class,this::view);
