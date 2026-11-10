@@ -2220,3 +2220,7 @@ The existing v3 analysis view accepts PROVISIONAL and optional subScores. No new
 ## Popup image attachments
 
 POST and DELETE `/api/admin/popups/{popupId}/image`, and optional image metadata in popup reads: [full request, response, lifecycle and error contract](popup-images.md).
+
+## Administrator authorization boundary
+
+`/api/admin` and `/api/admin/**` require a verified ADMIN access credential at the common security boundary. Existing administrator-module current-role/session checks remain required. Response contracts stay 401 UNAUTHORIZED or 403 ACCESS_DENIED with no-store. `/api/users/me/popup` remains a normal authenticated-user route. [Details](../architecture/admin-access-boundary.md).
