@@ -106,6 +106,24 @@ class AdminCourseIntegrationTest {
         mvc.perform(get("/api/admin/contents").param("type","CLASS_PRACTICE").param("excludeClassPractice","true")
                 .header("Authorization","Bearer "+adminToken)).andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
     }
+    @Test void excludesLinkedSentencesRegardlessOfTypeButKeepsStandaloneSentences() throws Exception {
+        var course=create();
+        tx.executeWithoutResult(status->{
+            em.createQuery("update PracticeContent c set c.contentType=:type where c.id=:id")
+                    .setParameter("type",ContentType.SENTENCE).setParameter("id",course.sentences().getFirst().contentId()).executeUpdate();
+            em.persist(PracticeContent.draft(ContentType.SENTENCE,LearningFocus.PRONUNCIATION,"CONSONANT",Difficulty.BEGINNER,
+                    "독립 문장 "+actor,"설명","독립 원문",List.of(),10,OffsetDateTime.now()));
+        });
+        mvc.perform(get("/api/admin/contents").param("keyword","문장 1").param("type","SENTENCE")
+                .param("excludeClassPractice","true").header("Authorization","Bearer "+adminToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        mvc.perform(get("/api/admin/contents").param("keyword","문장 1").param("type","SENTENCE")
+                .header("Authorization","Bearer "+adminToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1));
+        mvc.perform(get("/api/admin/contents").param("keyword","독립 문장 "+actor).param("type","SENTENCE")
+                .param("excludeClassPractice","true").header("Authorization","Bearer "+adminToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1));
+    }
     @Test void concurrentEditsFromTheSameRevisionCommitOnlyOneReplacement() throws Exception {
         var initial=create();
         try(var workers=java.util.concurrent.Executors.newFixedThreadPool(2)) {

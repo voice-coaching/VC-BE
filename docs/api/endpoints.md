@@ -355,3 +355,6 @@ V65부터 공용 콘텐츠 전체 유형을 공개 상태와 관계없이 수정
 | PATCH | `/api/admin/courses/{id}` | 활성 ADMIN | 정보·문장 추가/수정/제외를 새 개정으로 저장 |
 
 `GET /api/admin/contents`의 선택 `excludeClassPractice` 필터를 포함한 [필드·오류·동시성·기존 학습 보존 계약](admin-course-sentences.md).
+
+
+| PATCH | `/api/admin/users/{userId}/role` | ADMIN | Change member role; [contract](admin-user-roles.md) |

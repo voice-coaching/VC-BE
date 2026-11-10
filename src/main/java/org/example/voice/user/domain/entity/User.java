@@ -91,6 +91,11 @@ public class User {
         this.updatedAt = now;
     }
 
+    public void changeRole(UserRole role, OffsetDateTime now) {
+        this.role = java.util.Objects.requireNonNull(role);
+        this.updatedAt = now;
+    }
+
     public boolean isSuspended() {
         return status == UserStatus.SUSPENDED;
     }

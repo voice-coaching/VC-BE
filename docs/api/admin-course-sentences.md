@@ -62,7 +62,7 @@
 
 ## 일반 콘텐츠 목록
 
-기존 `GET /api/admin/contents`에 선택 boolean `excludeClassPractice=false`를 추가한다. true이면 CLASS_PRACTICE를 **서버 페이징 전에** 제외한다. 다른 필터와 교집합으로 적용하며 totalElements/totalPages도 같은 조건을 사용한다. 기본 false이므로 기존 호출은 유지한다.
+기존 `GET /api/admin/contents`의 선택 boolean `excludeClassPractice=false`를 사용한다. true이면 CLASS_PRACTICE와 실제 PracticeExample → PracticeExampleSet.stepId → CourseStep 연결이 있는 다른 유형의 문장도 **서버 페이징 전에** 제외한다. 과거 개정의 문장도 제외하며 독립 문장은 유지한다. 제목이나 분류로 연결 관계를 추측하지 않는다. 다른 필터와 교집합으로 적용하며 totalElements/totalPages도 같은 조건을 사용한다. 기본 false이므로 기존 호출은 유지한다.
 
 프론트 `/admin/contents`는 위 클래스 목록을 상단에 표시하고 일반 목록은 `excludeClassPractice=true`로 조회한다. `/admin/courses/{id}` 안에서 클래스와 연결 문장을 함께 편집한다.
 
