@@ -17,6 +17,7 @@ public class AdminPopup {
     @Column(nullable=false) private boolean enabled;
     private Long createdBy;
     @Column(nullable=false) private OffsetDateTime createdAt;
+    private java.util.UUID imageRevision;
     public static AdminPopup create(long actor,OffsetDateTime now) {
         var p=new AdminPopup();p.createdBy=actor;p.createdAt=now;return p;
     }
@@ -24,4 +25,5 @@ public class AdminPopup {
         this.title=title;this.body=body;this.deepLink=link;this.priority=priority;
         this.startsAt=start;this.endsAt=start.plusDays(days);this.enabled=enabled;
     }
+    public void imageChanged() { imageRevision=java.util.UUID.randomUUID(); }
 }

@@ -358,3 +358,9 @@ V65부터 공용 콘텐츠 전체 유형을 공개 상태와 관계없이 수정
 
 
 | PATCH | `/api/admin/users/{userId}/role` | ADMIN | Change member role; [contract](admin-user-roles.md) |
+
+
+| POST | `/api/admin/popups/{popupId}/image` | ADMIN | Upload or replace a popup image |
+| DELETE | `/api/admin/popups/{popupId}/image` | ADMIN | Detach a popup image |
+
+[Popup image contract](popup-images.md).

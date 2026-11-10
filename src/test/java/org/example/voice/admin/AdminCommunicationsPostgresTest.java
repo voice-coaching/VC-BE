@@ -32,7 +32,7 @@ class AdminCommunicationsPostgresTest {
             var db=new DriverManagerDataSource(url+(url.contains("?")?"&":"?")+"currentSchema="+schema,user,password);
             var jdbc=new JdbcTemplate(db);
             long before=jdbc.queryForObject("select count(*) from users",Long.class);
-            flyway=Flyway.configure().dataSource(url,user,password).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").target("64").load();
+            flyway=Flyway.configure().dataSource(url,user,password).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").target("72").load();
             flyway.migrate();flyway.validate();
             assertThat(jdbc.queryForObject("select count(*) from users",Long.class)).isEqualTo(before);
             factory.setDataSource(db);
@@ -48,7 +48,7 @@ class AdminCommunicationsPostgresTest {
             var tx=new TransactionTemplate(new JpaTransactionManager(emf));
             var admin=new AdminPersistence(em);var comm=new AdminCommunicationPersistence(em);var members=new AdminMemberPersistence(em);
             var clock=Clock.fixed(Instant.parse("2026-11-01T00:00:00Z"),ZoneOffset.UTC);
-            var service=new AdminCommunicationService(new AdminAccessService(admin),comm,admin,clock);
+            var service=new AdminCommunicationService(new AdminAccessService(admin),comm,admin,clock,org.mockito.Mockito.mock(org.example.voice.admin.application.PopupImageReader.class));
             long actor=account(jdbc,"ADMIN"),target=account(jdbc,"USER"),other=account(jdbc,"USER");
             var c=tx.execute(s->service.create(actor,new CampaignDraft(AdminAudience.SELECTED_USERS,AdminNotificationKind.PLAN,"요금제 안내","서비스 안내","/mypage",List.of(target)),"등록"));
             // A later failure must roll back inbox rows, campaign state and success audit together.
@@ -116,6 +116,12 @@ class AdminCommunicationsPostgresTest {
             jdbc.update("update users set deleted_at=null where id=?",target);
             var start=OffsetDateTime.now(clock);
             var popup=tx.execute(s->service.createPopup(actor,new PopupDraft("기간 안내","내용",null,10,start,2,true),"등록"));
+            var firstImage=UUID.randomUUID();var secondImage=UUID.randomUUID();
+            jdbc.update("insert into admin_popup_images(id,popup_id,object_key,state,created_at) values(?,?,?,'ATTACHED',now())",firstImage,popup.id(),"popup-images/"+firstImage+".png");
+            assertThatThrownBy(()->jdbc.update("insert into admin_popup_images(id,popup_id,object_key,state,created_at) values(?,?,?,'ATTACHED',now())",secondImage,popup.id(),"popup-images/"+secondImage+".png"))
+                    .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+            jdbc.update("update admin_popup_images set state='RETIRED' where id=?",firstImage);
+            jdbc.update("insert into admin_popup_images(id,popup_id,object_key,state,created_at) values(?,?,?,'ATTACHED',now())",secondImage,popup.id(),"popup-images/"+secondImage+".png");
             tx.executeWithoutResult(s->{
                 assertThat(comm.activePopup(target,start)).isPresent();
                 assertThat(comm.activePopup(target,start.minusNanos(1000))).isEmpty();

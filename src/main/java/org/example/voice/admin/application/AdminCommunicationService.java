@@ -18,6 +18,7 @@ public class AdminCommunicationService {
     private final AdminCommunicationStore communications;
     private final AdminStore store;
     private final Clock clock;
+    private final PopupImageReader popupImages;
     public Page<CampaignView> campaigns(long actor,int page,int size) {
         access.require(actor);AdminValidation.page(page,size);var p=communications.campaigns(page,size);
         return new Page<>(p.items().stream().map(this::view).toList(),page,size,p.totalElements());
@@ -86,7 +87,7 @@ public class AdminCommunicationService {
                 sent?c.getSentCount():communications.activeRecipients(c.getUserIds(),c.getAudience()==AdminAudience.ALL_ACTIVE),
                 c.getSentCount(),c.getCreatedAt(),c.getSentAt());
     }
-    private PopupView view(AdminPopup p) { return new PopupView(p.getId(),p.getVersion(),p.getTitle(),p.getBody(),p.getDeepLink(),p.getPriority(),p.getStartsAt(),p.getEndsAt(),p.isEnabled(),p.getCreatedAt()); }
+    private PopupView view(AdminPopup p) { return new PopupView(p.getId(),p.getVersion(),p.getTitle(),p.getBody(),p.getDeepLink(),p.getPriority(),p.getStartsAt(),p.getEndsAt(),p.isEnabled(),p.getCreatedAt(),popupImages.image(p.getId(),p.getEndsAt())); }
     private void validate(PopupDraft d,String reason) {
         reason(reason);if(d==null)AdminValidation.invalid();message(d.title(),d.body(),d.deepLink(),false);
         if(d.startsAt()==null||d.startsAt().getYear()<2000||d.startsAt().getYear()>2200||d.durationDays()<1||d.durationDays()>365||d.priority()<0||d.priority()>100)AdminValidation.invalid();

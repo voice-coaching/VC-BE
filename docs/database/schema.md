@@ -2207,3 +2207,19 @@ PostgreSQL 18의 `pg_restore --schema-only --no-owner --no-privileges --file=<�
 ## Video lip consumer integrity (2026-11-07)
 
 No migration, table or column is added. Existing V41/V42 media preparation and execution snapshots, and V43 result storage are reused. Preparation receipts cannot be overwritten; file hashes and execution identities are checked on request and result. Optional lip subscores remain inside result JSON. See [contract](../api/video-lip-provisional-consumer.md).
+# 팝업 이미지 확장 (V72)
+
+`admin_popups.image_revision UUID NULL`: 첨부 변경 때 갱신하는 내부 표식. 기존 JPA version 증가를 유발하며, 기존 팝업은 null을 유지한다.
+
+`admin_popup_images`는 admin 모듈이 소유한 S3 파일 생명주기 테이블이다.
+
+| 열 | 타입 | 필수/기본값 | 역할 |
+| --- | --- | --- | --- |
+| id | UUID | 필수, PK, 서버 생성 | 첨부 식별자 |
+| popup_id | BIGINT | 필수 | admin_popups.id FK, 다대일, 팝업 삭제 기본 RESTRICT |
+| object_key | VARCHAR(255) | 필수, UNIQUE | popup-images/{UUID}.png. 원본명/URL 미보관 |
+| state | VARCHAR(16) | 필수 | PENDING/ATTACHED/RETIRED/DELETED CHECK |
+| created_at | TIMESTAMPTZ | 필수 | 예약 생성 시각, 고아 업로드 정리 기준 |
+| deleted_at | TIMESTAMPTZ | nullable | S3 삭제 성공 시각 |
+
+popup_id의 ATTACHED 행에 부분 UNIQUE 인덱스가 있어 팝업당 첨부 하나만 허용한다. state/created_at 인덱스를 정리에 사용한다. DELETED 행은 삭제 영수증으로 유지하며 파일 삭제 성공 후에만 전이한다. 팝업 만료는 팝업의 ends_at을 조회해 판단하므로 별도의 만료 복사값을 갱신할 필요가 없다. [API·동시성·배포](../api/popup-images.md).

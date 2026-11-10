@@ -9,5 +9,10 @@ public final class AdminCommunicationData {
             String deepLink,List<Long> userIds,String status,long audienceCount,long sentCount,OffsetDateTime createdAt,OffsetDateTime sentAt) {}
     public record PopupDraft(String title,String body,String deepLink,int priority,OffsetDateTime startsAt,int durationDays,boolean enabled) {}
     public record PopupView(long id,long version,String title,String body,String deepLink,int priority,
-            OffsetDateTime startsAt,OffsetDateTime endsAt,boolean enabled,OffsetDateTime createdAt) {}
+            OffsetDateTime startsAt,OffsetDateTime endsAt,boolean enabled,OffsetDateTime createdAt,PopupImageView image) {
+        public PopupView(long id,long version,String title,String body,String deepLink,int priority,OffsetDateTime start,OffsetDateTime end,boolean enabled,OffsetDateTime created) {
+            this(id,version,title,body,deepLink,priority,start,end,enabled,created,null);
+        }
+    }
+    public record PopupImageView(java.util.UUID id,String url,OffsetDateTime expiresAt) {}
 }

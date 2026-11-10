@@ -256,3 +256,8 @@ No new module: analysis/domain/model/CanonicalAnalysisView contains the lip mode
 
 
 `admin/controller/AdminUserRoleController` and `controller/dto/AdminUserRoleDto` map HTTP. `application/AdminUserRoleService` checks roles and writes audits atomically through `domain/port/AdminUserRoleStore` and `infrastructure/AdminUserRolePersistence`. The adapter locks actor and target in ID order and refreshes managed state. No AI or database schema changes.
+
+
+## Popup images
+
+`admin/controller/PopupImageController` and controller DTO parse multipart/JSON. `application/PopupImageService` orchestrates the processor and S3 adapter. `PopupImageTransactions` reserves durable cleanup records, serializes attachment/expiration with popup locks and writes audits. `PopupImageReader` produces short-lived signed views. `domain/entity/AdminPopupImage`, `domain/type/PopupImageState` and the PopupImage ports define lifecycle boundaries. `infrastructure/PopupImageCleanup` uses a dedicated scheduler, while PopupImagePersistence/Decoder/S3PopupImageStorage isolate JPA, image decoding and S3. [Contract and operations](../api/popup-images.md).
