@@ -40,6 +40,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/admin", "/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, UserAuthenticationRoutes.PUBLIC_GET.toArray(String[]::new)).permitAll()
                         .requestMatchers(HttpMethod.POST, UserAuthenticationRoutes.PUBLIC_POST.toArray(String[]::new)).permitAll()
                         .requestMatchers(UserAuthenticationRoutes.INTERNAL_AI).permitAll()
